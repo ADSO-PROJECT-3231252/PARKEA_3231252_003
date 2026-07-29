@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+@theme {
+    --color-parkea-green: #42A362;
+    --color-parkea-red: #C62828;
+    --color-parkea-gray: #555555;
+    --color-parkea-bg: #F8F4F4;
+}
