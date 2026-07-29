@@ -20,3 +20,15 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
+
+-- 3. Table: vehicles
+-- Relation: users (1) - (N) vehicles
+CREATE TABLE vehicles (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id VARCHAR(36) NOT NULL,
+    plate VARCHAR(20) NOT NULL UNIQUE,
+    brand VARCHAR(50),
+    model VARCHAR(50),
+    color VARCHAR(30),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
