@@ -55,3 +55,15 @@ CREATE TABLE reservations (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 );
+
+
+-- 6. Table: payments
+-- Relation: reservations (1) - (1) payments (enforced with UNIQUE on reservation_id)
+CREATE TABLE payments (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    reservation_id VARCHAR(36) NOT NULL UNIQUE,
+    amount DECIMAL(10,2) NOT NULL CHECK (amount >= 0),
+    payment_status ENUM('Pending', 'Paid', 'Cancelled') NOT NULL DEFAULT 'Pending',
+    payment_method VARCHAR(50),
+    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE
+);
