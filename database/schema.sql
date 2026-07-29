@@ -43,3 +43,15 @@ CREATE TABLE zones (
     hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate >= 0)
 );
 
+-- 5. Table: reservations
+-- Relations: zones (1) - (N) reservations | users (1) - (N) reservations
+CREATE TABLE reservations (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id VARCHAR(36) NOT NULL,
+    zone_id VARCHAR(36) NOT NULL,
+    start_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    end_time DATETIME,
+    status ENUM('Active', 'Finished', 'Cancelled') NOT NULL DEFAULT 'Active',
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+);
