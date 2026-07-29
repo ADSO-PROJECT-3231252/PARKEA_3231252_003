@@ -32,3 +32,14 @@ CREATE TABLE vehicles (
     color VARCHAR(30),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
+
+-- 4. Table: zones
+CREATE TABLE zones (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    name VARCHAR(100) NOT NULL,
+    address VARCHAR(255),
+    total_slots INT NOT NULL DEFAULT 0,
+    available_slots INT NOT NULL CHECK (available_slots >= 0),
+    hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate >= 0)
+);
+
