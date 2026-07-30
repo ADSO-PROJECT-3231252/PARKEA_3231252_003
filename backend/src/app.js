@@ -17,10 +17,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rutas de autenticación
-const authroutes = require('./routes/authroutes');
-app.use('/auth', authroutes);
-
 // Health check route, useful to confirm the server is running
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'PARKEA API' });
@@ -39,5 +35,4 @@ app.use((err, req, res, next) => {
     });
 });
 
-console.log("Auth routes cargadas");
 module.exports = app;
