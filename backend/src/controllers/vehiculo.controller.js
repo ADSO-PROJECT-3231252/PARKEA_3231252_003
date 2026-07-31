@@ -10,7 +10,7 @@ async function registrar(req, res, next) {
         }
 
         const { plate, brand, model, color } = req.body;
-        const userId = req.usuario.id; 
+        const userId = req.usuario.id;
 
         const existente = await Vehiculo.findOne({ where: { plate } });
         if (existente) {
@@ -28,4 +28,59 @@ async function registrar(req, res, next) {
     }
 }
 
-module.exports = { registrar };
+// HU-11: View My Registered Vehicles
+async function misVehiculos(req, res, next) {
+    try {
+        const userId = req.usuario.id;
+
+        const vehiculos = await Vehiculo.findAll({ where: { userId } });
+
+        return res.status(200).json({ vehicles: vehiculos });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// HU-12: Edit Vehicle Information
+async function editar(req, res, next) {
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+
+        const vehiculo = await Vehiculo.findOne({ where: { id, userId } });
+        if (!vehiculo) {
+            return res.status(404).json({ message: 'Vehicle not found' });
+        }
+
+        const { brand, model, color } = req.body;
+        await vehiculo.update({ brand, model, color });
+
+        return res.status(200).json({
+            message: 'Vehicle updated successfully',
+            vehicle: vehiculo,
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// HU-13: Delete a Vehicle
+async function eliminar(req, res, next) {
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+
+        const vehiculo = await Vehiculo.findOne({ where: { id, userId } });
+        if (!vehiculo) {
+            return res.status(404).json({ message: 'Vehicle not found' });
+        }
+
+        await vehiculo.destroy();
+
+        return res.status(200).json({ message: 'Vehicle deleted successfully' });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { registrar, misVehiculos, editar, eliminar };
