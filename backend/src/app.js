@@ -22,6 +22,9 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'PARKEA API' });
 });
 
+// Mount all API routes under /api
+app.use('/api', require('./routes'));
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });
