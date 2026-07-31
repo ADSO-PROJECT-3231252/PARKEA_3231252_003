@@ -1,9 +1,17 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
+import { login } from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
     const [form, setForm] = useState({ email: '', password: '' });
     const [errors, setErrors] = useState({});
+    const [serverError, setServerError] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const { loginUser } = useAuth();
+    const navigate = useNavigate();
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -27,12 +35,22 @@ export default function Login() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setServerError('');
         if (!validate()) return;
 
-        // HU-05: aquí conectamos con authService.login(form) en el siguiente paso
-        console.log('Formulario válido, listo para conectar con el backend:', form);
+        setLoading(true);
+        try {
+            const { data } = await login(form);
+            loginUser(data.token, data.user);
+            navigate('/dashboard');
+        } catch (err) {
+            const message = err.response?.data?.message || 'No se pudo iniciar sesión. Intenta de nuevo.';
+            setServerError(message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -45,6 +63,12 @@ export default function Login() {
                 <h1 className="text-2xl font-bold text-parkea-gray text-center">
                     Iniciar sesión
                 </h1>
+
+                {serverError && (
+                    <p role="alert" className="text-sm text-parkea-red text-center">
+                        {serverError}
+                    </p>
+                )}
 
                 <div>
                     <label htmlFor="email" className="block text-sm font-medium text-parkea-gray mb-1">
@@ -94,9 +118,10 @@ export default function Login() {
 
                 <button
                     type="submit"
-                    className="w-full rounded-md bg-parkea-green text-white font-semibold py-2 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-green transition"
+                    disabled={loading}
+                    className="w-full rounded-md bg-parkea-green text-white font-semibold py-2 hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-green transition disabled:opacity-60"
                 >
-                    Iniciar sesión
+                    {loading ? 'Ingresando...' : 'Iniciar sesión'}
                 </button>
             </form>
         </div>
