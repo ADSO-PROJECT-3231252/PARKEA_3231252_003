@@ -4,8 +4,7 @@ const { Model } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
   class Zona extends Model {
     static associate(models) {
-      // Se completa cuando exista el modelo Reserva
-      // Zona.hasMany(models.Reserva, { foreignKey: 'zoneId', as: 'reservations' });
+      Zona.hasMany(models.Reserva, { foreignKey: 'zoneId', as: 'reservations' });
     }
   }
   Zona.init({
