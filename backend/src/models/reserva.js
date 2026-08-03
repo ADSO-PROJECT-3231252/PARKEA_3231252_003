@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
       Reserva.belongsTo(models.Usuario, { foreignKey: 'userId', as: 'user' });
       Reserva.belongsTo(models.Zona, { foreignKey: 'zoneId', as: 'zone' });
       Reserva.belongsTo(models.Vehiculo, { foreignKey: 'vehicleId', as: 'vehicle' });
+      Reserva.hasOne(models.Pago, { foreignKey: 'reservationId', as: 'payment' });
     }
   }
   Reserva.init({
@@ -46,9 +47,20 @@ module.exports = (sequelize, DataTypes) => {
       field: 'spot_number',
     },
     status: {
-      type: DataTypes.ENUM('Pending', 'Active', 'Finished', 'Cancelled'),
+      type: DataTypes.ENUM('Pending', 'Active', 'Finished', 'Cancelled', 'Expired'),
       allowNull: false,
       defaultValue: 'Pending',
+    },
+    holdExpiresAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'hold_expires_at',
+    },
+    appliedHourlyRate: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0,
+      field: 'applied_hourly_rate',
     },
   }, {
     sequelize,
