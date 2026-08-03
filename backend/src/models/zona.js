@@ -39,6 +39,20 @@ module.exports = (sequelize, DataTypes) => {
       field: 'hourly_rate',
       validate: { min: 0 },
     },
+    latitude: {
+      type: DataTypes.DECIMAL(10, 7),
+      allowNull: true,
+    },
+    longitude: {
+      type: DataTypes.DECIMAL(10, 7),
+      allowNull: true,
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'is_active',
+    },
   }, {
     sequelize,
     modelName: 'Zona',
