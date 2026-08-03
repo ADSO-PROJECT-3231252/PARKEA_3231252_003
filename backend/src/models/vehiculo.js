@@ -19,6 +19,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       unique: true,
     },
+    vehicleType: {
+      type: DataTypes.ENUM('car', 'motorcycle', 'truck'),
+      allowNull: false,
+      defaultValue: 'car',
+      field: 'vehicle_type',
+    },
     brand: {
       type: DataTypes.STRING(50),
       allowNull: true,
@@ -31,6 +37,17 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(30),
       allowNull: true,
     },
+    visualDescription: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'visual_description',
+    },
+    isDefault: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'is_default',
+    },
     userId: {
       type: DataTypes.UUID,
       allowNull: false,
@@ -40,7 +57,11 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'Vehiculo',
     tableName: 'vehicles',
-    timestamps: false,
+    timestamps: true,
+    createdAt: false,
+    updatedAt: false,
+    deletedAt: 'deleted_at',
+    paranoid: true,
   });
   return Vehiculo;
 };
