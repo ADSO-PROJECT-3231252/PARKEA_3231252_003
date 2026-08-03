@@ -34,6 +34,29 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(20),
       allowNull: true,
     },
+    documentType: {
+      type: DataTypes.ENUM('CC', 'TI', 'CE', 'PASSPORT'),
+      allowNull: true,
+      field: 'document_type',
+    },
+    documentNumber: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true,
+      field: 'document_number',
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'is_active',
+    },
+    isPrimaryAdmin: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'is_primary_admin',
+    },
     roleId: {
       type: DataTypes.UUID,
       allowNull: false,
