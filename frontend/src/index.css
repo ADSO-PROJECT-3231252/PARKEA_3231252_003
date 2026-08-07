@@ -1,8 +1,97 @@
 @import "tailwindcss";
 
 @theme {
-    --color-parkea-green: #42A362;
-    --color-parkea-red: #C62828;
-    --color-parkea-gray: #555555;
-    --color-parkea-bg: #F8F4F4;
+    /* Verde primario — el 600 es el tono por defecto para botones/links/texto */
+    --color-parkea-50: #ECF7F1;
+    --color-parkea-100: #D0EADD;
+    --color-parkea-200: #A5D6BF;
+    --color-parkea-300: #6FBD9B;
+    --color-parkea-400: #3F9E75;
+    --color-parkea-500: #2A8560;
+    --color-parkea-600: #1F6B4D;
+    --color-parkea-700: #17503A;
+    --color-parkea-800: #103728;
+    --color-parkea-900: #0A2318;
+
+    /* Semánticos — tono sólido + fondo suave */
+    --color-warning: #8A5A0E;
+    --color-warning-soft: #FDF3E2;
+    --color-danger: #B3261E;
+    --color-danger-soft: #FBEBEA;
+    --color-info: #1B5FA8;
+    --color-info-soft: #EAF1FA;
+
+    /* Neutros */
+    --color-neutral-50: #F6F8F7;
+    --color-neutral-100: #EDEFEE;
+    --color-neutral-200: #DCE0DE;
+    --color-neutral-300: #BFC5C2;
+    --color-neutral-400: #949B98;
+    --color-neutral-500: #6E7572;
+    --color-neutral-600: #545B58;
+    --color-neutral-700: #3D4441;
+    --color-neutral-800: #272C2A;
+    --color-neutral-900: #161A18;
+
+    /* Familias tipográficas */
+    --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --font-sans: "Barlow", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+    /* Escala tipográfica */
+    --text-display: 2.125rem;
+    /* 34px */
+    --text-display--line-height: 1.15;
+    --text-display--font-weight: 600;
+
+    --text-title: 1.5rem;
+    /* 24px */
+    --text-title--line-height: 1.2;
+    --text-title--font-weight: 600;
+
+    --text-subtitle: 1.125rem;
+    /* 18px */
+    --text-subtitle--line-height: 1.3;
+    --text-subtitle--font-weight: 600;
+
+    --text-body: 0.9375rem;
+    /* 15px */
+    --text-body--line-height: 1.6;
+
+    --text-label: 0.84375rem;
+    /* 13.5px */
+    --text-label--line-height: 1.4;
+    --text-label--font-weight: 500;
+
+    --text-caption: 0.78125rem;
+    /* 12.5px */
+    --text-caption--line-height: 1.4;
+
+    /* Radios */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 12px;
+}
+
+@layer base {
+    body {
+        background-color: var(--color-neutral-50);
+        color: var(--color-neutral-900);
+        font-family: var(--font-sans);
+        font-size: var(--text-body);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+        }
+    }
 }
