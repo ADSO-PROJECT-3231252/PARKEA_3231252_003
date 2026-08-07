@@ -46,6 +46,8 @@ async function crear(req, res, next) {
 
         const spotNumber = zona.totalSlots - zona.availableSlots + 1;
 
+        const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos desde ahora
+
         const reserva = await Reserva.create({
             userId,
             zoneId,
@@ -54,6 +56,7 @@ async function crear(req, res, next) {
             startTime: start,
             endTime: end,
             status: 'Pending',
+            holdExpiresAt,
         }, { transaction: t });
 
         await zona.decrement('availableSlots', { by: 1, transaction: t });
