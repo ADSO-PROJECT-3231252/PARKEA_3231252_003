@@ -57,6 +57,7 @@ async function crear(req, res, next) {
             endTime: end,
             status: 'Pending',
             holdExpiresAt,
+            appliedHourlyRate: zona.hourlyRate,
         }, { transaction: t });
 
         await zona.decrement('availableSlots', { by: 1, transaction: t });
