@@ -1,5 +1,6 @@
 const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
 const { sequelize } = require('../models');
+const ErrorCodes = require('../constants/errorCodes');
 
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
@@ -10,7 +11,7 @@ async function crear(req, res, next) {
 
         if (!zoneId || !vehicleId || !startTime || !endTime) {
             await t.rollback();
-            return res.status(400).json({ message: 'zoneId, vehicleId, startTime, and endTime are required' });
+            return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'zoneId, vehicleId, startTime, and endTime are required' });
         }
 
         const start = new Date(startTime);
@@ -19,24 +20,24 @@ async function crear(req, res, next) {
 
         if (start <= now) {
             await t.rollback();
-            return res.status(400).json({ message: 'The start time must be in the future' });
+            return res.status(400).json({ code: ErrorCodes.START_TIME_IN_PAST, message: 'The start time must be in the future' });
         }
         if (end <= start) {
             await t.rollback();
-            return res.status(400).json({ message: 'The end time must be after the start time' });
+            return res.status(400).json({ code: ErrorCodes.END_BEFORE_START, message: 'The end time must be after the start time' });
         }
 
         // Confirm the vehicle belongs to this user
         const vehiculo = await Vehiculo.findOne({ where: { id: vehicleId, userId }, transaction: t });
         if (!vehiculo) {
             await t.rollback();
-            return res.status(404).json({ message: 'Vehicle not found' });
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
         const zona = await Zona.findByPk(zoneId, { transaction: t });
         if (!zona) {
             await t.rollback();
-            return res.status(404).json({ message: 'Zone not found' });
+            return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
         }
 
         // Lock and claim one available physical spot, skipping locked rows so two
@@ -51,10 +52,10 @@ async function crear(req, res, next) {
 
         if (!cupo) {
             await t.rollback();
-            return res.status(409).json({ message: 'This spot is no longer available. Please select another zone or time.' });
+            return res.status(409).json({ code: ErrorCodes.NO_SPOTS_AVAILABLE, message: 'This spot is no longer available. Please select another zone or time.' });
         }
 
-        const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos desde ahora
+        const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
 
         const reserva = await Reserva.create({
             userId,
@@ -103,7 +104,7 @@ async function obtenerConfirmacion(req, res, next) {
         });
 
         if (!reserva) {
-            return res.status(404).json({ message: 'Reservation not found' });
+            return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
         }
 
         const durationMs = new Date(reserva.endTime) - new Date(reserva.startTime);
@@ -158,17 +159,17 @@ async function cancelar(req, res, next) {
         });
         if (!reserva) {
             await t.rollback();
-            return res.status(404).json({ message: 'Reservation not found' });
+            return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
         }
         const now = new Date();
         const yaEmpezo = new Date(reserva.startTime) <= now;
         if (yaEmpezo) {
             await t.rollback();
-            return res.status(409).json({ message: 'This reservation has already started and cannot be cancelled' });
+            return res.status(409).json({ code: ErrorCodes.RESERVATION_ALREADY_STARTED, message: 'This reservation has already started and cannot be cancelled' });
         }
         if (reserva.status !== 'Pending' && reserva.status !== 'Active') {
             await t.rollback();
-            return res.status(409).json({ message: `A reservation with status "${reserva.status}" cannot be cancelled` });
+            return res.status(409).json({ code: ErrorCodes.RESERVATION_NOT_CANCELLABLE, message: `A reservation with status "${reserva.status}" cannot be cancelled` });
         }
 
         // Release the physical spot, not just the zone counter
