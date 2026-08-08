@@ -11,10 +11,23 @@ const validateRegister = [
         .isEmail().withMessage('Invalid email'),
     body('password')
         .notEmpty().withMessage('Password is required')
-        .isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+        .matches(/[A-Z]/).withMessage('Password must include an uppercase letter')
+        .matches(/[0-9]/).withMessage('Password must include a number')
+        .matches(/[^A-Za-z0-9]/).withMessage('Password must include a special character'),
+    body('confirmPassword')
+        .custom((value, { req }) => value === req.body.password)
+        .withMessage('Passwords do not match'),
     body('phone')
         .optional()
-        .isLength({ max: 20 }).withMessage('Phone must be at most 20 characters'),
+        .matches(/^[0-9]{7,15}$/).withMessage('Phone must contain only digits (7-15 characters)'),
+    body('documentType')
+        .notEmpty().withMessage('Document type is required')
+        .isIn(['CC', 'TI', 'CE', 'PASSPORT']).withMessage('Invalid document type'),
+    body('documentNumber')
+        .trim()
+        .notEmpty().withMessage('Document number is required')
+        .isAlphanumeric().withMessage('Document number must contain only letters and numbers'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
@@ -23,7 +36,6 @@ const validateRegister = [
         next();
     },
 ];
-
 const validateLogin = [
     body('email').isEmail().withMessage('Invalid email'),
     body('password').notEmpty().withMessage('Password is required'),
