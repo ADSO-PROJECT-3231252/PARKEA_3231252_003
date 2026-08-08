@@ -1,4 +1,5 @@
 const { Zona, Reserva, ParkingSpot } = require('../models');
+const ErrorCodes = require('../constants/errorCodes');
 
 // GET /api/zones — public, list only active zones
 async function getZonas(req, res, next) {
@@ -16,15 +17,15 @@ async function createZona(req, res, next) {
     const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
 
     if (!name || totalSlots == null || hourlyRate == null) {
-      return res.status(400).json({ message: 'name, totalSlots, and hourlyRate are required' });
+      return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, totalSlots, and hourlyRate are required' });
     }
     if (totalSlots < 0 || hourlyRate < 0) {
-      return res.status(400).json({ message: 'totalSlots and hourlyRate cannot be negative' });
+      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'totalSlots and hourlyRate cannot be negative' });
     }
 
     const existente = await Zona.findOne({ where: { name } });
     if (existente) {
-      return res.status(409).json({ message: 'A zone with this name already exists' });
+      return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
     }
 
     const zona = await Zona.create({
@@ -57,16 +58,16 @@ async function updateZona(req, res, next) {
     const { id } = req.params;
     const zona = await Zona.findByPk(id);
     if (!zona) {
-      return res.status(404).json({ message: 'Zone not found' });
+      return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
 
     const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
 
     if (totalSlots != null && totalSlots < 0) {
-      return res.status(400).json({ message: 'totalSlots cannot be negative' });
+      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'totalSlots cannot be negative' });
     }
     if (hourlyRate != null && hourlyRate < 0) {
-      return res.status(400).json({ message: 'hourlyRate cannot be negative' });
+      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' });
     }
 
     const updates = { name, address, latitude, longitude, hourlyRate };
@@ -77,6 +78,7 @@ async function updateZona(req, res, next) {
       });
       if (totalSlots < ocupados) {
         return res.status(400).json({
+          code: ErrorCodes.CAPACITY_BELOW_IN_USE,
           message: `Cannot reduce capacity below ${ocupados} spots currently in use`,
         });
       }
@@ -106,6 +108,7 @@ async function updateZona(req, res, next) {
 
         if (candidatos.length < delta) {
           return res.status(400).json({
+            code: ErrorCodes.INSUFFICIENT_AVAILABLE_SPOTS,
             message: 'Cannot reduce capacity: some of the highest-numbered spots are currently occupied',
           });
         }
@@ -138,7 +141,7 @@ async function toggleZona(req, res, next) {
     const { id } = req.params;
     const zona = await Zona.findByPk(id);
     if (!zona) {
-      return res.status(404).json({ message: 'Zone not found' });
+      return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
 
     await zona.update({ isActive: !zona.isActive });
