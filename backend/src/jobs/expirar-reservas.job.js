@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { sequelize, Reserva, Zona } = require('../models');
+const { sequelize, Reserva, Zona, ParkingSpot } = require('../models');
 
 const INTERVALO_MS = 60 * 1000; // corre cada minuto
 
@@ -26,6 +26,17 @@ async function expirarReservasVencidas() {
             if (!reservaActual) {
                 await t.rollback();
                 continue;
+            }
+
+            // Release the physical spot, not just the zone counter
+            if (reservaActual.parkingSpotId) {
+                const cupo = await ParkingSpot.findByPk(reservaActual.parkingSpotId, {
+                    transaction: t,
+                    lock: t.LOCK.UPDATE,
+                });
+                if (cupo && cupo.status === 'Occupied') {
+                    await cupo.update({ status: 'Available' }, { transaction: t });
+                }
             }
 
             await reservaActual.update({ status: 'Expired' }, { transaction: t });
