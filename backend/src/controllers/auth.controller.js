@@ -6,13 +6,19 @@ const { Usuario, Rol } = require('../models');
 const SALT_ROUNDS = 10;
 
 // HU-01: User Registration
+
 async function register(req, res) {
     try {
-        const { fullName, email, password, phone } = req.body;
+        const { fullName, email, password, phone, documentType, documentNumber } = req.body;
 
-        const existingUser = await Usuario.findOne({ where: { email } });
-        if (existingUser) {
+        const existingEmail = await Usuario.findOne({ where: { email } });
+        if (existingEmail) {
             return res.status(409).json({ message: 'This email is already registered' });
+        }
+
+        const existingDocument = await Usuario.findOne({ where: { documentNumber } });
+        if (existingDocument) {
+            return res.status(409).json({ message: 'This document number is already registered' });
         }
 
         const defaultRole = await Rol.findOne({ where: { name: 'user' } });
@@ -27,12 +33,14 @@ async function register(req, res) {
             email,
             password: passwordHash,
             phone,
+            documentType,
+            documentNumber,
             roleId: defaultRole.id,
         });
 
         return res.status(201).json({
-            message: 'User registered successfully',
-            user: { id: usuario.id, fullName: usuario.fullName, email: usuario.email, phone: usuario.phone },
+            message: 'Registration complete. Please sign in.',
+            user: { id: usuario.id, fullName: usuario.fullName, email: usuario.email },
         });
     } catch (error) {
         console.error(error);
