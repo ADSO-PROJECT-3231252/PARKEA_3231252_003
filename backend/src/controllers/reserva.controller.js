@@ -1,4 +1,4 @@
-const { Reserva, Zona, Vehiculo } = require('../models');
+const { Reserva, Zona, Vehiculo, Pago } = require('../models');
 const { sequelize } = require('../models');
 
 // HU-14: Reserve a Spot
@@ -135,4 +135,44 @@ async function obtenerConfirmacion(req, res, next) {
     }
 }
 
-module.exports = { crear, obtenerConfirmacion };
+// HU-16: Cancel a Reservation
+async function cancelar(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+        const reserva = await Reserva.findOne({
+            where: { id, userId },
+            include: [{ model: Pago, as: 'payment' }],
+            transaction: t,
+        });
+        if (!reserva) {
+            await t.rollback();
+            return res.status(404).json({ message: 'Reservation not found' });
+        }
+        const now = new Date();
+        const yaEmpezo = new Date(reserva.startTime) <= now;
+        if (reserva.status === 'Active' && yaEmpezo) {
+            await t.rollback();
+            return res.status(409).json({ message: 'This reservation has already started and cannot be cancelled' });
+        }
+        if (reserva.status !== 'Pending' && reserva.status !== 'Active') {
+            await t.rollback();
+            return res.status(409).json({ message: `A reservation with status "${reserva.status}" cannot be cancelled` });
+        }
+        // Lock the zone row before releasing the slot
+        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+        await zona.increment('availableSlots', { by: 1, transaction: t });
+        await reserva.update({ status: 'Cancelled' }, { transaction: t });
+        if (reserva.payment && reserva.payment.paymentStatus === 'Paid') {
+            await reserva.payment.update({ paymentStatus: 'Refunded' }, { transaction: t });
+        }
+        await t.commit();
+        return res.status(200).json({ message: 'Reservation cancelled successfully' });
+    } catch (error) {
+        await t.rollback();
+        next(error);
+    }
+}
+
+module.exports = { crear, obtenerConfirmacion, cancelar };
