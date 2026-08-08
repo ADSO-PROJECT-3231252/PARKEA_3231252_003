@@ -152,7 +152,7 @@ async function cancelar(req, res, next) {
         }
         const now = new Date();
         const yaEmpezo = new Date(reserva.startTime) <= now;
-        if (reserva.status === 'Active' && yaEmpezo) {
+        if (yaEmpezo) {
             await t.rollback();
             return res.status(409).json({ message: 'This reservation has already started and cannot be cancelled' });
         }
