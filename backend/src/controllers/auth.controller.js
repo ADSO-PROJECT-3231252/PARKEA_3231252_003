@@ -1,29 +1,28 @@
-
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Usuario, Rol } = require('../models');
+const ErrorCodes = require('../constants/errorCodes');
 
 const SALT_ROUNDS = 10;
 
 // HU-01: User Registration
-
 async function register(req, res) {
     try {
         const { fullName, email, password, phone, documentType, documentNumber } = req.body;
 
         const existingEmail = await Usuario.findOne({ where: { email } });
         if (existingEmail) {
-            return res.status(409).json({ message: 'This email is already registered' });
+            return res.status(409).json({ code: ErrorCodes.EMAIL_ALREADY_REGISTERED, message: 'This email is already registered' });
         }
 
         const existingDocument = await Usuario.findOne({ where: { documentNumber } });
         if (existingDocument) {
-            return res.status(409).json({ message: 'This document number is already registered' });
+            return res.status(409).json({ code: ErrorCodes.DOCUMENT_ALREADY_REGISTERED, message: 'This document number is already registered' });
         }
 
         const defaultRole = await Rol.findOne({ where: { name: 'user' } });
         if (!defaultRole) {
-            return res.status(500).json({ message: 'Default role not configured. Run the roles seed.' });
+            return res.status(500).json({ code: ErrorCodes.ROLE_NOT_CONFIGURED, message: 'Default role not configured. Run the roles seed.' });
         }
 
         const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -44,7 +43,7 @@ async function register(req, res) {
         });
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ message: 'Error registering user' });
+        return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Error registering user' });
     }
 }
 
@@ -55,12 +54,12 @@ async function login(req, res) {
 
         const usuario = await Usuario.findOne({ where: { email }, include: { model: Rol, as: 'role' } });
         if (!usuario) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
         }
 
         const validPassword = await bcrypt.compare(password, usuario.password);
         if (!validPassword) {
-            return res.status(401).json({ message: 'Invalid credentials' });
+            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
         }
 
         const token = jwt.sign(
@@ -76,7 +75,7 @@ async function login(req, res) {
         });
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ message: 'Error logging in' });
+        return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Error logging in' });
     }
 }
 
