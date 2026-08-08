@@ -1,4 +1,4 @@
-const { Reserva, Zona, Vehiculo, Pago } = require('../models');
+const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
 const { sequelize } = require('../models');
 
 // HU-14: Reserve a Spot
@@ -33,18 +33,26 @@ async function crear(req, res, next) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
 
-        // Lock the zone row to prevent a race condition on availableSlots
-        const zona = await Zona.findByPk(zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+        const zona = await Zona.findByPk(zoneId, { transaction: t });
         if (!zona) {
             await t.rollback();
             return res.status(404).json({ message: 'Zone not found' });
         }
-        if (zona.availableSlots <= 0) {
+
+        // Lock and claim one available physical spot, skipping locked rows so two
+        // concurrent requests never grab the same spot
+        const cupo = await ParkingSpot.findOne({
+            where: { zoneId, status: 'Available' },
+            order: [['spotNumber', 'ASC']],
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+            skipLocked: true,
+        });
+
+        if (!cupo) {
             await t.rollback();
             return res.status(409).json({ message: 'This spot is no longer available. Please select another zone or time.' });
         }
-
-        const spotNumber = zona.totalSlots - zona.availableSlots + 1;
 
         const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos desde ahora
 
@@ -52,7 +60,8 @@ async function crear(req, res, next) {
             userId,
             zoneId,
             vehicleId,
-            spotNumber,
+            parkingSpotId: cupo.id,
+            spotNumber: cupo.spotNumber,
             startTime: start,
             endTime: end,
             status: 'Pending',
@@ -60,6 +69,7 @@ async function crear(req, res, next) {
             appliedHourlyRate: zona.hourlyRate,
         }, { transaction: t });
 
+        await cupo.update({ status: 'Occupied' }, { transaction: t });
         await zona.decrement('availableSlots', { by: 1, transaction: t });
 
         await t.commit();
@@ -160,7 +170,15 @@ async function cancelar(req, res, next) {
             await t.rollback();
             return res.status(409).json({ message: `A reservation with status "${reserva.status}" cannot be cancelled` });
         }
-        // Lock the zone row before releasing the slot
+
+        // Release the physical spot, not just the zone counter
+        if (reserva.parkingSpotId) {
+            const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
+            if (cupo && cupo.status === 'Occupied') {
+                await cupo.update({ status: 'Available' }, { transaction: t });
+            }
+        }
+
         const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ status: 'Cancelled' }, { transaction: t });

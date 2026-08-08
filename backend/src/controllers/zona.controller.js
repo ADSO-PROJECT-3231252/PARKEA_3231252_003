@@ -1,4 +1,4 @@
-const { Zona, Reserva } = require('../models');
+const { Zona, Reserva, ParkingSpot } = require('../models');
 
 // GET /api/zones — public, list only active zones
 async function getZonas(req, res, next) {
@@ -33,9 +33,17 @@ async function createZona(req, res, next) {
       latitude,
       longitude,
       totalSlots,
-      availableSlots: totalSlots, // starts full
+      availableSlots: totalSlots,
       hourlyRate,
     });
+
+    // Create one physical spot per slot, numbered 1..totalSlots
+    const spots = Array.from({ length: totalSlots }, (_, i) => ({
+      zoneId: zona.id,
+      spotNumber: i + 1,
+      status: 'Available',
+    }));
+    await ParkingSpot.bulkCreate(spots);
 
     return res.status(201).json({ message: 'Zone created successfully', zone: zona });
   } catch (error) {
@@ -72,11 +80,51 @@ async function updateZona(req, res, next) {
           message: `Cannot reduce capacity below ${ocupados} spots currently in use`,
         });
       }
+
+      if (totalSlots > zona.totalSlots) {
+        // Grow: add the missing physical spots, numbered after the highest existing one
+        const nuevos = Array.from(
+          { length: totalSlots - zona.totalSlots },
+          (_, i) => ({
+            zoneId: id,
+            spotNumber: zona.totalSlots + i + 1,
+            status: 'Available',
+          })
+        );
+        await ParkingSpot.bulkCreate(nuevos);
+      } else if (totalSlots < zona.totalSlots) {
+        // Shrink: disable the highest-numbered spots that are currently Available.
+        // Occupied spots can never be disabled, that's already guaranteed by the
+        // "ocupados" check above, but we still only pick from Available spots here
+        // as a second layer of protection.
+        const delta = zona.totalSlots - totalSlots;
+        const candidatos = await ParkingSpot.findAll({
+          where: { zoneId: id, status: 'Available' },
+          order: [['spotNumber', 'DESC']],
+          limit: delta,
+        });
+
+        if (candidatos.length < delta) {
+          return res.status(400).json({
+            message: 'Cannot reduce capacity: some of the highest-numbered spots are currently occupied',
+          });
+        }
+
+        await ParkingSpot.update(
+          { status: 'Disabled' },
+          { where: { id: candidatos.map((c) => c.id) } }
+        );
+      }
+
       updates.totalSlots = totalSlots;
-      updates.availableSlots = totalSlots - ocupados;
     }
 
     await zona.update(updates);
+
+    // Recompute availableSlots directly from the physical spots, so it's always
+    // the source of truth instead of a manually maintained counter
+    const disponibles = await ParkingSpot.count({ where: { zoneId: id, status: 'Available' } });
+    await zona.update({ availableSlots: disponibles });
 
     return res.status(200).json({ message: 'Zone updated successfully', zone: zona });
   } catch (error) {
