@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       Reserva.belongsTo(models.Zona, { foreignKey: 'zoneId', as: 'zone' });
       Reserva.belongsTo(models.Vehiculo, { foreignKey: 'vehicleId', as: 'vehicle' });
       Reserva.hasOne(models.Pago, { foreignKey: 'reservationId', as: 'payment' });
+      Reserva.belongsTo(models.ParkingSpot, { foreignKey: 'parkingSpotId', as: 'parkingSpot' });
     }
   }
   Reserva.init({
@@ -61,6 +62,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 0,
       field: 'applied_hourly_rate',
+    },
+    parkingSpotId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'parking_spot_id',
     },
   }, {
     sequelize,
