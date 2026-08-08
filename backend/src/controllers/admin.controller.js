@@ -1,5 +1,6 @@
 const { Usuario, Rol, Zona, Reserva, Pago, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const ErrorCodes = require('../constants/errorCodes');
 
 function getRangoFecha(range) {
   const ahora = new Date();
@@ -148,15 +149,15 @@ async function cambiarRol(req, res, next) {
     const solicitanteId = req.usuario.id;
 
     if (id === solicitanteId) {
-      return res.status(403).json({ message: 'You cannot change your own role' });
+      return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot change your own role' });
     }
 
     const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }] });
     if (!usuario) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
     }
     if (usuario.isPrimaryAdmin) {
-      return res.status(403).json({ message: 'The primary administrator role cannot be changed' });
+      return res.status(403).json({ code: ErrorCodes.PRIMARY_ADMIN_PROTECTED, message: 'The primary administrator role cannot be changed' });
     }
 
     // If demoting an admin, make sure at least one active admin remains
@@ -166,13 +167,13 @@ async function cambiarRol(req, res, next) {
         include: [{ model: Rol, as: 'role', where: { name: 'admin' } }],
       });
       if (admins <= 1) {
-        return res.status(400).json({ message: 'The system must always keep at least one active administrator' });
+        return res.status(400).json({ code: ErrorCodes.MIN_ONE_ADMIN_REQUIRED, message: 'The system must always keep at least one active administrator' });
       }
     }
 
     const nuevoRol = await Rol.findOne({ where: { name: role } });
     if (!nuevoRol) {
-      return res.status(400).json({ message: 'Invalid role' });
+      return res.status(400).json({ code: ErrorCodes.INVALID_ROLE, message: 'Invalid role' });
     }
 
     await usuario.update({ roleId: nuevoRol.id });
@@ -190,15 +191,15 @@ async function cambiarEstado(req, res, next) {
     const solicitanteId = req.usuario.id;
 
     if (id === solicitanteId) {
-      return res.status(403).json({ message: 'You cannot deactivate your own account' });
+      return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot deactivate your own account' });
     }
 
     const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }] });
     if (!usuario) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
     }
     if (usuario.isPrimaryAdmin) {
-      return res.status(403).json({ message: 'The primary administrator cannot be deactivated' });
+      return res.status(403).json({ code: ErrorCodes.PRIMARY_ADMIN_PROTECTED, message: 'The primary administrator cannot be deactivated' });
     }
 
     if (usuario.role.name === 'admin' && isActive === false) {
@@ -207,7 +208,7 @@ async function cambiarEstado(req, res, next) {
         include: [{ model: Rol, as: 'role', where: { name: 'admin' } }],
       });
       if (admins <= 1) {
-        return res.status(400).json({ message: 'The system must always keep at least one active administrator' });
+        return res.status(400).json({ code: ErrorCodes.MIN_ONE_ADMIN_REQUIRED, message: 'The system must always keep at least one active administrator' });
       }
     }
 
