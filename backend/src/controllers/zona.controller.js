@@ -1,9 +1,9 @@
-const { Zona } = require('../models');
+const { Zona, Reserva } = require('../models');
 
-// GET /api/zones — public, list all zones
+// GET /api/zones — public, list only active zones
 async function getZonas(req, res, next) {
   try {
-    const zonas = await Zona.findAll();
+    const zonas = await Zona.findAll({ where: { isActive: true } });
     return res.status(200).json({ zones: zonas });
   } catch (error) {
     next(error);
@@ -13,7 +13,7 @@ async function getZonas(req, res, next) {
 // POST /api/zones — admin only
 async function createZona(req, res, next) {
   try {
-    const { name, address, totalSlots, hourlyRate } = req.body;
+    const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
 
     if (!name || totalSlots == null || hourlyRate == null) {
       return res.status(400).json({ message: 'name, totalSlots, and hourlyRate are required' });
@@ -22,9 +22,16 @@ async function createZona(req, res, next) {
       return res.status(400).json({ message: 'totalSlots and hourlyRate cannot be negative' });
     }
 
+    const existente = await Zona.findOne({ where: { name } });
+    if (existente) {
+      return res.status(409).json({ message: 'A zone with this name already exists' });
+    }
+
     const zona = await Zona.create({
       name,
       address,
+      latitude,
+      longitude,
       totalSlots,
       availableSlots: totalSlots, // starts full
       hourlyRate,
@@ -45,11 +52,8 @@ async function updateZona(req, res, next) {
       return res.status(404).json({ message: 'Zone not found' });
     }
 
-    const { name, address, totalSlots, availableSlots, hourlyRate } = req.body;
+    const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
 
-    if (availableSlots != null && availableSlots < 0) {
-      return res.status(400).json({ message: 'availableSlots cannot be negative' });
-    }
     if (totalSlots != null && totalSlots < 0) {
       return res.status(400).json({ message: 'totalSlots cannot be negative' });
     }
@@ -57,7 +61,22 @@ async function updateZona(req, res, next) {
       return res.status(400).json({ message: 'hourlyRate cannot be negative' });
     }
 
-    await zona.update({ name, address, totalSlots, availableSlots, hourlyRate });
+    const updates = { name, address, latitude, longitude, hourlyRate };
+
+    if (totalSlots != null) {
+      const ocupados = await Reserva.count({
+        where: { zoneId: id, status: ['Pending', 'Active'] },
+      });
+      if (totalSlots < ocupados) {
+        return res.status(400).json({
+          message: `Cannot reduce capacity below ${ocupados} spots currently in use`,
+        });
+      }
+      updates.totalSlots = totalSlots;
+      updates.availableSlots = totalSlots - ocupados;
+    }
+
+    await zona.update(updates);
 
     return res.status(200).json({ message: 'Zone updated successfully', zone: zona });
   } catch (error) {
@@ -65,8 +84,8 @@ async function updateZona(req, res, next) {
   }
 }
 
-// DELETE /api/zones/:id — admin only
-async function deleteZona(req, res, next) {
+// PATCH /api/zones/:id/toggle — admin only, activate/deactivate instead of deleting
+async function toggleZona(req, res, next) {
   try {
     const { id } = req.params;
     const zona = await Zona.findByPk(id);
@@ -74,12 +93,15 @@ async function deleteZona(req, res, next) {
       return res.status(404).json({ message: 'Zone not found' });
     }
 
-    await zona.destroy();
+    await zona.update({ isActive: !zona.isActive });
 
-    return res.status(200).json({ message: 'Zone deleted successfully' });
+    return res.status(200).json({
+      message: `Zone ${zona.isActive ? 'activated' : 'deactivated'} successfully`,
+      zone: zona,
+    });
   } catch (error) {
     next(error);
   }
 }
 
-module.exports = { getZonas, createZona, updateZona, deleteZona };
+module.exports = { getZonas, createZona, updateZona, toggleZona };
