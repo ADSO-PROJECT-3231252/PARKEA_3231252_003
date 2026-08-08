@@ -1,12 +1,13 @@
 const { validationResult } = require('express-validator');
 const { Vehiculo } = require('../models');
+const ErrorCodes = require('../constants/errorCodes');
 
 // HU-10: Register Vehicle
 async function registrar(req, res, next) {
     try {
         const errores = validationResult(req);
         if (!errores.isEmpty()) {
-            return res.status(400).json({ errors: errores.array() });
+            return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, errors: errores.array() });
         }
 
         const { plate, brand, model, color } = req.body;
@@ -14,7 +15,7 @@ async function registrar(req, res, next) {
 
         const existente = await Vehiculo.findOne({ where: { plate } });
         if (existente) {
-            return res.status(409).json({ message: 'This plate is already registered' });
+            return res.status(409).json({ code: ErrorCodes.PLATE_ALREADY_REGISTERED, message: 'This plate is already registered' });
         }
 
         const vehiculo = await Vehiculo.create({ plate, brand, model, color, userId });
@@ -49,7 +50,7 @@ async function editar(req, res, next) {
 
         const vehiculo = await Vehiculo.findOne({ where: { id, userId } });
         if (!vehiculo) {
-            return res.status(404).json({ message: 'Vehicle not found' });
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
         const { brand, model, color } = req.body;
@@ -72,7 +73,7 @@ async function eliminar(req, res, next) {
 
         const vehiculo = await Vehiculo.findOne({ where: { id, userId } });
         if (!vehiculo) {
-            return res.status(404).json({ message: 'Vehicle not found' });
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
         await vehiculo.destroy();

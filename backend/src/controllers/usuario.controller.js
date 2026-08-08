@@ -1,13 +1,14 @@
 const { validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
 const { Usuario } = require('../models');
+const ErrorCodes = require('../constants/errorCodes');
 
 // HU-08: Edit profile (name/phone)
 async function editarPerfil(req, res, next) {
     try {
         const errores = validationResult(req);
         if (!errores.isEmpty()) {
-            return res.status(400).json({ errors: errores.array() });
+            return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, errors: errores.array() });
         }
 
         const userId = req.usuario.id;
@@ -15,7 +16,7 @@ async function editarPerfil(req, res, next) {
 
         const usuario = await Usuario.findByPk(userId);
         if (!usuario) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
         }
 
         await usuario.update({ fullName, phone });
@@ -39,7 +40,7 @@ async function cambiarPassword(req, res, next) {
     try {
         const errores = validationResult(req);
         if (!errores.isEmpty()) {
-            return res.status(400).json({ errors: errores.array() });
+            return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, errors: errores.array() });
         }
 
         const userId = req.usuario.id;
@@ -47,17 +48,17 @@ async function cambiarPassword(req, res, next) {
 
         const usuario = await Usuario.findByPk(userId);
         if (!usuario) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
         }
 
         const passwordValida = await bcrypt.compare(currentPassword, usuario.password);
         if (!passwordValida) {
-            return res.status(401).json({ message: 'Current password is incorrect' });
+            return res.status(401).json({ code: ErrorCodes.CURRENT_PASSWORD_INCORRECT, message: 'Current password is incorrect' });
         }
 
         const esLaMisma = await bcrypt.compare(newPassword, usuario.password);
         if (esLaMisma) {
-            return res.status(400).json({ message: 'New password must be different from the current one' });
+            return res.status(400).json({ code: ErrorCodes.PASSWORD_UNCHANGED, message: 'New password must be different from the current one' });
         }
 
         const hashNuevo = await bcrypt.hash(newPassword, 10);
