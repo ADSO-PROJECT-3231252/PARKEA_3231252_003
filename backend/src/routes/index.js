@@ -5,5 +5,6 @@ router.use('/vehicles', require('./vehiculo.routes'));
 router.use('/zones', require('./zona.routes'));
 router.use('/reservations', require('./reserva.routes'));
 router.use('/payments', require('./pago.routes'));
+router.use('/users', require('./usuario.routes'));
 
 module.exports = router;
