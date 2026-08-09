@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
   async up(queryInterface) {
-    await queryInterface.bulkInsert('zones', [
+    const zonas = [
       {
         id: uuidv4(),
         name: 'Centro',
@@ -48,12 +48,39 @@ module.exports = {
         hourly_rate: 1500,
         is_active: true,
       },
-    ]);
+    ];
+
+    await queryInterface.bulkInsert('zones', zonas);
+
+    // Generate one physical parking spot per slot for each zone,
+    // same as createZona() does for zones created through the API
+    const spots = [];
+    for (const zona of zonas) {
+      for (let i = 1; i <= zona.total_slots; i++) {
+        spots.push({
+          id: uuidv4(),
+          zone_id: zona.id,
+          spot_number: i,
+          status: 'Available',
+        });
+      }
+    }
+    await queryInterface.bulkInsert('parking_spots', spots);
   },
 
-  async down(queryInterface) {
-    await queryInterface.bulkDelete('zones', {
-      name: ['Centro', 'Parque Olaya', 'La Popa', 'Av. Simón Bolívar'],
-    }, {});
+  async down(queryInterface, Sequelize) {
+    const { Op } = Sequelize;
+    const zoneNames = ['Centro', 'Parque Olaya', 'La Popa', 'Av. Simón Bolívar'];
+
+    const zonas = await queryInterface.sequelize.query(
+      `SELECT id FROM zones WHERE name IN (:zoneNames)`,
+      { replacements: { zoneNames }, type: queryInterface.sequelize.QueryTypes.SELECT }
+    );
+    const zoneIds = zonas.map((z) => z.id);
+
+    if (zoneIds.length > 0) {
+      await queryInterface.bulkDelete('parking_spots', { zone_id: { [Op.in]: zoneIds } }, {});
+    }
+    await queryInterface.bulkDelete('zones', { name: { [Op.in]: zoneNames } }, {});
   },
 };
