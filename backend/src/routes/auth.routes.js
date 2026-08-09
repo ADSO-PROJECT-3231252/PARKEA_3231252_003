@@ -4,5 +4,6 @@ const { validateRegister, validateLogin } = require('../middlewares/auth.validat
 
 router.post('/register', validateRegister, register);
 router.post('/login', validateLogin, login);
+router.use('/', require('./passwordReset.routes'));
 
 module.exports = router;
