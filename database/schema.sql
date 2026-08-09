@@ -61,18 +61,37 @@ CREATE TABLE zones (
     is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- 5. Table: reservations
--- Relations: users (1) - (N) | zones (1) - (N) | vehicles (1) - (N)
+-- 5. Table: parking_spots
+-- Relation: zones (1) - (N) parking_spots
+-- One row per physical spot. Created automatically (1..total_slots) when a
+-- zone is created, and adjusted when its capacity changes. Spots are never
+-- deleted — a spot that no longer fits the zone's capacity is Disabled
+-- instead, so reservation history keeps its reference intact.
+CREATE TABLE parking_spots (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    zone_id VARCHAR(36) NOT NULL,
+    spot_number INT NOT NULL,
+    status ENUM('Available', 'Occupied', 'Disabled') NOT NULL DEFAULT 'Available',
+    UNIQUE KEY parking_spots_zone_spot_unique (zone_id, spot_number),
+    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+);
+
+-- 6. Table: reservations
+-- Relations: users (1) - (N) | zones (1) - (N) | vehicles (1) - (N) | parking_spots (1) - (N)
+-- parking_spot_id links the reservation to the exact physical spot assigned
+-- automatically at booking time (spot_number is kept as a denormalized
+-- copy for quick display, sourced from the assigned spot)
 -- applied_hourly_rate freezes the zone rate at booking time, so later rate
 -- changes never alter the price of an existing reservation
 -- hold_expires_at: an unpaid reservation expires and releases its spot (HU-26)
--- Foreign keys use RESTRICT so removing a user, zone or vehicle can never
--- destroy the booking history
+-- Foreign keys use RESTRICT so removing a user, zone, vehicle, or spot can
+-- never destroy the booking history
 CREATE TABLE reservations (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     user_id VARCHAR(36) NOT NULL,
     zone_id VARCHAR(36) NOT NULL,
     vehicle_id VARCHAR(36) NOT NULL,
+    parking_spot_id VARCHAR(36) NULL,
     spot_number INT NOT NULL,
     start_time DATETIME NOT NULL,
     end_time DATETIME NOT NULL,
@@ -85,10 +104,12 @@ CREATE TABLE reservations (
     CONSTRAINT reservations_zone_id_fk FOREIGN KEY (zone_id)
         REFERENCES zones(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT reservations_vehicle_id_fk FOREIGN KEY (vehicle_id)
-        REFERENCES vehicles(id) ON DELETE RESTRICT ON UPDATE CASCADE
+        REFERENCES vehicles(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT reservations_parking_spot_id_fk FOREIGN KEY (parking_spot_id)
+        REFERENCES parking_spots(id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- 6. Table: payments
+-- 7. Table: payments
 -- Relation: reservations (1) - (1) payments (enforced with UNIQUE)
 -- The full card number is never stored, only the last four digits
 CREATE TABLE payments (
@@ -104,7 +125,7 @@ CREATE TABLE payments (
     FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE
 );
 
--- 7. Table: password_reset_tokens
+-- 8. Table: password_reset_tokens
 -- Single-use tokens, valid for one hour (HU-07)
 -- Only the hash of the token is stored, never the token itself
 CREATE TABLE password_reset_tokens (
