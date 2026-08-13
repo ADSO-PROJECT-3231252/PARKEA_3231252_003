@@ -5,6 +5,9 @@ const reservaController = require('../controllers/reserva.controller');
 // POST /api/reservations — create a reservation (HU-14)
 router.post('/', verificarToken, reservaController.crear);
 
+// GET /api/reservations — list the authenticated user's reservations (HU-18)
+router.get('/', verificarToken, reservaController.misReservas);
+
 // GET /api/reservations/:id — reservation confirmation details (HU-15)
 router.get('/:id', verificarToken, reservaController.obtenerConfirmacion);
 
