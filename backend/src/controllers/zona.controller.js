@@ -190,4 +190,20 @@ async function getSpotsDeZona(req, res, next) {
   }
 }
 
-module.exports = { getZonas, createZona, updateZona, toggleZona, getSpotsDeZona };
+// GET /api/zones/:id — public, single zone detail (needed for the reservation screen, HU-14)
+async function getZonaPorId(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const zona = await Zona.findOne({ where: { id, isActive: true } });
+    if (!zona) {
+      return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
+    }
+
+    return res.status(200).json({ zone: zona });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId };
