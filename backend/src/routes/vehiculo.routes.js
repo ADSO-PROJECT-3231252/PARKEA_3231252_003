@@ -19,6 +19,9 @@ router.post(
 // GET /api/vehicles — list the authenticated user's vehicles
 router.get('/', verificarToken, vehiculoController.misVehiculos);
 
+// GET /api/vehicles/:id — single vehicle detail (prefills the edit form)
+router.get('/:id', verificarToken, vehiculoController.obtenerVehiculo);
+
 // PUT /api/vehicles/:id — edit vehicle info (type, brand, model, color, visual description)
 router.put('/:id', verificarToken, vehiculoController.editar);
 

@@ -194,4 +194,31 @@ async function cancelar(req, res, next) {
     }
 }
 
-module.exports = { crear, obtenerConfirmacion, cancelar };
+// HU-18: View Booking History
+async function misReservas(req, res, next) {
+    try {
+        const userId = req.usuario.id;
+        const { status } = req.query;
+
+        const where = { userId };
+        if (status && status !== 'All') {
+            where.status = status;
+        }
+
+        const reservas = await Reserva.findAll({
+            where,
+            order: [['startTime', 'DESC']],
+            include: [
+                { model: Zona, as: 'zone', attributes: ['id', 'name'] },
+                { model: Vehiculo, as: 'vehicle', attributes: ['id', 'plate'] },
+                { model: Pago, as: 'payment', attributes: ['amount', 'paymentStatus'] },
+            ],
+        });
+
+        return res.status(200).json({ reservations: reservas });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { crear, obtenerConfirmacion, cancelar, misReservas };
