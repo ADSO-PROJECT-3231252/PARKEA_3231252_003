@@ -200,14 +200,20 @@ async function misReservas(req, res, next) {
         const userId = req.usuario.id;
         const { status } = req.query;
 
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
+        const offset = (page - 1) * limit;
+
         const where = { userId };
         if (status && status !== 'All') {
             where.status = status;
         }
 
-        const reservas = await Reserva.findAll({
+        const { count, rows } = await Reserva.findAndCountAll({
             where,
             order: [['startTime', 'DESC']],
+            limit,
+            offset,
             include: [
                 { model: Zona, as: 'zone', attributes: ['id', 'name'] },
                 { model: Vehiculo, as: 'vehicle', attributes: ['id', 'plate'] },
@@ -215,7 +221,43 @@ async function misReservas(req, res, next) {
             ],
         });
 
-        return res.status(200).json({ reservations: reservas });
+        const reservations = rows.map((r) => {
+            const yaTienePago = r.payment && ['Paid', 'Refunded'].includes(r.payment.paymentStatus);
+
+            let amount;
+            let amountType;
+            if (yaTienePago) {
+                amount = Number(r.payment.amount);
+                amountType = 'paid';
+            } else {
+                const horas = (new Date(r.endTime) - new Date(r.startTime)) / (1000 * 60 * 60);
+                amount = Number((horas * Number(r.appliedHourlyRate)).toFixed(2));
+                amountType = 'estimated';
+            }
+
+            return {
+                id: r.id,
+                status: r.status,
+                spotNumber: r.spotNumber,
+                startTime: r.startTime,
+                endTime: r.endTime,
+                zone: r.zone,
+                vehicle: r.vehicle,
+                amount,
+                amountType, // 'estimated' | 'paid' — the frontend uses this to label it
+                paymentStatus: r.payment ? r.payment.paymentStatus : 'Pending',
+            };
+        });
+
+        return res.status(200).json({
+            reservations,
+            pagination: {
+                page,
+                limit,
+                total: count,
+                totalPages: Math.ceil(count / limit),
+            },
+        });
     } catch (error) {
         next(error);
     }
