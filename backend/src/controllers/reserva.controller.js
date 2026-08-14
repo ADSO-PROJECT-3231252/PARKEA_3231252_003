@@ -39,6 +39,10 @@ async function crear(req, res, next) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
         }
+        if (!zona.isActive) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
+        }
 
         // Lock and claim one available physical spot, skipping locked rows so two
         // concurrent requests never grab the same spot
