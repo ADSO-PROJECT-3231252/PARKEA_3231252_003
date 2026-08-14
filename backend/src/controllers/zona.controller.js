@@ -190,12 +190,14 @@ async function getSpotsDeZona(req, res, next) {
   }
 }
 
-// GET /api/zones/:id — public, single zone detail (needed for the reservation screen, HU-14)
+// GET /api/zones/:id — single zone detail (used for reservations AND admin editing,
+// so it must NOT filter by isActive — an admin needs to reach a deactivated zone
+// to reactivate it)
 async function getZonaPorId(req, res, next) {
   try {
     const { id } = req.params;
 
-    const zona = await Zona.findOne({ where: { id, isActive: true } });
+    const zona = await Zona.findByPk(id);
     if (!zona) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
@@ -206,4 +208,14 @@ async function getZonaPorId(req, res, next) {
   }
 }
 
-module.exports = { getZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId };
+// GET /api/zones/all — admin only, ALL zones regardless of active status (HU-19, AC-01)
+async function getTodasLasZonas(req, res, next) {
+  try {
+    const zonas = await Zona.findAll({ order: [['name', 'ASC']] });
+    return res.status(200).json({ zones: zonas });
+  } catch (error) {
+    next(error);
+  }
+}
+
+module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId };
