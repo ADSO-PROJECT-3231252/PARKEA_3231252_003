@@ -1,7 +1,35 @@
 const { validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
-const { Usuario } = require('../models');
+const { Usuario, Rol } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
+
+// GET /api/users/me — load the authenticated user's profile
+async function obtenerPerfil(req, res, next) {
+    try {
+        const userId = req.usuario.id;
+
+        const usuario = await Usuario.findByPk(userId, {
+            include: { model: Rol, as: 'role' },
+        });
+        if (!usuario) {
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+
+        return res.status(200).json({
+            user: {
+                id: usuario.id,
+                fullName: usuario.fullName,
+                email: usuario.email,
+                phone: usuario.phone,
+                documentType: usuario.documentType,
+                documentNumber: usuario.documentNumber,
+                role: usuario.role.name,
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
 
 // HU-08: Edit profile (name/phone)
 async function editarPerfil(req, res, next) {
@@ -70,4 +98,4 @@ async function cambiarPassword(req, res, next) {
     }
 }
 
-module.exports = { editarPerfil, cambiarPassword };
+module.exports = { obtenerPerfil, editarPerfil, cambiarPassword };
