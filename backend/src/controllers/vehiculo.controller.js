@@ -176,4 +176,21 @@ async function eliminar(req, res, next) {
     }
 }
 
-module.exports = { registrar, misVehiculos, editar, marcarPredeterminado, eliminar };
+// GET /api/vehicles/:id — single vehicle detail (needed to prefill the edit form)
+async function obtenerVehiculo(req, res, next) {
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+
+        const vehiculo = await Vehiculo.findOne({ where: { id, userId } });
+        if (!vehiculo) {
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
+        return res.status(200).json({ vehicle: vehiculo });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { registrar, misVehiculos, obtenerVehiculo, editar, marcarPredeterminado, eliminar };
