@@ -10,21 +10,23 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         const token = localStorage.getItem('token');
-        if (token) {
+        const storedUser = localStorage.getItem('user');
+        if (token && storedUser) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setUser({ token });
+            setUser({ token, ...JSON.parse(storedUser) });
         }
-        
         setLoading(false);
     }, []);
 
     const loginUser = (token, userData) => {
         localStorage.setItem('token', token);
-        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser({ token, ...userData });
     };
 
     const logoutUser = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         setUser(null);
     };
 
