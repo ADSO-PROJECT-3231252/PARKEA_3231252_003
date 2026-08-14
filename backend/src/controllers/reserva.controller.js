@@ -1,6 +1,11 @@
+const { Op } = require('sequelize');
 const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
+
+const DURACION_MIN_MS = 30 * 60 * 1000;
+const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
+const ANTICIPACION_MAX_MS = 48 * 60 * 60 * 1000;
 
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
@@ -22,16 +27,41 @@ async function crear(req, res, next) {
             await t.rollback();
             return res.status(400).json({ code: ErrorCodes.START_TIME_IN_PAST, message: 'The start time must be in the future' });
         }
+        if (start - now > ANTICIPACION_MAX_MS) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.RESERVATION_TOO_FAR_AHEAD, message: 'Reservations can only be made up to 48 hours in advance' });
+        }
         if (end <= start) {
             await t.rollback();
             return res.status(400).json({ code: ErrorCodes.END_BEFORE_START, message: 'The end time must be after the start time' });
         }
 
-        // Confirm the vehicle belongs to this user
+        const duracionMs = end - start;
+        if (duracionMs < DURACION_MIN_MS || duracionMs > DURACION_MAX_MS) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.INVALID_DURATION, message: 'The reservation must last between 30 minutes and 24 hours' });
+        }
+
         const vehiculo = await Vehiculo.findOne({ where: { id: vehicleId, userId }, transaction: t });
         if (!vehiculo) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
+        // Reject if this vehicle already has a Pending/Active reservation
+        // that overlaps the requested time range
+        const solapada = await Reserva.findOne({
+            where: {
+                vehicleId,
+                status: ['Pending', 'Active'],
+                startTime: { [Op.lt]: end },
+                endTime: { [Op.gt]: start },
+            },
+            transaction: t,
+        });
+        if (solapada) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
         }
 
         const zona = await Zona.findByPk(zoneId, { transaction: t });
@@ -123,11 +153,14 @@ async function obtenerConfirmacion(req, res, next) {
                 startTime: reserva.startTime,
                 endTime: reserva.endTime,
                 durationHours: Number(durationHours.toFixed(2)),
+                holdExpiresAt: reserva.holdExpiresAt,
                 zone: {
                     id: reserva.zone.id,
                     name: reserva.zone.name,
                     address: reserva.zone.address,
                     hourlyRate: reserva.zone.hourlyRate,
+                    latitude: reserva.zone.latitude,
+                    longitude: reserva.zone.longitude,
                 },
                 vehicle: {
                     id: reserva.vehicle.id,
@@ -248,7 +281,7 @@ async function misReservas(req, res, next) {
                 zone: r.zone,
                 vehicle: r.vehicle,
                 amount,
-                amountType, // 'estimated' | 'paid' — the frontend uses this to label it
+                amountType,
                 paymentStatus: r.payment ? r.payment.paymentStatus : 'Pending',
             };
         });
