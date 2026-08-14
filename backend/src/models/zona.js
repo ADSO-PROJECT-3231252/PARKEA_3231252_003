@@ -5,6 +5,7 @@ module.exports = (sequelize, DataTypes) => {
   class Zona extends Model {
     static associate(models) {
       Zona.hasMany(models.Reserva, { foreignKey: 'zoneId', as: 'reservations' });
+      Zona.hasMany(models.ParkingSpot, { foreignKey: 'zoneId', as: 'parkingSpots' });
     }
   }
   Zona.init({
