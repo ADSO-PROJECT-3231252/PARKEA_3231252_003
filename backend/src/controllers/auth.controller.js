@@ -47,7 +47,7 @@ async function register(req, res) {
     }
 }
 
-// HU-02/05: User Login
+// HU-05: User Login
 async function login(req, res) {
     try {
         const { email, password } = req.body;
@@ -60,6 +60,10 @@ async function login(req, res) {
         const validPassword = await bcrypt.compare(password, usuario.password);
         if (!validPassword) {
             return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
+        }
+
+        if (!usuario.isActive) {
+            return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
         }
 
         const token = jwt.sign(
@@ -79,4 +83,46 @@ async function login(req, res) {
     }
 }
 
-module.exports = { register, login };
+// HU-06: Administrator Login
+async function loginAdmin(req, res) {
+    try {
+        const { email, password } = req.body;
+
+        const usuario = await Usuario.findOne({ where: { email }, include: { model: Rol, as: 'role' } });
+        if (!usuario) {
+            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
+        }
+
+        const validPassword = await bcrypt.compare(password, usuario.password);
+        if (!validPassword) {
+            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
+        }
+
+        if (!usuario.isActive) {
+            return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
+        }
+
+        // Credentials are valid at this point — unlike wrong credentials, revealing
+        // that the account lacks admin privileges is intentional and required (AC-06)
+        if (usuario.role.name !== 'admin') {
+            return res.status(403).json({ code: ErrorCodes.NOT_ADMIN_ACCOUNT, message: 'This account does not have administrator privileges' });
+        }
+
+        const token = jwt.sign(
+            { id: usuario.id, email: usuario.email, rol: usuario.role.name },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
+        );
+
+        return res.status(200).json({
+            message: 'Login successful',
+            token,
+            user: { id: usuario.id, fullName: usuario.fullName, email: usuario.email, role: usuario.role.name },
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Error logging in' });
+    }
+}
+
+module.exports = { register, login, loginAdmin };

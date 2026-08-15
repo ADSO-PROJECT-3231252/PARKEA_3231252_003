@@ -11,16 +11,29 @@ async function getZonas(req, res, next) {
   }
 }
 
+function coordenadasValidas(lat, lng) {
+  return (
+    typeof lat === 'number' && lat >= -90 && lat <= 90 &&
+    typeof lng === 'number' && lng >= -180 && lng <= 180
+  );
+}
+
 // POST /api/zones — admin only
 async function createZona(req, res, next) {
   try {
     const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
 
-    if (!name || totalSlots == null || hourlyRate == null) {
-      return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, totalSlots, and hourlyRate are required' });
+    if (!name || totalSlots == null || hourlyRate == null || latitude == null || longitude == null) {
+      return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, latitude, longitude, totalSlots, and hourlyRate are required' });
     }
-    if (totalSlots < 0 || hourlyRate < 0) {
-      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'totalSlots and hourlyRate cannot be negative' });
+    if (!Number.isInteger(totalSlots) || totalSlots <= 0) {
+      return res.status(400).json({ code: ErrorCodes.INVALID_CAPACITY, message: 'totalSlots must be a whole number greater than zero' });
+    }
+    if (hourlyRate < 0) {
+      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' });
+    }
+    if (!coordenadasValidas(latitude, longitude)) {
+      return res.status(400).json({ code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' });
     }
 
     const existente = await Zona.findOne({ where: { name } });
@@ -38,7 +51,6 @@ async function createZona(req, res, next) {
       hourlyRate,
     });
 
-    // Create one physical spot per slot, numbered 1..totalSlots
     const spots = Array.from({ length: totalSlots }, (_, i) => ({
       zoneId: zona.id,
       spotNumber: i + 1,
@@ -63,11 +75,14 @@ async function updateZona(req, res, next) {
 
     const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
 
-    if (totalSlots != null && totalSlots < 0) {
-      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'totalSlots cannot be negative' });
+    if (totalSlots != null && (!Number.isInteger(totalSlots) || totalSlots <= 0)) {
+      return res.status(400).json({ code: ErrorCodes.INVALID_CAPACITY, message: 'totalSlots must be a whole number greater than zero' });
     }
     if (hourlyRate != null && hourlyRate < 0) {
       return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' });
+    }
+    if ((latitude != null || longitude != null) && !coordenadasValidas(latitude, longitude)) {
+      return res.status(400).json({ code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' });
     }
 
     const updates = { name, address, latitude, longitude, hourlyRate };
@@ -84,7 +99,6 @@ async function updateZona(req, res, next) {
       }
 
       if (totalSlots > zona.totalSlots) {
-        // Grow: add the missing physical spots, numbered after the highest existing one
         const nuevos = Array.from(
           { length: totalSlots - zona.totalSlots },
           (_, i) => ({
@@ -95,10 +109,6 @@ async function updateZona(req, res, next) {
         );
         await ParkingSpot.bulkCreate(nuevos);
       } else if (totalSlots < zona.totalSlots) {
-        // Shrink: disable the highest-numbered spots that are currently Available.
-        // Occupied spots can never be disabled, that's already guaranteed by the
-        // "ocupados" check above, but we still only pick from Available spots here
-        // as a second layer of protection.
         const delta = zona.totalSlots - totalSlots;
         const candidatos = await ParkingSpot.findAll({
           where: { zoneId: id, status: 'Available' },
@@ -124,8 +134,6 @@ async function updateZona(req, res, next) {
 
     await zona.update(updates);
 
-    // Recompute availableSlots directly from the physical spots, so it's always
-    // the source of truth instead of a manually maintained counter
     const disponibles = await ParkingSpot.count({ where: { zoneId: id, status: 'Available' } });
     await zona.update({ availableSlots: disponibles });
 

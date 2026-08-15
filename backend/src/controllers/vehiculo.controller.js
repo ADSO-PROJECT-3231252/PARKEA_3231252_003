@@ -82,6 +82,11 @@ async function misVehiculos(req, res, next) {
 // HU-12: Edit Vehicle Information
 async function editar(req, res, next) {
     try {
+        const errores = validationResult(req);
+        if (!errores.isEmpty()) {
+            return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, errors: errores.array() });
+        }
+
         const { id } = req.params;
         const userId = req.usuario.id;
 
@@ -94,8 +99,7 @@ async function editar(req, res, next) {
 
         // If the vehicle type changes, the existing plate must still be valid
         // for the new type (HU-12, AC-05)
-        const nuevoTipo = vehicleType || vehiculo.vehicleType;
-        if (!plateMatchesType(vehiculo.plate, nuevoTipo)) {
+        if (!plateMatchesType(vehiculo.plate, vehicleType)) {
             return res.status(400).json({
                 code: ErrorCodes.INVALID_PLATE_FORMAT,
                 message: "The current plate does not match the new vehicle type's format",

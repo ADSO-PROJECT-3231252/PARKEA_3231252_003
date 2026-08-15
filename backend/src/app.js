@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const ErrorCodes = require('./constants/errorCodes');
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(err.status || 500).json({
+        code: err.code || ErrorCodes.INTERNAL_ERROR,
         message: err.message || 'Internal server error',
     });
 });

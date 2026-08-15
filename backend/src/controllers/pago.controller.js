@@ -30,6 +30,13 @@ const crearPago = async (req, res) => {
       await t.rollback();
       return res.status(403).json({ code: ErrorCodes.RESERVATION_NOT_OWNED, message: 'This reservation does not belong to you' });
     }
+    if (reserva.status === 'Expired') {
+      await t.rollback();
+      return res.status(400).json({
+        code: ErrorCodes.RESERVATION_EXPIRED,
+        message: 'This reservation expired because it was not paid in time. Please make a new reservation.',
+      });
+    }
     if (reserva.status !== 'Pending') {
       await t.rollback();
       return res.status(400).json({ code: ErrorCodes.RESERVATION_NOT_PENDING, message: 'This reservation is not pending payment' });

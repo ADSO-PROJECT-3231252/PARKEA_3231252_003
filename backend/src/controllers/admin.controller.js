@@ -1,6 +1,8 @@
-const { Usuario, Rol, Zona, Reserva, Pago, sequelize } = require('../models');
+const { Usuario, Rol, Zona, Reserva, Pago, AdminActionLog, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const ErrorCodes = require('../constants/errorCodes');
+
+const RANGOS_VALIDOS = ['today', 'week', 'month'];
 
 function getRangoFecha(range) {
   const ahora = new Date();
@@ -19,12 +21,26 @@ function getRangoFecha(range) {
 async function getDashboard(req, res, next) {
   try {
     const range = req.query.range || 'today';
+    if (!RANGOS_VALIDOS.includes(range)) {
+      return res.status(400).json({ code: ErrorCodes.INVALID_RANGE, message: 'range must be one of: today, week, month' });
+    }
     const { inicio, fin } = getRangoFecha(range);
 
-    const [activeReservations, activeZones, registeredUsers, revenueResult] = await Promise.all([
-      Reserva.count({ where: { status: 'Active' } }),
+    const [activeReservations, activeZones, newUsers, revenueResult] = await Promise.all([
+      // Reservations that were Active at some point overlapping the selected range
+      Reserva.count({
+        where: {
+          status: 'Active',
+          startTime: { [Op.lte]: fin },
+          endTime: { [Op.gte]: inicio },
+        },
+      }),
+      // Active zones is a current-state snapshot: the system doesn't keep a
+      // history of when a zone was activated/deactivated, so this can't be
+      // meaningfully scoped to the selected range
       Zona.count({ where: { isActive: true } }),
-      Usuario.count(),
+      // New registrations within the selected range
+      Usuario.count({ where: { created_at: { [Op.between]: [inicio, fin] } } }),
       Pago.sum('amount', {
         where: { paymentStatus: 'Paid', paidAt: { [Op.between]: [inicio, fin] } },
       }),
@@ -35,10 +51,51 @@ async function getDashboard(req, res, next) {
         activeReservations,
         revenue: revenueResult || 0,
         activeZones,
-        registeredUsers,
+        newUsers,
       },
       range,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/admin/dashboard/reservations-by-zone?range=today|week|month
+async function getReservasPorZona(req, res, next) {
+  try {
+    const range = req.query.range || 'today';
+    if (!RANGOS_VALIDOS.includes(range)) {
+      return res.status(400).json({ code: ErrorCodes.INVALID_RANGE, message: 'range must be one of: today, week, month' });
+    }
+    const { inicio, fin } = getRangoFecha(range);
+
+    const zonas = await Zona.findAll({
+      where: { isActive: true },
+      attributes: [
+        'id',
+        'name',
+        [
+          sequelize.fn('COUNT', sequelize.col('reservations.id')),
+          'reservationCount',
+        ],
+      ],
+      include: [{
+        model: Reserva,
+        as: 'reservations',
+        attributes: [],
+        required: false,
+        where: { startTime: { [Op.between]: [inicio, fin] } },
+      }],
+      group: ['Zona.id'],
+    });
+
+    const result = zonas.map((z) => ({
+      zoneId: z.id,
+      zoneName: z.name,
+      reservationCount: Number(z.get('reservationCount')),
+    }));
+
+    return res.status(200).json({ reservationsByZone: result, range });
   } catch (error) {
     next(error);
   }
@@ -63,11 +120,18 @@ async function getOcupacionPorZona(req, res, next) {
   }
 }
 
-// GET /api/admin/dashboard/payments-status
+// GET /api/admin/dashboard/payments-status?range=today|week|month
 async function getEstadoPagos(req, res, next) {
   try {
+    const range = req.query.range || 'today';
+    if (!RANGOS_VALIDOS.includes(range)) {
+      return res.status(400).json({ code: ErrorCodes.INVALID_RANGE, message: 'range must be one of: today, week, month' });
+    }
+    const { inicio, fin } = getRangoFecha(range);
+
     const resultados = await Pago.findAll({
       attributes: ['paymentStatus', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+      where: { created_at: { [Op.between]: [inicio, fin] } },
       group: ['paymentStatus'],
     });
     const resumen = resultados.reduce((acc, r) => {
@@ -75,7 +139,7 @@ async function getEstadoPagos(req, res, next) {
       return acc;
     }, { Pending: 0, Paid: 0, Cancelled: 0, Refunded: 0 });
 
-    return res.status(200).json({ paymentStatus: resumen });
+    return res.status(200).json({ paymentStatus: resumen, range });
   } catch (error) {
     next(error);
   }
@@ -102,10 +166,35 @@ async function getPagosRecientes(req, res, next) {
   }
 }
 
-// GET /api/admin/users
+// GET /api/admin/dashboard/alerts
+async function getAlertas(req, res, next) {
+  try {
+    const zonasLlenas = await Zona.findAll({
+      where: { isActive: true, availableSlots: 0 },
+      attributes: ['id', 'name'],
+    });
+
+    const alerts = zonasLlenas.map((z) => ({
+      type: 'zone_full',
+      severity: 'warning',
+      message: `Zone "${z.name}" has reached full capacity`,
+      zoneId: z.id,
+    }));
+
+    return res.status(200).json({ alerts });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/admin/users?search=&role=&status=&page=&limit=
 async function getUsuarios(req, res, next) {
   try {
     const { search, role, status } = req.query;
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
+    const offset = (page - 1) * limit;
+
     const where = {};
 
     if (search) {
@@ -123,7 +212,41 @@ async function getUsuarios(req, res, next) {
       include[0].where = { name: role === 'admin' ? 'admin' : 'user' };
     }
 
-    const usuarios = await Usuario.findAll({ where, include });
+    const { count, rows } = await Usuario.findAndCountAll({
+      where,
+      include,
+      // Never expose the password hash in this list
+      attributes: { exclude: ['password'] },
+      limit,
+      offset,
+      order: [['created_at', 'DESC']],
+    });
+
+    // Reservation count per listed user (AC-03)
+    const userIds = rows.map((u) => u.id);
+    const conteos = userIds.length
+      ? await Reserva.findAll({
+          attributes: ['userId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+          where: { userId: userIds },
+          group: ['userId'],
+        })
+      : [];
+    const conteoPorUsuario = conteos.reduce((acc, r) => {
+      acc[r.userId] = Number(r.get('count'));
+      return acc;
+    }, {});
+
+    const users = rows.map((u) => ({
+      id: u.id,
+      fullName: u.fullName,
+      email: u.email,
+      documentNumber: u.documentNumber,
+      role: u.role.name,
+      isActive: u.isActive,
+      isPrimaryAdmin: u.isPrimaryAdmin,
+      createdAt: u.created_at,
+      reservationCount: conteoPorUsuario[u.id] || 0,
+    }));
 
     const [total, activos, inactivos, admins] = await Promise.all([
       Usuario.count(),
@@ -133,9 +256,27 @@ async function getUsuarios(req, res, next) {
     ]);
 
     return res.status(200).json({
-      users: usuarios,
+      users,
       summary: { total, active: activos, inactive: inactivos, admins },
+      pagination: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/admin/users/logs — most recent admin actions (AC-14)
+async function getRegistroDeCambios(req, res, next) {
+  try {
+    const logs = await AdminActionLog.findAll({
+      order: [['created_at', 'DESC']],
+      limit: 10,
+      include: [
+        { model: Usuario, as: 'admin', attributes: ['fullName'] },
+        { model: Usuario, as: 'targetUser', attributes: ['fullName'] },
+      ],
+    });
+    return res.status(200).json({ logs });
   } catch (error) {
     next(error);
   }
@@ -160,7 +301,8 @@ async function cambiarRol(req, res, next) {
       return res.status(403).json({ code: ErrorCodes.PRIMARY_ADMIN_PROTECTED, message: 'The primary administrator role cannot be changed' });
     }
 
-    // If demoting an admin, make sure at least one active admin remains
+    const rolAnterior = usuario.role.name;
+
     if (usuario.role.name === 'admin' && role === 'user') {
       const admins = await Usuario.count({
         where: { isActive: true },
@@ -177,6 +319,14 @@ async function cambiarRol(req, res, next) {
     }
 
     await usuario.update({ roleId: nuevoRol.id });
+
+    await AdminActionLog.create({
+      adminId: solicitanteId,
+      targetUserId: id,
+      action: 'role_changed',
+      details: `Role changed from "${rolAnterior}" to "${role}"`,
+    });
+
     return res.status(200).json({ message: 'Role updated successfully' });
   } catch (error) {
     next(error);
@@ -213,6 +363,14 @@ async function cambiarEstado(req, res, next) {
     }
 
     await usuario.update({ isActive });
+
+    await AdminActionLog.create({
+      adminId: solicitanteId,
+      targetUserId: id,
+      action: 'status_changed',
+      details: `Status changed to ${isActive ? 'active' : 'inactive'}`,
+    });
+
     return res.status(200).json({ message: 'Status updated successfully' });
   } catch (error) {
     next(error);
@@ -221,10 +379,13 @@ async function cambiarEstado(req, res, next) {
 
 module.exports = {
   getDashboard,
+  getReservasPorZona,
   getOcupacionPorZona,
   getEstadoPagos,
   getPagosRecientes,
+  getAlertas,
   getUsuarios,
+  getRegistroDeCambios,
   cambiarRol,
   cambiarEstado,
 };

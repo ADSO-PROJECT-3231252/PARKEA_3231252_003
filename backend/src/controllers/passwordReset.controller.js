@@ -70,7 +70,7 @@ async function restablecerPassword(req, res, next) {
 
         if (esInvalido) {
             return res.status(400).json({
-                code: 'RESET_TOKEN_INVALID',
+                code: ErrorCodes.RESET_TOKEN_INVALID,
                 message: 'This recovery link is no longer valid. Please request a new one.',
             });
         }

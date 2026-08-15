@@ -1,4 +1,5 @@
-const { body } = require('express-validator');
+const { body, validationResult } = require('express-validator');
+const ErrorCodes = require('../constants/errorCodes');
 
 const validarEditarPerfil = [
     body('fullName')
@@ -8,6 +9,13 @@ const validarEditarPerfil = [
     body('phone')
         .optional()
         .matches(/^[0-9]{7,15}$/).withMessage('Phone must contain only digits (7-15 characters)'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, errors: errors.array() });
+        }
+        next();
+    },
 ];
 
 const validarCambiarPassword = [
@@ -20,6 +28,13 @@ const validarCambiarPassword = [
     body('confirmNewPassword')
         .custom((value, { req }) => value === req.body.newPassword)
         .withMessage('Passwords do not match'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, errors: errors.array() });
+        }
+        next();
+    },
 ];
 
 module.exports = { validarEditarPerfil, validarCambiarPassword };

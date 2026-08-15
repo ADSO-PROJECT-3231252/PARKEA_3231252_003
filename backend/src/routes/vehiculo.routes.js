@@ -3,15 +3,22 @@ const { body } = require('express-validator');
 const { verificarToken } = require('../middlewares/auth.middleware');
 const vehiculoController = require('../controllers/vehiculo.controller');
 
+const validarCamposVehiculo = [
+    body('vehicleType')
+        .notEmpty().withMessage('Vehicle type is required')
+        .isIn(['car', 'motorcycle', 'truck']).withMessage('Invalid vehicle type'),
+    body('brand').trim().notEmpty().withMessage('Brand is required'),
+    body('model').trim().notEmpty().withMessage('Model is required'),
+    body('color').trim().notEmpty().withMessage('Color is required'),
+];
+
 // POST /api/vehicles — requires authentication
 router.post(
     '/',
     verificarToken,
     [
         body('plate').notEmpty().withMessage('Plate is required'),
-        body('vehicleType')
-            .notEmpty().withMessage('Vehicle type is required')
-            .isIn(['car', 'motorcycle', 'truck']).withMessage('Invalid vehicle type'),
+        ...validarCamposVehiculo,
     ],
     vehiculoController.registrar
 );
@@ -23,7 +30,7 @@ router.get('/', verificarToken, vehiculoController.misVehiculos);
 router.get('/:id', verificarToken, vehiculoController.obtenerVehiculo);
 
 // PUT /api/vehicles/:id — edit vehicle info (type, brand, model, color, visual description)
-router.put('/:id', verificarToken, vehiculoController.editar);
+router.put('/:id', verificarToken, validarCamposVehiculo, vehiculoController.editar);
 
 // PATCH /api/vehicles/:id/default — set this vehicle as the default one
 router.patch('/:id/default', verificarToken, vehiculoController.marcarPredeterminado);
