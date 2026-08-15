@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import logo from '../assets/logo.png';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
@@ -29,7 +29,13 @@ export default function Login() {
     const { loginUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const justRegistered = location.state?.registered;
+    const [justRegistered, setJustRegistered] = useState(Boolean(location.state?.registered));
+
+    useEffect(() => {
+        if (!justRegistered) return;
+        const timer = setTimeout(() => setJustRegistered(false), 3000);
+        return () => clearTimeout(timer);
+    }, [justRegistered]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -78,7 +84,7 @@ export default function Login() {
 
                 {/* Logo */}
                 <div className="flex flex-col items-center mb-6">
-                    <img src={logo} alt="PARKEA" className="h-12 w-auto object-contain" />
+                    <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
                     <p className="font-sans text-caption text-parkea-600 mt-1">
                         Reserva tu parqueo, simplifica tu día.
                     </p>
