@@ -54,9 +54,9 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 
 | Name | Role | GitHub | Main Branch |
 |------|------|--------|-------------|
-| **Michael Isaza** | Scrum Master / Tech Lead | [@MichaellIsaza](https://github.com/MichaellIsaza) | `isaza_backend`, `isaza_frontend` |
+| **Michael Isaza** | Scrum Master / Tech Lead | [@MichaelIsaza](https://github.com/MichaelIsaza) | `isaza_backend`, `isaza_frontend` |
 | **Jhoan Marín** | Full Stack Developer | [@jhoanmarin227](https://github.com/jhoanmarin227) | `marin_backend`, `marin_frontend` |
-| **Stiven Sánchez** | Backend Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `sanchez_backend` |
+| **Stiven Sánchez** | Backend Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend` |
 | **David León** | Frontend Developer / DBA | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_sql` |
 | **Jhoan Almario** | Analyst / Backend | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
 
@@ -67,7 +67,7 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 ### Frontend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| React | 19.2.7 | UI Library |
+| React | ^19.2.7 | UI Library |
 | Vite | 8.1.1 | Bundler and dev server |
 | Tailwind CSS | 4.3.3 | Utility-first CSS framework |
 | React Router DOM | 7.18.1 | SPA routing |
@@ -76,7 +76,7 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 ### Backend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| Node.js | 20.x | JavaScript runtime |
+| Node.js | 24.15.0 | JavaScript runtime |
 | Express | 5.2.1 | Web framework |
 | Sequelize | 6.37.8 | MySQL ORM |
 | MySQL2 | 3.23.1 | Database driver |
@@ -115,10 +115,9 @@ PARKEA_3231252_003/
 │ │ ├── 📁 constants/ # Centralized error codes
 │ │ ├── 📁 controllers/ # Business logic (one per HU module)
 │ │ ├── 📁 jobs/ # Background jobs (expiration, finalization)
-│ │ ├── 📁 middlewares/ # Auth, error handling
-│ │ ├── 📁 models/ # Sequelize models (8 tables)
-│ │ ├── 📁 routes/ # API route definitions
-│ │ └── 📁 validators/ # express-validator rules
+│ │ ├── 📁 middlewares/ # Auth, error handling, and express-validator rules (*.validator.js)
+│ │ ├── 📁 models/ # Sequelize models (9 tables)
+│ │ └── 📁 routes/ # API route definitions
 │ ├── package.json
 │ ├── .env.example
 │ └── README.md
@@ -135,15 +134,14 @@ PARKEA_3231252_003/
 │ │ ├── 📁 routes/ # Route definitions
 │ │ ├── 📁 services/ # API calls (Axios)
 │ │ ├── 📁 utils/ # Helpers and validators
-│ │ └── index.css # Tailwind CSS + PARKEA theme
+│ │ └── index.css # Tailwind CSS + PARKEA theme (design tokens via @theme)
 │ ├── package.json
 │ ├── vite.config.js
-│ ├── tailwind.config.js
 │ ├── .env.example
 │ └── index.html
 │
 ├── 📁 database/
-│ └── schema.sql # Complete DDL script (8 tables)
+│ └── schema.sql # Complete DDL script (9 tables)
 │
 ├── 📁 docs/
 │ ├── SRS.md # Software Requirements Specification
@@ -163,9 +161,9 @@ PARKEA_3231252_003/
 | `develop` | Continuous integration | Michael (merge) | 🟢 Active |
 | `backend` | Consolidated backend dev | Michael | 🟢 Most advanced |
 | `frontend` | Consolidated frontend dev | Various | 🟡 In progress |
-| `isaza_backend` | Michael's individual work | @MichaellIsaza | 🟢 Active |
-| `isaza_frontend` | Michael's individual work | @MichaellIsaza | 🟡 Active |
-| `sanchez_backend` | Stiven's individual work | @Stiven5-ctrl | 🟢 Active |
+| `isaza_backend` | Michael's individual work | @MichaelIsaza | 🟢 Active |
+| `isaza_frontend` | Michael's individual work | @MichaelIsaza | 🟡 Active |
+| `stiven_backend` | Stiven's individual work | @Stiven5-ctrl | 🟢 Active |
 | `marin_backend` | Jhoan M.'s individual work | @jhoanmarin227 | 🟢 Active |
 | `marin_frontend` | Jhoan M.'s individual work | @jhoanmarin227 | 🟡 Active |
 | `leon_backend` | David's individual work | @David-Leon1089 | 🟢 Active |
@@ -173,7 +171,7 @@ PARKEA_3231252_003/
 | `almario_backend` | Almario's individual work | @centinel117 | 🟢 Active |
 | `almario_frontend` | Almario's individual work | @centinel117 | 🔴 Inactive |
 
-**Workflow:** Simplified Git Flow. Each member works on their personal branch, makes PR to `develop`, and `develop` merges to `main` only on stable releases.
+**Workflow:** Simplified Git Flow. Each member works on their personal branch, makes PR to their area branch (`backend` or `frontend`), and those merge to `develop`. Files not tied to one area (README, `database/schema.sql`) PR directly to `develop`. `develop` merges to `main` only on stable releases.
 
 ---
 
@@ -181,7 +179,7 @@ PARKEA_3231252_003/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) ≥ 20.x
+- [Node.js](https://nodejs.org) — see version above ⚠️
 - [MySQL](https://mysql.com) ≥ 8.0
 - [Git](https://git-scm.com)
 
@@ -197,7 +195,7 @@ CREATE DATABASE parkea_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 mysql -u root -p parkea_db < database/schema.sql
 ```
 
-> The script creates 8 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens, admin_action_logs.
+> The script creates 9 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens, admin_action_logs.
 
 ### Backend
 
@@ -295,7 +293,7 @@ VITE_API_URL=http://localhost:3000/api
 
 ## 🎨 PARKEA Color Palette
 
-Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variables:
+Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variables.
 
 ### Primary Green
 | Token | Hex | Use |
@@ -329,8 +327,8 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | `neutral-200` | `#DCE0DE` | **Input borders** |
 | `neutral-300` | `#BFC5C2` | Dividers |
 | `neutral-400` | `#949B98` | Placeholders |
-| `neutral-500` | `#6E7572` | Secondary text |
-| `neutral-600` | `#545B58` | Labels |
+| `neutral-500` | `#6E7572` | Decorative icons/placeholders only — fails text contrast |
+| `neutral-600` | `#545B58` | Secondary text, labels |
 | `neutral-700` | `#3D4441` | Primary text |
 | `neutral-800` | `#272C2A` | Headings |
 | `neutral-900` | `#161A18` | Maximum contrast text |
@@ -340,7 +338,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 |-------|--------|-----|
 | `font-display` | Barlow Condensed | Headings |
 | `font-sans` | Barlow | Body text |
-| `font-mono` | IBM Plex Mono | Code, IDs |
+| `font-mono` | IBM Plex Mono | Code, IDs, plates, amounts |
 
 ---
 
@@ -357,8 +355,8 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | HU-07 | Password Recovery | @centinel117 | ✅ | 🔴 |
 | HU-08 | Profile Management | @jhoanmarin227 | ✅ | 🟡 |
 | HU-09 | Browse Available Zones | @jhoanmarin227 | ✅ | 🟡 |
-| HU-10 | Register Vehicle | @MichaellIsaza | ✅ | 🟡 |
-| HU-11 | View My Vehicles | @MichaellIsaza | ✅ | 🟡 |
+| HU-10 | Register Vehicle | @MichaellIsaza | ✅ | 🔴 |
+| HU-11 | View My Vehicles | @MichaellIsaza | ✅ | 🔴 |
 | HU-12 | Edit Vehicle | @MichaellIsaza | ✅ | 🔴 |
 | HU-13 | Delete Vehicle | @MichaellIsaza | ✅ | 🔴 |
 | HU-14 | Reserve a Spot | @MichaellIsaza | ✅ | 🔴 |
@@ -371,7 +369,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | HU-21 | Edit Zone | @Stiven5-ctrl | ✅ | 🔴 |
 | HU-22 | Admin Dashboard | @David-Leon1089 | ✅ | 🔴 |
 | HU-23 | User Management (admin) | @David-Leon1089 | ✅ | 🔴 |
-| HU-24 | Sign Out | @centinel117 | ✅ | 🟡 |
+| HU-24 | Sign Out | @centinel117 | N/A | 🟡 |
 | HU-25 | View Zones on Map | @jhoanmarin227 | N/A | 🔴 |
 | HU-26 | Reservation Expiration | @MichaellIsaza | ✅ | N/A |
 
@@ -379,23 +377,24 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 - ✅ Implemented and verified
 - 🟡 In development / partial
 - 🔴 Not started
-- N/A Not applicable (automatic process or backend-only)
+- N/A Not applicable (automatic process, client-side only, or backend-only)
 
 ---
 
 ## 🔐 Code Conventions
 
 ### Backend
-- **Language:** Spanish for variable, function, and file names (e.g., `cambiarRol`, `vehiculo.controller.js`)
+- **Naming language (official team decision):** domain/business names — files, models, and controller functions that represent a business entity or action (e.g. `Usuario`, `Zona`, `vehiculo.controller.js`, `cambiarRol`) — stay in **Spanish**, since they reflect the data model vocabulary already defined in the SRS. Everything else (internal variable names, code comments, log/error messages) is in **English**.
 - **Error codes:** English uppercase with underscores in `constants/errorCodes.js`
 - **Models:** PascalCase singular (e.g., `Usuario`, `Vehiculo`)
 - **Tables:** Plural snake_case in DB (e.g., `users`, `parking_spots`)
 - **Controllers:** async/await with try/catch, errors passed to `next(error)`
-- **Validation:** express-validator in separate `*.validator.js` files
+- **Validation:** express-validator rules in separate `*.validator.js` files inside `middlewares/`
 
 ### Frontend
-- **Language:** Spanish for UI, English for code
-- **Components:** PascalCase (e.g., `LoginPage.jsx`)
+- **Language:** Spanish for UI text, English for code
+- **Routes (official team decision):** English (e.g. `/login`, `/forgot-password`, `/admin/login`)
+- **Components:** PascalCase (e.g., `Login.jsx`)
 - **Hooks:** camelCase with `use` prefix (e.g., `useAuth`)
 - **Services:** camelCase (e.g., `authService.js`)
 - **Styles:** Tailwind CSS utilities, PARKEA theme in `index.css`
@@ -403,7 +402,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 ### Git
 - Descriptive commits in English or Spanish
 - One branch per member: `{name}_{area}`
-- Mandatory PR to `develop` before merging
+- Mandatory PR to the area branch (`backend`/`frontend`) before merging to `develop`
 
 ---
 
