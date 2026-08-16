@@ -355,12 +355,12 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | HU-07 | Password Recovery | @centinel117 | ✅ | 🔴 |
 | HU-08 | Profile Management | @jhoanmarin227 | ✅ | 🟡 |
 | HU-09 | Browse Available Zones | @jhoanmarin227 | ✅ | 🟡 |
-| HU-10 | Register Vehicle | @MichaellIsaza | ✅ | 🔴 |
-| HU-11 | View My Vehicles | @MichaellIsaza | ✅ | 🔴 |
-| HU-12 | Edit Vehicle | @MichaellIsaza | ✅ | 🔴 |
-| HU-13 | Delete Vehicle | @MichaellIsaza | ✅ | 🔴 |
-| HU-14 | Reserve a Spot | @MichaellIsaza | ✅ | 🔴 |
-| HU-15 | Reservation Confirmation | @MichaellIsaza | ✅ | 🔴 |
+| HU-10 | Register Vehicle | @MichaelIsaza | ✅ | 🔴 |
+| HU-11 | View My Vehicles | @MichaelIsaza | ✅ | 🔴 |
+| HU-12 | Edit Vehicle | @MichaelIsaza | ✅ | 🔴 |
+| HU-13 | Delete Vehicle | @MichaelIsaza | ✅ | 🔴 |
+| HU-14 | Reserve a Spot | @MichaelIsaza | ✅ | 🔴 |
+| HU-15 | Reservation Confirmation | @MichaelIsaza | ✅ | 🔴 |
 | HU-16 | Cancel Reservation | @jhoanmarin227 | ✅ | 🔴 |
 | HU-17 | Simulated Payment | @centinel117 | ✅ | 🔴 |
 | HU-18 | Booking History | @Stiven5-ctrl | ✅ | 🔴 |
@@ -371,7 +371,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | HU-23 | User Management (admin) | @David-Leon1089 | ✅ | 🔴 |
 | HU-24 | Sign Out | @centinel117 | N/A | 🟡 |
 | HU-25 | View Zones on Map | @jhoanmarin227 | N/A | 🔴 |
-| HU-26 | Reservation Expiration | @MichaellIsaza | ✅ | N/A |
+| HU-26 | Reservation Expiration | @MichaelIsaza | ✅ | N/A |
 
 **Legend:**
 - ✅ Implemented and verified
