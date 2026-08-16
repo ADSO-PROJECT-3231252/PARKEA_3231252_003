@@ -68,7 +68,10 @@ export default function Login() {
             navigate('/dashboard');
         } catch (err) {
             // AC-08: mensaje genérico siempre, sin importar si falló el email o la contraseña
-            if (err.response?.status === 401) {
+            const code = err.response?.data?.code;
+            if (code === 'ACCOUNT_DEACTIVATED') {
+                setServerError('Tu cuenta ha sido desactivada. Contacta al administrador.');
+            } else if (code === 'INVALID_CREDENTIALS' || err.response?.status === 401) {
                 setServerError('Credenciales inválidas.');
             } else {
                 setServerError('No se pudo iniciar sesión. Intenta de nuevo.');
@@ -124,7 +127,7 @@ export default function Login() {
                             onChange={handleChange}
                             aria-invalid={Boolean(errors.email)}
                             aria-describedby={errors.email ? 'email-error' : undefined}
-                            className={`w-full rounded-[10px] border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                            className={`w-full rounded-md border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                 errors.email ? 'border-danger' : 'border-neutral-200'
                             }`}
                         />
@@ -149,7 +152,7 @@ export default function Login() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.password)}
                                 aria-describedby={errors.password ? 'password-error' : undefined}
-                                className={`w-full rounded-[10px] border px-3 py-2.5 pr-10 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                                className={`w-full rounded-md border px-3 py-2.5 pr-10 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                     errors.password ? 'border-danger' : 'border-neutral-200'
                                 }`}
                             />
@@ -172,7 +175,7 @@ export default function Login() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full rounded-[10px] bg-parkea-600 text-white font-sans font-medium py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+                        className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
                     >
                         {loading ? 'Ingresando...' : 'Iniciar sesión'}
                     </button>

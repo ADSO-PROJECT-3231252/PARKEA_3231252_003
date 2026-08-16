@@ -162,7 +162,7 @@ export default function Register() {
                                     name="documentType"
                                     value={form.documentType}
                                     onChange={handleChange}
-                                    className="w-full rounded-[10px] border border-neutral-200 px-3 py-2 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                                    className="w-full rounded-md border border-neutral-200 px-3 py-2 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                                 >
                                     {DOCUMENT_TYPES.map((opt) => (
                                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -183,7 +183,7 @@ export default function Register() {
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.documentNumber)}
                                     aria-describedby={errors.documentNumber ? 'documentNumber-error' : undefined}
-                                    className={`w-full rounded-[10px] border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                                    className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                         errors.documentNumber ? 'border-danger' : 'border-neutral-200'
                                     }`}
                                 />
@@ -208,7 +208,7 @@ export default function Register() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.fullName)}
                                 aria-describedby={errors.fullName ? 'fullName-error' : undefined}
-                                className={`w-full rounded-[10px] border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                     errors.fullName ? 'border-danger' : 'border-neutral-200'
                                 }`}
                             />
@@ -232,7 +232,7 @@ export default function Register() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.email)}
                                 aria-describedby={errors.email ? 'email-error' : undefined}
-                                className={`w-full rounded-[10px] border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                     errors.email ? 'border-danger' : 'border-neutral-200'
                                 }`}
                             />
@@ -257,7 +257,7 @@ export default function Register() {
                                         onChange={handleChange}
                                         aria-invalid={Boolean(errors.password)}
                                         aria-describedby={errors.password ? 'password-error' : 'password-hint'}
-                                        className={`w-full rounded-[10px] border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                             errors.password ? 'border-danger' : 'border-neutral-200'
                                         }`}
                                     />
@@ -290,7 +290,7 @@ export default function Register() {
                                         onChange={handleChange}
                                         aria-invalid={Boolean(errors.confirmPassword)}
                                         aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
-                                        className={`w-full rounded-[10px] border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                             errors.confirmPassword ? 'border-danger' : 'border-neutral-200'
                                         }`}
                                     />
@@ -330,7 +330,7 @@ export default function Register() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.phone)}
                                 aria-describedby={errors.phone ? 'phone-error' : undefined}
-                                className={`w-full rounded-[10px] border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
                                     errors.phone ? 'border-danger' : 'border-neutral-200'
                                 }`}
                             />
@@ -344,7 +344,7 @@ export default function Register() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-[10px] bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+                            className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
                         >
                             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
                         </button>
