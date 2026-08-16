@@ -1,17 +1,5 @@
 <div align="center">
 
-**[⬆ Volver al inicio](#-tabla-de-contenidos)**
-
-</div>
-
----
-
----
-
-# 🇬🇧 English Version
-
-<div align="center">
-
 # 🅿️ PARKEA
 
 ### *Smart Urban Parking Reservation System*
@@ -66,11 +54,11 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 
 | Name | Role | GitHub | Main Branch |
 |------|------|--------|-------------|
-| **Michael Isaza** | Scrum Master / Tech Lead | [@MichaelIsaza](https://github.com/MichaelIsaza) | `isaza_backend`, `isaza_frontend` |
+| **Michael Isaza** | Scrum Master / Tech Lead | [@MichaellIsaza](https://github.com/MichaellIsaza) | `isaza_backend`, `isaza_frontend` |
 | **Jhoan Marín** | Full Stack Developer | [@jhoanmarin227](https://github.com/jhoanmarin227) | `marin_backend`, `marin_frontend` |
-| **Stiven Sánchez** | Backend Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend` |
+| **Stiven Sánchez** | Backend Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `sanchez_backend` |
 | **David León** | Frontend Developer / DBA | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_sql` |
-| **Jhoan Almario** | Analyst / Backend | [@johan_almario](https://github.com/johan_almario) | `almario_backend`, `almario_frontend` |
+| **Jhoan Almario** | Analyst / Backend | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
 
 ---
 
@@ -117,55 +105,53 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 
 ## 📁 Repository Structure
 
-```
 PARKEA_3231252_003/
 │
 ├── 📁 backend/
-│   ├── src/
-│   │   ├── app.js                 # Express config (middlewares, routes)
-│   │   ├── server.js              # Entry point (sync DB + jobs + listen)
-│   │   ├── 📁 config/             # Sequelize + MySQL config
-│   │   ├── 📁 constants/          # Centralized error codes
-│   │   ├── 📁 controllers/        # Business logic (one per HU module)
-│   │   ├── 📁 jobs/               # Background jobs (expiration, finalization)
-│   │   ├── 📁 middlewares/        # Auth, error handling
-│   │   ├── 📁 models/             # Sequelize models (8 tables)
-│   │   ├── 📁 routes/             # API route definitions
-│   │   └── 📁 validators/         # express-validator rules
-│   ├── package.json
-│   ├── .env.example
-│   └── README.md
+│ ├── src/
+│ │ ├── app.js # Express config (middlewares, routes)
+│ │ ├── server.js # Entry point (sync DB + jobs + listen)
+│ │ ├── 📁 config/ # Sequelize + MySQL config
+│ │ ├── 📁 constants/ # Centralized error codes
+│ │ ├── 📁 controllers/ # Business logic (one per HU module)
+│ │ ├── 📁 jobs/ # Background jobs (expiration, finalization)
+│ │ ├── 📁 middlewares/ # Auth, error handling
+│ │ ├── 📁 models/ # Sequelize models (8 tables)
+│ │ ├── 📁 routes/ # API route definitions
+│ │ └── 📁 validators/ # express-validator rules
+│ ├── package.json
+│ ├── .env.example
+│ └── README.md
 │
 ├── 📁 frontend/
-│   ├── src/
-│   │   ├── main.jsx               # React entry point
-│   │   ├── App.jsx                # Router + AuthProvider
-│   │   ├── 📁 assets/             # Images, logos, illustrations
-│   │   ├── 📁 components/         # Reusable UI components
-│   │   ├── 📁 context/            # Global state (AuthContext)
-│   │   ├── 📁 hooks/              # Custom React hooks
-│   │   ├── 📁 pages/              # Route-based views
-│   │   ├── 📁 routes/             # Route definitions
-│   │   ├── 📁 services/           # API calls (Axios)
-│   │   ├── 📁 utils/              # Helpers and validators
-│   │   └── index.css              # Tailwind CSS + PARKEA theme
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   ├── .env.example
-│   └── index.html
+│ ├── src/
+│ │ ├── main.jsx # React entry point
+│ │ ├── App.jsx # Router + AuthProvider
+│ │ ├── 📁 assets/ # Images, logos, illustrations
+│ │ ├── 📁 components/ # Reusable UI components
+│ │ ├── 📁 context/ # Global state (AuthContext)
+│ │ ├── 📁 hooks/ # Custom React hooks
+│ │ ├── 📁 pages/ # Route-based views
+│ │ ├── 📁 routes/ # Route definitions
+│ │ ├── 📁 services/ # API calls (Axios)
+│ │ ├── 📁 utils/ # Helpers and validators
+│ │ └── index.css # Tailwind CSS + PARKEA theme
+│ ├── package.json
+│ ├── vite.config.js
+│ ├── tailwind.config.js
+│ ├── .env.example
+│ └── index.html
 │
 ├── 📁 database/
-│   └── schema.sql                 # Complete DDL script (8 tables)
+│ └── schema.sql # Complete DDL script (8 tables)
 │
 ├── 📁 docs/
-│   ├── SRS.md                     # Software Requirements Specification
-│   └── mockups/                   # UI designs
+│ ├── SRS.md # Software Requirements Specification
+│ └── mockups/ # UI designs
 │
 ├── .gitignore
-├── README.md                      # ← This document
+├── README.md # ← This document
 └── LICENSE
-```
 
 ---
 
@@ -177,15 +163,15 @@ PARKEA_3231252_003/
 | `develop` | Continuous integration | Michael (merge) | 🟢 Active |
 | `backend` | Consolidated backend dev | Michael | 🟢 Most advanced |
 | `frontend` | Consolidated frontend dev | Various | 🟡 In progress |
-| `isaza_backend` | Michael's individual work | @MichaelIsaza | 🟢 Active |
-| `isaza_frontend` | Michael's individual work | @MichaelIsaza | 🟡 Active |
-| `stiven_backend` | Stiven's individual work | @Stiven5-ctrl | 🟢 Active |
+| `isaza_backend` | Michael's individual work | @MichaellIsaza | 🟢 Active |
+| `isaza_frontend` | Michael's individual work | @MichaellIsaza | 🟡 Active |
+| `sanchez_backend` | Stiven's individual work | @Stiven5-ctrl | 🟢 Active |
 | `marin_backend` | Jhoan M.'s individual work | @jhoanmarin227 | 🟢 Active |
 | `marin_frontend` | Jhoan M.'s individual work | @jhoanmarin227 | 🟡 Active |
 | `leon_backend` | David's individual work | @David-Leon1089 | 🟢 Active |
 | `leon_sql` | Database design | @David-Leon1089 | ✅ Complete |
-| `almario_backend` | Almario's individual work | @johan_almario | 🟢 Active |
-| `almario_frontend` | Almario's individual work | @johan_almario | 🔴 Inactive |
+| `almario_backend` | Almario's individual work | @centinel117 | 🟢 Active |
+| `almario_frontend` | Almario's individual work | @centinel117 | 🔴 Inactive |
 
 **Workflow:** Simplified Git Flow. Each member works on their personal branch, makes PR to `develop`, and `develop` merges to `main` only on stable releases.
 
@@ -371,12 +357,12 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | HU-07 | Password Recovery | @centinel117 | ✅ | 🔴 |
 | HU-08 | Profile Management | @jhoanmarin227 | ✅ | 🟡 |
 | HU-09 | Browse Available Zones | @jhoanmarin227 | ✅ | 🟡 |
-| HU-10 | Register Vehicle | @MichaelIsaza | ✅ | 🟡 |
-| HU-11 | View My Vehicles | @MichaelIsaza | ✅ | 🟡 |
-| HU-12 | Edit Vehicle | @MichaelIsaza | ✅ | 🔴 |
-| HU-13 | Delete Vehicle | @MichaelIsaza | ✅ | 🔴 |
-| HU-14 | Reserve a Spot | @MichaelIsaza | ✅ | 🔴 |
-| HU-15 | Reservation Confirmation | @MichaelIsaza | ✅ | 🔴 |
+| HU-10 | Register Vehicle | @MichaellIsaza | ✅ | 🟡 |
+| HU-11 | View My Vehicles | @MichaellIsaza | ✅ | 🟡 |
+| HU-12 | Edit Vehicle | @MichaellIsaza | ✅ | 🔴 |
+| HU-13 | Delete Vehicle | @MichaellIsaza | ✅ | 🔴 |
+| HU-14 | Reserve a Spot | @MichaellIsaza | ✅ | 🔴 |
+| HU-15 | Reservation Confirmation | @MichaellIsaza | ✅ | 🔴 |
 | HU-16 | Cancel Reservation | @jhoanmarin227 | ✅ | 🔴 |
 | HU-17 | Simulated Payment | @centinel117 | ✅ | 🔴 |
 | HU-18 | Booking History | @Stiven5-ctrl | ✅ | 🔴 |
@@ -387,7 +373,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | HU-23 | User Management (admin) | @David-Leon1089 | ✅ | 🔴 |
 | HU-24 | Sign Out | @centinel117 | ✅ | 🟡 |
 | HU-25 | View Zones on Map | @jhoanmarin227 | N/A | 🔴 |
-| HU-26 | Reservation Expiration | @MichaelIsaza | ✅ | N/A |
+| HU-26 | Reservation Expiration | @MichaellIsaza | ✅ | N/A |
 
 **Legend:**
 - ✅ Implemented and verified
