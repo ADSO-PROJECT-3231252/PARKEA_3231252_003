@@ -40,7 +40,7 @@ async function solicitarRecuperacion(req, res, next) {
             expiresAt,
         });
 
-        const resetUrl = `http://localhost:5173/restablecer?token=${tokenPlano}`;
+        const resetUrl = `http://localhost:5173/reset-password?token=${tokenPlano}`;
         await enviarCorreoRecuperacion(usuario.email, resetUrl);
 
         return res.status(200).json(respuestaGenerica);

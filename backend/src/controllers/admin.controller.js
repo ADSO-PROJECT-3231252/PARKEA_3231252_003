@@ -284,20 +284,24 @@ async function getRegistroDeCambios(req, res, next) {
 
 // PATCH /api/admin/users/:id/role
 async function cambiarRol(req, res, next) {
+  const t = await sequelize.transaction();
   try {
     const { id } = req.params;
     const { role } = req.body; // 'admin' | 'user'
     const solicitanteId = req.usuario.id;
 
     if (id === solicitanteId) {
+      await t.rollback();
       return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot change your own role' });
     }
 
-    const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }] });
+    const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }], transaction: t });
     if (!usuario) {
+      await t.rollback();
       return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
     }
     if (usuario.isPrimaryAdmin) {
+      await t.rollback();
       return res.status(403).json({ code: ErrorCodes.PRIMARY_ADMIN_PROTECTED, message: 'The primary administrator role cannot be changed' });
     }
 
@@ -307,48 +311,58 @@ async function cambiarRol(req, res, next) {
       const admins = await Usuario.count({
         where: { isActive: true },
         include: [{ model: Rol, as: 'role', where: { name: 'admin' } }],
+        transaction: t,
       });
       if (admins <= 1) {
+        await t.rollback();
         return res.status(400).json({ code: ErrorCodes.MIN_ONE_ADMIN_REQUIRED, message: 'The system must always keep at least one active administrator' });
       }
     }
 
-    const nuevoRol = await Rol.findOne({ where: { name: role } });
+    const nuevoRol = await Rol.findOne({ where: { name: role }, transaction: t });
     if (!nuevoRol) {
+      await t.rollback();
       return res.status(400).json({ code: ErrorCodes.INVALID_ROLE, message: 'Invalid role' });
     }
 
-    await usuario.update({ roleId: nuevoRol.id });
+    await usuario.update({ roleId: nuevoRol.id }, { transaction: t });
 
     await AdminActionLog.create({
       adminId: solicitanteId,
       targetUserId: id,
       action: 'role_changed',
       details: `Role changed from "${rolAnterior}" to "${role}"`,
-    });
+    }, { transaction: t });
+
+    await t.commit();
 
     return res.status(200).json({ message: 'Role updated successfully' });
   } catch (error) {
+    await t.rollback();
     next(error);
   }
 }
 
 // PATCH /api/admin/users/:id/status
 async function cambiarEstado(req, res, next) {
+  const t = await sequelize.transaction();
   try {
     const { id } = req.params;
     const { isActive } = req.body;
     const solicitanteId = req.usuario.id;
 
     if (id === solicitanteId) {
+      await t.rollback();
       return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot deactivate your own account' });
     }
 
-    const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }] });
+    const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }], transaction: t });
     if (!usuario) {
+      await t.rollback();
       return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
     }
     if (usuario.isPrimaryAdmin) {
+      await t.rollback();
       return res.status(403).json({ code: ErrorCodes.PRIMARY_ADMIN_PROTECTED, message: 'The primary administrator cannot be deactivated' });
     }
 
@@ -356,23 +370,28 @@ async function cambiarEstado(req, res, next) {
       const admins = await Usuario.count({
         where: { isActive: true },
         include: [{ model: Rol, as: 'role', where: { name: 'admin' } }],
+        transaction: t,
       });
       if (admins <= 1) {
+        await t.rollback();
         return res.status(400).json({ code: ErrorCodes.MIN_ONE_ADMIN_REQUIRED, message: 'The system must always keep at least one active administrator' });
       }
     }
 
-    await usuario.update({ isActive });
+    await usuario.update({ isActive }, { transaction: t });
 
     await AdminActionLog.create({
       adminId: solicitanteId,
       targetUserId: id,
       action: 'status_changed',
       details: `Status changed to ${isActive ? 'active' : 'inactive'}`,
-    });
+    }, { transaction: t });
+
+    await t.commit();
 
     return res.status(200).json({ message: 'Status updated successfully' });
   } catch (error) {
+    await t.rollback();
     next(error);
   }
 }
