@@ -1,8 +1,5 @@
-/* eslint-disable react-refresh/only-export-components */
-
-import { createContext, useContext, useState, useEffect } from 'react';
-
-const AuthContext = createContext(null);
+import { useState, useEffect } from 'react';
+import { AuthContext } from './authContext';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
@@ -35,12 +32,4 @@ export function AuthProvider({ children }) {
             {children}
         </AuthContext.Provider>
     );
-}
-
-export function useAuth() {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth debe usarse dentro de un AuthProvider');
-    }
-    return context;
 }
