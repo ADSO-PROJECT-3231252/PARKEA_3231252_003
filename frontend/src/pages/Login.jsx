@@ -4,7 +4,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { login } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Shield } from 'lucide-react';
 
 export default function Login() {
     const [form, setForm] = useState({ email: '', password: '' });
@@ -113,9 +113,8 @@ export default function Login() {
                             onChange={handleChange}
                             aria-invalid={Boolean(errors.email)}
                             aria-describedby={errors.email ? 'email-error' : undefined}
-                            className={`w-full rounded-md border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                errors.email ? 'border-danger' : 'border-neutral-200'
-                            }`}
+                            className={`w-full rounded-md border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
+                                }`}
                         />
                         {errors.email && (
                             <p id="email-error" role="alert" className="mt-1 text-caption text-danger">
@@ -138,9 +137,8 @@ export default function Login() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.password)}
                                 aria-describedby={errors.password ? 'password-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2.5 pr-10 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                    errors.password ? 'border-danger' : 'border-neutral-200'
-                                }`}
+                                className={`w-full rounded-md border px-3 py-2.5 pr-10 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.password ? 'border-danger' : 'border-neutral-200'
+                                    }`}
                             />
                             <button
                                 type="button"
@@ -183,9 +181,7 @@ export default function Login() {
                         className="flex items-center justify-center gap-2 text-label text-parkea-700 hover:text-parkea-800"
                     >
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-parkea-50">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" />
-                            </svg>
+                            <Shield size={13} />
                         </span>
                         Iniciar sesión como administrador
                     </Link>
