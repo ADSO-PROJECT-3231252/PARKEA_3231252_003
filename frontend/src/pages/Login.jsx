@@ -3,7 +3,7 @@ import logo from '../assets/logo.png';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { login } from '../services/authService';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 
 export default function Login() {
