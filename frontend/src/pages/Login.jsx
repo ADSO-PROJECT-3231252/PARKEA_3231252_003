@@ -5,6 +5,7 @@ import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { login } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Shield } from 'lucide-react';
+import { translateError } from '../utils/errorMessages';
 
 export default function Login() {
     const [form, setForm] = useState({ email: '', password: '' });
@@ -55,13 +56,7 @@ export default function Login() {
             navigate('/dashboard');
         } catch (err) {
             const code = err.response?.data?.code;
-            if (code === 'ACCOUNT_DEACTIVATED') {
-                setServerError('Tu cuenta ha sido desactivada. Contacta al administrador.');
-            } else if (code === 'INVALID_CREDENTIALS' || err.response?.status === 401) {
-                setServerError('Credenciales inválidas.');
-            } else {
-                setServerError('No se pudo iniciar sesión. Intenta de nuevo.');
-            }
+            setServerError(translateError(code));
         } finally {
             setLoading(false);
         }

@@ -5,6 +5,7 @@ import { register } from '../services/authService';
 import logo from '../assets/logo.png';
 import carImage from '../assets/car_register.png';
 import { Eye, EyeOff } from 'lucide-react';
+import { translateError } from '../utils/errorMessages';
 
 const DOCUMENT_TYPES = [
     { value: 'CC', label: 'CC' },
@@ -59,11 +60,12 @@ export default function Register() {
             newErrors.password = 'La contraseña es obligatoria.';
         } else if (
             form.password.length < 8 ||
+            form.password.length > 20 ||
             !/[A-Z]/.test(form.password) ||
             !/[0-9]/.test(form.password) ||
             !/[^A-Za-z0-9]/.test(form.password)
         ) {
-            newErrors.password = 'Mínimo 8 caracteres, con una mayúscula, un número y un carácter especial.';
+            newErrors.password = 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
         }
 
         if (!isNotEmpty(form.confirmPassword)) {
@@ -103,11 +105,11 @@ export default function Register() {
             const code = err.response?.data?.code;
 
             if (code === 'EMAIL_ALREADY_REGISTERED') {
-                setErrors((prev) => ({ ...prev, email: 'Este correo ya está registrado.' }));
+                setErrors((prev) => ({ ...prev, email: translateError(code) }));
             } else if (code === 'DOCUMENT_ALREADY_REGISTERED') {
-                setErrors((prev) => ({ ...prev, documentNumber: 'Este número de documento ya está registrado.' }));
+                setErrors((prev) => ({ ...prev, documentNumber: translateError(code) }));
             } else {
-                setServerError('No se pudo completar el registro. Intenta de nuevo.');
+                setServerError(translateError(code));
             }
         } finally {
             setLoading(false);
@@ -170,9 +172,8 @@ export default function Register() {
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.documentNumber)}
                                     aria-describedby={errors.documentNumber ? 'documentNumber-error' : undefined}
-                                    className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                        errors.documentNumber ? 'border-danger' : 'border-neutral-200'
-                                    }`}
+                                    className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.documentNumber ? 'border-danger' : 'border-neutral-200'
+                                        }`}
                                 />
                                 {errors.documentNumber && (
                                     <p id="documentNumber-error" role="alert" className="mt-1 text-caption text-danger">
@@ -195,9 +196,8 @@ export default function Register() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.fullName)}
                                 aria-describedby={errors.fullName ? 'fullName-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                    errors.fullName ? 'border-danger' : 'border-neutral-200'
-                                }`}
+                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.fullName ? 'border-danger' : 'border-neutral-200'
+                                    }`}
                             />
                             {errors.fullName && (
                                 <p id="fullName-error" role="alert" className="mt-1 text-caption text-danger">
@@ -219,9 +219,8 @@ export default function Register() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.email)}
                                 aria-describedby={errors.email ? 'email-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                    errors.email ? 'border-danger' : 'border-neutral-200'
-                                }`}
+                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
+                                    }`}
                             />
                             {errors.email && (
                                 <p id="email-error" role="alert" className="mt-1 text-caption text-danger">
@@ -240,13 +239,13 @@ export default function Register() {
                                         id="password"
                                         name="password"
                                         type={showPassword ? 'text' : 'password'}
+                                        maxLength={20}
                                         value={form.password}
                                         onChange={handleChange}
                                         aria-invalid={Boolean(errors.password)}
                                         aria-describedby={errors.password ? 'password-error' : 'password-hint'}
-                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                            errors.password ? 'border-danger' : 'border-neutral-200'
-                                        }`}
+                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.password ? 'border-danger' : 'border-neutral-200'
+                                            }`}
                                     />
                                     <button
                                         type="button"
@@ -273,13 +272,13 @@ export default function Register() {
                                         id="confirmPassword"
                                         name="confirmPassword"
                                         type={showConfirmPassword ? 'text' : 'password'}
+                                        maxLength={20}
                                         value={form.confirmPassword}
                                         onChange={handleChange}
                                         aria-invalid={Boolean(errors.confirmPassword)}
                                         aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
-                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                            errors.confirmPassword ? 'border-danger' : 'border-neutral-200'
-                                        }`}
+                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.confirmPassword ? 'border-danger' : 'border-neutral-200'
+                                            }`}
                                     />
                                     <button
                                         type="button"
@@ -299,8 +298,8 @@ export default function Register() {
                         </div>
 
                         {!errors.password && !errors.confirmPassword && (
-                            <p id="password-hint" className="text-caption text-neutral-500">
-                                Mínimo 8 caracteres, una mayúscula, un número y un carácter especial.
+                            <p id="password-hint" className="-mt-1 text-caption text-neutral-500">
+                                Entre 8 y 20 caracteres, una mayúscula, un número y un carácter especial.
                             </p>
                         )}
 
@@ -317,9 +316,8 @@ export default function Register() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.phone)}
                                 aria-describedby={errors.phone ? 'phone-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                                    errors.phone ? 'border-danger' : 'border-neutral-200'
-                                }`}
+                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.phone ? 'border-danger' : 'border-neutral-200'
+                                    }`}
                             />
                             {errors.phone && (
                                 <p id="phone-error" role="alert" className="mt-1 text-caption text-danger">
