@@ -88,7 +88,7 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
-            <div className="mx-auto flex h-16 w-[92%] max-w-[1800px] items-center gap-4 px-4 sm:px-6">
+            <div className="mx-auto flex h-18 w-[92%] max-w-[1800px] items-center gap-4 px-4 sm:px-6">
                 <NavLink
                     to={homeLink}
                     className={`flex shrink-0 items-center rounded-md ${FOCUS_RING}`}
