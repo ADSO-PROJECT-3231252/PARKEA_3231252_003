@@ -88,13 +88,13 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
-            <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
+            <div className="mx-auto flex h-16 w-[92%] max-w-[1800px] items-center gap-4 px-4 sm:px-6">
                 <NavLink
                     to={homeLink}
                     className={`flex shrink-0 items-center rounded-md ${FOCUS_RING}`}
                     aria-label="Ir al inicio"
                 >
-                    <img src={logo} alt="PARKEA" className="h-8 w-auto" />
+                    <img src={logo} alt="PARKEA" className="h-15 w-auto" />
                 </NavLink>
 
                 <div className="hidden h-8 w-px bg-neutral-200 sm:block" aria-hidden="true" />

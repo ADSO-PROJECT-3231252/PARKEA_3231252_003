@@ -97,7 +97,7 @@ function CardShell({ title, viewAllTo, viewAllLabel, children, footerTo, footerL
 
 function VisitorHome() {
     return (
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <section className="flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
                     <h1 className="text-display font-display uppercase text-neutral-900">
@@ -207,7 +207,7 @@ function AuthenticatedHome({ user }) {
     }, []);
 
     return (
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <section className="flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
                     <h1 className="text-display font-display uppercase text-neutral-900">
@@ -356,7 +356,7 @@ function AuthenticatedHome({ user }) {
 
 function AdminHome() {
     return (
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <section className="flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="flex items-start gap-5">
                     <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-800 text-white">
