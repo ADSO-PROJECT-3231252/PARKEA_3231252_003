@@ -252,7 +252,7 @@ async function misReservas(req, res, next) {
             limit,
             offset,
             include: [
-                { model: Zona, as: 'zone', attributes: ['id', 'name'] },
+                { model: Zona, as: 'zone', attributes: ['id', 'name', 'address'] },
                 { model: Vehiculo, as: 'vehicle', attributes: ['id', 'plate'] },
                 { model: Pago, as: 'payment', attributes: ['amount', 'paymentStatus'] },
             ],
