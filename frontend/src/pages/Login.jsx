@@ -44,7 +44,7 @@ export default function Login() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
         if (!validate()) return;
@@ -53,7 +53,7 @@ export default function Login() {
         try {
             const { data } = await login(form);
             loginUser(data.token, data.user);
-            navigate('/dashboard');
+            navigate(data.user.role === 'admin' ? '/admin/dashboard' : '/');
         } catch (err) {
             const code = err.response?.data?.code;
             setServerError(translateError(code));
