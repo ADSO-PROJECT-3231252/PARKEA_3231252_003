@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
     MapPin,
     CalendarCheck,
+    Calendar,
     Map,
     History,
     ChevronRight,
@@ -19,19 +20,19 @@ import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 
 import heroVisitorIllustration from '../assets/hero-visitor.png';
-// import heroUserIllustration from '../assets/hero-user.png';
+import heroUserIllustration from '../assets/hero-user.png';
 // import heroAdminIllustration from '../assets/hero-admin.png';
-const heroUserIllustration = null;
 const heroAdminIllustration = null;
 
-function HeroIllustration({ src }) {
+function HeroIllustration({ src, height = 132, right = 32 }) {
     if (!src) return null;
     return (
         <img
             src={src}
             alt=""
             aria-hidden="true"
-            className="hidden absolute right-8 top-1/2 -translate-y-1/2 h-132 w-auto lg:block"
+            style={{ height: `${height}px`, right: `${right}px` }}
+            className="hidden absolute top-1/2 -translate-y-1/2 w-auto lg:block"
         />
     );
 }
@@ -70,18 +71,12 @@ function ErrorMessage() {
     );
 }
 
-function CardShell({ title, viewAllTo, viewAllLabel, children, footerTo, footerLabel }) {
+function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
     return (
         <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
             <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-title font-display uppercase text-neutral-900">{title}</h3>
-                <Link
-                    to={viewAllTo}
-                    className="inline-flex items-center gap-0.5 text-label text-parkea-600 hover:text-parkea-700"
-                >
-                    {viewAllLabel}
-                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </Link>
+                <Icon className="h-6 w-6 text-parkea-600" aria-hidden="true" />
             </div>
             <div className="flex-1">{children}</div>
             <Link
@@ -116,7 +111,7 @@ function VisitorHome() {
                         Ver zonas disponibles
                     </Link>
                 </div>
-                <HeroIllustration src={heroVisitorIllustration} />
+                <HeroIllustration src={heroVisitorIllustration} height={520} right={110} />
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -214,12 +209,12 @@ function AuthenticatedHome({ user }) {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="text-hero font-display uppercase text-neutral-900">
-                        ¡Bienvenido, {user.fullName}!
+                    <h1 className="text-hero-sm font-display uppercase text-neutral-900">
+                        ¡Bienvenido, {user.fullName?.split(' ')[0]}!
                     </h1>
-                    <p className="mt-3 text-body text-neutral-600">
+                    <p className="mt-3 text-subtitle-sm text-neutral-900">
                         Encuentra y reserva tu espacio de parqueo de forma rápida, segura y confiable.
                     </p>
                     <Link
@@ -230,14 +225,13 @@ function AuthenticatedHome({ user }) {
                         Ver zonas disponibles
                     </Link>
                 </div>
-                <HeroIllustration src={heroUserIllustration} />
+                <HeroIllustration src={heroUserIllustration} height={340} right={160} />
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
                 <CardShell
                     title="Reservas"
-                    viewAllTo="/reservations"
-                    viewAllLabel="Ver todas"
+                    icon={CalendarCheck}
                     footerTo="/reservations"
                     footerLabel="Ver mis reservas"
                 >
@@ -262,11 +256,20 @@ function AuthenticatedHome({ user }) {
                                     {RESERVATION_STATUS_LABEL[latestReservation.status]?.text ?? latestReservation.status}
                                 </span>
                             </div>
-                            <p className="mt-2 text-body text-neutral-600">
+
+                            {latestReservation.zone.address && (
+                                <p className="mt-0.5 pl-[18px] text-body text-neutral-600">
+                                    {latestReservation.zone.address}
+                                </p>
+                            )}
+
+                            <p className="mt-2 flex items-center gap-1 text-body font-medium text-neutral-900">
+                                <Calendar className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
                                 {formatDate(latestReservation.startTime)}
                             </p>
+
                             <div className="mt-0.5 flex items-center justify-between">
-                                <p className="text-body text-neutral-600">
+                                <p className="pl-[18px] text-body text-neutral-600">
                                     {formatTime(latestReservation.startTime)} – {formatTime(latestReservation.endTime)}
                                 </p>
                                 <p className="font-mono text-label text-neutral-600">
@@ -279,8 +282,7 @@ function AuthenticatedHome({ user }) {
 
                 <CardShell
                     title="Zonas"
-                    viewAllTo="/zones"
-                    viewAllLabel="Ver todas"
+                    icon={Map}
                     footerTo="/zones"
                     footerLabel="Explorar zonas"
                 >
@@ -296,16 +298,18 @@ function AuthenticatedHome({ user }) {
                             {zones.map((zone) => {
                                 const availability = getZoneAvailabilityLabel(zone.availableSlots, zone.totalSlots);
                                 return (
-                                    <li key={zone.id} className="flex items-center justify-between">
+                                    <li key={zone.id} className="flex items-center justify-between rounded-md bg-parkea-50 p-3">
                                         <p className="flex items-center gap-1 text-body text-neutral-900">
                                             <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
                                             {zone.name}
                                         </p>
                                         <div className="flex items-center gap-3">
-                                            <span className="font-mono text-caption text-neutral-600">
-                                                {zone.availableSlots} de {zone.totalSlots}
+                                            <span className="flex items-baseline gap-1 font-mono text-caption text-neutral-600">
+                                                <span className="text-right tabular-nums">{zone.availableSlots}</span>
+                                                <span>de</span>
+                                                <span className="text-right tabular-nums">{zone.totalSlots}</span>
                                             </span>
-                                            <span className={`text-label font-medium ${availability.color}`}>
+                                            <span className={`w-[80px] text-right text-label font-medium ${availability.color}`}>
                                                 {availability.text}
                                             </span>
                                         </div>
@@ -318,8 +322,7 @@ function AuthenticatedHome({ user }) {
 
                 <CardShell
                     title="Historial"
-                    viewAllTo="/reservations"
-                    viewAllLabel="Ver todo"
+                    icon={History}
                     footerTo="/reservations"
                     footerLabel="Ver historial completo"
                 >
@@ -382,7 +385,7 @@ function AdminHome() {
                         </Link>
                     </div>
                 </div>
-                <HeroIllustration src={heroAdminIllustration} />
+                <HeroIllustration src={heroAdminIllustration} height={110} right={100} />
             </section>
 
             <section className="mt-8">
