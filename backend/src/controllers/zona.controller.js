@@ -1,10 +1,15 @@
 const { Zona, Reserva, ParkingSpot } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
-// GET /api/zones — public, list only active zones
+// GET /api/zones — public, list only active zones, ordered by highest availability first
 async function getZonas(req, res, next) {
   try {
-    const zonas = await Zona.findAll({ where: { isActive: true } });
+    const zonas = await Zona.findAll({
+      where: { isActive: true },
+      order: [
+        [Zona.sequelize.literal('available_slots / total_slots'), 'DESC'],
+      ],
+    });
     return res.status(200).json({ zones: zonas });
   } catch (error) {
     next(error);
