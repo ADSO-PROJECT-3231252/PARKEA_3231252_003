@@ -39,6 +39,11 @@
     --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
     /* Escala tipográfica */
+        --text-hero: 4rem;
+    /* 48px */
+    --text-hero--line-height: 1.1;
+    --text-hero--font-weight: 900;
+
     --text-display: 2.125rem;
     /* 34px */
     --text-display--line-height: 1.15;
