@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
+
 import {
     MapPin,
     Calendar,
@@ -13,19 +14,22 @@ import {
     User,
     Menu,
     X,
+    Home,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getInitials } from '../utils/format';
 import logo from '../assets/logo.png';
 
 const NAV_ITEMS_USER = [
+    { to: '/', label: 'Inicio', icon: Home, end: true },
     { to: '/zones', label: 'Zonas', icon: MapPin },
     { to: '/reservations', label: 'Mis reservas', icon: Calendar },
     { to: '/vehicles', label: 'Mis vehículos', icon: Car },
 ];
 
 const NAV_ITEMS_ADMIN = [
-    { to: '/admin/dashboard', label: 'Panel', icon: LayoutDashboard },
+    { to: '/admin/dashboard', label: 'Inicio', icon: Home, end: true },
+    { to: '/admin/panel', label: 'Panel', icon: LayoutDashboard },
     { to: '/admin/zones', label: 'Zonas', icon: MapPin },
     { to: '/admin/users', label: 'Usuarios', icon: Users },
 ];
@@ -79,7 +83,9 @@ export default function Header() {
     }
 
     const desktopNavLinkClass = ({ isActive }) =>
-        `flex items-center gap-1.5 rounded-md px-1 py-0.5 text-label transition-colors ${FOCUS_RING} ${isActive ? 'text-parkea-600' : 'text-neutral-600 hover:text-parkea-600'
+        `flex h-full items-center gap-1.5 border-b-2 px-1 text-label transition-colors ${FOCUS_RING} ${isActive
+            ? 'border-parkea-600 text-parkea-600'
+            : 'border-transparent text-neutral-600 hover:text-parkea-600'
         }`;
 
     const mobileNavLinkClass = ({ isActive }) =>
@@ -88,7 +94,7 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
-            <div className="mx-auto flex h-18 w-[92%] max-w-[1800px] items-center gap-4 px-4 sm:px-6">
+            <div className="mx-auto flex h-16 w-[92%] max-w-[1800px] items-center gap-4 px-4 sm:px-6">
                 <NavLink
                     to={homeLink}
                     className={`flex shrink-0 items-center rounded-md ${FOCUS_RING}`}
@@ -101,11 +107,11 @@ export default function Header() {
 
                 {user && (
                     <nav
-                        className="hidden flex-1 items-center gap-6 md:flex"
+                        className="hidden h-16 flex-1 items-center gap-6 md:flex"
                         aria-label="Navegación principal"
                     >
-                        {navItems.map(({ to, label, icon: Icon }) => (
-                            <NavLink key={to} to={to} className={desktopNavLinkClass}>
+                        {navItems.map(({ to, label, icon: Icon, end }) => (
+                            <NavLink key={to} to={to} end={end} className={desktopNavLinkClass}>
                                 <Icon className="h-4 w-4" aria-hidden="true" />
                                 {label}
                             </NavLink>
@@ -226,10 +232,11 @@ export default function Header() {
                     aria-label="Navegación principal (móvil)"
                 >
                     <div className="flex flex-col gap-1">
-                        {navItems.map(({ to, label, icon: Icon }) => (
+                        {navItems.map(({ to, label, icon: Icon, end }) => (
                             <NavLink
                                 key={to}
                                 to={to}
+                                end={end}
                                 onClick={() => setMobileOpen(false)}
                                 className={mobileNavLinkClass}
                             >
