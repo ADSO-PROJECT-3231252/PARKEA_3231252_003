@@ -1,4 +1,3 @@
-// src/pages/Home.jsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -8,7 +7,7 @@ import {
     Map,
     History,
     ChevronRight,
-    Check,
+    CheckCircle2,
     ShieldCheck,
     LayoutGrid,
     BarChart3,
@@ -21,18 +20,21 @@ import { formatDate, formatTime, formatCurrency } from '../utils/format';
 
 import heroVisitorIllustration from '../assets/hero-visitor.png';
 import heroUserIllustration from '../assets/hero-user.png';
-// import heroAdminIllustration from '../assets/hero-admin.png';
-const heroAdminIllustration = null;
+import heroAdminIllustration from '../assets/hero-admin.png';
 
-function HeroIllustration({ src, height = 132, right = 32 }) {
+function HeroIllustration({ src, height = 132, right = 32, top }) {
     if (!src) return null;
     return (
         <img
             src={src}
             alt=""
             aria-hidden="true"
-            style={{ height: `${height}px`, right: `${right}px` }}
-            className="hidden absolute top-1/2 -translate-y-1/2 w-auto lg:block"
+            style={
+                top !== undefined
+                    ? { height: `${height}px`, right: `${right}px`, top: `${top}px` }
+                    : { height: `${height}px`, right: `${right}px`, top: '50%', transform: 'translateY(-50%)' }
+            }
+            className="hidden absolute w-auto lg:block"
         />
     );
 }
@@ -334,14 +336,14 @@ function AuthenticatedHome({ user }) {
                         <p className="text-body text-neutral-600">Aún no tienes historial de reservas.</p>
                     )}
                     {!historyLoading && !historyError && history.length > 0 && (
-                        <ul className="space-y-2">
+                        <ul className="space-y-1.5">
                             {history.map((item) => (
-                                <li key={item.id} className="flex items-start justify-between gap-2">
-                                    <div className="flex items-start gap-1.5">
-                                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
+                                <li key={item.id} className="flex items-center justify-between gap-2 rounded-md bg-parkea-50 px-3 py-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
                                         <div>
-                                            <p className="text-body text-neutral-900">{item.zone.name}</p>
-                                            <p className="text-caption text-neutral-600">
+                                            <p className="text-body leading-tight text-neutral-900">{item.zone.name}</p>
+                                            <p className="text-caption leading-tight text-neutral-600">
                                                 {formatDate(item.startTime)} · {formatTime(item.startTime)} –{' '}
                                                 {formatTime(item.endTime)}
                                             </p>
@@ -369,80 +371,84 @@ function AdminHome() {
                         <ShieldCheck className="h-8 w-8" aria-hidden="true" />
                     </span>
                     <div className="max-w-xl">
-                        <h1 className="text-title font-display uppercase text-neutral-900">
+                        <h1 className="text-hero-sm font-display uppercase text-neutral-900">
                             Bienvenido, Administrador
                         </h1>
-                        <p className="mt-2 text-body text-neutral-600">
-                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas, usuarios y consultar el
-                            rendimiento del servicio.
+                        <p className="mt-2 text-subtitle-sm text-neutral-900">
+                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,
+                            <br className="hidden md:block" />
+                            usuarios y consultar el rendimiento del servicio.
                         </p>
                         <Link
                             to="/admin/panel"
-                            className="mt-4 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2.5 text-label text-white transition-colors hover:bg-parkea-700"
+                            className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
                         >
-                            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                            <LayoutGrid className="h-6 w-6" aria-hidden="true" />
                             Ir al panel de administración
                         </Link>
                     </div>
                 </div>
-                <HeroIllustration src={heroAdminIllustration} height={110} right={100} />
+                <HeroIllustration src={heroAdminIllustration} height={250} right={250} top={95} />
             </section>
 
             <section className="mt-8">
-                <h2 className="text-title font-display uppercase text-neutral-900">Módulos principales</h2>
-                <p className="mt-1 text-body text-neutral-600">
+                <h2 className="text-title font-display uppercase text-parkea-700">Módulos principales</h2>
+                <p className="mt-1 text-body text-neutral-900">
                     Accede rápidamente a las funcionalidades más importantes del sistema.
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-3">
-                    <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <BarChart3 className="h-5 w-5" aria-hidden="true" />
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Panel de control</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Consulta estadísticas generales, reservas, ocupación de zonas y actividad del sistema en
-                            tiempo real.
+                            Consulta estadísticas generales, reservas, ocupación de
+                            <br className="hidden md:block" />
+                            zonas y actividad del sistema en tiempo real.
                         </p>
                         <Link
                             to="/admin/panel"
-                            className="mt-3 inline-flex items-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
+                            className="mt-3 inline-flex items-center justify-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
                         >
                             Ir al panel de control
                             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </Link>
                     </div>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <MapPin className="h-5 w-5" aria-hidden="true" />
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de zonas</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Crea, edita y administra las zonas de parqueo, tarifas, cupos disponibles y horarios de
-                            operación.
+                            Crea, edita y administra las zonas de parqueo, tarifas,
+                            <br className="hidden md:block" />
+                            cupos disponibles y horarios de operación.
                         </p>
                         <Link
                             to="/admin/zones"
-                            className="mt-3 inline-flex items-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
+                            className="mt-3 inline-flex items-center justify-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
                         >
                             Ir a gestión de zonas
                             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </Link>
                     </div>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-6">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                    <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <Users className="h-5 w-5" aria-hidden="true" />
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de usuarios</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Administra los usuarios del sistema, asigna roles y consulta la información de las cuentas
-                            registradas.
+                            Administra los usuarios del sistema, asigna roles y
+                            <br className="hidden md:block" />
+                            consulta la información de las cuentas registradas.
                         </p>
                         <Link
                             to="/admin/users"
-                            className="mt-3 inline-flex items-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
+                            className="mt-3 inline-flex items-center justify-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
                         >
                             Ir a gestión de usuarios
                             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
