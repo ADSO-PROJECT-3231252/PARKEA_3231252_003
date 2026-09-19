@@ -1,3 +1,4 @@
+// src/pages/Home.jsx
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -17,10 +18,9 @@ import { getZones } from '../services/zoneService';
 import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 
-// import heroVisitorIllustration from '../assets/hero-visitor.png';
+import heroVisitorIllustration from '../assets/hero-visitor.png';
 // import heroUserIllustration from '../assets/hero-user.png';
 // import heroAdminIllustration from '../assets/hero-admin.png';
-const heroVisitorIllustration = null;
 const heroUserIllustration = null;
 const heroAdminIllustration = null;
 
@@ -31,7 +31,7 @@ function HeroIllustration({ src }) {
             src={src}
             alt=""
             aria-hidden="true"
-            className="hidden h-40 w-auto shrink-0 lg:block"
+            className="hidden absolute right-8 top-1/2 -translate-y-1/2 h-132 w-auto lg:block"
         />
     );
 }
@@ -98,21 +98,21 @@ function CardShell({ title, viewAllTo, viewAllLabel, children, footerTo, footerL
 function VisitorHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="text-display font-display uppercase text-neutral-900">
+                    <h1 className="text-hero font-display uppercase text-parkea-700">
                         Reserva tu parqueo
                         <br />
                         fácil, rápido y seguro
                     </h1>
-                    <p className="mt-3 text-body text-neutral-600">
+                    <p className="mt-3 text-subtitle text-neutral-900">
                         Encuentra, reserva y paga tu parqueo en las mejores zonas.
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2.5 text-label text-white transition-colors hover:bg-parkea-700"
+                        className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
                     >
-                        <MapPin className="h-4 w-4" aria-hidden="true" />
+                        <MapPin className="h-6 w-6" aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
@@ -121,30 +121,36 @@ function VisitorHome() {
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
                 <div className="rounded-lg bg-parkea-50 p-6 text-center">
-                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
-                        <CalendarCheck className="h-6 w-6" aria-hidden="true" />
+                    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                        <CalendarCheck className="h-7 w-7" aria-hidden="true" />
                     </span>
-                    <h2 className="mt-4 text-title font-display uppercase text-neutral-900">Reservas</h2>
-                    <p className="mt-2 text-body text-neutral-600">
-                        Reserva tu cupo de parqueo con anticipación y asegura tu espacio.
+                    <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Reservas</h2>
+                    <p className="mt-2 text-subtitle text-neutral-900">
+                        Reserva tu cupo de parqueo con
+                        <br className="hidden md:block" />
+                        anticipación y asegura tu espacio.
                     </p>
                 </div>
                 <div className="rounded-lg bg-parkea-50 p-6 text-center">
-                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
-                        <Map className="h-6 w-6" aria-hidden="true" />
+                    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                        <Map className="h-7 w-7" aria-hidden="true" />
                     </span>
-                    <h2 className="mt-4 text-title font-display uppercase text-neutral-900">Zonas</h2>
-                    <p className="mt-2 text-body text-neutral-600">
-                        Explora zonas de parqueo cercanas, con información clara y actualizada.
+                    <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Zonas</h2>
+                    <p className="mt-2 text-subtitle text-neutral-900">
+                        Explora zonas de parqueo cercanas,
+                        <br className="hidden md:block" />
+                        con información clara y actualizada.
                     </p>
                 </div>
                 <div className="rounded-lg bg-parkea-50 p-6 text-center">
-                    <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
-                        <History className="h-6 w-6" aria-hidden="true" />
+                    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                        <History className="h-7 w-7" aria-hidden="true" />
                     </span>
-                    <h2 className="mt-4 text-title font-display uppercase text-neutral-900">Historial</h2>
-                    <p className="mt-2 text-body text-neutral-600">
-                        Consulta tus reservas pasadas y próximas en un solo lugar.
+                    <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Historial</h2>
+                    <p className="mt-2 text-subtitle text-neutral-900">
+                        Consulta tus reservas pasadas
+                        <br className="hidden md:block" />
+                        y próximas en un solo lugar.
                     </p>
                 </div>
             </section>
@@ -210,7 +216,7 @@ function AuthenticatedHome({ user }) {
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <section className="flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="text-display font-display uppercase text-neutral-900">
+                    <h1 className="text-hero font-display uppercase text-neutral-900">
                         ¡Bienvenido, {user.fullName}!
                     </h1>
                     <p className="mt-3 text-body text-neutral-600">
@@ -218,9 +224,9 @@ function AuthenticatedHome({ user }) {
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2.5 text-label text-white transition-colors hover:bg-parkea-700"
+                        className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
                     >
-                        <MapPin className="h-4 w-4" aria-hidden="true" />
+                        <MapPin className="h-6 w-6" aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
@@ -228,7 +234,6 @@ function AuthenticatedHome({ user }) {
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-                {/* Tarjeta: Tus reservas */}
                 <CardShell
                     title="Reservas"
                     viewAllTo="/reservations"
@@ -272,7 +277,6 @@ function AuthenticatedHome({ user }) {
                     )}
                 </CardShell>
 
-                {/* Tarjeta: Zonas disponibles */}
                 <CardShell
                     title="Zonas"
                     viewAllTo="/zones"
@@ -312,7 +316,6 @@ function AuthenticatedHome({ user }) {
                     )}
                 </CardShell>
 
-                {/* Tarjeta: Últimas reservas (historial) */}
                 <CardShell
                     title="Historial"
                     viewAllTo="/reservations"
@@ -371,7 +374,7 @@ function AdminHome() {
                             rendimiento del servicio.
                         </p>
                         <Link
-                            to="/admin/dashboard"
+                            to="/admin/panel"
                             className="mt-4 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2.5 text-label text-white transition-colors hover:bg-parkea-700"
                         >
                             <LayoutGrid className="h-4 w-4" aria-hidden="true" />
@@ -399,7 +402,7 @@ function AdminHome() {
                             tiempo real.
                         </p>
                         <Link
-                            to="/admin/dashboard"
+                            to="/admin/panel"
                             className="mt-3 inline-flex items-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
                         >
                             Ir al panel de control
