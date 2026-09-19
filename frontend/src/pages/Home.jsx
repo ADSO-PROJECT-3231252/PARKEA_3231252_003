@@ -227,7 +227,7 @@ function AuthenticatedHome({ user }) {
                         Ver zonas disponibles
                     </Link>
                 </div>
-                <HeroIllustration src={heroUserIllustration} height={340} right={160} />
+                <HeroIllustration src={heroUserIllustration} height={315} right={160} />
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -365,7 +365,7 @@ function AuthenticatedHome({ user }) {
 function AdminHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="flex items-start gap-5">
                     <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-800 text-white">
                         <ShieldCheck className="h-8 w-8" aria-hidden="true" />
@@ -388,7 +388,7 @@ function AdminHome() {
                         </Link>
                     </div>
                 </div>
-                <HeroIllustration src={heroAdminIllustration} height={250} right={250} top={95} />
+                <HeroIllustration src={heroAdminIllustration} height={250} right={250} />
             </section>
 
             <section className="mt-8">
