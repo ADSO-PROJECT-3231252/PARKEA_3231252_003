@@ -249,7 +249,7 @@ export default function Zones() {
                             >
                                 <button
                                     type="button"
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    onClick={() => setPage(currentPage - 1)}
                                     disabled={currentPage === 1}
                                     aria-label="Página anterior"
                                     className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
@@ -262,7 +262,7 @@ export default function Zones() {
                                 </span>
                                 <button
                                     type="button"
-                                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                    onClick={() => setPage(currentPage + 1)}
                                     disabled={currentPage === totalPages}
                                     aria-label="Página siguiente"
                                     className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
@@ -275,7 +275,7 @@ export default function Zones() {
 
                         <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
                             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            La disponibilidad se actualiza en tiempo real.
+                            La disponibilidad se actualiza cada vez que recargas la página o buscas.
                         </p>
                     </>
                 )}
