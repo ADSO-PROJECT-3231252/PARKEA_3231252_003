@@ -55,8 +55,12 @@ export default function Login() {
         try {
             const { data } = await login(form);
             loginUser(data.token, data.user);
+            // An admin returning from a regular-user route would land on a screen that
+            // isn't theirs, so admins always go to their dashboard unless they were
+            // actually headed somewhere under /admin.
             const from = location.state?.from;
-            navigate(from || (data.user.role === 'admin' ? '/admin/dashboard' : '/'));
+            const isAdmin = data.user.role === 'admin';
+            navigate(isAdmin && !from?.startsWith('/admin') ? '/admin/dashboard' : from || '/');
         } catch (err) {
             const code = err.response?.data?.code;
             setServerError(translateError(code));
