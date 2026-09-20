@@ -6,7 +6,8 @@ import { getZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 
-const PAGE_SIZE = 10;
+// AC-11: the list must be paginated when there are more than 9 zones.
+const PAGE_SIZE = 9;
 
 // Badge styles per availability state; the state itself comes from utils/zones.
 const BADGE_CLASSES = {
@@ -90,6 +91,14 @@ export default function Zones() {
     useEffect(() => {
         fetchZones();
     }, [fetchZones]);
+
+    // AC-08: zone data must be refreshed when the user searches, so availability
+    // is never stale. Debounced so a request isn't fired on every keystroke.
+    useEffect(() => {
+        if (!search) return;
+        const timer = setTimeout(fetchZones, 400);
+        return () => clearTimeout(timer);
+    }, [search, fetchZones]);
 
     const handleRetry = () => {
         setLoading(true);
