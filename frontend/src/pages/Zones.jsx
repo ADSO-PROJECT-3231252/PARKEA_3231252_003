@@ -4,23 +4,19 @@ import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, B
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
+import { getZoneAvailability } from '../utils/zones';
 
 const PAGE_SIZE = 10;
 
-// Mirrors getZoneAvailabilityLabel in Home.jsx (AuthenticatedHome) — same
-// three states and the same 20% "casi llena" threshold, kept in sync there.
-function getAvailabilityBadge(availableSlots, totalSlots) {
-    if (availableSlots === 0) {
-        return { text: 'Llena', className: 'bg-danger-soft text-danger' };
-    }
-    if (totalSlots > 0 && availableSlots / totalSlots <= 0.2) {
-        return { text: 'Casi llena', className: 'bg-warning-soft text-warning' };
-    }
-    return { text: 'Disponible', className: 'bg-parkea-50 text-parkea-600' };
-}
+// Badge styles per availability state; the state itself comes from utils/zones.
+const BADGE_CLASSES = {
+    full: 'bg-danger-soft text-danger',
+    almost: 'bg-warning-soft text-warning',
+    available: 'bg-parkea-50 text-parkea-600',
+};
 
 function ZoneCard({ zone, onReserve }) {
-    const badge = getAvailabilityBadge(zone.availableSlots, zone.totalSlots);
+    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
     const full = zone.availableSlots === 0;
 
     return (
@@ -30,8 +26,8 @@ function ZoneCard({ zone, onReserve }) {
                     <MapPin className="h-4 w-4 shrink-0 text-parkea-600" aria-hidden="true" />
                     {zone.name}
                 </h3>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-label font-medium ${badge.className}`}>
-                    {badge.text}
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-label font-medium ${BADGE_CLASSES[availability.state]}`}>
+                    {availability.text}
                 </span>
             </div>
 
@@ -57,10 +53,13 @@ function ZoneCard({ zone, onReserve }) {
             <button
                 type="button"
                 onClick={() => onReserve(zone)}
-                disabled={full}
+                aria-disabled={full || undefined}
                 aria-label={full ? `Reservar en ${zone.name} (no disponible: esta zona no tiene cupos)` : `Reservar en ${zone.name}`}
                 title={full ? 'Esta zona no tiene cupos disponibles' : undefined}
-                className="mt-4 w-full rounded-md bg-parkea-600 px-4 py-2 text-label font-medium text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-500 disabled:hover:bg-neutral-200"
+                className={`mt-4 w-full rounded-md px-4 py-2 text-label font-medium transition-colors ${full
+                    ? 'cursor-not-allowed bg-neutral-200 text-neutral-500'
+                    : 'bg-parkea-600 text-white hover:bg-parkea-700'
+                    }`}
             >
                 {full ? 'Sin cupos disponibles' : 'Reservar'}
             </button>

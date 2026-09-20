@@ -1,6 +1,5 @@
 import { getInitials } from '../utils/format';
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, Info, Calendar } from 'lucide-react';
 import { isNotEmpty } from '../utils/validators';
 import { getProfile, updateProfile, changePassword } from '../services/userService';
@@ -15,7 +14,7 @@ const DOCUMENT_LABELS = {
 };
 
 export default function Profile() {
-    const { user, updateUser } = useAuth();
+    const { updateUser } = useAuth();
 
     const [profile, setProfile] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
