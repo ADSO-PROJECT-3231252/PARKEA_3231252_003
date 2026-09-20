@@ -1,3 +1,4 @@
+import { getInitials } from '../utils/format';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, Info, Calendar } from 'lucide-react';
@@ -12,15 +13,6 @@ const DOCUMENT_LABELS = {
     CE: 'Cédula de extranjería',
     PASSPORT: 'Pasaporte',
 };
-
-function getInitials(fullName = '') {
-    return fullName
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((w) => w[0]?.toUpperCase())
-        .join('');
-}
 
 export default function Profile() {
     const { user, updateUser } = useAuth();
@@ -250,9 +242,10 @@ export default function Profile() {
                         </div>
 
                         <button
-                            type="submit"
+                            type="button"
+                            onClick={handleSaveProfile}
                             disabled={savingProfile}
-                            className="hidden md:inline-block rounded-md bg-parkea-600 text-white text-label font-medium px-4 py-2 hover:bg-parkea-700 disabled:opacity-60"
+                            className="md:hidden w-full rounded-md bg-parkea-600 text-white text-label font-medium px-4 py-2 hover:bg-parkea-700 disabled:opacity-60"
                         >
                             {savingProfile ? 'Guardando...' : 'Guardar cambios'}
                         </button>
