@@ -24,7 +24,7 @@ async function obtenerPerfil(req, res, next) {
                 documentType: usuario.documentType,
                 documentNumber: usuario.documentNumber,
                 role: usuario.role.name,
-                createdAt: usuario.createdAt,
+                createdAt: usuario.created_at,
             },
         });
     } catch (error) {
