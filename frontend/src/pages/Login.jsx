@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import logo from '../assets/logo.png';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { login } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
@@ -18,6 +18,8 @@ export default function Login() {
     const navigate = useNavigate();
     const location = useLocation();
     const [justRegistered, setJustRegistered] = useState(Boolean(location.state?.registered));
+    const [searchParams] = useSearchParams();
+    const sessionExpired = searchParams.get('expired') === '1';
 
     useEffect(() => {
         if (!justRegistered) return;
@@ -44,7 +46,7 @@ export default function Login() {
         return Object.keys(newErrors).length === 0;
     };
 
-const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
         if (!validate()) return;
@@ -87,6 +89,11 @@ const handleSubmit = async (e) => {
                     {justRegistered && !serverError && (
                         <p role="status" className="text-caption text-parkea-700 bg-parkea-50 rounded-md px-3 py-2 text-center">
                             Registro completado. Por favor inicia sesión.
+                        </p>
+                    )}
+                    {sessionExpired && !serverError && (
+                        <p role="alert" className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 text-center">
+                            Tu sesión expiró. Inicia sesión de nuevo.
                         </p>
                     )}
                     {serverError && (

@@ -3,6 +3,7 @@ import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ComingSoon from '../pages/ComingSoon';
+import Profile from '../pages/Profile';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 
@@ -22,7 +23,7 @@ export default function AppRoutes() {
                 <Route path="/zones" element={<ComingSoon />} />
                 <Route path="/zones/map" element={<ComingSoon />} />
 
-                <Route path="/profile" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/vehicles" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/vehicles/new" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/vehicles/:id/edit" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
