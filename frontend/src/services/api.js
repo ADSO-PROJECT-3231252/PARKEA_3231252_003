@@ -15,4 +15,20 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const code = error.response?.data?.code;
+        const sessionEndingCodes = ['NO_TOKEN', 'INVALID_TOKEN', 'ACCOUNT_DEACTIVATED'];
+        if (sessionEndingCodes.includes(code)) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login?expired=1';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;
