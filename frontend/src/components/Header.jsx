@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 import {
     MapPin,
@@ -39,6 +39,7 @@ const FOCUS_RING =
 
 export default function Header() {
     const { user, logoutUser } = useAuth();
+    const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const menuRef = useRef(null);
@@ -78,9 +79,10 @@ export default function Header() {
     }, [menuOpen]);
 
     function handleLogout() {
-        setMenuOpen(false);
-        logoutUser();
-    }
+    setMenuOpen(false);
+    logoutUser();
+    setTimeout(() => navigate('/', { replace: true }), 0);
+}
 
     const desktopNavLinkClass = ({ isActive }) =>
         `flex h-full items-center gap-1.5 border-b-2 px-1 text-label transition-colors ${FOCUS_RING} ${isActive
