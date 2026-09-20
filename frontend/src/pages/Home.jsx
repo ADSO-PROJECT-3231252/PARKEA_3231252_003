@@ -17,6 +17,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
+import { getZoneAvailability } from '../utils/zones';
 
 import heroVisitorIllustration from '../assets/hero-visitor.png';
 import heroUserIllustration from '../assets/hero-user.png';
@@ -47,15 +48,11 @@ const RESERVATION_STATUS_LABEL = {
     Expired: { text: 'Expirada', color: 'text-danger' },
 };
 
-function getZoneAvailabilityLabel(availableSlots, totalSlots) {
-    if (availableSlots === 0) {
-        return { text: 'Llena', color: 'text-danger' };
-    }
-    if (totalSlots > 0 && availableSlots / totalSlots <= 0.2) {
-        return { text: 'Casi llena', color: 'text-warning' };
-    }
-    return { text: 'Disponible', color: 'text-parkea-600' };
-}
+const ZONE_AVAILABILITY_COLORS = {
+    full: 'text-danger',
+    almost: 'text-warning',
+    available: 'text-parkea-600',
+};
 
 function LoadingMessage() {
     return (
@@ -298,7 +295,7 @@ function AuthenticatedHome({ user }) {
                     {!zonesLoading && !zonesError && zones.length > 0 && (
                         <ul className="space-y-2">
                             {zones.map((zone) => {
-                                const availability = getZoneAvailabilityLabel(zone.availableSlots, zone.totalSlots);
+                                const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
                                 return (
                                     <li key={zone.id} className="flex items-center justify-between rounded-md bg-parkea-50 p-3">
                                         <p className="flex items-center gap-1 text-body text-neutral-900">
@@ -311,7 +308,7 @@ function AuthenticatedHome({ user }) {
                                                 <span>de</span>
                                                 <span className="text-right tabular-nums">{zone.totalSlots}</span>
                                             </span>
-                                            <span className={`w-[80px] text-right text-label font-medium ${availability.color}`}>
+                                            <span className={`w-[80px] text-right text-label font-medium ${ZONE_AVAILABILITY_COLORS[availability.state]}`}>
                                                 {availability.text}
                                             </span>
                                         </div>

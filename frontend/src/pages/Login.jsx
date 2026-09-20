@@ -55,7 +55,8 @@ export default function Login() {
         try {
             const { data } = await login(form);
             loginUser(data.token, data.user);
-            navigate(data.user.role === 'admin' ? '/admin/dashboard' : '/');
+            const from = location.state?.from;
+            navigate(from || (data.user.role === 'admin' ? '/admin/dashboard' : '/'));
         } catch (err) {
             const code = err.response?.data?.code;
             setServerError(translateError(code));

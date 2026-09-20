@@ -4,6 +4,7 @@ import Login from '../pages/Login';
 import Register from '../pages/Register';
 import ComingSoon from '../pages/ComingSoon';
 import Profile from '../pages/Profile';
+import Zones from '../pages/Zones';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 
@@ -20,7 +21,7 @@ export default function AppRoutes() {
             {/* Everything else shares the Header via Layout */}
             <Route element={<Layout />}>
                 <Route path="/" element={<Home />} />
-                <Route path="/zones" element={<ComingSoon />} />
+                <Route path="/zones" element={<Zones />} />
                 <Route path="/zones/map" element={<ComingSoon />} />
 
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
