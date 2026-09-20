@@ -241,14 +241,6 @@ export default function Profile() {
                             )}
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={handleSaveProfile}
-                            disabled={savingProfile}
-                            className="md:hidden w-full rounded-md bg-parkea-600 text-white text-label font-medium px-4 py-2 hover:bg-parkea-700 disabled:opacity-60"
-                        >
-                            {savingProfile ? 'Guardando...' : 'Guardar cambios'}
-                        </button>
                     </form>
 
                     <div className="bg-parkea-50 rounded-md p-4 space-y-3 h-fit">
@@ -279,7 +271,7 @@ export default function Profile() {
                     </div>
 
                     <button
-                        type="submit"
+                        type="button"
                         onClick={handleSaveProfile}
                         disabled={savingProfile}
                         className="md:hidden w-full rounded-md bg-parkea-600 text-white text-label font-medium px-4 py-2 hover:bg-parkea-700 disabled:opacity-60"
