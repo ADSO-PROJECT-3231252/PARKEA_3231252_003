@@ -64,7 +64,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     <button
                         type="button"
                         onClick={() => onSetDefault(vehicle.id)}
-                        disabled={isSettingThis}
+                        disabled={settingDefaultId !== null}
                         aria-label={`Marcar ${vehicleDescription} como vehículo predeterminado`}
                         className="flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-3 py-1 text-label font-medium text-neutral-600 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-60"
                     >
