@@ -15,6 +15,7 @@ import {
     Info,
 } from 'lucide-react';
 import { getVehicles, setDefaultVehicle } from '../services/vehicleService';
+import { translateError } from '../utils/errorMessages';
 
 // AC-10: the list must be paginated when there are more than 9 vehicles.
 const PAGE_SIZE = 9;
@@ -31,7 +32,7 @@ function LicensePlate({ plate }) {
         <div className="flex w-[128px] shrink-0 flex-col items-center overflow-hidden rounded-md border-2 border-neutral-900 bg-neutral-200">
             <p className="mt-1 font-mono text-subtitle font-bold tracking-wider text-neutral-900">{plate}</p>
             <div className="flex w-full items-center justify-center gap-1 bg-neutral-900 py-0.5">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-white">Colombia</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white">Colombia</span>
                 <span className="flex h-2 w-3 flex-col overflow-hidden rounded-[1px]" aria-hidden="true">
                     <span className="h-1 bg-[#FCD116]" />
                     <span className="h-[2px] bg-[#003893]" />
@@ -56,7 +57,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
             <div className="absolute -top-3 left-4">
                 {vehicle.isDefault ? (
                     <span className="flex items-center gap-1.5 rounded-full border border-parkea-600 bg-white px-3 py-1 text-label font-medium text-parkea-600">
-                        <Star className="h-3.5 w-3.5 fill-[#F5C518] text-[#F5C518]" aria-hidden="true" />
+                        <Star className="h-3.5 w-3.5 fill-gold-500 text-gold-500" aria-hidden="true" />
                         Predeterminado
                     </span>
                 ) : (
@@ -132,6 +133,7 @@ export default function VehicleList() {
     const [error, setError] = useState(false);
     const [page, setPage] = useState(1);
     const [settingDefaultId, setSettingDefaultId] = useState(null);
+    const [setDefaultError, setSetDefaultError] = useState('');
 
     const fetchVehicles = useCallback(() => {
         getVehicles()
@@ -158,9 +160,12 @@ export default function VehicleList() {
     // (AC-07/AC-08 ordering is already handled server-side, see vehicleService).
     const handleSetDefault = (id) => {
         setSettingDefaultId(id);
+        setSetDefaultError('');
         setDefaultVehicle(id)
             .then(() => fetchVehicles())
-            .catch(() => setError(true))
+            .catch((err) => {
+                setSetDefaultError(translateError(err.response?.data?.code));
+            })
             .finally(() => setSettingDefaultId(null));
     };
 
@@ -194,6 +199,12 @@ export default function VehicleList() {
                     Agregar vehículo
                 </button>
             </div>
+
+            {setDefaultError && (
+                <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
+                    {setDefaultError}
+                </p>
+            )}
 
             <div className="mt-6">
                 {loading && (
