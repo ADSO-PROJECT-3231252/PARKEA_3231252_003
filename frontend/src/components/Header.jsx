@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, startTransition } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 import {
@@ -79,10 +79,20 @@ export default function Header() {
     }, [menuOpen]);
 
     function handleLogout() {
-    setMenuOpen(false);
-    logoutUser();
-    setTimeout(() => navigate('/', { replace: true }), 0);
-}
+        // HU-24 AC-04: signing out always lands on the public home. navigate()
+        // runs as a low-priority transition while logoutUser() clears the user
+        // at normal priority, done separately, React first re-renders the
+        // current (possibly protected) page with no user, so ProtectedRoute
+        // bounces to /login and saves that page as the post-login destination,
+        // before the navigate to '/' ever takes effect. Wrapping both in the
+        // same startTransition makes React apply them together in one render,
+        // so a protected page never renders without a user in the first place.
+        setMenuOpen(false);
+        startTransition(() => {
+            navigate('/', { replace: true });
+            logoutUser();
+        });
+    }
 
     const desktopNavLinkClass = ({ isActive }) =>
         `flex h-full items-center gap-1.5 border-b-2 px-1 text-label transition-colors ${FOCUS_RING} ${isActive
