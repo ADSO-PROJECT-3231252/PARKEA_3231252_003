@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Car,
     Truck,
@@ -23,10 +23,6 @@ const PAGE_SIZE = 9;
 const VEHICLE_TYPE_ICONS = { car: Car, motorcycle: Motorbike, truck: Truck };
 const VEHICLE_TYPE_LABELS = { car: 'Automóvil', motorcycle: 'Motocicleta', truck: 'Camión' };
 
-// Uses a single neutral color for all plates, regardless of vehicle type.
-// Colombian plate colors depend on the type of service (private/public/
-// official), not vehicle type, a fact the system doesn't track, so
-// coloring by vehicleType would misrepresent something we can't verify.
 function LicensePlate({ plate }) {
     return (
         <div className="flex w-[128px] shrink-0 flex-col items-center overflow-hidden rounded-md border-2 border-neutral-900 bg-neutral-200">
@@ -127,6 +123,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
 
 export default function VehicleList() {
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [vehicles, setVehicles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -134,6 +131,16 @@ export default function VehicleList() {
     const [page, setPage] = useState(1);
     const [settingDefaultId, setSettingDefaultId] = useState(null);
     const [setDefaultError, setSetDefaultError] = useState('');
+
+    // AC-07 (HU-10): flash message after a successful registration redirect
+    // same pattern as Login.jsx's "Registro completado" (location.state, auto-dismiss).
+    const [vehicleAdded, setVehicleAdded] = useState(Boolean(location.state?.vehicleAdded));
+
+    useEffect(() => {
+        if (!vehicleAdded) return;
+        const timer = setTimeout(() => setVehicleAdded(false), 3000);
+        return () => clearTimeout(timer);
+    }, [vehicleAdded]);
 
     const fetchVehicles = useCallback(() => {
         getVehicles()
@@ -155,9 +162,6 @@ export default function VehicleList() {
         fetchVehicles();
     };
 
-    // AC-05 / AC-06: sets a new default vehicle. The backend clears the
-    // previous default; the frontend just re-fetches to reflect the new order
-    // (AC-07/AC-08 ordering is already handled server-side, see vehicleService).
     const handleSetDefault = (id) => {
         setSettingDefaultId(id);
         setSetDefaultError('');
@@ -171,7 +175,6 @@ export default function VehicleList() {
 
     const handleEdit = (id) => navigate(`/vehicles/${id}/edit`);
 
-    // HU-13 not built yet — placeholder only, per instructions.
     const handleDelete = (id) => {
         console.log('TODO: HU-13 — open delete confirmation dialog for vehicle', id);
     };
@@ -199,6 +202,12 @@ export default function VehicleList() {
                     Agregar vehículo
                 </button>
             </div>
+
+            {vehicleAdded && (
+                <p role="status" className="mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center text-caption text-parkea-700">
+                    Vehículo registrado correctamente.
+                </p>
+            )}
 
             {setDefaultError && (
                 <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
