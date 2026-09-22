@@ -52,11 +52,14 @@ export default function Profile() {
         };
     }, []);
 
-    // Only what actually changed gets sent, so a password-only change doesn't also
-    // report "Perfil actualizado" for a profile nobody touched.
-    const profileChanged =
-        profile !== null &&
-        (form.fullName !== (profile.fullName || '') || normalizePhone(form.phone) !== (profile.phone || ''));
+    // Tracked separately (not just a combined "did anything change") so validation
+    // and the save payload can each act only on the field that actually changed —
+    // an account created before the 10-digit phone rule can have a legacy phone
+    // that no longer matches it; editing just the name must not get blocked by,
+    // or resend, a phone field nobody touched.
+    const nameChanged = profile !== null && form.fullName !== (profile.fullName || '');
+    const phoneChanged = profile !== null && normalizePhone(form.phone) !== (profile.phone || '');
+    const profileChanged = nameChanged || phoneChanged;
     const passwordTouched = Boolean(
         pwForm.currentPassword || pwForm.newPassword || pwForm.confirmNewPassword
     );
@@ -72,15 +75,20 @@ export default function Profile() {
         setPwForm((prev) => ({ ...prev, [name]: value }));
     };
 
+    // Only validates the field(s) that actually changed — an untouched field
+    // (e.g. a legacy phone that predates the 10-digit rule) must not block
+    // saving a change to the other one.
     const validateProfile = () => {
         const errors = {};
-        if (!isNotEmpty(form.fullName)) {
+        if (nameChanged && !isNotEmpty(form.fullName)) {
             errors.fullName = 'El nombre completo es obligatorio.';
         }
-        if (!isNotEmpty(form.phone)) {
-            errors.phone = 'El teléfono es obligatorio.';
-        } else if (!isValidPhone(form.phone)) {
-            errors.phone = 'El teléfono debe tener 10 dígitos y solo números.';
+        if (phoneChanged) {
+            if (!isNotEmpty(form.phone)) {
+                errors.phone = 'El teléfono es obligatorio.';
+            } else if (!isValidPhone(form.phone)) {
+                errors.phone = 'El teléfono debe tener 10 dígitos y solo números.';
+            }
         }
         setProfileErrors(errors);
         return Object.keys(errors).length === 0;
@@ -128,7 +136,13 @@ export default function Profile() {
 
         if (profileChanged) {
             try {
-                const { data } = await updateProfile({ fullName: form.fullName, phone: normalizePhone(form.phone) });
+                // Only the field(s) that changed go in the request — sending an
+                // untouched, legacy-invalid phone back would make the backend's own
+                // validator reject the whole update for a field nobody edited.
+                const payload = {};
+                if (nameChanged) payload.fullName = form.fullName;
+                if (phoneChanged) payload.phone = normalizePhone(form.phone);
+                const { data } = await updateProfile(payload);
                 setProfile((prev) => ({ ...prev, ...data.user }));
                 setForm({ fullName: data.user.fullName || '', phone: data.user.phone || '' });
                 updateUser({ fullName: data.user.fullName, phone: data.user.phone });
