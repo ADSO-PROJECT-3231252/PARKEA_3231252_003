@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { isValidEmail, isNotEmpty } from '../utils/validators';
+import { isValidEmail, isNotEmpty, isValidPhone, normalizePhone } from '../utils/validators';
 import { register } from '../services/authService';
 import logo from '../assets/logo.png';
 import carImage from '../assets/car_register.png';
@@ -13,6 +13,26 @@ const DOCUMENT_TYPES = [
     { value: 'CE', label: 'CE' },
     { value: 'PASSPORT', label: 'Pasaporte' },
 ];
+
+// Length limits agreed with the team. The inputs enforce them with maxLength.
+const MAX_LENGTH = {
+    documentNumber: 15,
+    fullName: 70,
+    email: 100,
+};
+
+// When the backend rejects a field that passed the checks here (e.g. an email like
+// "juan..perez@gmail.com"), it answers VALIDATION_ERROR with the failing fields in
+// errors[].path. Each one is shown inline on its own field, so the user knows what
+// to fix instead of seeing only the general message.
+const SERVER_FIELD_MESSAGES = {
+    documentNumber: 'El documento solo debe contener letras y números.',
+    fullName: 'Revisa el nombre completo.',
+    email: 'Ingresa un correo válido.',
+    password: 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.',
+    confirmPassword: 'Las contraseñas no coinciden.',
+    phone: 'El teléfono debe tener 10 dígitos y solo números.',
+};
 
 export default function Register() {
     const [form, setForm] = useState({
@@ -35,6 +55,14 @@ export default function Register() {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
+        // The field's error goes away as soon as the user starts correcting it.
+        // Everything is validated again on submit.
+        setErrors((prev) => {
+            if (!prev[name]) return prev;
+            const next = { ...prev };
+            delete next[name];
+            return next;
+        });
     };
 
     const validate = () => {
@@ -76,8 +104,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.phone)) {
             newErrors.phone = 'El teléfono es obligatorio.';
-        } else if (!/^[0-9]{7,15}$/.test(form.phone)) {
-            newErrors.phone = 'El teléfono debe contener solo números (7 a 15 dígitos).';
+        } else if (!isValidPhone(form.phone)) {
+            newErrors.phone = 'El teléfono debe tener 10 dígitos y solo números.';
         }
 
         setErrors(newErrors);
@@ -96,7 +124,7 @@ export default function Register() {
                 documentNumber: form.documentNumber,
                 fullName: form.fullName,
                 email: form.email,
-                phone: form.phone,
+                phone: normalizePhone(form.phone),
                 password: form.password,
                 confirmPassword: form.confirmPassword,
             });
@@ -108,6 +136,15 @@ export default function Register() {
                 setErrors((prev) => ({ ...prev, email: translateError(code) }));
             } else if (code === 'DOCUMENT_ALREADY_REGISTERED') {
                 setErrors((prev) => ({ ...prev, documentNumber: translateError(code) }));
+            } else if (code === 'VALIDATION_ERROR') {
+                const fieldErrors = {};
+                for (const { path } of err.response.data.errors ?? []) {
+                    if (SERVER_FIELD_MESSAGES[path]) fieldErrors[path] = SERVER_FIELD_MESSAGES[path];
+                }
+                const markedAny = Object.keys(fieldErrors).length > 0;
+                setErrors((prev) => ({ ...prev, ...fieldErrors }));
+                // "Revisa los campos marcados" only makes sense if a field was marked.
+                setServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
             } else {
                 setServerError(translateError(code));
             }
@@ -117,16 +154,16 @@ export default function Register() {
     };
 
     return (
-        <div className="h-screen flex items-start justify-center bg-neutral-50 px-4 py-2 overflow-hidden">
-            <div className="w-full max-w-5xl h-[calc(100vh-16px)] bg-white rounded-lg shadow-sm border border-neutral-200 flex flex-col md:flex-row overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-3">
+            <div className="w-full max-w-5xl bg-white rounded-lg shadow-sm border border-neutral-200 flex flex-col md:flex-row overflow-hidden">
                 {/* Columna del formulario */}
-                <div className="flex-1 p-5 overflow-y-auto md:overflow-visible">
-                    <div className="flex flex-col items-center mb-2">
-                        <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
+                <div className="flex-1 px-5 py-4">
+                    <div className="flex flex-col items-center mb-1">
+                        <img src={logo} alt="PARKEA" className="h-14 w-auto object-contain" />
                     </div>
 
-                    <div className="text-center mb-2">
-                        <h1 className="font-display text-title text-neutral-900">
+                    <div className="text-center mb-1.5">
+                        <h1 className="font-display text-title text-neutral-900 uppercase">
                             Crear <span className="text-parkea-600">cuenta</span>
                         </h1>
                         <p className="font-sans text-body text-neutral-600 mt-1">
@@ -140,10 +177,10 @@ export default function Register() {
                         </p>
                     )}
 
-                    <form onSubmit={handleSubmit} noValidate className="space-y-2">
+                    <form onSubmit={handleSubmit} noValidate className="space-y-1.5">
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="documentType" className="block font-sans text-label text-neutral-700 mb-1">
+                                <label htmlFor="documentType" className="block font-sans text-label text-neutral-700 mb-0.5">
                                     Tipo de documento
                                 </label>
                                 <select
@@ -151,7 +188,7 @@ export default function Register() {
                                     name="documentType"
                                     value={form.documentType}
                                     onChange={handleChange}
-                                    className="w-full rounded-md border border-neutral-200 px-3 py-2 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                                    className="w-full rounded-md border border-neutral-200 px-3 py-1.5 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                                 >
                                     {DOCUMENT_TYPES.map((opt) => (
                                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -160,23 +197,24 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="documentNumber" className="block font-sans text-label text-neutral-700 mb-1">
+                                <label htmlFor="documentNumber" className="block font-sans text-label text-neutral-700 mb-0.5">
                                     Número de documento
                                 </label>
                                 <input
                                     id="documentNumber"
                                     name="documentNumber"
+                                    maxLength={MAX_LENGTH.documentNumber}
                                     type="text"
                                     placeholder="1234567890"
                                     value={form.documentNumber}
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.documentNumber)}
                                     aria-describedby={errors.documentNumber ? 'documentNumber-error' : undefined}
-                                    className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.documentNumber ? 'border-danger' : 'border-neutral-200'
+                                    className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.documentNumber ? 'border-danger' : 'border-neutral-200'
                                         }`}
                                 />
                                 {errors.documentNumber && (
-                                    <p id="documentNumber-error" role="alert" className="mt-1 text-caption text-danger">
+                                    <p id="documentNumber-error" role="alert" className="mt-0.5 text-caption text-danger">
                                         {errors.documentNumber}
                                     </p>
                                 )}
@@ -184,46 +222,48 @@ export default function Register() {
                         </div>
 
                         <div>
-                            <label htmlFor="fullName" className="block font-sans text-label text-neutral-700 mb-1">
+                            <label htmlFor="fullName" className="block font-sans text-label text-neutral-700 mb-0.5">
                                 Nombre completo
                             </label>
                             <input
                                 id="fullName"
                                 name="fullName"
+                                maxLength={MAX_LENGTH.fullName}
                                 type="text"
                                 placeholder="Ej. Juan Pérez"
                                 value={form.fullName}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.fullName)}
                                 aria-describedby={errors.fullName ? 'fullName-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.fullName ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.fullName ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.fullName && (
-                                <p id="fullName-error" role="alert" className="mt-1 text-caption text-danger">
+                                <p id="fullName-error" role="alert" className="mt-0.5 text-caption text-danger">
                                     {errors.fullName}
                                 </p>
                             )}
                         </div>
 
                         <div>
-                            <label htmlFor="email" className="block font-sans text-label text-neutral-700 mb-1">
+                            <label htmlFor="email" className="block font-sans text-label text-neutral-700 mb-0.5">
                                 Correo electrónico
                             </label>
                             <input
                                 id="email"
                                 name="email"
+                                maxLength={MAX_LENGTH.email}
                                 type="email"
                                 placeholder="ejemplo@correo.com"
                                 value={form.email}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.email)}
                                 aria-describedby={errors.email ? 'email-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.email && (
-                                <p id="email-error" role="alert" className="mt-1 text-caption text-danger">
+                                <p id="email-error" role="alert" className="mt-0.5 text-caption text-danger">
                                     {errors.email}
                                 </p>
                             )}
@@ -231,7 +271,7 @@ export default function Register() {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="password" className="block font-sans text-label text-neutral-700 mb-1">
+                                <label htmlFor="password" className="block font-sans text-label text-neutral-700 mb-0.5">
                                     Contraseña
                                 </label>
                                 <div className="relative">
@@ -244,7 +284,7 @@ export default function Register() {
                                         onChange={handleChange}
                                         aria-invalid={Boolean(errors.password)}
                                         aria-describedby={errors.password ? 'password-error' : 'password-hint'}
-                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.password ? 'border-danger' : 'border-neutral-200'
+                                        className={`w-full rounded-md border px-3 py-1.5 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.password ? 'border-danger' : 'border-neutral-200'
                                             }`}
                                     />
                                     <button
@@ -257,14 +297,14 @@ export default function Register() {
                                     </button>
                                 </div>
                                 {errors.password && (
-                                    <p id="password-error" role="alert" className="mt-1 text-caption text-danger">
+                                    <p id="password-error" role="alert" className="mt-0.5 text-caption text-danger">
                                         {errors.password}
                                     </p>
                                 )}
                             </div>
 
                             <div>
-                                <label htmlFor="confirmPassword" className="block font-sans text-label text-neutral-700 mb-1">
+                                <label htmlFor="confirmPassword" className="block font-sans text-label text-neutral-700 mb-0.5">
                                     Confirmar contraseña
                                 </label>
                                 <div className="relative">
@@ -277,7 +317,7 @@ export default function Register() {
                                         onChange={handleChange}
                                         aria-invalid={Boolean(errors.confirmPassword)}
                                         aria-describedby={errors.confirmPassword ? 'confirmPassword-error' : undefined}
-                                        className={`w-full rounded-md border px-3 py-2 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.confirmPassword ? 'border-danger' : 'border-neutral-200'
+                                        className={`w-full rounded-md border px-3 py-1.5 pr-9 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.confirmPassword ? 'border-danger' : 'border-neutral-200'
                                             }`}
                                     />
                                     <button
@@ -290,7 +330,7 @@ export default function Register() {
                                     </button>
                                 </div>
                                 {errors.confirmPassword && (
-                                    <p id="confirmPassword-error" role="alert" className="mt-1 text-caption text-danger">
+                                    <p id="confirmPassword-error" role="alert" className="mt-0.5 text-caption text-danger">
                                         {errors.confirmPassword}
                                     </p>
                                 )}
@@ -304,7 +344,7 @@ export default function Register() {
                         )}
 
                         <div>
-                            <label htmlFor="phone" className="block font-sans text-label text-neutral-700 mb-1">
+                            <label htmlFor="phone" className="block font-sans text-label text-neutral-700 mb-0.5">
                                 Teléfono
                             </label>
                             <input
@@ -316,11 +356,11 @@ export default function Register() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.phone)}
                                 aria-describedby={errors.phone ? 'phone-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.phone ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.phone ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.phone && (
-                                <p id="phone-error" role="alert" className="mt-1 text-caption text-danger">
+                                <p id="phone-error" role="alert" className="mt-0.5 text-caption text-danger">
                                     {errors.phone}
                                 </p>
                             )}

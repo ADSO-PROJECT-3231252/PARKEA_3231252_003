@@ -84,7 +84,7 @@ export default function Login() {
                 <form onSubmit={handleSubmit} noValidate className="space-y-5">
                     <div className="text-center">
                         <h1 className="font-display text-title text-neutral-900 uppercase">
-                            Iniciar sesión
+                            <span className="text-parkea-600">Iniciar</span> sesión
                         </h1>
                         <p className="font-sans text-body text-neutral-600 mt-1">
                             Ingresa tus datos para acceder a tu cuenta.
