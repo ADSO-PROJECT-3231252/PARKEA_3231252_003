@@ -7,9 +7,22 @@ const validarCamposVehiculo = [
     body('vehicleType')
         .notEmpty().withMessage('Vehicle type is required')
         .isIn(['car', 'motorcycle', 'truck']).withMessage('Invalid vehicle type'),
-    body('brand').trim().notEmpty().withMessage('Brand is required'),
-    body('model').trim().notEmpty().withMessage('Model is required'),
-    body('color').trim().notEmpty().withMessage('Color is required'),
+    body('brand')
+        .trim()
+        .notEmpty().withMessage('Brand is required')
+        .isLength({ max: 50 }).withMessage('Brand must be at most 50 characters'),
+    body('model')
+        .trim()
+        .notEmpty().withMessage('Model is required')
+        .isLength({ max: 50 }).withMessage('Model must be at most 50 characters'),
+    body('color')
+        .trim()
+        .notEmpty().withMessage('Color is required')
+        .isLength({ max: 30 }).withMessage('Color must be at most 30 characters'),
+    body('visualDescription')
+        .optional({ checkFalsy: true })
+        .trim()
+        .isLength({ max: 255 }).withMessage('Visual description must be at most 255 characters'),
 ];
 
 // POST /api/vehicles — requires authentication
