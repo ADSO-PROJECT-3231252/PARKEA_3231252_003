@@ -77,23 +77,29 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     <Icon className="h-7 w-7" aria-hidden="true" />
                 </span>
 
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                    <div>
+                <div className="grid grid-cols-[130px_140px_1fr] gap-x-8 gap-y-2">
+                    <div className="col-start-1 row-start-1">
                         <p className="text-caption text-neutral-500">Marca</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.brand}</p>
                     </div>
-                    <div>
+                    <div className="col-start-2 row-start-1">
                         <p className="text-caption text-neutral-500">Modelo</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.model}</p>
                     </div>
-                    <div>
+                    <div className="col-start-1 row-start-2">
                         <p className="text-caption text-neutral-500">Color</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.color}</p>
                     </div>
-                    <div>
+                    <div className="col-start-2 row-start-2">
                         <p className="text-caption text-neutral-500">Tipo</p>
                         <p className="text-body font-medium text-neutral-900">{typeLabel}</p>
                     </div>
+                    {vehicle.visualDescription && (
+                        <div className="col-start-3 row-start-1 row-span-2">
+                            <p className="text-caption text-neutral-500">Descripción visual</p>
+                            <p className="text-body font-medium text-neutral-900">{vehicle.visualDescription}</p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="ml-auto flex shrink-0 flex-col gap-2">
