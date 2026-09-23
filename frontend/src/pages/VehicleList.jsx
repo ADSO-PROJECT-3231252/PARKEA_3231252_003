@@ -23,6 +23,10 @@ const PAGE_SIZE = 9;
 const VEHICLE_TYPE_ICONS = { car: Car, motorcycle: Motorbike, truck: Truck };
 const VEHICLE_TYPE_LABELS = { car: 'Automóvil', motorcycle: 'Motocicleta', truck: 'Camión' };
 
+// Uses a single neutral color for all plates, regardless of vehicle type.
+// Colombian plate colors depend on the type of service (private/public/
+// official), not vehicle type, a fact the system doesn't track, so
+// coloring by vehicleType would misrepresent something we can't verify.
 function LicensePlate({ plate }) {
     return (
         <div className="flex w-[128px] shrink-0 flex-col items-center overflow-hidden rounded-md border-2 border-neutral-900 bg-neutral-200">
@@ -77,27 +81,29 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     <Icon className="h-7 w-7" aria-hidden="true" />
                 </span>
 
-                <div className="grid grid-cols-[130px_140px_1fr] gap-x-8 gap-y-2">
-                    <div className="col-start-1 row-start-1">
+                <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-2 md:grid-cols-[130px_140px_minmax(0,1fr)]">
+                    <div className="md:col-start-1 md:row-start-1">
                         <p className="text-caption text-neutral-500">Marca</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.brand}</p>
                     </div>
-                    <div className="col-start-2 row-start-1">
+                    <div className="md:col-start-2 md:row-start-1">
                         <p className="text-caption text-neutral-500">Modelo</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.model}</p>
                     </div>
-                    <div className="col-start-1 row-start-2">
+                    <div className="md:col-start-1 md:row-start-2">
                         <p className="text-caption text-neutral-500">Color</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.color}</p>
                     </div>
-                    <div className="col-start-2 row-start-2">
+                    <div className="md:col-start-2 md:row-start-2">
                         <p className="text-caption text-neutral-500">Tipo</p>
                         <p className="text-body font-medium text-neutral-900">{typeLabel}</p>
                     </div>
                     {vehicle.visualDescription && (
-                        <div className="col-start-3 row-start-1 row-span-2">
+                        <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-3 md:row-span-2 md:row-start-1">
                             <p className="text-caption text-neutral-500">Descripción visual</p>
-                            <p className="text-body font-medium text-neutral-900">{vehicle.visualDescription}</p>
+                            <p className="text-body font-medium break-words text-neutral-900">
+                                {vehicle.visualDescription}
+                            </p>
                         </div>
                     )}
                 </div>
@@ -144,6 +150,11 @@ export default function VehicleList() {
 
     useEffect(() => {
         if (!vehicleAdded) return;
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: this
+        // should only run once, when vehicleAdded flips to true, not on every
+        // navigate/location change (which would defeat the point of clearing it once).
+        // Clears location.state so refreshing the page doesn't replay the message.
+        navigate(location.pathname, { replace: true, state: null });
         const timer = setTimeout(() => setVehicleAdded(false), 3000);
         return () => clearTimeout(timer);
     }, [vehicleAdded]);
@@ -168,6 +179,9 @@ export default function VehicleList() {
         fetchVehicles();
     };
 
+    // AC-05 / AC-06: sets a new default vehicle. The backend clears the
+    // previous default; the frontend just re-fetches to reflect the new order
+    // (AC-07/AC-08 ordering is already handled server-side, see vehicleService).
     const handleSetDefault = (id) => {
         setSettingDefaultId(id);
         setSetDefaultError('');
@@ -181,6 +195,7 @@ export default function VehicleList() {
 
     const handleEdit = (id) => navigate(`/vehicles/${id}/edit`);
 
+    // HU-13 not built yet — placeholder only, per instructions.
     const handleDelete = (id) => {
         console.log('TODO: HU-13 — open delete confirmation dialog for vehicle', id);
     };
