@@ -133,7 +133,7 @@ export default function Header() {
 
                 {!user && <div className="flex-1" />}
 
-                <div className="flex items-center gap-3">
+                <div className="ml-auto flex items-center gap-3">
                     {!user && (
                         <>
                             <NavLink
