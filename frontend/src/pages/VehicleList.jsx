@@ -150,13 +150,10 @@ export default function VehicleList() {
 
     useEffect(() => {
         if (!vehicleAdded) return;
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: this
-        // should only run once, when vehicleAdded flips to true, not on every
-        // navigate/location change (which would defeat the point of clearing it once).
-        // Clears location.state so refreshing the page doesn't replay the message.
-        navigate(location.pathname, { replace: true, state: null });
+        navigate(location.pathname + location.search, { replace: true, state: null });
         const timer = setTimeout(() => setVehicleAdded(false), 3000);
         return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: solo debe correr cuando vehicleAdded pasa a true, no en cada cambio de navigate/location (eso anularía el propósito de limpiarlo una sola vez)
     }, [vehicleAdded]);
 
     const fetchVehicles = useCallback(() => {
