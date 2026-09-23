@@ -137,14 +137,14 @@ export default function RegisterVehicle() {
                 Registra un nuevo vehículo para usarlo en tus reservas.
             </p>
 
-            <form onSubmit={handleSubmit} noValidate className="mt-6 max-w-3xl rounded-lg border border-neutral-200 bg-white p-8">
+            <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
                 {serverError && (
                     <p role="alert" className="mb-6 rounded-md bg-danger-soft px-3 py-2 text-center text-caption text-danger">
                         {serverError}
                     </p>
                 )}
 
-                <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-x-8 gap-y-6 md:grid-cols-2">
                     <FieldRow icon={Car}>
                         <label htmlFor="vehicleType" className="block text-label text-neutral-700">
                             Tipo de vehículo <span className="text-danger">*</span>
@@ -256,6 +256,24 @@ export default function RegisterVehicle() {
                         )}
                     </FieldRow>
 
+                    <FieldRow icon={Eye}>
+                        <label htmlFor="visualDescription" className="block text-label text-neutral-700">
+                            Descripción visual <span className="text-neutral-500">(opcional)</span>
+                        </label>
+                        <textarea
+                            id="visualDescription"
+                            name="visualDescription"
+                            rows={3}
+                            value={form.visualDescription}
+                            onChange={handleChange}
+                            placeholder="Ejemplo: Rayón en la puerta delantera derecha, calcomanía en el vidrio trasero."
+                            className="mt-1 w-full resize-none rounded-md border border-neutral-200 px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                        />
+                        <p className="mt-1 text-caption text-neutral-500">
+                            Información adicional para identificar tu vehículo fácilmente.
+                        </p>
+                    </FieldRow>
+
                     <FieldRow icon={Palette}>
                         <label htmlFor="color" className="block text-label text-neutral-700">
                             Color <span className="text-danger">*</span>
@@ -272,34 +290,15 @@ export default function RegisterVehicle() {
                             className={`mt-1 w-full rounded-md border px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.color ? 'border-danger' : 'border-neutral-200'
                                 }`}
                         />
-                        {errors.color && (
+                        {errors.color ? (
                             <p id="color-error" role="alert" className="mt-1 text-caption text-danger">
                                 {errors.color}
                             </p>
-                        )}
-                    </FieldRow>
-
-                    <FieldRow icon={Eye}>
-                        <label htmlFor="visualDescription" className="block text-label text-neutral-700">
-                            Descripción visual <span className="text-neutral-500">(opcional)</span>
-                        </label>
-                        <textarea
-                            id="visualDescription"
-                            name="visualDescription"
-                            rows={3}
-                            value={form.visualDescription}
-                            onChange={handleChange}
-                            placeholder="Ejemplo: Rayón en la puerta delantera derecha, calcomanía en el vidrio trasero."
-                            className="mt-1 w-full resize-none rounded-md border border-neutral-200 px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600"
-                        />
-                        <div className="mt-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                            <p className="text-caption text-neutral-500">
-                                Información adicional para identificar tu vehículo fácilmente.
-                            </p>
-                            <p className="text-caption text-neutral-500">
+                        ) : (
+                            <p className="mt-1 text-caption text-neutral-500">
                                 Los campos rellenados con <span className="text-danger">*</span> son obligatorios
                             </p>
-                        </div>
+                        )}
                     </FieldRow>
                 </div>
 
