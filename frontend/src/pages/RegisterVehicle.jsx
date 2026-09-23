@@ -19,6 +19,15 @@ const PLATE_PLACEHOLDER = {
 
 const REQUIRED_MESSAGE = 'Este campo es obligatorio.';
 
+// Mirrors the DB column limits (brand/model varchar(50), color varchar(30),
+// visual_description varchar(255)) — see vehiculo.routes.js on the backend.
+const MAX_LENGTH = {
+    brand: 50,
+    model: 50,
+    color: 30,
+    visualDescription: 255,
+};
+
 function FieldRow({ icon: Icon, children }) {
     return (
         <div className="flex items-start gap-4">
@@ -218,6 +227,7 @@ export default function RegisterVehicle() {
                             id="brand"
                             name="brand"
                             type="text"
+                            maxLength={MAX_LENGTH.brand}
                             value={form.brand}
                             onChange={handleChange}
                             placeholder="Ejemplo: Mazda"
@@ -241,6 +251,7 @@ export default function RegisterVehicle() {
                             id="model"
                             name="model"
                             type="text"
+                            maxLength={MAX_LENGTH.model}
                             value={form.model}
                             onChange={handleChange}
                             placeholder="Ejemplo: CX-30 2.0"
@@ -264,6 +275,7 @@ export default function RegisterVehicle() {
                             id="visualDescription"
                             name="visualDescription"
                             rows={3}
+                            maxLength={MAX_LENGTH.visualDescription}
                             value={form.visualDescription}
                             onChange={handleChange}
                             placeholder="Ejemplo: Rayón en la puerta delantera derecha, calcomanía en el vidrio trasero."
@@ -282,6 +294,7 @@ export default function RegisterVehicle() {
                             id="color"
                             name="color"
                             type="text"
+                            maxLength={MAX_LENGTH.color}
                             value={form.color}
                             onChange={handleChange}
                             placeholder="Ejemplo: Gris Platino"
