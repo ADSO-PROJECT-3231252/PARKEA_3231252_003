@@ -8,6 +8,7 @@ import Zones from '../pages/Zones';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 import VehicleList from '../pages/VehicleList';
+import RegisterVehicle from '../pages/RegisterVehicle';
 
 export default function AppRoutes() {
     return (
@@ -27,7 +28,7 @@ export default function AppRoutes() {
 
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/vehicles" element={<ProtectedRoute><VehicleList /></ProtectedRoute>} />
-                <Route path="/vehicles/new" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/vehicles/new" element={<ProtectedRoute><RegisterVehicle /></ProtectedRoute>} />
                 <Route path="/vehicles/:id/edit" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/reserve/:zoneId" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/reservations" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />

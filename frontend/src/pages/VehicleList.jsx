@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Car,
     Truck,
@@ -81,23 +81,31 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     <Icon className="h-7 w-7" aria-hidden="true" />
                 </span>
 
-                <div className="grid grid-cols-2 gap-x-8 gap-y-2">
-                    <div>
+                <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-2 md:grid-cols-[130px_140px_minmax(0,1fr)]">
+                    <div className="md:col-start-1 md:row-start-1">
                         <p className="text-caption text-neutral-500">Marca</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.brand}</p>
                     </div>
-                    <div>
+                    <div className="md:col-start-2 md:row-start-1">
                         <p className="text-caption text-neutral-500">Modelo</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.model}</p>
                     </div>
-                    <div>
+                    <div className="md:col-start-1 md:row-start-2">
                         <p className="text-caption text-neutral-500">Color</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.color}</p>
                     </div>
-                    <div>
+                    <div className="md:col-start-2 md:row-start-2">
                         <p className="text-caption text-neutral-500">Tipo</p>
                         <p className="text-body font-medium text-neutral-900">{typeLabel}</p>
                     </div>
+                    {vehicle.visualDescription && (
+                        <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-3 md:row-span-2 md:row-start-1">
+                            <p className="text-caption text-neutral-500">Descripción visual</p>
+                            <p className="text-body font-medium break-words text-neutral-900">
+                                {vehicle.visualDescription}
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 <div className="ml-auto flex shrink-0 flex-col gap-2">
@@ -127,6 +135,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
 
 export default function VehicleList() {
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [vehicles, setVehicles] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -134,6 +143,18 @@ export default function VehicleList() {
     const [page, setPage] = useState(1);
     const [settingDefaultId, setSettingDefaultId] = useState(null);
     const [setDefaultError, setSetDefaultError] = useState('');
+
+    // AC-07 (HU-10): flash message after a successful registration redirect
+    // same pattern as Login.jsx's "Registro completado" (location.state, auto-dismiss).
+    const [vehicleAdded, setVehicleAdded] = useState(Boolean(location.state?.vehicleAdded));
+
+    useEffect(() => {
+        if (!vehicleAdded) return;
+        navigate(location.pathname + location.search, { replace: true, state: null });
+        const timer = setTimeout(() => setVehicleAdded(false), 3000);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: solo debe correr cuando vehicleAdded pasa a true, no en cada cambio de navigate/location (eso anularía el propósito de limpiarlo una sola vez)
+    }, [vehicleAdded]);
 
     const fetchVehicles = useCallback(() => {
         getVehicles()
@@ -199,6 +220,12 @@ export default function VehicleList() {
                     Agregar vehículo
                 </button>
             </div>
+
+            {vehicleAdded && (
+                <p role="status" className="mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center text-caption text-parkea-700">
+                    Vehículo registrado correctamente.
+                </p>
+            )}
 
             {setDefaultError && (
                 <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
