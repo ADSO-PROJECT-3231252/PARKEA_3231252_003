@@ -75,11 +75,12 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
             </div>
 
             <div className="flex flex-col gap-6 md:flex-row md:flex-wrap md:items-center">
-                <LicensePlate plate={vehicle.plate} />
-
-                <span className="flex h-16 w-16 shrink-0 items-center justify-center self-start rounded-full bg-parkea-50 text-parkea-600 md:self-auto">
-                    <Icon className="h-7 w-7" aria-hidden="true" />
-                </span>
+                <div className="flex items-center gap-3">
+                    <LicensePlate plate={vehicle.plate} />
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                        <Icon className="h-7 w-7" aria-hidden="true" />
+                    </span>
+                </div>
 
                 <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-2 md:grid-cols-[130px_140px_minmax(0,1fr)]">
                     <div className="md:col-start-1 md:row-start-1">
