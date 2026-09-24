@@ -74,10 +74,10 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                 )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-6">
+            <div className="flex flex-col gap-6 md:flex-row md:flex-wrap md:items-center">
                 <LicensePlate plate={vehicle.plate} />
 
-                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center self-start rounded-full bg-parkea-50 text-parkea-600 md:self-auto">
                     <Icon className="h-7 w-7" aria-hidden="true" />
                 </span>
 
@@ -108,12 +108,12 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     )}
                 </div>
 
-                <div className="ml-auto flex shrink-0 flex-col gap-2">
+                <div className="flex shrink-0 gap-2 md:ml-auto md:flex-col">
                     <button
                         type="button"
                         onClick={() => onEdit(vehicle.id)}
                         aria-label={`Editar ${vehicleDescription}`}
-                        className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-4 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-4 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 md:flex-none"
                     >
                         <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                         Editar
@@ -122,7 +122,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                         type="button"
                         onClick={() => onDelete(vehicle.id)}
                         aria-label={`Eliminar ${vehicleDescription}`}
-                        className="flex items-center gap-1.5 rounded-md border border-danger px-4 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-danger px-4 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft md:flex-none"
                     >
                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         Eliminar
