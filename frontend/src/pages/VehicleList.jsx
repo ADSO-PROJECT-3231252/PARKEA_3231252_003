@@ -14,8 +14,9 @@ import {
     ChevronRight,
     Info,
 } from 'lucide-react';
-import { getVehicles, setDefaultVehicle } from '../services/vehicleService';
+import { getVehicles, setDefaultVehicle, deleteVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 // AC-10: the list must be paginated when there are more than 9 vehicles.
 const PAGE_SIZE = 9;
