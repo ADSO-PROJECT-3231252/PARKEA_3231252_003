@@ -384,6 +384,26 @@ export default function VehicleList() {
                     </>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={Boolean(deleteTarget)}
+                variant="danger"
+                title="Eliminar vehículo"
+                message={
+                    deleteTarget
+                        ? `¿Estás seguro de que deseas eliminar tu ` +
+                          `${deleteTarget.brand} ${deleteTarget.model} ` +
+                          `(placa ${deleteTarget.plate})? Esta acción no ` +
+                          `se puede deshacer.`
+                        : ''
+                }
+                confirmLabel="Confirmar"
+                cancelLabel="Cancelar"
+                confirming={deleting}
+                error={deleteError}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+            />
         </div>
     );
 }
