@@ -210,9 +210,44 @@ export default function VehicleList() {
 
     const handleEdit = (id) => navigate(`/vehicles/${id}/edit`);
 
-    // HU-13 not built yet — placeholder only, per instructions.
-    const handleDelete = (id) => {
-        console.log('TODO: HU-13 — open delete confirmation dialog for vehicle', id);
+    // AC-01: opens the confirmation dialog for this specific vehicle.
+    const handleDelete = (vehicle) => {
+        setDeleteTarget(vehicle);
+        setDeleteError('');
+    };
+
+    const handleCancelDelete = () => {
+        if (deleting) return;
+        setDeleteTarget(null);
+        setDeleteError('');
+    };
+
+    // AC-02/AC-03/AC-04/AC-06 are already enforced by the backend's eliminar()
+    // controller (blocks active reservations, soft-deletes, reassigns the
+    // default vehicle, scopes the query to the authenticated owner) -- this
+    // just calls it and reacts to the result.
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        setDeleteError('');
+        deleteVehicle(deleteTarget.id)
+            .then(() => {
+                // AC-05: no full page reload -- closing the dialog and
+                // re-fetching updates the list and the reassigned default
+                // (if any) in place.
+                setDeleteTarget(null);
+                setVehicleDeleted(true);
+                fetchVehicles();
+            })
+            .catch((err) => {
+                // AC-02/AC-07: shown inside the dialog, not as a page banner --
+                // the user is mid-confirmation and this is the direct result of
+                // the action they just took. VEHICLE_HAS_ACTIVE_RESERVATION
+                // already has its own message in errorMessages.js; anything
+                // else falls back to translateError's generic message.
+                setDeleteError(translateError(err.response?.data?.code));
+            })
+            .finally(() => setDeleting(false));
     };
 
     const totalPages = Math.max(1, Math.ceil(vehicles.length / PAGE_SIZE));
