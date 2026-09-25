@@ -27,3 +27,13 @@ export function formatTime(isoString) {
 export function formatCurrency(amount) {
     return `$ ${Math.round(Number(amount)).toLocaleString('es-CO')}`;
 }
+
+// "2 horas 30 minutos" / "1 hora 00 minutos" / "30 minutos".
+export const formatDuration = (startIso, endIso) => {
+    const totalMinutes = Math.max(0, Math.round((new Date(endIso) - new Date(startIso)) / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const paddedMinutes = String(minutes).padStart(2, '0');
+    if (hours === 0) return `${minutes} minutos`;
+    return `${hours} ${hours === 1 ? 'hora' : 'horas'} ${paddedMinutes} minutos`;
+};
