@@ -286,6 +286,16 @@ export default function VehicleList() {
                 </p>
             )}
 
+            {vehicleDeleted && (
+                <p
+                    role="status"
+                    className={`mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center
+                        text-caption text-parkea-700`}
+                >
+                    Vehículo eliminado correctamente.
+                </p>
+            )}
+
             <div className="mt-6">
                 {loading && (
                     <p role="status" aria-live="polite" className="text-body text-neutral-600">
