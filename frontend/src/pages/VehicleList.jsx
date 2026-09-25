@@ -145,6 +145,23 @@ export default function VehicleList() {
     const [settingDefaultId, setSettingDefaultId] = useState(null);
     const [setDefaultError, setSetDefaultError] = useState('');
 
+    // HU-13: delete confirmation dialog state. deleteTarget holds the whole
+    // vehicle object (not just the id) so the dialog can show its brand/model/
+    // plate in the confirmation message.
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+    const [vehicleDeleted, setVehicleDeleted] = useState(false);
+
+    // Same 3-second auto-dismiss pattern as vehicleAdded, but this one never
+    // needs the location.state/navigate cleanup -- deleting happens without
+    // leaving the page, so there's no redirect state to clear.
+    useEffect(() => {
+        if (!vehicleDeleted) return;
+        const timer = setTimeout(() => setVehicleDeleted(false), 3000);
+        return () => clearTimeout(timer);
+    }, [vehicleDeleted]);
+
     // AC-07 (HU-10): flash message after a successful registration redirect
     // same pattern as Login.jsx's "Registro completado" (location.state, auto-dismiss).
     const [vehicleAdded, setVehicleAdded] = useState(Boolean(location.state?.vehicleAdded));
