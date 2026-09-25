@@ -121,7 +121,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     </button>
                     <button
                         type="button"
-                        onClick={() => onDelete(vehicle.id)}
+                        onClick={() => onDelete(vehicle)}
                         aria-label={`Eliminar ${vehicleDescription}`}
                         className="flex items-center gap-1.5 rounded-md border border-danger px-4 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft"
                     >
