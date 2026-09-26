@@ -14,8 +14,9 @@ import {
     ChevronRight,
     Info,
 } from 'lucide-react';
-import { getVehicles, setDefaultVehicle } from '../services/vehicleService';
+import { getVehicles, setDefaultVehicle, deleteVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 // AC-10: the list must be paginated when there are more than 9 vehicles.
 const PAGE_SIZE = 9;
@@ -120,7 +121,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     </button>
                     <button
                         type="button"
-                        onClick={() => onDelete(vehicle.id)}
+                        onClick={() => onDelete(vehicle)}
                         aria-label={`Eliminar ${vehicleDescription}`}
                         className="flex items-center gap-1.5 rounded-md border border-danger px-4 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft"
                     >
@@ -143,6 +144,23 @@ export default function VehicleList() {
     const [page, setPage] = useState(1);
     const [settingDefaultId, setSettingDefaultId] = useState(null);
     const [setDefaultError, setSetDefaultError] = useState('');
+
+    // HU-13: delete confirmation dialog state. deleteTarget holds the whole
+    // vehicle object (not just the id) so the dialog can show its brand/model/
+    // plate in the confirmation message.
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+    const [vehicleDeleted, setVehicleDeleted] = useState(false);
+
+    // Same 3-second auto-dismiss pattern as vehicleAdded, but this one never
+    // needs the location.state/navigate cleanup -- deleting happens without
+    // leaving the page, so there's no redirect state to clear.
+    useEffect(() => {
+        if (!vehicleDeleted) return;
+        const timer = setTimeout(() => setVehicleDeleted(false), 3000);
+        return () => clearTimeout(timer);
+    }, [vehicleDeleted]);
 
     // AC-07 (HU-10): flash message after a successful registration redirect
     // same pattern as Login.jsx's "Registro completado" (location.state, auto-dismiss).
@@ -192,9 +210,44 @@ export default function VehicleList() {
 
     const handleEdit = (id) => navigate(`/vehicles/${id}/edit`);
 
-    // HU-13 not built yet — placeholder only, per instructions.
-    const handleDelete = (id) => {
-        console.log('TODO: HU-13 — open delete confirmation dialog for vehicle', id);
+    // AC-01: opens the confirmation dialog for this specific vehicle.
+    const handleDelete = (vehicle) => {
+        setDeleteTarget(vehicle);
+        setDeleteError('');
+    };
+
+    const handleCancelDelete = () => {
+        if (deleting) return;
+        setDeleteTarget(null);
+        setDeleteError('');
+    };
+
+    // AC-02/AC-03/AC-04/AC-06 are already enforced by the backend's eliminar()
+    // controller (blocks active reservations, soft-deletes, reassigns the
+    // default vehicle, scopes the query to the authenticated owner) -- this
+    // just calls it and reacts to the result.
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        setDeleteError('');
+        deleteVehicle(deleteTarget.id)
+            .then(() => {
+                // AC-05: no full page reload -- closing the dialog and
+                // re-fetching updates the list and the reassigned default
+                // (if any) in place.
+                setDeleteTarget(null);
+                setVehicleDeleted(true);
+                fetchVehicles();
+            })
+            .catch((err) => {
+                // AC-02/AC-07: shown inside the dialog, not as a page banner --
+                // the user is mid-confirmation and this is the direct result of
+                // the action they just took. VEHICLE_HAS_ACTIVE_RESERVATION
+                // already has its own message in errorMessages.js; anything
+                // else falls back to translateError's generic message.
+                setDeleteError(translateError(err.response?.data?.code));
+            })
+            .finally(() => setDeleting(false));
     };
 
     const totalPages = Math.max(1, Math.ceil(vehicles.length / PAGE_SIZE));
@@ -230,6 +283,16 @@ export default function VehicleList() {
             {setDefaultError && (
                 <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
                     {setDefaultError}
+                </p>
+            )}
+
+            {vehicleDeleted && (
+                <p
+                    role="status"
+                    className={`mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center
+                        text-caption text-parkea-700`}
+                >
+                    Vehículo eliminado correctamente.
                 </p>
             )}
 
@@ -321,6 +384,26 @@ export default function VehicleList() {
                     </>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={Boolean(deleteTarget)}
+                variant="danger"
+                title="Eliminar vehículo"
+                message={
+                    deleteTarget
+                        ? `¿Estás seguro de que deseas eliminar tu ` +
+                          `${deleteTarget.brand} ${deleteTarget.model} ` +
+                          `(placa ${deleteTarget.plate})? Esta acción no ` +
+                          `se puede deshacer.`
+                        : ''
+                }
+                confirmLabel="Confirmar"
+                cancelLabel="Cancelar"
+                confirming={deleting}
+                error={deleteError}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+            />
         </div>
     );
 }
