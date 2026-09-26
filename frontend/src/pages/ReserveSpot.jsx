@@ -205,3 +205,41 @@ export default function ReserveSpot() {
     const handleBack = () => navigate('/zones'); // AC-11: explicit route, not navigate(-1)
 
     
+    if (zoneLoading || vehiclesLoading) {
+        return (
+            <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <p role="status" aria-live="polite" className="text-body text-neutral-600">
+                    Cargando…
+                </p>
+            </div>
+        );
+    }
+
+    if (zoneError || !zone) {
+        return (
+            <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-danger-soft bg-danger-soft p-5">
+                    <p className="flex items-center gap-2 text-body text-danger">
+                        <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        No pudimos cargar esta zona.
+                    </p>
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={handleRetryZone}
+                            className="flex items-center gap-1.5 rounded-md border border-danger px-3 py-1.5 text-label text-danger transition-colors hover:bg-white"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                            Reintentar
+                        </button>
+                        <Link
+                            to="/zones"
+                            className="rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                        >
+                            Volver a zonas
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
