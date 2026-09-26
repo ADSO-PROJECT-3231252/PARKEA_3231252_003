@@ -79,7 +79,7 @@ export default function ReserveSpot() {
             .then(({ data }) => {
                 setVehicles(data.vehicles);
                 setVehiclesError(false);
-                // AC-03: the list already comes with the default vehicle first —
+                // AC-03: the list already comes with the default vehicle first
                 // no need to search for isDefault manually.
                 if (data.vehicles.length > 0) {
                     setForm((prev) => ({ ...prev, vehicleId: data.vehicles[0].id }));
@@ -95,7 +95,7 @@ export default function ReserveSpot() {
     }, [fetchZone, fetchVehicleList]);
 
     // Same handleRetry pattern already used in VehicleList.jsx: the reset
-    // (loading=true, error=false) lives here, in the click handler — never
+    // (loading=true, error=false) lives here, in the click handler, never
     // synchronously inside the effect itself, which is what triggered the
     // "setState synchronously within an effect" warning.
     const handleRetryZone = () => {
@@ -108,4 +108,59 @@ export default function ReserveSpot() {
         setVehiclesLoading(true);
         setVehiclesError(false);
         fetchVehicleList();
+    };
+
+    
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const startDateTime = combineDateTime(form.startDate, form.startTime);
+    const endDateTime = combineDateTime(form.endDate, form.endTime);
+
+    // AC-09/AC-10: only compute duration/cost once both ends form a valid range
+    // otherwise showing a number here would be meaningless.
+    const hasValidRange = Boolean(startDateTime && endDateTime && endDateTime > startDateTime);
+    let durationLabel = '';
+    let estimatedCost = 0;
+    let hoursLabel = '';
+
+    if (hasValidRange && zone) {
+        durationLabel = formatDuration(startDateTime, endDateTime);
+        const totalMinutes = Math.round((endDateTime - startDateTime) / 60000);
+        const hoursDecimal = totalMinutes / 60;
+        estimatedCost = Math.round(hoursDecimal * Number(zone.hourlyRate));
+        hoursLabel = Number.isInteger(hoursDecimal) ? String(hoursDecimal) : hoursDecimal.toFixed(1);
+    }
+
+    const validate = () => {
+        const newErrors = {};
+        const now = new Date();
+
+        if (!isNotEmpty(form.vehicleId)) {
+            newErrors.vehicle = 'Este campo es obligatorio.';
+        }
+
+        if (!startDateTime) {
+            newErrors.start = 'Este campo es obligatorio.';
+        } else if (startDateTime <= now) {
+            newErrors.start = translateError('START_TIME_IN_PAST');
+        } else if (startDateTime - now > MAX_ADVANCE_HOURS * 60 * 60 * 1000) {
+            newErrors.start = translateError('RESERVATION_TOO_FAR_AHEAD');
+        }
+
+        if (!endDateTime) {
+            newErrors.end = 'Este campo es obligatorio.';
+        } else if (startDateTime && endDateTime <= startDateTime) {
+            newErrors.end = translateError('END_BEFORE_START');
+        } else if (startDateTime) {
+            const totalMinutes = Math.round((endDateTime - startDateTime) / 60000);
+            if (totalMinutes < MIN_DURATION_MINUTES || totalMinutes > MAX_DURATION_MINUTES) {
+                newErrors.end = translateError('INVALID_DURATION');
+            }
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
