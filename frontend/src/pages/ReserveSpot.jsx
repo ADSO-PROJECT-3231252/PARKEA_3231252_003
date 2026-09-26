@@ -63,7 +63,6 @@ export default function ReserveSpot() {
     const [serverError, setServerError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-
     const fetchZone = useCallback(() => {
         getZone(zoneId)
             .then(({ data }) => {
@@ -109,7 +108,6 @@ export default function ReserveSpot() {
         setVehiclesError(false);
         fetchVehicleList();
     };
-
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -165,7 +163,6 @@ export default function ReserveSpot() {
         return Object.keys(newErrors).length === 0;
     };
 
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
@@ -203,7 +200,6 @@ export default function ReserveSpot() {
     };
 
     const handleBack = () => navigate('/zones'); // AC-11: explicit route, not navigate(-1)
-
 
     if (zoneLoading || vehiclesLoading) {
         return (
@@ -243,7 +239,6 @@ export default function ReserveSpot() {
             </div>
         );
     }
-
 
     const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
 
@@ -307,7 +302,6 @@ export default function ReserveSpot() {
                     </div>
                 </div>
             </div>
-
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
                 <h3 className="text-body font-medium text-neutral-900">Información de la reserva</h3>
@@ -412,7 +406,6 @@ export default function ReserveSpot() {
                             <p className="mt-1 text-caption text-neutral-500">Selecciona cuándo vas a ingresar al parqueadero.</p>
                         )}
                     </div>
-
 
                     {/* AC-02/AC-06/AC-07: end date + time */}
                     <div>
