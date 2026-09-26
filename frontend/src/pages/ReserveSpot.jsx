@@ -63,7 +63,7 @@ export default function ReserveSpot() {
     const [serverError, setServerError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
-    
+
     const fetchZone = useCallback(() => {
         getZone(zoneId)
             .then(({ data }) => {
@@ -110,7 +110,7 @@ export default function ReserveSpot() {
         fetchVehicleList();
     };
 
-    
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
@@ -165,7 +165,7 @@ export default function ReserveSpot() {
         return Object.keys(newErrors).length === 0;
     };
 
-    
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
@@ -204,7 +204,7 @@ export default function ReserveSpot() {
 
     const handleBack = () => navigate('/zones'); // AC-11: explicit route, not navigate(-1)
 
-    
+
     if (zoneLoading || vehiclesLoading) {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -244,7 +244,7 @@ export default function ReserveSpot() {
         );
     }
 
-    
+
     const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
 
     // AC-04: no vehicles at all block the flow entirely, don't render the form.
@@ -308,7 +308,7 @@ export default function ReserveSpot() {
                 </div>
             </div>
 
-            
+
             <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
                 <h3 className="text-body font-medium text-neutral-900">Información de la reserva</h3>
                 <div className="mt-4 border-t border-neutral-100" />
@@ -412,3 +412,119 @@ export default function ReserveSpot() {
                             <p className="mt-1 text-caption text-neutral-500">Selecciona cuándo vas a ingresar al parqueadero.</p>
                         )}
                     </div>
+
+
+                    {/* AC-02/AC-06/AC-07: end date + time */}
+                    <div>
+                        <span className="block text-label text-neutral-700">
+                            Fecha y hora de salida <span className="text-danger">*</span>
+                        </span>
+                        <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="relative">
+                                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                                <label htmlFor="endDate" className="sr-only">
+                                    Fecha de salida
+                                </label>
+                                <input
+                                    id="endDate"
+                                    name="endDate"
+                                    type="date"
+                                    value={form.endDate}
+                                    onChange={handleChange}
+                                    aria-invalid={Boolean(errors.end)}
+                                    aria-describedby={errors.end ? 'end-error' : undefined}
+                                    className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
+                                        }`}
+                                />
+                            </div>
+                            <div className="relative">
+                                <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                                <label htmlFor="endTime" className="sr-only">
+                                    Hora de salida
+                                </label>
+                                <input
+                                    id="endTime"
+                                    name="endTime"
+                                    type="time"
+                                    value={form.endTime}
+                                    onChange={handleChange}
+                                    aria-invalid={Boolean(errors.end)}
+                                    aria-describedby={errors.end ? 'end-error' : undefined}
+                                    className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
+                                        }`}
+                                />
+                            </div>
+                        </div>
+                        {errors.end ? (
+                            <p id="end-error" role="alert" className="mt-1 text-caption text-danger">
+                                {errors.end}
+                            </p>
+                        ) : (
+                            <p className="mt-1 text-caption text-neutral-500">Selecciona cuándo planeas salir del parqueadero.</p>
+                        )}
+                    </div>
+
+                    {/* AC-09/AC-10: real-time duration + cost, hidden until the range is valid */}
+                    {hasValidRange && (
+                        <div className="rounded-lg bg-parkea-50 p-5">
+                            <h4 className="text-label font-medium uppercase text-parkea-700">Resumen de la reserva</h4>
+                            <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-parkea-600">
+                                        <Clock className="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="text-caption text-neutral-500">Duración</p>
+                                        <p className="break-words text-body font-medium text-neutral-900">{durationLabel}</p>
+                                    </div>
+                                </div>
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-parkea-600">
+                                        <Banknote className="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="text-caption text-neutral-500">Costo total estimado</p>
+                                        <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(estimatedCost)}</p>
+                                        <p className="text-caption text-neutral-500">
+                                            (Tarifa: {formatCurrency(zone.hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <p className="flex items-center gap-1.5 text-caption text-neutral-500">
+                        <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        El costo final puede variar según el tiempo real de uso.
+                    </p>
+
+                    {serverError && (
+                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-center text-caption text-danger">
+                            {serverError}
+                        </p>
+                    )}
+                </div>
+
+                <div className="mt-8 flex items-center justify-between border-t border-neutral-200 pt-6">
+                    <button
+                        type="button"
+                        onClick={handleBack}
+                        className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                    >
+                        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                        Volver a zonas
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={submitting}
+                        className="flex items-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+                        {submitting ? 'Reservando…' : 'Reservar cupo'}
+                    </button>
+                </div>
+            </form>
+        </div>
+    );
+}
