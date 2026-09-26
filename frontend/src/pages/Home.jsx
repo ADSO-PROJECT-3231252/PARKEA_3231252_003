@@ -243,13 +243,13 @@ function AuthenticatedHome({ user }) {
                     )}
                     {!reservationsLoading && !reservationsError && latestReservation && (
                         <div className="rounded-md bg-parkea-50 p-3">
-                            <div className="flex items-start justify-between">
-                                <p className="flex items-center gap-1 text-label font-medium text-neutral-900">
-                                    <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
-                                    {latestReservation.zone.name}
+                            <div className="flex items-start justify-between gap-2">
+                                <p className="flex min-w-0 items-center gap-1 text-label font-medium text-neutral-900">
+                                    <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
+                                    <span className="truncate">{latestReservation.zone.name}</span>
                                 </p>
                                 <span
-                                    className={`text-label font-medium ${RESERVATION_STATUS_LABEL[latestReservation.status]?.color ?? 'text-neutral-600'
+                                    className={`shrink-0 text-label font-medium ${RESERVATION_STATUS_LABEL[latestReservation.status]?.color ?? 'text-neutral-600'
                                         }`}
                                 >
                                     {RESERVATION_STATUS_LABEL[latestReservation.status]?.text ?? latestReservation.status}
@@ -297,18 +297,18 @@ function AuthenticatedHome({ user }) {
                             {zones.map((zone) => {
                                 const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
                                 return (
-                                    <li key={zone.id} className="flex items-center justify-between rounded-md bg-parkea-50 p-3">
-                                        <p className="flex items-center gap-1 text-body text-neutral-900">
-                                            <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
-                                            {zone.name}
+                                    <li key={zone.id} className="flex flex-col gap-1 rounded-md bg-parkea-50 p-3">
+                                        <p className="flex min-w-0 items-center gap-1 text-body text-neutral-900">
+                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
+                                            <span className="truncate">{zone.name}</span>
                                         </p>
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center justify-between gap-3 pl-[18px]">
                                             <span className="flex items-baseline gap-1 font-mono text-caption text-neutral-600">
                                                 <span className="text-right tabular-nums">{zone.availableSlots}</span>
                                                 <span>de</span>
                                                 <span className="text-right tabular-nums">{zone.totalSlots}</span>
                                             </span>
-                                            <span className={`w-[80px] text-right text-label font-medium ${ZONE_AVAILABILITY_COLORS[availability.state]}`}>
+                                            <span className={`text-right text-label font-medium ${ZONE_AVAILABILITY_COLORS[availability.state]}`}>
                                                 {availability.text}
                                             </span>
                                         </div>
