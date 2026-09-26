@@ -164,3 +164,44 @@ export default function ReserveSpot() {
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
+
+    
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setServerError('');
+        if (!validate()) return;
+
+        setSubmitting(true);
+        try {
+            const { data } = await createReservation({
+                zoneId,
+                vehicleId: form.vehicleId,
+                startTime: startDateTime.toISOString(),
+                endTime: endDateTime.toISOString(),
+            });
+            // AC-12: redirect to the confirmation screen (HU-15).
+            navigate(`/reservations/${data.reservation.id}`);
+        } catch (err) {
+            const code = err.response?.data?.code;
+            // AC-08/AC-14: these are only detectable server-side (need the vehicle's
+            // other reservations, or a live lock on the zone's spots) the client
+            // validation above can never catch them on its own.
+            if (code === 'START_TIME_IN_PAST' || code === 'RESERVATION_TOO_FAR_AHEAD') {
+                setErrors((prev) => ({ ...prev, start: translateError(code) }));
+            } else if (code === 'END_BEFORE_START' || code === 'INVALID_DURATION') {
+                setErrors((prev) => ({ ...prev, end: translateError(code) }));
+            } else if (code === 'VEHICLE_RESERVATION_OVERLAP' || code === 'VEHICLE_NOT_FOUND') {
+                setErrors((prev) => ({ ...prev, vehicle: translateError(code) }));
+            } else {
+                // NO_SPOTS_AVAILABLE (AC-14), ZONE_NOT_FOUND, ZONE_INACTIVE,
+                // MISSING_REQUIRED_FIELDS, or anything else generic banner.
+                setServerError(translateError(code));
+            }
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleBack = () => navigate('/zones'); // AC-11: explicit route, not navigate(-1)
+
+    
