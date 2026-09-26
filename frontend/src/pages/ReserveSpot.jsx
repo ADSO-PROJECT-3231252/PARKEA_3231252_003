@@ -243,3 +243,67 @@ export default function ReserveSpot() {
             </div>
         );
     }
+
+    
+    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
+
+    // AC-04: no vehicles at all block the flow entirely, don't render the form.
+    if (!vehiclesError && vehicles.length === 0) {
+        return (
+            <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <h1 className="text-title font-display uppercase text-neutral-900">Reservar cupo</h1>
+                <div className="mt-6 flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
+                    <p className="text-body text-neutral-600">
+                        Necesitas registrar un vehículo antes de hacer una reserva.
+                    </p>
+                    <Link
+                        to="/vehicles/new"
+                        className="flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2 text-label text-white transition-colors hover:bg-parkea-700"
+                    >
+                        <Car className="h-4 w-4" aria-hidden="true" />
+                        Registrar vehículo
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <h1 className="text-title font-display uppercase text-neutral-900">Reservar cupo</h1>
+            <p className="mt-1 text-body text-neutral-600">Completa la información para asegurar tu cupo de parqueo.</p>
+
+            {/* AC-01: zone context, read-only */}
+            <div className="mt-6 flex flex-col gap-4 rounded-lg border border-neutral-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                        <MapPin className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                        <h2 className="break-words text-subtitle-sm font-display uppercase text-neutral-900">{zone.name}</h2>
+                        {zone.address && <p className="break-words text-body text-neutral-600">{zone.address}</p>}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full px-2.5 py-1 text-label font-medium ${BADGE_CLASSES[availability.state]}`}>
+                                {availability.text}
+                            </span>
+                            <span className="flex flex-wrap items-center gap-1 text-body text-neutral-600">
+                                <Users className="h-3.5 w-3.5 shrink-0 text-neutral-500" aria-hidden="true" />
+                                <span className="font-mono tabular-nums">{zone.availableSlots}</span>
+                                <span>de</span>
+                                <span className="font-mono tabular-nums">{zone.totalSlots}</span>
+                                <span>cupos disponibles</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-3 sm:border-l sm:border-neutral-200 sm:pl-6">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                        <Banknote className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div>
+                        <p className="text-caption text-neutral-500">Tarifa por hora</p>
+                        <p className="font-mono text-subtitle-sm text-neutral-900">{formatCurrency(zone.hourlyRate)}</p>
+                    </div>
+                </div>
+            </div>
