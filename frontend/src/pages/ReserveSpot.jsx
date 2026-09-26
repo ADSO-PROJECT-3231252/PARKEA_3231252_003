@@ -307,3 +307,108 @@ export default function ReserveSpot() {
                     </div>
                 </div>
             </div>
+
+            
+            <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
+                <h3 className="text-body font-medium text-neutral-900">Información de la reserva</h3>
+                <div className="mt-4 border-t border-neutral-100" />
+
+                <div className="mt-6 space-y-6">
+                    {vehiclesError && (
+                        <div role="alert" className="flex items-center justify-between gap-3 rounded-md bg-danger-soft px-3 py-2">
+                            <p className="text-caption text-danger">No pudimos cargar tus vehículos.</p>
+                            <button
+                                type="button"
+                                onClick={handleRetryVehicles}
+                                className="flex items-center gap-1.5 rounded-md border border-danger px-2.5 py-1 text-caption text-danger transition-colors hover:bg-white"
+                            >
+                                <RefreshCw className="h-3 w-3" aria-hidden="true" />
+                                Reintentar
+                            </button>
+                        </div>
+                    )}
+
+                    {/* AC-02/AC-03: vehicle selector */}
+                    <div>
+                        <label htmlFor="vehicleId" className="block text-label text-neutral-700">
+                            Vehículo <span className="text-danger">*</span>
+                        </label>
+                        <div className="relative mt-1">
+                            <Car className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                            <select
+                                id="vehicleId"
+                                name="vehicleId"
+                                value={form.vehicleId}
+                                onChange={handleChange}
+                                aria-invalid={Boolean(errors.vehicle)}
+                                aria-describedby={errors.vehicle ? 'vehicleId-error' : undefined}
+                                className={`w-full appearance-none rounded-md border bg-white py-2.5 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.vehicle ? 'border-danger' : 'border-neutral-200'
+                                    }`}
+                            >
+                                {vehicles.map((v) => (
+                                    <option key={v.id} value={v.id}>
+                                        {v.plate} - {v.brand} {v.model} - {v.color}
+                                        {v.isDefault ? ' (Predeterminado)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" aria-hidden="true" />
+                        </div>
+                        {errors.vehicle ? (
+                            <p id="vehicleId-error" role="alert" className="mt-1 text-caption text-danger">
+                                {errors.vehicle}
+                            </p>
+                        ) : (
+                            <p className="mt-1 text-caption text-neutral-500">Este vehículo se usará para tu reserva.</p>
+                        )}
+                    </div>
+
+                    {/* AC-02/AC-05/AC-19: start date + time */}
+                    <div>
+                        <span className="block text-label text-neutral-700">
+                            Fecha y hora de entrada <span className="text-danger">*</span>
+                        </span>
+                        <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="relative">
+                                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                                <label htmlFor="startDate" className="sr-only">
+                                    Fecha de entrada
+                                </label>
+                                <input
+                                    id="startDate"
+                                    name="startDate"
+                                    type="date"
+                                    value={form.startDate}
+                                    onChange={handleChange}
+                                    aria-invalid={Boolean(errors.start)}
+                                    aria-describedby={errors.start ? 'start-error' : undefined}
+                                    className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.start ? 'border-danger' : 'border-neutral-200'
+                                        }`}
+                                />
+                            </div>
+                            <div className="relative">
+                                <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                                <label htmlFor="startTime" className="sr-only">
+                                    Hora de entrada
+                                </label>
+                                <input
+                                    id="startTime"
+                                    name="startTime"
+                                    type="time"
+                                    value={form.startTime}
+                                    onChange={handleChange}
+                                    aria-invalid={Boolean(errors.start)}
+                                    aria-describedby={errors.start ? 'start-error' : undefined}
+                                    className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.start ? 'border-danger' : 'border-neutral-200'
+                                        }`}
+                                />
+                            </div>
+                        </div>
+                        {errors.start ? (
+                            <p id="start-error" role="alert" className="mt-1 text-caption text-danger">
+                                {errors.start}
+                            </p>
+                        ) : (
+                            <p className="mt-1 text-caption text-neutral-500">Selecciona cuándo vas a ingresar al parqueadero.</p>
+                        )}
+                    </div>
