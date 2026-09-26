@@ -62,3 +62,50 @@ export default function ReserveSpot() {
     const [errors, setErrors] = useState({});
     const [serverError, setServerError] = useState('');
     const [submitting, setSubmitting] = useState(false);
+
+    
+    const fetchZone = useCallback(() => {
+        getZone(zoneId)
+            .then(({ data }) => {
+                setZone(data.zone);
+                setZoneError(false);
+            })
+            .catch(() => setZoneError(true))
+            .finally(() => setZoneLoading(false));
+    }, [zoneId]);
+
+    const fetchVehicleList = useCallback(() => {
+        getVehicles()
+            .then(({ data }) => {
+                setVehicles(data.vehicles);
+                setVehiclesError(false);
+                // AC-03: the list already comes with the default vehicle first —
+                // no need to search for isDefault manually.
+                if (data.vehicles.length > 0) {
+                    setForm((prev) => ({ ...prev, vehicleId: data.vehicles[0].id }));
+                }
+            })
+            .catch(() => setVehiclesError(true))
+            .finally(() => setVehiclesLoading(false));
+    }, []);
+
+    useEffect(() => {
+        fetchZone();
+        fetchVehicleList();
+    }, [fetchZone, fetchVehicleList]);
+
+    // Same handleRetry pattern already used in VehicleList.jsx: the reset
+    // (loading=true, error=false) lives here, in the click handler — never
+    // synchronously inside the effect itself, which is what triggered the
+    // "setState synchronously within an effect" warning.
+    const handleRetryZone = () => {
+        setZoneLoading(true);
+        setZoneError(false);
+        fetchZone();
+    };
+
+    const handleRetryVehicles = () => {
+        setVehiclesLoading(true);
+        setVehiclesError(false);
+        fetchVehicleList();
+    };
