@@ -23,8 +23,10 @@ export default function Login() {
 
     useEffect(() => {
         if (!justRegistered) return;
+        navigate(location.pathname + location.search, { replace: true, state: null });
         const timer = setTimeout(() => setJustRegistered(false), 3000);
         return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [justRegistered]);
 
     const handleChange = (e) => {
