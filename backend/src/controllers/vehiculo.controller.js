@@ -1,5 +1,5 @@
 const { validationResult } = require('express-validator');
-const { Vehiculo, Reserva } = require('../models');
+const { Vehiculo, Reserva, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
 const PLATE_FORMATS = {
@@ -128,9 +128,18 @@ async function marcarPredeterminado(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
-        // Only one default per user: clear the previous one first (HU-11, AC-06)
-        await Vehiculo.update({ isDefault: false }, { where: { userId, isDefault: true } });
-        await vehiculo.update({ isDefault: true });
+        // Only one default per user: clear the previous one first (HU-11, AC-06).
+        // Wrapped in a transaction so the two updates are applied atomically,
+        // without this, two concurrent requests could each read/clear the
+        // previous default before either one applies its own "set new default",
+        // leaving more than one vehicle marked as default at once.
+        await sequelize.transaction(async (t) => {
+            await Vehiculo.update(
+                { isDefault: false },
+                { where: { userId, isDefault: true }, transaction: t }
+            );
+            await vehiculo.update({ isDefault: true }, { transaction: t });
+        });
 
         return res.status(200).json({ message: 'Default vehicle updated successfully', vehicle: vehiculo });
     } catch (error) {

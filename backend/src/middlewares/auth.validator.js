@@ -5,12 +5,13 @@ const validateRegister = [
     body('fullName')
         .trim()
         .notEmpty().withMessage('Full name is required')
-        .isLength({ max: 100 }).withMessage('Full name must be at most 100 characters'),
+        .isLength({ max: 70 }).withMessage('Full name must be at most 70 characters'),
     body('email')
         .trim()
         .notEmpty().withMessage('Email is required')
-        .isEmail().withMessage('Invalid email'),
-        body('password')
+        .isEmail().withMessage('Invalid email')
+        .isLength({ max: 100 }).withMessage('Email must be at most 100 characters'),
+    body('password')
         .notEmpty().withMessage('Password is required')
         .isLength({ min: 8, max: 20 }).withMessage('Password must be between 8 and 20 characters')
         .matches(/[A-Z]/).withMessage('Password must include an uppercase letter')
@@ -21,14 +22,15 @@ const validateRegister = [
         .withMessage('Passwords do not match'),
     body('phone')
         .optional()
-        .matches(/^[0-9]{7,15}$/).withMessage('Phone must contain only digits (7-15 characters)'),
+        .matches(/^[0-9]{10}$/).withMessage('Phone must be exactly 10 digits'),
     body('documentType')
         .notEmpty().withMessage('Document type is required')
         .isIn(['CC', 'TI', 'CE', 'PASSPORT']).withMessage('Invalid document type'),
     body('documentNumber')
         .trim()
         .notEmpty().withMessage('Document number is required')
-        .isAlphanumeric().withMessage('Document number must contain only letters and numbers'),
+        .isAlphanumeric().withMessage('Document number must contain only letters and numbers')
+        .isLength({ max: 15 }).withMessage('Document number must be at most 15 characters'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
