@@ -10,6 +10,7 @@ import Layout from '../components/Layout';
 import VehicleList from '../pages/VehicleList';
 import RegisterVehicle from '../pages/RegisterVehicle';
 import ReserveSpot from '../pages/ReserveSpot';
+import AdminLogin from '../pages/AdminLogin';
 
 export default function AppRoutes() {
     return (
@@ -17,7 +18,7 @@ export default function AppRoutes() {
             {/* Standalone auth screens — no shared Header */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/admin/login" element={<ComingSoon />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/forgot-password" element={<ComingSoon />} />
             <Route path="/reset-password" element={<ComingSoon />} />
 
