@@ -1,13 +1,21 @@
 import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, ShieldCheck, UserRound, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
+import { loginAdmin } from '../services/authService';
+import { translateError } from '../utils/errorMessages';
+import { useAuth } from '../hooks/useAuth';
 import logo from '../assets/logo.png';
 
 export default function AdminLogin() {
     const [form, setForm] = useState({ email: '', password: '' });
     const [errors, setErrors] = useState({});
+    const [serverError, setServerError] = useState('');
+    const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+
+    const { loginUser } = useAuth();
+    const navigate = useNavigate();
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -31,10 +39,24 @@ export default function AdminLogin() {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setServerError('');
         if (!validate()) return;
-        // La llamada real a loginAdmin llega en el próximo commit.
+
+        setLoading(true);
+        try {
+            const { data } = await loginAdmin(form);
+            loginUser(data.token, data.user);
+            navigate('/admin/dashboard');
+        } catch (err) {
+            // AC-06: NOT_ADMIN_ACCOUNT revela el motivo a propósito,
+            // a diferencia de las credenciales inválidas
+            const code = err.response?.data?.code;
+            setServerError(translateError(code));
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -66,6 +88,15 @@ export default function AdminLogin() {
                                 Ingresa tus credenciales para acceder al panel administrativo.
                             </p>
                         </div>
+
+                        {serverError && (
+                            <p
+                                role="alert"
+                                className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 text-center"
+                            >
+                                {serverError}
+                            </p>
+                        )}
 
                         <div>
                             <label htmlFor="email" className="block font-sans text-label text-neutral-700 mb-1">
@@ -134,11 +165,12 @@ export default function AdminLogin() {
 
                         <button
                             type="submit"
+                            disabled={loading}
                             className="w-full rounded-md bg-parkea-700 text-white font-sans font-medium py-2.5
                                 hover:bg-parkea-800 focus:outline-none focus:ring-2 focus:ring-offset-2
-                                focus:ring-parkea-700 transition"
+                                focus:ring-parkea-700 transition disabled:opacity-60"
                         >
-                            Iniciar sesión
+                            {loading ? 'Ingresando...' : 'Iniciar sesión'}
                         </button>
 
                         <div className="text-center">
