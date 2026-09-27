@@ -65,7 +65,7 @@ export default function AdminLogin() {
                 overflow-hidden">
 
                 <div className="bg-parkea-700 h-12 flex items-center justify-center">
-                    <ShieldCheck size={18} color="white" />
+                    <ShieldCheck className="h-4 w-4 text-white" aria-hidden="true" />
                 </div>
 
                 <div className="p-8">
@@ -79,7 +79,7 @@ export default function AdminLogin() {
                     <form onSubmit={handleSubmit} noValidate className="space-y-5">
                         <div className="text-center">
                             <div className="flex items-center justify-center gap-2">
-                                <UserRound size={20} className="text-neutral-900" />
+                                <UserRound className="h-5 w-5 text-neutral-900" aria-hidden="true" />
                                 <h1 className="font-display text-title text-neutral-900 uppercase">
                                     Acceso administrador
                                 </h1>
@@ -153,7 +153,11 @@ export default function AdminLogin() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
                                         hover:text-neutral-700"
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showPassword ? (
+                                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                                    ) : (
+                                        <Eye className="h-4 w-4" aria-hidden="true" />
+                                    )}
                                 </button>
                             </div>
                             {errors.password && (
@@ -179,7 +183,7 @@ export default function AdminLogin() {
                                 className="inline-flex items-center gap-1 text-caption text-parkea-600 underline
                                     hover:text-parkea-700"
                             >
-                                <ArrowLeft size={14} />
+                                <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                                 Volver al inicio de sesión de usuario
                             </Link>
                         </div>
