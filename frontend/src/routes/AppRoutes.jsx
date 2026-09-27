@@ -9,6 +9,7 @@ import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 import VehicleList from '../pages/VehicleList';
 import RegisterVehicle from '../pages/RegisterVehicle';
+import ReserveSpot from '../pages/ReserveSpot';
 
 export default function AppRoutes() {
     return (
@@ -30,7 +31,7 @@ export default function AppRoutes() {
                 <Route path="/vehicles" element={<ProtectedRoute><VehicleList /></ProtectedRoute>} />
                 <Route path="/vehicles/new" element={<ProtectedRoute><RegisterVehicle /></ProtectedRoute>} />
                 <Route path="/vehicles/:id/edit" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
-                <Route path="/reserve/:zoneId" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/reserve/:zoneId" element={<ProtectedRoute><ReserveSpot /></ProtectedRoute>} />
                 <Route path="/reservations" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/reservations/:id" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/reservations/:id/payment" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />

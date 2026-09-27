@@ -210,7 +210,7 @@ function AuthenticatedHome({ user }) {
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="text-hero-sm font-display uppercase text-neutral-900">
+                    <h1 className="break-words text-hero-sm font-display uppercase text-neutral-900">
                         ¡Bienvenido, {user.fullName?.split(' ')[0]}!
                     </h1>
                     <p className="mt-3 text-subtitle-sm text-neutral-900">
@@ -243,13 +243,13 @@ function AuthenticatedHome({ user }) {
                     )}
                     {!reservationsLoading && !reservationsError && latestReservation && (
                         <div className="rounded-md bg-parkea-50 p-3">
-                            <div className="flex items-start justify-between">
-                                <p className="flex items-center gap-1 text-label font-medium text-neutral-900">
-                                    <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
-                                    {latestReservation.zone.name}
+                            <div className="flex items-start justify-between gap-2">
+                                <p className="flex min-w-0 items-center gap-1 text-label font-medium text-neutral-900">
+                                    <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
+                                    <span className="truncate">{latestReservation.zone.name}</span>
                                 </p>
                                 <span
-                                    className={`text-label font-medium ${RESERVATION_STATUS_LABEL[latestReservation.status]?.color ?? 'text-neutral-600'
+                                    className={`shrink-0 text-label font-medium ${RESERVATION_STATUS_LABEL[latestReservation.status]?.color ?? 'text-neutral-600'
                                         }`}
                                 >
                                     {RESERVATION_STATUS_LABEL[latestReservation.status]?.text ?? latestReservation.status}
@@ -267,11 +267,11 @@ function AuthenticatedHome({ user }) {
                                 {formatDate(latestReservation.startTime)}
                             </p>
 
-                            <div className="mt-0.5 flex items-center justify-between">
-                                <p className="pl-[18px] text-body text-neutral-600">
+                            <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pl-[18px]">
+                                <p className="text-body text-neutral-600">
                                     {formatTime(latestReservation.startTime)} – {formatTime(latestReservation.endTime)}
                                 </p>
-                                <p className="font-mono text-label text-neutral-600">
+                                <p className="shrink-0 font-mono text-label text-neutral-600">
                                     Cupo N.º {latestReservation.spotNumber}
                                 </p>
                             </div>
@@ -297,18 +297,21 @@ function AuthenticatedHome({ user }) {
                             {zones.map((zone) => {
                                 const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
                                 return (
-                                    <li key={zone.id} className="flex items-center justify-between rounded-md bg-parkea-50 p-3">
-                                        <p className="flex items-center gap-1 text-body text-neutral-900">
-                                            <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
-                                            {zone.name}
+                                    <li
+                                        key={zone.id}
+                                        className="flex flex-col gap-1 rounded-md bg-parkea-50 p-3 lg:flex-row lg:items-center lg:justify-between lg:gap-2"
+                                    >
+                                        <p className="flex min-w-0 items-center gap-1 text-body text-neutral-900">
+                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
+                                            <span className="truncate">{zone.name}</span>
                                         </p>
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center justify-between gap-3 pl-[18px] lg:shrink-0 lg:justify-end lg:pl-0">
                                             <span className="flex items-baseline gap-1 font-mono text-caption text-neutral-600">
                                                 <span className="text-right tabular-nums">{zone.availableSlots}</span>
                                                 <span>de</span>
                                                 <span className="text-right tabular-nums">{zone.totalSlots}</span>
                                             </span>
-                                            <span className={`w-[80px] text-right text-label font-medium ${ZONE_AVAILABILITY_COLORS[availability.state]}`}>
+                                            <span className={`text-right text-label font-medium ${ZONE_AVAILABILITY_COLORS[availability.state]}`}>
                                                 {availability.text}
                                             </span>
                                         </div>
@@ -336,10 +339,10 @@ function AuthenticatedHome({ user }) {
                         <ul className="space-y-1.5">
                             {history.map((item) => (
                                 <li key={item.id} className="flex items-center justify-between gap-2 rounded-md bg-parkea-50 px-3 py-2">
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex min-w-0 items-center gap-1.5">
                                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
-                                        <div>
-                                            <p className="text-body leading-tight text-neutral-900">{item.zone.name}</p>
+                                        <div className="min-w-0">
+                                            <p className="truncate text-body leading-tight text-neutral-900">{item.zone.name}</p>
                                             <p className="text-caption leading-tight text-neutral-600">
                                                 {formatDate(item.startTime)} · {formatTime(item.startTime)} –{' '}
                                                 {formatTime(item.endTime)}
