@@ -75,7 +75,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                 )}
             </div>
 
-            <div className="flex flex-col gap-6 md:flex-row md:flex-wrap md:items-center">
+            <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center">
                 <div className="flex items-center gap-3">
                     <LicensePlate plate={vehicle.plate} />
                     <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
@@ -83,25 +83,25 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     </span>
                 </div>
 
-                <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-2 md:grid-cols-[130px_140px_minmax(0,1fr)]">
-                    <div className="md:col-start-1 md:row-start-1">
+                <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-2 lg:grid-cols-[130px_140px_minmax(0,1fr)]">
+                    <div className="lg:col-start-1 lg:row-start-1">
                         <p className="text-caption text-neutral-500">Marca</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.brand}</p>
                     </div>
-                    <div className="md:col-start-2 md:row-start-1">
+                    <div className="lg:col-start-2 lg:row-start-1">
                         <p className="text-caption text-neutral-500">Modelo</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.model}</p>
                     </div>
-                    <div className="md:col-start-1 md:row-start-2">
+                    <div className="lg:col-start-1 lg:row-start-2">
                         <p className="text-caption text-neutral-500">Color</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.color}</p>
                     </div>
-                    <div className="md:col-start-2 md:row-start-2">
+                    <div className="lg:col-start-2 lg:row-start-2">
                         <p className="text-caption text-neutral-500">Tipo</p>
                         <p className="text-body font-medium text-neutral-900">{typeLabel}</p>
                     </div>
                     {vehicle.visualDescription && (
-                        <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-3 md:row-span-2 md:row-start-1">
+                        <div className="col-span-2 min-w-0 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
                             <p className="text-caption text-neutral-500">Descripción visual</p>
                             <p className="text-body font-medium break-words text-neutral-900">
                                 {vehicle.visualDescription}
@@ -110,12 +110,12 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                     )}
                 </div>
 
-                <div className="flex shrink-0 gap-2 md:ml-auto md:flex-col">
+                <div className="flex shrink-0 gap-2 lg:flex-col">
                     <button
                         type="button"
                         onClick={() => onEdit(vehicle.id)}
                         aria-label={`Editar ${vehicleDescription}`}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-4 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 md:flex-none"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-4 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 lg:flex-none"
                     >
                         <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                         Editar
@@ -124,7 +124,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                         type="button"
                         onClick={() => onDelete(vehicle)}
                         aria-label={`Eliminar ${vehicleDescription}`}
-                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-danger px-4 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft md:flex-none"
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-danger px-4 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft lg:flex-none"
                     >
                         <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                         Eliminar
@@ -393,9 +393,9 @@ export default function VehicleList() {
                 message={
                     deleteTarget
                         ? `¿Estás seguro de que deseas eliminar tu ` +
-                          `${deleteTarget.brand} ${deleteTarget.model} ` +
-                          `(placa ${deleteTarget.plate})? Esta acción no ` +
-                          `se puede deshacer.`
+                        `${deleteTarget.brand} ${deleteTarget.model} ` +
+                        `(placa ${deleteTarget.plate})? Esta acción no ` +
+                        `se puede deshacer.`
                         : ''
                 }
                 confirmLabel="Confirmar"
