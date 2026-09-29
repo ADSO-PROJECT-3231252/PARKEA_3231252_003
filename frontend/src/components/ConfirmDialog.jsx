@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { AlertTriangle } from "lucide-react";
+import { useEffect, useRef } from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 // Generic accessible confirmation modal -- no portal needed, since nothing
 // in the project uses transformed ancestors that would break position:
@@ -10,13 +10,13 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Confirmar",
-  cancelLabel = "Cancelar",
+  confirmLabel = 'Confirmar',
+  cancelLabel = 'Cancelar',
   onConfirm,
   onCancel,
   confirming = false,
-  variant = "default", // 'default' | 'danger'
-  error = "",
+  variant = 'default', // 'default' | 'danger'
+  error = '',
 }) {
   const dialogRef = useRef(null);
   const cancelButtonRef = useRef(null);
@@ -33,14 +33,14 @@ export default function ConfirmDialog({
     cancelButtonRef.current?.focus();
 
     function handleKeyDown(event) {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         if (!confirming) onCancel();
         return;
       }
-      if (event.key !== "Tab") return;
+      if (event.key !== 'Tab') return;
 
       const focusable = dialogRef.current?.querySelectorAll(
-        "button:not([disabled]), [href], input, select, textarea, " +
+        'button:not([disabled]), [href], input, select, textarea, ' +
           '[tabindex]:not([tabindex="-1"])',
       );
       if (!focusable || focusable.length === 0) return;
@@ -56,9 +56,9 @@ export default function ConfirmDialog({
       }
     }
 
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
       previouslyFocusedRef.current?.focus();
     };
   }, [open, confirming, onCancel]);
@@ -83,7 +83,7 @@ export default function ConfirmDialog({
         className="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
       >
         <div className="flex items-start gap-3">
-          {variant === "danger" && (
+          {variant === 'danger' && (
             <span
               className={`flex h-9 w-9 shrink-0 items-center justify-center
                                 rounded-full bg-danger-soft text-danger`}
@@ -137,12 +137,12 @@ export default function ConfirmDialog({
             className={`rounded-md px-4 py-2 text-label font-medium text-white
                             transition-colors disabled:cursor-not-allowed
                             disabled:opacity-60 ${
-                              variant === "danger"
-                                ? "bg-danger hover:opacity-90"
-                                : "bg-parkea-600 hover:bg-parkea-700"
+                              variant === 'danger'
+                                ? 'bg-danger hover:opacity-90'
+                                : 'bg-parkea-600 hover:bg-parkea-700'
                             }`}
           >
-            {confirming ? "Procesando…" : confirmLabel}
+            {confirming ? 'Procesando…' : confirmLabel}
           </button>
         </div>
       </div>
