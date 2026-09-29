@@ -17,7 +17,10 @@ module.exports = (sequelize, DataTypes) => {
     plate: {
       type: DataTypes.STRING(20),
       allowNull: false,
-      unique: true,
+      // Not `unique: true` here: the real uniqueness constraint lives on the
+      // generated `plate_active` column (NULL for soft-deleted vehicles), added
+      // by the 20260925022623 migration, so a deleted vehicle's plate can be
+      // reused. `plate` itself has no DB-level unique index anymore.
     },
     vehicleType: {
       type: DataTypes.ENUM('car', 'motorcycle', 'truck'),
