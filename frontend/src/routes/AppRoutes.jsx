@@ -39,11 +39,11 @@ export default function AppRoutes() {
                 <Route path="/reservations/:id/payment" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
 
                 <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><Home /></ProtectedRoute>} />
-                <Route path="/admin/panel" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
+                <Route path="/admin/panel" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />
                 <Route path="/admin/zones" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/zones/new" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/zones/:id/edit" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
-                <Route path="/admin/panel" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
 
                 <Route path="*" element={<Home />} />
             </Route>
