@@ -12,6 +12,8 @@ import RegisterVehicle from '../pages/RegisterVehicle';
 import AdminPanel from '../pages/AdminPanel';
 import ReserveSpot from '../pages/ReserveSpot';
 import AdminLogin from '../pages/AdminLogin';
+import ForgotPassword from '../pages/ForgotPassword';
+import ResetPassword from '../pages/ResetPassword';
 
 export default function AppRoutes() {
     return (
@@ -20,8 +22,8 @@ export default function AppRoutes() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/forgot-password" element={<ComingSoon />} />
-            <Route path="/reset-password" element={<ComingSoon />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Everything else shares the Header via Layout */}
             <Route element={<Layout />}>
