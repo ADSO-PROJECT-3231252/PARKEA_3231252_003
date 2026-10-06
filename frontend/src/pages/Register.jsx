@@ -159,7 +159,7 @@ export default function Register() {
                 {/* Columna del formulario */}
                 <div className="flex-1 px-5 py-4">
                     <div className="flex flex-col items-center mb-1">
-                        <img src={logo} alt="PARKEA" className="h-14 w-auto object-contain" />
+                        <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
                     </div>
 
                     <div className="text-center mb-1.5">
@@ -293,7 +293,11 @@ export default function Register() {
                                         aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
                                     >
-                                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        {showPassword ? (
+                                            <EyeOff className="h-4 w-4" aria-hidden="true" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" aria-hidden="true" />
+                                        )}
                                     </button>
                                 </div>
                                 {errors.password && (
@@ -326,7 +330,11 @@ export default function Register() {
                                         aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                                         className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
                                     >
-                                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        {showConfirmPassword ? (
+                                            <EyeOff className="h-4 w-4" aria-hidden="true" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" aria-hidden="true" />
+                                        )}
                                     </button>
                                 </div>
                                 {errors.confirmPassword && (

@@ -153,7 +153,11 @@ export default function Login() {
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
                             >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                {showPassword ? (
+                                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                                ) : (
+                                    <Eye className="h-4 w-4" aria-hidden="true" />
+                                )}
                             </button>
                         </div>
                         {errors.password && (
@@ -188,7 +192,7 @@ export default function Login() {
                         className="flex items-center justify-center gap-2 text-label text-parkea-700 hover:text-parkea-800"
                     >
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-parkea-50">
-                            <Shield size={13} />
+                            <Shield className="h-3.5 w-3.5" aria-hidden="true" />
                         </span>
                         Iniciar sesión como administrador
                     </Link>

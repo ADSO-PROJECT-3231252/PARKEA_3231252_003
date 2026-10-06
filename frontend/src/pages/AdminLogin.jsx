@@ -65,12 +65,12 @@ export default function AdminLogin() {
                 overflow-hidden">
 
                 <div className="bg-parkea-700 h-12 flex items-center justify-center">
-                    <ShieldCheck className="h-4 w-4 text-white" aria-hidden="true" />
+                    <ShieldCheck className="h-6 w-6 text-white" aria-hidden="true" />
                 </div>
 
                 <div className="p-8">
                     <div className="flex flex-col items-center mb-6">
-                        <img src={logo} alt="PARKEA" className="h-12 w-auto object-contain" />
+                        <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
                         <p className="font-sans text-caption text-parkea-600 mt-1">
                             Reserva tu parqueo, simplifica tu día.
                         </p>
