@@ -9,6 +9,7 @@ import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 import VehicleList from '../pages/VehicleList';
 import RegisterVehicle from '../pages/RegisterVehicle';
+import AdminPanel from '../pages/AdminPanel';
 import ReserveSpot from '../pages/ReserveSpot';
 import AdminLogin from '../pages/AdminLogin';
 
@@ -42,7 +43,7 @@ export default function AppRoutes() {
                 <Route path="/admin/zones" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/zones/new" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/zones/:id/edit" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
-                <Route path="/admin/users" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
+                <Route path="/admin/panel" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />
 
                 <Route path="*" element={<Home />} />
             </Route>
