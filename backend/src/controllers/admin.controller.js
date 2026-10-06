@@ -76,18 +76,15 @@ async function getReservasPorZona(req, res, next) {
         'id',
         'name',
         [
-          sequelize.fn('COUNT', sequelize.col('reservations.id')),
+          sequelize.literal(`(
+            SELECT COUNT(*) FROM reservations AS r
+                WHERE r.zone_id = \`Zona\`.\`id\`
+                  AND r.start_time BETWEEN :inicio AND :fin
+            )`),
           'reservationCount',
         ],
       ],
-      include: [{
-        model: Reserva,
-        as: 'reservations',
-        attributes: [],
-        required: false,
-        where: { startTime: { [Op.between]: [inicio, fin] } },
-      }],
-      group: ['Zona.id'],
+      replacements: { inicio, fin },
     });
 
     const result = zonas.map((z) => ({
@@ -178,7 +175,7 @@ async function getAlertas(req, res, next) {
     const alerts = zonasLlenas.map((z) => ({
       type: 'zone_full',
       severity: 'warning',
-      message: `Zone "${z.name}" has reached full capacity`,
+      message: `La zona "${z.name}" ha alcanzado su capacidad máxima.`,
       zoneId: z.id,
     }));
 
