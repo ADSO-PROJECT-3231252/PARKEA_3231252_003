@@ -216,9 +216,13 @@ export default function AdminPanel() {
                             role="alert"
                             className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning bg-warning-soft px-5 py-4"
                         >
-                            <div className="flex items-center gap-3">
-                                <AlertTriangle className="h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
-                                <p className="text-body text-neutral-900">{alert.message}</p>
+                            <div className="flex min-w-0 items-center gap-3"><AlertTriangle
+                                className="h-5 w-5 shrink-0 text-warning"
+                                aria-hidden="true"
+                            />
+                                <p className="break-words text-body text-neutral-900">
+                                    {alert.message}
+                                </p>
                             </div>
                             {alert.type === 'zone_full' && (
                                 <Link
