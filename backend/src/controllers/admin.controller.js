@@ -41,6 +41,8 @@ async function getDashboard(req, res, next) {
       Zona.count({ where: { isActive: true } }),
       // Registered users (AC-04) is the total headcount, like activeZones --
       // a current-state snapshot, not new signups within the selected range.
+      // Deactivated accounts are included on purpose: this is a volume metric,
+      // unlike activeZones (explicit team decision).
       Usuario.count(),
       Pago.sum('amount', {
         where: { paymentStatus: 'Paid', paidAt: { [Op.between]: [inicio, fin] } },
@@ -224,10 +226,10 @@ async function getUsuarios(req, res, next) {
     const userIds = rows.map((u) => u.id);
     const conteos = userIds.length
       ? await Reserva.findAll({
-        attributes: ['userId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
-        where: { userId: userIds },
-        group: ['userId'],
-      })
+          attributes: ['userId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+          where: { userId: userIds },
+          group: ['userId'],
+        })
       : [];
     const conteoPorUsuario = conteos.reduce((acc, r) => {
       acc[r.userId] = Number(r.get('count'));
