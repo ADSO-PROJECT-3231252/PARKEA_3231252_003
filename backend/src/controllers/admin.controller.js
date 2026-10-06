@@ -26,7 +26,7 @@ async function getDashboard(req, res, next) {
     }
     const { inicio, fin } = getRangoFecha(range);
 
-    const [activeReservations, activeZones, newUsers, revenueResult] = await Promise.all([
+    const [activeReservations, activeZones, registeredUsers, revenueResult] = await Promise.all([
       // Reservations that were Active at some point overlapping the selected range
       Reserva.count({
         where: {
@@ -39,8 +39,9 @@ async function getDashboard(req, res, next) {
       // history of when a zone was activated/deactivated, so this can't be
       // meaningfully scoped to the selected range
       Zona.count({ where: { isActive: true } }),
-      // New registrations within the selected range
-      Usuario.count({ where: { created_at: { [Op.between]: [inicio, fin] } } }),
+      // Registered users (AC-04) is the total headcount, like activeZones --
+      // a current-state snapshot, not new signups within the selected range.
+      Usuario.count(),
       Pago.sum('amount', {
         where: { paymentStatus: 'Paid', paidAt: { [Op.between]: [inicio, fin] } },
       }),
@@ -51,7 +52,7 @@ async function getDashboard(req, res, next) {
         activeReservations,
         revenue: revenueResult || 0,
         activeZones,
-        newUsers,
+        registeredUsers,
       },
       range,
     });
@@ -226,10 +227,10 @@ async function getUsuarios(req, res, next) {
     const userIds = rows.map((u) => u.id);
     const conteos = userIds.length
       ? await Reserva.findAll({
-          attributes: ['userId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
-          where: { userId: userIds },
-          group: ['userId'],
-        })
+        attributes: ['userId', [sequelize.fn('COUNT', sequelize.col('id')), 'count']],
+        where: { userId: userIds },
+        group: ['userId'],
+      })
       : [];
     const conteoPorUsuario = conteos.reduce((acc, r) => {
       acc[r.userId] = Number(r.get('count'));
