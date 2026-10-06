@@ -175,6 +175,28 @@ export default function AdminPanel() {
         loadRecentPayments();
         loadAlerts();
     }, [loadOccupancy, loadRecentPayments, loadAlerts]);
+    // Auto-refresh every 5s while the panel stays open, so new reservations,
+    // payments and alerts show up without the admin having to do anything.
+    // The loaders never flip loading back to true on their own (see above),
+    // so this swaps in fresh data quietly, with no flicker or loading reset.
+    useEffect(() => {
+        const interval = setInterval(() => {
+            loadMetrics();
+            loadReservationsByZone();
+            loadPaymentsStatus();
+            loadOccupancy();
+            loadRecentPayments();
+            loadAlerts();
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [
+        loadMetrics,
+        loadReservationsByZone,
+        loadPaymentsStatus,
+        loadOccupancy,
+        loadRecentPayments,
+        loadAlerts,
+    ]);
 
     const handleRetryMetrics = () => {
         setMetricsLoading(true);
