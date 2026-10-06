@@ -166,6 +166,8 @@ export default function VehicleList() {
     // AC-07 (HU-10): flash message after a successful registration redirect
     // same pattern as Login.jsx's "Registro completado" (location.state, auto-dismiss).
     const [vehicleAdded, setVehicleAdded] = useState(Boolean(location.state?.vehicleAdded));
+    // AC-08 (HU-12): flash message after a successful edit redirect, same pattern as above.
+    const [vehicleUpdated, setVehicleUpdated] = useState(Boolean(location.state?.vehicleUpdated));
 
     useEffect(() => {
         if (!vehicleAdded) return;
@@ -174,6 +176,14 @@ export default function VehicleList() {
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: solo debe correr cuando vehicleAdded pasa a true, no en cada cambio de navigate/location (eso anularía el propósito de limpiarlo una sola vez)
     }, [vehicleAdded]);
+    useEffect(() => {
+        if (!vehicleUpdated) return;
+        navigate(location.pathname + location.search, { replace: true, state: null });
+        const timer = setTimeout(() => setVehicleUpdated(false), 3000);
+        return () => clearTimeout(timer);
+        // Intentional: only runs when vehicleUpdated turns true.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [vehicleUpdated]);
 
     const fetchVehicles = useCallback(() => {
         getVehicles()
@@ -278,6 +288,16 @@ export default function VehicleList() {
             {vehicleAdded && (
                 <p role="status" className="mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center text-caption text-parkea-700">
                     Vehículo registrado correctamente.
+                </p>
+            )}
+
+            {vehicleUpdated && (
+                <p
+                    role="status"
+                    className={`mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center
+                        text-caption text-parkea-700`}
+                >
+                    Vehículo actualizado correctamente.
                 </p>
             )}
 
