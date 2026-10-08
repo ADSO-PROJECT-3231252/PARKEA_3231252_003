@@ -1,11 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Clock,
-    CircleCheck,
-    Flag,
-    CircleX,
-    Hourglass,
     Car,
     CalendarDays,
     CreditCard,
@@ -18,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getReservations } from '../services/reservationService';
 import { formatCurrency, formatDuration } from '../utils/format';
+import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
 // done by the backend: GET /reservations?status=&page=&limit=
@@ -32,45 +28,6 @@ const STATUS_FILTERS = [
     { value: 'Cancelled', label: 'Canceladas' },
     { value: 'Expired', label: 'Expiradas' },
 ];
-// AC-13: status is always conveyed by icon + text; the colored left border
-// on each row is only a visual reinforcement, never the sole signal.
-const RESERVATION_STATUS = {
-    Pending: {
-        label: 'Pendiente de pago',
-        Icon: Clock,
-        badge: 'border-warning/30 bg-warning-soft text-warning',
-        border: 'border-l-warning',
-    },
-    Active: {
-        label: 'Activa',
-        Icon: CircleCheck,
-        badge: 'border-parkea-200 bg-parkea-50 text-parkea-700',
-        border: 'border-l-parkea-600',
-    },
-    Finished: {
-        label: 'Finalizada',
-        Icon: Flag,
-        badge: 'border-neutral-300 bg-neutral-100 text-neutral-700',
-        border: 'border-l-neutral-400',
-    },
-    Cancelled: {
-        label: 'Cancelada',
-        Icon: CircleX,
-        badge: 'border-danger/30 bg-danger-soft text-danger',
-        border: 'border-l-danger',
-    },
-    Expired: {
-        label: 'Expirada',
-        Icon: Hourglass,
-        badge: 'border-neutral-300 bg-neutral-100 text-neutral-700',
-        border: 'border-l-neutral-400',
-    },
-};
-const FALLBACK_STATUS = {
-    Icon: Clock,
-    badge: 'border-neutral-300 bg-neutral-100 text-neutral-700',
-    border: 'border-l-neutral-400',
-};
 // AC-02: payment status is required on every entry.
 const PAYMENT_STATUS_LABELS = {
     Pending: 'Pendiente',
