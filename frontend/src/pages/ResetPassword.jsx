@@ -16,6 +16,7 @@ export default function ResetPassword() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [tokenInvalid, setTokenInvalid] = useState(false);
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
@@ -52,13 +53,21 @@ export default function ResetPassword() {
             navigate('/login', { state: { passwordReset: true } });
         } catch (err) {
             const code = err.response?.data?.code;
-            setServerError(translateError(code));
+            // AC-09: a token the server rejects (invalid, used or expired)
+            // gets the same dedicated screen as a missing token, with the
+            // link back to phase 1.
+            if (code === 'RESET_TOKEN_INVALID') {
+                setTokenInvalid(true);
+            } else {
+                setServerError(translateError(code));
+            }
         } finally {
             setLoading(false);
         }
     };
-    // Sin token en la URL, el flujo no tiene sentido — mismo trato que un token inválido
-    if (!token) {
+    // AC-09: no token in the URL, or a token the server rejected, shows
+    // the message with the link back to phase 1.
+    if (!token || tokenInvalid) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
                 <div
