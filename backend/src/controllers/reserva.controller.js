@@ -133,7 +133,7 @@ async function obtenerConfirmacion(req, res, next) {
             where: { id, userId },
             include: [
                 { model: Zona, as: 'zone' },
-                { model: Vehiculo, as: 'vehicle' },
+                { model: Vehiculo, as: 'vehicle', paranoid: false },
             ],
         });
 
