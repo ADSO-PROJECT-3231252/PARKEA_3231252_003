@@ -282,6 +282,7 @@ async function misReservas(req, res, next) {
                 vehicle: r.vehicle,
                 amount,
                 amountType,
+                appliedHourlyRate: Number(r.appliedHourlyRate),
                 paymentStatus: r.payment ? r.payment.paymentStatus : 'Pending',
             };
         });
