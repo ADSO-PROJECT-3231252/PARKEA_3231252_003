@@ -3,15 +3,18 @@ import { Link } from 'react-router-dom';
 import { Lock, ArrowLeft } from 'lucide-react';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { forgotPassword } from '../services/authService';
+import { translateError } from '../utils/errorMessages';
 import logo from '../assets/logo.png';
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');
     const [errors, setErrors] = useState({});
     const [sent, setSent] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [serverError, setServerError] = useState('');
     const handleChange = (e) => {
         setEmail(e.target.value);
         if (errors.email) setErrors({});
+        if (serverError) setServerError('');
     };
     const validate = () => {
         const newErrors = {};
@@ -25,17 +28,27 @@ export default function ForgotPassword() {
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setServerError('');
         if (!validate()) return;
         setLoading(true);
         try {
-            // AC-04: el backend siempre responde igual, exista o no el correo
+            // AC-04: the backend always responds the same way, whether or not the email exists.
             await forgotPassword({ email });
-        } catch {
-            // Silenciado a propósito: nunca reveles si la petición falló por
-            // el correo (AC-04) — solo importa si fue un error real de red/servidor
+            setSent(true);
+        } catch (err) {
+            if (!err.response) {
+                // No response at all (network down or server off): the request
+                // never reached the backend, so showing an error reveals nothing
+                // about the account.
+                setServerError(translateError('INTERNAL_ERROR'));
+            } else {
+                // The server did respond (e.g. a 500 while sending the email):
+                // show the same generic message as on success, so it never
+                // reveals whether the account exists (AC-04).
+                setSent(true);
+            }
         } finally {
             setLoading(false);
-            setSent(true);
         }
     };
     return (
@@ -72,6 +85,14 @@ export default function ForgotPassword() {
                             Ingresa tu correo electrónico y te enviaremos un enlace para que puedas
                             restablecer tu contraseña.
                         </p>
+                        {serverError && (
+                            <p
+                                role="alert"
+                                className="mb-4 text-caption text-danger bg-danger-soft rounded-md px-3 py-2 text-center"
+                            >
+                                {serverError}
+                            </p>
+                        )}
                         <form onSubmit={handleSubmit} noValidate className="space-y-5">
                             <div>
                                 <label
