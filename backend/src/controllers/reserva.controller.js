@@ -253,7 +253,7 @@ async function misReservas(req, res, next) {
             offset,
             include: [
                 { model: Zona, as: 'zone', attributes: ['id', 'name', 'address'] },
-                { model: Vehiculo, as: 'vehicle', attributes: ['id', 'plate', 'brand', 'model', 'color'] },
+                { model: Vehiculo, as: 'vehicle', paranoid: false, attributes: ['id', 'plate', 'brand', 'model', 'color'] },
                 { model: Pago, as: 'payment', attributes: ['amount', 'paymentStatus'] },
             ],
         });
