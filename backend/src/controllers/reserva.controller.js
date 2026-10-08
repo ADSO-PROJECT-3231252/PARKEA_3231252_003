@@ -143,7 +143,7 @@ async function obtenerConfirmacion(req, res, next) {
 
         const durationMs = new Date(reserva.endTime) - new Date(reserva.startTime);
         const durationHours = durationMs / (1000 * 60 * 60);
-        const estimatedTotal = Number((durationHours * reserva.zone.hourlyRate).toFixed(2));
+        const estimatedTotal = Number((durationHours * Number(reserva.appliedHourlyRate)).toFixed(2));
 
         return res.status(200).json({
             reservation: {
@@ -172,7 +172,7 @@ async function obtenerConfirmacion(req, res, next) {
                 paymentSummary: {
                     zoneName: reserva.zone.name,
                     spotNumber: reserva.spotNumber,
-                    hourlyRate: reserva.zone.hourlyRate,
+                    hourlyRate: Number(reserva.appliedHourlyRate),
                     durationHours: Number(durationHours.toFixed(2)),
                     estimatedTotal,
                 },
