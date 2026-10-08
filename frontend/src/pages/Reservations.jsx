@@ -17,7 +17,7 @@ import {
     AlertCircle,
 } from 'lucide-react';
 import { getReservations } from '../services/reservationService';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatDuration } from '../utils/format';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
 // done by the backend: GET /reservations?status=&page=&limit=
@@ -85,14 +85,6 @@ function formatDateTime(isoString) {
     const fecha = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
     const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     return `${fecha} ${hora}`;
-}
-// "2 horas 30 minutos" / "1 hora 00 minutos" / "30 minutos".
-function formatDuration(startIso, endIso) {
-    const totalMinutes = Math.max(0, Math.round((new Date(endIso) - new Date(startIso)) / 60000));
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    if (hours === 0) return `${minutes} minutos`;
-    return `${hours} ${hours === 1 ? 'hora' : 'horas'} ${pad(minutes)} minutos`;
 }
 // The backend has no human-readable reservation code, only the UUID. The
 // first 8 characters are shown as a short code; the full ID is still what
