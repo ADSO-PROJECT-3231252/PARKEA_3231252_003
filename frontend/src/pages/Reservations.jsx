@@ -404,7 +404,7 @@ hover:text-parkea-600"
                     <>
                         {/* Desktop: table, as in the mockup */}
                         <div
-                            className="hidden overflow-hidden rounded-lg border border-neutral-200
+                            className="hidden overflow-x-auto rounded-lg border border-neutral-200
 bg-white lg:block"
                         >
                             <table className="w-full text-left">
