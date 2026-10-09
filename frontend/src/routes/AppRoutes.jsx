@@ -8,6 +8,7 @@ import Zones from '../pages/Zones';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 import VehicleList from '../pages/VehicleList';
+import Reservations from '../pages/Reservations';
 import RegisterVehicle from '../pages/RegisterVehicle';
 import AdminPanel from '../pages/AdminPanel';
 import ReserveSpot from '../pages/ReserveSpot';
@@ -36,7 +37,7 @@ export default function AppRoutes() {
                 <Route path="/vehicles/new" element={<ProtectedRoute><RegisterVehicle /></ProtectedRoute>} />
                 <Route path="/vehicles/:id/edit" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/reserve/:zoneId" element={<ProtectedRoute><ReserveSpot /></ProtectedRoute>} />
-                <Route path="/reservations" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
                 <Route path="/reservations/:id" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/reservations/:id/payment" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
 
