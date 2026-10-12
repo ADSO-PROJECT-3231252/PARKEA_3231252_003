@@ -1,37 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Car, IdCard, Tag, Layers, Palette, Eye, ChevronDown, AlertCircle, RefreshCw } from 'lucide-react';
-import { isNotEmpty, isValidPlate } from '../utils/validators';
+import { isNotEmpty, isValidPlate, REQUIRED_MESSAGE } from '../utils/validators';
 import { getVehicle, updateVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
-const VEHICLE_TYPE_OPTIONS = [
-    { value: 'car', label: 'Automóvil' },
-    { value: 'motorcycle', label: 'Motocicleta' },
-    { value: 'truck', label: 'Camión' },
-];
-const REQUIRED_MESSAGE = 'Este campo es obligatorio.';
-// Mirrors the DB column limits (brand/model varchar(50), color varchar(30),
-// visual_description varchar(255)) — see vehiculo.routes.js on the backend.
-// Same constant as RegisterVehicle.jsx; duplicated on purpose for now.
-const MAX_LENGTH = {
-    brand: 50,
-    model: 50,
-    color: 30,
-    visualDescription: 255,
-};
-function FieldRow({ icon: Icon, children }) {
-    return (
-        <div className="flex items-start gap-4">
-            <span
-                className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center
-rounded-full bg-parkea-50 text-parkea-600`}
-            >
-                <Icon className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div className="flex-1">{children}</div>
-        </div>
-    );
-}
+import { MAX_LENGTH } from '../utils/vehicleFieldLimits';
+import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
+import FieldRow from '../components/FieldRow';
+
 export default function EditVehicle() {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -398,4 +374,4 @@ disabled:cursor-not-allowed disabled:opacity-60`}
             </form>
         </div>
     );
-}
+} 
