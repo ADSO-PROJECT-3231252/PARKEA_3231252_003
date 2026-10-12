@@ -29,3 +29,6 @@ export const isValidPhone = (phone) => {
 export const isNotEmpty = (value) => {
     return value !== undefined && value !== null && value.toString().trim() !== '';
 };
+
+// Shared message for empty required fields, so every form says it the same way.
+export const REQUIRED_MESSAGE = 'Este campo es obligatorio.'; 
