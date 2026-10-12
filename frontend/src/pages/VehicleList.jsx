@@ -17,12 +17,21 @@ import {
 import { getVehicles, setDefaultVehicle, deleteVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { VEHICLE_TYPE_LABELS } from '../utils/vehicleTypes';
 
 // AC-10: the list must be paginated when there are more than 9 vehicles.
 const PAGE_SIZE = 9;
 
+// One flash message slot for the whole page (same idea as FLASH_MESSAGES in
+// Login.jsx). Added/updated arrive through location.state after a redirect;
+// deleted is set here, since deleting never leaves the page.
+const FLASH_MESSAGES = {
+    vehicleAdded: 'Vehículo registrado correctamente.',
+    vehicleUpdated: 'Vehículo actualizado correctamente.',
+    vehicleDeleted: 'Vehículo eliminado correctamente.',
+};
+
 const VEHICLE_TYPE_ICONS = { car: Car, motorcycle: Motorbike, truck: Truck };
-const VEHICLE_TYPE_LABELS = { car: 'Automóvil', motorcycle: 'Motocicleta', truck: 'Camión' };
 
 // Uses a single neutral color for all plates, regardless of vehicle type.
 // Colombian plate colors depend on the type of service (private/public/
@@ -152,38 +161,24 @@ export default function VehicleList() {
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleting, setDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
-    const [vehicleDeleted, setVehicleDeleted] = useState(false);
 
-    // Same 3-second auto-dismiss pattern as vehicleAdded, but this one never
-    // needs the location.state/navigate cleanup -- deleting happens without
-    // leaving the page, so there's no redirect state to clear.
-    useEffect(() => {
-        if (!vehicleDeleted) return;
-        const timer = setTimeout(() => setVehicleDeleted(false), 3000);
-        return () => clearTimeout(timer);
-    }, [vehicleDeleted]);
-
-    // AC-07 (HU-10): flash message after a successful registration redirect
-    // same pattern as Login.jsx's "Registro completado" (location.state, auto-dismiss).
-    const [vehicleAdded, setVehicleAdded] = useState(Boolean(location.state?.vehicleAdded));
-    // AC-08 (HU-12): flash message after a successful edit redirect, same pattern as above.
-    const [vehicleUpdated, setVehicleUpdated] = useState(Boolean(location.state?.vehicleUpdated));
+    // AC-07 (HU-10) / AC-08 (HU-12) / HU-13: a single success message, shown
+    // for 3 seconds. The redirect state is cleared once so a page refresh
+    // doesn't show the message again.
+    const [flash, setFlash] = useState(() => {
+        if (location.state?.vehicleAdded) return FLASH_MESSAGES.vehicleAdded;
+        if (location.state?.vehicleUpdated) return FLASH_MESSAGES.vehicleUpdated;
+        return '';
+    });
 
     useEffect(() => {
-        if (!vehicleAdded) return;
-        navigate(location.pathname + location.search, { replace: true, state: null });
-        const timer = setTimeout(() => setVehicleAdded(false), 3000);
+        if (!flash) return;
+        if (location.state) navigate(location.pathname + location.search, { replace: true, state: null });
+        const timer = setTimeout(() => setFlash(''), 3000);
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- intencional: solo debe correr cuando vehicleAdded pasa a true, no en cada cambio de navigate/location (eso anularía el propósito de limpiarlo una sola vez)
-    }, [vehicleAdded]);
-    useEffect(() => {
-        if (!vehicleUpdated) return;
-        navigate(location.pathname + location.search, { replace: true, state: null });
-        const timer = setTimeout(() => setVehicleUpdated(false), 3000);
-        return () => clearTimeout(timer);
-        // Intentional: only runs when vehicleUpdated turns true.
+        // Intentional: only runs when the message changes, not on every navigate/location change.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [vehicleUpdated]);
+    }, [flash]);
 
     const fetchVehicles = useCallback(() => {
         getVehicles()
@@ -247,7 +242,7 @@ export default function VehicleList() {
                 // re-fetching updates the list and the reassigned default
                 // (if any) in place.
                 setDeleteTarget(null);
-                setVehicleDeleted(true);
+                setFlash(FLASH_MESSAGES.vehicleDeleted);
                 fetchVehicles();
             })
             .catch((err) => {
@@ -285,35 +280,15 @@ export default function VehicleList() {
                 </button>
             </div>
 
-            {vehicleAdded && (
+            {flash && (
                 <p role="status" className="mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center text-caption text-parkea-700">
-                    Vehículo registrado correctamente.
-                </p>
-            )}
-
-            {vehicleUpdated && (
-                <p
-                    role="status"
-                    className={`mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center
-                        text-caption text-parkea-700`}
-                >
-                    Vehículo actualizado correctamente.
+                    {flash}
                 </p>
             )}
 
             {setDefaultError && (
                 <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
                     {setDefaultError}
-                </p>
-            )}
-
-            {vehicleDeleted && (
-                <p
-                    role="status"
-                    className={`mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center
-                        text-caption text-parkea-700`}
-                >
-                    Vehículo eliminado correctamente.
                 </p>
             )}
 
@@ -427,4 +402,4 @@ export default function VehicleList() {
             />
         </div>
     );
-}
+} 
