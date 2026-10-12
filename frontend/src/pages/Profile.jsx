@@ -207,7 +207,7 @@ export default function Profile() {
                             </p>
                             {memberSince && (
                                 <p className="flex items-center gap-1 text-caption text-neutral-500 mt-3">
-                                    <Calendar size={13} />
+                                    <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
                                     Miembro desde {memberSince}
                                 </p>
                             )}
@@ -215,7 +215,7 @@ export default function Profile() {
 
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 text-label font-medium text-neutral-700">
-                                <User size={15} />
+                                <User className="h-4 w-4" aria-hidden="true" />
                                 Información personal
                             </div>
 
@@ -284,7 +284,7 @@ export default function Profile() {
 
                         <div className="bg-parkea-50 rounded-md p-4 space-y-3 h-fit">
                             <div className="flex items-center gap-2 text-label font-medium text-parkea-700">
-                                <Lock size={15} />
+                                <Lock className="h-4 w-4" aria-hidden="true" />
                                 Información no editable
                             </div>
 
@@ -308,7 +308,7 @@ export default function Profile() {
                             </div>
 
                             <p className="flex items-start gap-1.5 text-caption text-neutral-500">
-                                <Info size={13} className="mt-0.5 shrink-0" />
+                                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 Por seguridad, esta información no se puede editar.
                             </p>
                         </div>
@@ -316,7 +316,7 @@ export default function Profile() {
 
                     <div className="bg-white rounded-lg shadow-sm border border-neutral-200 p-6 space-y-4">
                         <div className="flex items-center gap-2 text-label font-medium text-neutral-700">
-                            <Lock size={15} />
+                            <Lock className="h-4 w-4" aria-hidden="true" />
                             Cambiar contraseña
                         </div>
                         <p className="text-caption text-neutral-500 -mt-2">
@@ -361,7 +361,7 @@ export default function Profile() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
                                         hover:text-neutral-700"
                                 >
-                                    {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showCurrent ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
                                 </button>
                             </div>
                             {pwErrors.currentPassword && (
@@ -399,7 +399,7 @@ export default function Profile() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
                                         hover:text-neutral-700"
                                 >
-                                    {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showNew ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
                                 </button>
                             </div>
                             {pwErrors.newPassword ? (
@@ -443,7 +443,7 @@ export default function Profile() {
                                     className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
                                         hover:text-neutral-700"
                                 >
-                                    {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showConfirm ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
                                 </button>
                             </div>
                             {pwErrors.confirmNewPassword && (
@@ -462,7 +462,7 @@ export default function Profile() {
                                 bg-parkea-600 text-white text-label font-medium px-6 py-2.5 hover:bg-parkea-700
                                 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
-                            <Save size={16} />
+                            <Save className="h-4 w-4" aria-hidden="true" />
                             {saving ? 'Guardando...' : 'Guardar cambios'}
                         </button>
                     </div>

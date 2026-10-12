@@ -7,6 +7,12 @@ import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
 
+// Confirmation messages handed over by other screens through router state.
+const FLASH_MESSAGES = {
+    registered: 'Registro completado. Por favor inicia sesión.',
+    passwordReset: 'Tu contraseña fue actualizada. Por favor inicia sesión.',
+};
+
 export default function Login() {
     const [form, setForm] = useState({ email: '', password: '' });
     const [errors, setErrors] = useState({});
@@ -17,17 +23,21 @@ export default function Login() {
     const { loginUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [justRegistered, setJustRegistered] = useState(Boolean(location.state?.registered));
+    const [flash, setFlash] = useState(() => {
+        if (location.state?.registered) return FLASH_MESSAGES.registered;
+        if (location.state?.passwordReset) return FLASH_MESSAGES.passwordReset;
+        return '';
+    });
     const [searchParams] = useSearchParams();
     const sessionExpired = searchParams.get('expired') === '1';
 
     useEffect(() => {
-        if (!justRegistered) return;
+        if (!flash) return;
         navigate(location.pathname + location.search, { replace: true, state: null });
-        const timer = setTimeout(() => setJustRegistered(false), 3000);
+        const timer = setTimeout(() => setFlash(''), 3000);
         return () => clearTimeout(timer);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [justRegistered]);
+    }, [flash]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -93,9 +103,9 @@ export default function Login() {
                         </p>
                     </div>
 
-                    {justRegistered && !serverError && (
+                    {flash && !serverError && (
                         <p role="status" className="text-caption text-parkea-700 bg-parkea-50 rounded-md px-3 py-2 text-center">
-                            Registro completado. Por favor inicia sesión.
+                            {flash}
                         </p>
                     )}
                     {sessionExpired && !serverError && (

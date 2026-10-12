@@ -8,11 +8,14 @@ import Zones from '../pages/Zones';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 import VehicleList from '../pages/VehicleList';
+import Reservations from '../pages/Reservations';
 import RegisterVehicle from '../pages/RegisterVehicle';
 import EditVehicle from '../pages/EditVehicle';
 import AdminPanel from '../pages/AdminPanel';
 import ReserveSpot from '../pages/ReserveSpot';
 import AdminLogin from '../pages/AdminLogin';
+import ForgotPassword from '../pages/ForgotPassword';
+import ResetPassword from '../pages/ResetPassword';
 
 export default function AppRoutes() {
     return (
@@ -21,8 +24,8 @@ export default function AppRoutes() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/forgot-password" element={<ComingSoon />} />
-            <Route path="/reset-password" element={<ComingSoon />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Everything else shares the Header via Layout */}
             <Route element={<Layout />}>
@@ -35,7 +38,7 @@ export default function AppRoutes() {
                 <Route path="/vehicles/new" element={<ProtectedRoute><RegisterVehicle /></ProtectedRoute>} />
                 <Route path="/vehicles/:id/edit" element={<ProtectedRoute><EditVehicle /></ProtectedRoute>} />
                 <Route path="/reserve/:zoneId" element={<ProtectedRoute><ReserveSpot /></ProtectedRoute>} />
-                <Route path="/reservations" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
                 <Route path="/reservations/:id" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/reservations/:id/payment" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
 
