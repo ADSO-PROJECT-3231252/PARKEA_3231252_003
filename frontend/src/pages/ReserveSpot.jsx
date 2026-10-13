@@ -19,7 +19,7 @@ import { getVehicles } from '../services/vehicleService';
 import { createReservation } from '../services/reservationService';
 import { formatCurrency, formatDuration } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
-import { isNotEmpty } from '../utils/validators';
+import { isNotEmpty, REQUIRED_MESSAGE } from '../utils/validators';
 import { translateError } from '../utils/errorMessages';
 
 // Same palette used by Zones.jsx's ZoneCard badge, reused here so the
@@ -137,11 +137,11 @@ export default function ReserveSpot() {
         const now = new Date();
 
         if (!isNotEmpty(form.vehicleId)) {
-            newErrors.vehicle = 'Este campo es obligatorio.';
+            newErrors.vehicle = REQUIRED_MESSAGE;
         }
 
         if (!startDateTime) {
-            newErrors.start = 'Este campo es obligatorio.';
+            newErrors.start = REQUIRED_MESSAGE;
         } else if (startDateTime <= now) {
             newErrors.start = translateError('START_TIME_IN_PAST');
         } else if (startDateTime - now > MAX_ADVANCE_HOURS * 60 * 60 * 1000) {
@@ -149,7 +149,7 @@ export default function ReserveSpot() {
         }
 
         if (!endDateTime) {
-            newErrors.end = 'Este campo es obligatorio.';
+            newErrors.end = REQUIRED_MESSAGE;
         } else if (startDateTime && endDateTime <= startDateTime) {
             newErrors.end = translateError('END_BEFORE_START');
         } else if (startDateTime) {
