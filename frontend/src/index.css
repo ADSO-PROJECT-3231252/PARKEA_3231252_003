@@ -36,6 +36,11 @@
     /* Dorado — uso puntual */
     --color-gold-500: #F5C518;
 
+    /* Colombian flag stripes, used on the license plate (VehicleList) */
+    --color-flag-yellow: #FCD116;
+    --color-flag-blue: #003893;
+    --color-flag-red: #CE1126;
+
     /* Familias tipográficas */
     --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
     --font-sans: "Barlow", system-ui, sans-serif;
