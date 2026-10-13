@@ -44,9 +44,9 @@ function LicensePlate({ plate }) {
             <div className="flex w-full items-center justify-center gap-1 bg-neutral-900 py-0.5">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-white">Colombia</span>
                 <span className="flex h-2 w-3 flex-col overflow-hidden rounded-[1px]" aria-hidden="true">
-                    <span className="h-1 bg-[#FCD116]" />
-                    <span className="h-[2px] bg-[#003893]" />
-                    <span className="h-[2px] bg-[#CE1126]" />
+                    <span className="h-1 bg-flag-yellow" />
+                    <span className="h-[2px] bg-flag-blue" />
+                    <span className="h-[2px] bg-flag-red" />
                 </span>
             </div>
         </div>
