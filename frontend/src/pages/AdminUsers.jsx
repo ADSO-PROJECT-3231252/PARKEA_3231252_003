@@ -431,7 +431,7 @@ export default function AdminUsers() {
                             <table className="w-full min-w-[900px] border-collapse text-left">
                                 <thead>
                                     <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900">
-                                        <th scope="col" className="px-4 py-3 font-medium">Nombre</th>
+                                        <th scope="col" className="min-w-[220px] px-4 py-3 font-medium">Nombre</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Correo electrónico</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Documento</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Rol</th>
