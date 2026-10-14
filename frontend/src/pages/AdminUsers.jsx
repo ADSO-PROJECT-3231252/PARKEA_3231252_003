@@ -4,6 +4,9 @@ import {
     UserCheck,
     UserX,
     ShieldCheck,
+    Search,
+    X,
+    Filter,
     Activity,
     AlertCircle,
 } from 'lucide-react';
@@ -14,6 +17,7 @@ import MetricCard from '../components/MetricCard';
 
 // AC-15: the list is paginated when there are more than 10 accounts.
 const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
+const SEARCH_DEBOUNCE_MS = 400;
 
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
 
@@ -27,11 +31,20 @@ export default function AdminUsers() {
     // Bumped by "Reintentar" to re-run the fetch.
     const [reloadKey, setReloadKey] = useState(0);
 
+    // ----- Filters (AC-04) -----
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [role, setRole] = useState('');
+    const [status, setStatus] = useState('');
+
     useEffect(() => {
         // Guards against out-of-order responses: a response that arrives after
         // a newer request has started must not overwrite the newer data.
         let active = true;
         getUsers({
+            search: debouncedSearch || undefined,
+            role: role || undefined,
+            status: status || undefined,
             page: 1,
             limit: DEFAULT_PAGE_SIZE,
         })
@@ -51,7 +64,18 @@ export default function AdminUsers() {
         return () => {
             active = false;
         };
-    }, [reloadKey]);
+    }, [debouncedSearch, role, status, reloadKey]);
+
+    // Search is sent to the backend only after the user stops typing.
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const trimmed = search.trim();
+            if (trimmed === debouncedSearch) return;
+            setLoading(true);
+            setDebouncedSearch(trimmed);
+        }, SEARCH_DEBOUNCE_MS);
+        return () => clearTimeout(timer);
+    }, [search, debouncedSearch]);
 
     // Every change that triggers a new fetch shows the loading state first; it's
     // set here, in the event, rather than inside the effect.
@@ -60,10 +84,33 @@ export default function AdminUsers() {
         setError(false);
     };
 
+    const handleRoleFilter = (value) => {
+        if (value === role) return;
+        startLoading();
+        setRole(value);
+    };
+
+    const handleStatusFilter = (value) => {
+        if (value === status) return;
+        startLoading();
+        setStatus(value);
+    };
+
+    const handleClearFilters = () => {
+        // Only the values already sent to the backend trigger a new fetch.
+        if (debouncedSearch || role || status) startLoading();
+        setSearch('');
+        setDebouncedSearch('');
+        setRole('');
+        setStatus('');
+    };
+
     const handleRetry = () => {
         startLoading();
         setReloadKey((k) => k + 1);
     };
+
+    const hasActiveFilters = Boolean(search || role || status);
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -111,6 +158,78 @@ export default function AdminUsers() {
                     value={summary.admins}
                     sublabel={percent(summary.admins, summary.total)}
                 />
+            </div>
+
+            {/* AC-04: search and filters */}
+            <div className="mt-6 flex flex-wrap items-end gap-3 rounded-lg border border-neutral-200 bg-white p-4">
+                <div className="min-w-[220px] flex-1">
+                    <label htmlFor="user-search" className="mb-1 block text-label text-neutral-700">
+                        Buscar por nombre, correo o documento
+                    </label>
+                    <div className="relative">
+                        <Search
+                            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600"
+                            aria-hidden="true"
+                        />
+                        <input
+                            id="user-search"
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Ej. Juan Pérez, juan@mail.com o 1020304050"
+                            className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                        />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => setSearch('')}
+                                aria-label="Limpiar búsqueda"
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
+                            >
+                                <X className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div className="min-w-[180px]">
+                    <label htmlFor="role-filter" className="mb-1 block text-label text-neutral-700">
+                        Filtrar por rol
+                    </label>
+                    <select
+                        id="role-filter"
+                        value={role}
+                        onChange={(e) => handleRoleFilter(e.target.value)}
+                        className="w-full rounded-md border border-neutral-200 px-3 py-2 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                    >
+                        <option value="">Todos los roles</option>
+                        <option value="admin">Administrador</option>
+                        <option value="user">Usuario</option>
+                    </select>
+                </div>
+                <div className="min-w-[180px]">
+                    <label htmlFor="status-filter" className="mb-1 block text-label text-neutral-700">
+                        Filtrar por estado
+                    </label>
+                    <select
+                        id="status-filter"
+                        value={status}
+                        onChange={(e) => handleStatusFilter(e.target.value)}
+                        className="w-full rounded-md border border-neutral-200 px-3 py-2 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                    >
+                        <option value="">Todos los estados</option>
+                        <option value="active">Activo</option>
+                        <option value="inactive">Inactivo</option>
+                    </select>
+                </div>
+                <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    disabled={!hasActiveFilters}
+                    className="flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <Filter className="h-4 w-4 text-parkea-600" aria-hidden="true" />
+                    Limpiar filtros
+                </button>
             </div>
 
             {/* AC-03: user list */}
