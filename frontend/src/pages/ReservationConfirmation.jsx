@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
+    MapPin,
+    SquareParking,
+    Car,
+    LogIn,
+    LogOut,
+    Clock,
     AlertCircle,
     RefreshCw,
+    CalendarCheck,
     Ban,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
+import { formatDate, formatTime, formatDuration } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
 
 export default function ReservationConfirmation() {
@@ -100,6 +108,8 @@ export default function ReservationConfirmation() {
     const { label: statusLabel = reservation.status, Icon: StatusIcon, badge: statusBadge } =
         RESERVATION_STATUS[reservation.status] ?? FALLBACK_STATUS;
 
+    const durationLabel = formatDuration(reservation.startTime, reservation.endTime);
+
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <h1 className="sr-only">Confirmación de reserva</h1>
@@ -112,6 +122,97 @@ export default function ReservationConfirmation() {
                             <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
                             {statusLabel}
                         </span>
+                    </div>
+
+                    <div className="mt-4 space-y-4 divide-y divide-neutral-100">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 first:pt-0">
+                            <div className="flex min-w-0 items-start gap-3">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                    <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-caption text-neutral-600">Código de reserva</p>
+                                    <p className="break-all font-mono text-body font-medium text-neutral-900">{reservation.id}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-start justify-between gap-3 pt-4">
+                            <div className="flex min-w-0 items-start gap-3">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-caption text-neutral-600">Zona</p>
+                                    <p className="break-words text-body font-medium text-neutral-900">{reservation.zone.name}</p>
+                                    {reservation.zone.address && (
+                                        <p className="break-words text-caption text-neutral-600">{reservation.zone.address}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-3">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                    <SquareParking className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div>
+                                    <p className="text-caption text-neutral-600">Cupo asignado</p>
+                                    <p className="font-mono text-body font-medium text-neutral-900">{reservation.spotNumber}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3 pt-4">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                <Car className="h-4 w-4" aria-hidden="true" />
+                            </span>
+                            <div className="min-w-0">
+                                <p className="text-caption text-neutral-600">Vehículo</p>
+                                <p className="break-words text-body font-medium text-neutral-900">
+                                    {reservation.vehicle.plate} - {reservation.vehicle.brand} {reservation.vehicle.model} - {reservation.vehicle.color}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2">
+                            <div className="flex min-w-0 items-start gap-3">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                    <LogIn className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-caption text-neutral-600">Entrada</p>
+                                    <p className="break-words text-body font-medium text-neutral-900">{formatDate(reservation.startTime)}</p>
+                                    <p className="flex items-center gap-1 text-caption text-neutral-600">
+                                        <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {formatTime(reservation.startTime)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex min-w-0 items-start gap-3">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-caption text-neutral-600">Salida</p>
+                                    <p className="break-words text-body font-medium text-neutral-900">{formatDate(reservation.endTime)}</p>
+                                    <p className="flex items-center gap-1 text-caption text-neutral-600">
+                                        <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                        {formatTime(reservation.endTime)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                    <Clock className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div>
+                                    <p className="text-caption text-neutral-600">Duración</p>
+                                    <p className="text-body font-medium text-neutral-900">{durationLabel}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
