@@ -13,6 +13,7 @@ import {
     Map as MapIcon,
     Banknote,
     Wallet,
+    Timer,
     AlertCircle,
     RefreshCw,
     CalendarCheck,
@@ -23,7 +24,18 @@ import { getReservation } from '../services/reservationService';
 import { formatDate, formatTime, formatDuration, formatCurrency } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
 
+// Once the 15-minute hold runs out, the backend job (every 60 s) is what
+// actually marks the reservation as Expired, so the screen asks again every
+// few seconds until the new status arrives.
+const EXPIRED_POLL_MS = 5000;
 const COPY_FEEDBACK_MS = 2000;
+
+function formatCountdown(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
 
 export default function ReservationConfirmation() {
     const { id } = useParams();
@@ -33,26 +45,39 @@ export default function ReservationConfirmation() {
     const [error, setError] = useState(false);
     const [notFound, setNotFound] = useState(false);
 
+    // Current time, used to derive the countdown during render. It is only
+    // updated from callbacks (the fetch and the 1-second interval), never
+    // directly inside an effect.
+    const [now, setNow] = useState(null);
+    const lastPollRef = useRef(0);
+
     // 'idle' | 'copied' | 'failed'
     const [copyState, setCopyState] = useState('idle');
     const copyTimerRef = useRef(null);
 
-    const fetchReservation = useCallback(() => {
-        getReservation(id)
-            .then(({ data }) => {
-                setReservation(data.reservation);
-                setError(false);
-                setNotFound(false);
-            })
-            .catch((err) => {
-                if (err.response?.data?.code === 'RESERVATION_NOT_FOUND') {
-                    setNotFound(true);
-                } else {
-                    setError(true);
-                }
-            })
-            .finally(() => setLoading(false));
-    }, [id]);
+    // silent = background refresh after the hold expires: a network error
+    // there must not replace the whole screen with the error state.
+    const fetchReservation = useCallback(
+        (silent = false) => {
+            getReservation(id)
+                .then(({ data }) => {
+                    setNow(Date.now());
+                    setReservation(data.reservation);
+                    setError(false);
+                    setNotFound(false);
+                })
+                .catch((err) => {
+                    if (silent) return;
+                    if (err.response?.data?.code === 'RESERVATION_NOT_FOUND') {
+                        setNotFound(true);
+                    } else {
+                        setError(true);
+                    }
+                })
+                .finally(() => setLoading(false));
+        },
+        [id]
+    );
 
     useEffect(() => {
         fetchReservation();
@@ -63,6 +88,25 @@ export default function ReservationConfirmation() {
         setError(false);
         fetchReservation();
     };
+
+    // Only a Pending reservation has a running hold.
+    const holdExpiresAt = reservation?.status === 'Pending' ? reservation.holdExpiresAt : null;
+
+    useEffect(() => {
+        if (!holdExpiresAt) return;
+
+        const expiresAtMs = new Date(holdExpiresAt).getTime();
+        const interval = setInterval(() => {
+            const current = Date.now();
+            setNow(current);
+            if (current >= expiresAtMs && current - lastPollRef.current >= EXPIRED_POLL_MS) {
+                lastPollRef.current = current;
+                fetchReservation(true);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [holdExpiresAt, fetchReservation]);
 
     useEffect(() => {
         return () => clearTimeout(copyTimerRef.current);
@@ -137,7 +181,9 @@ export default function ReservationConfirmation() {
     const { label: statusLabel = reservation.status, Icon: StatusIcon, badge: statusBadge } =
         RESERVATION_STATUS[reservation.status] ?? FALLBACK_STATUS;
     const isPending = reservation.status === 'Pending';
-    const canPay = isPending;
+    const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
+    const isTimeUp = remainingMs !== null && remainingMs <= 0;
+    const canPay = isPending && !isTimeUp;
     const durationLabel = formatDuration(reservation.startTime, reservation.endTime);
     const { latitude, longitude } = reservation.zone;
     const hasCoordinates = latitude != null && longitude != null;
@@ -355,6 +401,25 @@ export default function ReservationConfirmation() {
                             {formatCurrency(reservation.paymentSummary.estimatedTotal)}
                         </span>
                     </div>
+
+                    {remainingMs !== null && (
+                        <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4">
+                            <div className="min-w-0">
+                                <p className="flex items-center gap-1.5 text-label font-medium text-warning">
+                                    <Timer className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {isTimeUp ? 'Tiempo agotado' : 'Se libera si no pagas'}
+                                </p>
+                                <p className="mt-0.5 text-caption text-warning">
+                                    {isTimeUp
+                                        ? 'Actualizando el estado de tu reserva…'
+                                        : 'Tienes 15 minutos para realizar el pago. Pasado este tiempo, el cupo se libera.'}
+                                </p>
+                            </div>
+                            <span role="timer" className="shrink-0 rounded-md bg-white px-3 py-2 font-mono text-title text-warning">
+                                {formatCountdown(remainingMs)}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
