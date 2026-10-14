@@ -295,7 +295,7 @@ export default function Profile() {
 
                             <div>
                                 <p className="text-label text-neutral-700 mb-1">Correo electrónico</p>
-                                <p className="text-body text-neutral-600 bg-neutral-100 rounded-md px-3 py-2">
+                                <p className="text-body text-neutral-600 bg-neutral-100 rounded-md px-3 py-2 wrap-anywhere">
                                     {profile?.email}
                                 </p>
                             </div>
