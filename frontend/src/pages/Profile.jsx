@@ -134,6 +134,28 @@ export default function Profile() {
 
         setSaving(true);
 
+        // AC-07: the password goes first. If it is rejected (e.g. the current
+        // password is wrong), the profile is not saved either, so a failed
+        // attempt never leaves the account half-updated.
+        if (passwordTouched) {
+            try {
+                await changePassword(pwForm);
+                setPwSuccess('Contraseña actualizada correctamente.');
+                setPwForm(EMPTY_PASSWORD_FORM);
+            } catch (err) {
+                const code = err.response?.data?.code;
+                if (code === 'CURRENT_PASSWORD_INCORRECT') {
+                    setPwErrors((prev) => ({ ...prev, currentPassword: translateError(code) }));
+                } else if (code === 'PASSWORD_UNCHANGED') {
+                    setPwErrors((prev) => ({ ...prev, newPassword: translateError(code) }));
+                } else {
+                    setPwServerError(translateError(code));
+                }
+                setSaving(false);
+                return;
+            }
+        }
+
         if (profileChanged) {
             try {
                 // Only the field(s) that changed go in the request — sending an
@@ -149,23 +171,6 @@ export default function Profile() {
                 setProfileSuccess('Perfil actualizado correctamente.');
             } catch (err) {
                 setProfileServerError(translateError(err.response?.data?.code));
-            }
-        }
-
-        if (passwordTouched) {
-            try {
-                await changePassword(pwForm);
-                setPwSuccess('Contraseña actualizada correctamente.');
-                setPwForm(EMPTY_PASSWORD_FORM);
-            } catch (err) {
-                const code = err.response?.data?.code;
-                if (code === 'CURRENT_PASSWORD_INCORRECT') {
-                    setPwErrors((prev) => ({ ...prev, currentPassword: translateError(code) }));
-                } else if (code === 'PASSWORD_UNCHANGED') {
-                    setPwErrors((prev) => ({ ...prev, newPassword: translateError(code) }));
-                } else {
-                    setPwServerError(translateError(code));
-                }
             }
         }
 
