@@ -21,7 +21,8 @@ const validateRegister = [
         .custom((value, { req }) => value === req.body.password)
         .withMessage('Passwords do not match'),
     body('phone')
-        .optional()
+        .trim()
+        .notEmpty().withMessage('Phone is required')
         .matches(/^[0-9]{10}$/).withMessage('Phone must be exactly 10 digits'),
     body('documentType')
         .notEmpty().withMessage('Document type is required')
