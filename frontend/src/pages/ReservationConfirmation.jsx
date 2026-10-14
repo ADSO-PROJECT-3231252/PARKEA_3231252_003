@@ -423,25 +423,32 @@ export default function ReservationConfirmation() {
                 </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                <Link
-                    to="/reservations"
-                    className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
-                >
-                    <CalendarCheck className="h-4 w-4" aria-hidden="true" />
-                    Ver mis reservas
-                </Link>
-                <Link
-                    to="/zones"
-                    className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
-                >
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                    Hacer otra reserva
-                </Link>
+            {/* Same columns as the cards above: the secondary actions sit under the
+                details card and "Ir al pago" under the payment summary. When the
+                reservation can no longer be paid, the secondary actions take the
+                full width so the row still spans both cards. */}
+            <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+                <div className={`flex flex-col gap-3 sm:flex-row ${canPay ? '' : 'lg:col-span-2'}`}>
+                    <Link
+                        to="/reservations"
+                        className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1"
+                    >
+                        <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+                        Ver mis reservas
+                    </Link>
+                    <Link
+                        to="/zones"
+                        className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1"
+                    >
+                        <Plus className="h-4 w-4" aria-hidden="true" />
+                        Hacer otra reserva
+                    </Link>
+                </div>
+                {/* On mobile the primary action goes first, right below the payment summary. */}
                 {canPay && (
                     <Link
                         to={`/reservations/${reservation.id}/payment`}
-                        className="flex items-center justify-center gap-1.5 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700"
+                        className="order-first flex items-center justify-center gap-1.5 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 lg:order-none"
                     >
                         <Wallet className="h-4 w-4" aria-hidden="true" />
                         Ir al pago
