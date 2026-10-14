@@ -296,7 +296,7 @@ export default function ReservationConfirmation() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
+                        <div className="flex flex-wrap items-start justify-between gap-3 py-4">
                             <div className="flex min-w-0 items-start gap-3">
                                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
                                     <LogIn className="h-4 w-4" aria-hidden="true" />
@@ -310,7 +310,7 @@ export default function ReservationConfirmation() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex min-w-0 items-start gap-3">
+                            <div className="flex shrink-0 items-start gap-3">
                                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
                                     <LogOut className="h-4 w-4" aria-hidden="true" />
                                 </span>
