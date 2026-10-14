@@ -461,7 +461,10 @@ export default function AdminUsers() {
                                                         <span className="text-body font-medium text-neutral-900">{u.fullName}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-body text-neutral-600">{u.email}</td>
+                                                <td className="px-4 py-3 text-body text-neutral-600">
+                                                    {/* <wbr> lets a long email break after the @ instead of widening the table */}
+                                                    {u.email.split('@')[0]}@<wbr />{u.email.split('@')[1]}
+                                                </td>
                                                 <td className="px-4 py-3 font-mono text-body text-neutral-600">{u.documentNumber}</td>
                                                 {/* AC-17: role and status are always written out, not color alone. */}
                                                 <td className="px-4 py-3">
@@ -486,7 +489,7 @@ export default function AdminUsers() {
                                                         {u.isActive ? 'Activo' : 'Inactivo'}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 font-mono text-body text-neutral-600">{formatDate(u.createdAt)}</td>
+                                                <td className="whitespace-nowrap px-4 py-3 font-mono text-body text-neutral-600">{formatDate(u.createdAt)}</td>
                                                 <td className="px-4 py-3 font-mono text-body tabular-nums text-neutral-900">{u.reservationCount}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-2">
@@ -495,7 +498,7 @@ export default function AdminUsers() {
                                                             onClick={() => openAction('role', u)}
                                                             disabled={locked}
                                                             aria-label={`Cambiar rol de ${u.fullName}`}
-                                                            className="flex items-center gap-1 rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-500 disabled:hover:bg-transparent"
+                                                            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-500 disabled:hover:bg-transparent"
                                                         >
                                                             <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
                                                             Cambiar rol
