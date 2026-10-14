@@ -9,6 +9,7 @@ import {
     Clock,
     Copy,
     Check,
+    Map as MapIcon,
     Banknote,
     Wallet,
     AlertCircle,
@@ -135,6 +136,9 @@ export default function ReservationConfirmation() {
         RESERVATION_STATUS[reservation.status] ?? FALLBACK_STATUS;
     const isPending = reservation.status === 'Pending';
     const durationLabel = formatDuration(reservation.startTime, reservation.endTime);
+    const { latitude, longitude } = reservation.zone;
+    const hasCoordinates = latitude != null && longitude != null;
+    const mapUrl = hasCoordinates ? `https://www.google.com/maps?q=${latitude},${longitude}` : null;
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -268,6 +272,19 @@ export default function ReservationConfirmation() {
                                     <p className="text-body font-medium text-neutral-900">{durationLabel}</p>
                                 </div>
                             </div>
+                            {/* Coordinates are optional on a zone, so the link only appears when both exist. */}
+                            {hasCoordinates && (
+                                <a
+                                    href={mapUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                                >
+                                    <MapIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Ver en el mapa
+                                    <span className="sr-only"> (se abre en una pestaña nueva)</span>
+                                </a>
+                            )}
                         </div>
                     </div>
                 </div>
