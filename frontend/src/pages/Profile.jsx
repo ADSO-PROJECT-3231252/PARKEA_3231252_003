@@ -312,7 +312,7 @@ export default function Profile() {
                                 </p>
                             </div>
 
-                            <p className="flex items-start gap-1.5 text-caption text-neutral-500">
+                            <p className="flex items-start gap-1.5 text-caption text-neutral-600">
                                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 Por seguridad, esta información no se puede editar.
                             </p>
