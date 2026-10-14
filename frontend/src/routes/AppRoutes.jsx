@@ -14,6 +14,7 @@ import EditVehicle from '../pages/EditVehicle';
 import AdminPanel from '../pages/AdminPanel';
 import ReserveSpot from '../pages/ReserveSpot';
 import AdminLogin from '../pages/AdminLogin';
+import AdminUsers from '../pages/AdminUsers';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 
@@ -47,7 +48,7 @@ export default function AppRoutes() {
                 <Route path="/admin/zones" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/zones/new" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/zones/:id/edit" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
-                <Route path="/admin/users" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} /> 
 
                 <Route path="*" element={<Home />} />
             </Route>
