@@ -44,4 +44,3 @@ export function getPageWindow(current, total) {
     }
     return result;
 }
-
