@@ -7,12 +7,16 @@ import {
     Search,
     X,
     Filter,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     Activity,
     AlertCircle,
 } from 'lucide-react';
 import { getUsers } from '../services/adminService';
 import { getInitials, formatDate, formatTime } from '../utils/format';
-import { PAGE_SIZE_OPTIONS } from '../utils/adminUsersHelpers';
+import { PAGE_SIZE_OPTIONS, getPageWindow } from '../utils/adminUsersHelpers';
 import MetricCard from '../components/MetricCard';
 
 // AC-15: the list is paginated when there are more than 10 accounts.
@@ -25,17 +29,20 @@ export default function AdminUsers() {
     // ----- User list -----
     const [users, setUsers] = useState([]);
     const [summary, setSummary] = useState({ total: 0, active: 0, inactive: 0, admins: 0 });
+    const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(null);
     // Bumped by "Reintentar" to re-run the fetch.
     const [reloadKey, setReloadKey] = useState(0);
 
-    // ----- Filters (AC-04) -----
+    // ----- Filters and pagination (AC-04, AC-15) -----
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [role, setRole] = useState('');
     const [status, setStatus] = useState('');
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
 
     useEffect(() => {
         // Guards against out-of-order responses: a response that arrives after
@@ -45,13 +52,22 @@ export default function AdminUsers() {
             search: debouncedSearch || undefined,
             role: role || undefined,
             status: status || undefined,
-            page: 1,
-            limit: DEFAULT_PAGE_SIZE,
+            page,
+            limit,
         })
             .then(({ data }) => {
                 if (!active) return;
+                const totalPages = Math.max(1, data.pagination?.totalPages ?? 1);
+                // If the current page no longer exists (e.g. its last user was
+                // just deactivated while filtering by "Activo"), jump to the last
+                // one that does.
+                if (page > totalPages) {
+                    setPage(totalPages);
+                    return;
+                }
                 setUsers(data.users);
                 setSummary(data.summary);
+                setPagination({ total: data.pagination?.total ?? data.users.length, totalPages });
                 setLastUpdated(new Date());
                 setError(false);
                 setLoading(false);
@@ -64,7 +80,7 @@ export default function AdminUsers() {
         return () => {
             active = false;
         };
-    }, [debouncedSearch, role, status, reloadKey]);
+    }, [debouncedSearch, role, status, page, limit, reloadKey]);
 
     // Search is sent to the backend only after the user stops typing.
     useEffect(() => {
@@ -73,6 +89,7 @@ export default function AdminUsers() {
             if (trimmed === debouncedSearch) return;
             setLoading(true);
             setDebouncedSearch(trimmed);
+            setPage(1);
         }, SEARCH_DEBOUNCE_MS);
         return () => clearTimeout(timer);
     }, [search, debouncedSearch]);
@@ -88,12 +105,21 @@ export default function AdminUsers() {
         if (value === role) return;
         startLoading();
         setRole(value);
+        setPage(1);
     };
 
     const handleStatusFilter = (value) => {
         if (value === status) return;
         startLoading();
         setStatus(value);
+        setPage(1);
+    };
+
+    const handleLimitChange = (value) => {
+        if (value === limit) return;
+        startLoading();
+        setLimit(value);
+        setPage(1);
     };
 
     const handleClearFilters = () => {
@@ -103,6 +129,13 @@ export default function AdminUsers() {
         setDebouncedSearch('');
         setRole('');
         setStatus('');
+        setPage(1);
+    };
+
+    const goToPage = (target) => {
+        if (target === page) return;
+        startLoading();
+        setPage(target);
     };
 
     const handleRetry = () => {
@@ -111,6 +144,13 @@ export default function AdminUsers() {
     };
 
     const hasActiveFilters = Boolean(search || role || status);
+
+    const rangeStart = pagination.total === 0 ? 0 : (page - 1) * limit + 1;
+    const rangeEnd = Math.min(page * limit, pagination.total);
+    const pageWindow = getPageWindow(page, pagination.totalPages);
+    const pageButton =
+        'flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 ' +
+        'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -322,6 +362,86 @@ export default function AdminUsers() {
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* AC-15: pagination */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
+                            <p className="text-caption text-neutral-600">
+                                Mostrando {rangeStart} a {rangeEnd} de {pagination.total} usuarios
+                            </p>
+                            <nav aria-label="Paginación de usuarios" className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => goToPage(1)}
+                                    disabled={page === 1}
+                                    aria-label="Primera página"
+                                    className={pageButton}
+                                >
+                                    <ChevronsLeft className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => goToPage(page - 1)}
+                                    disabled={page === 1}
+                                    aria-label="Página anterior"
+                                    className={pageButton}
+                                >
+                                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                                {pageWindow.map((item) =>
+                                    typeof item === 'number' ? (
+                                        <button
+                                            key={item}
+                                            type="button"
+                                            onClick={() => goToPage(item)}
+                                            aria-label={`Página ${item}`}
+                                            aria-current={item === page ? 'page' : undefined}
+                                            className={`flex h-7 w-7 items-center justify-center rounded-md text-label transition-colors ${item === page ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
+                                        >
+                                            {item}
+                                        </button>
+                                    ) : (
+                                        <span key={item} className="px-1 text-neutral-600" aria-hidden="true">
+                                            …
+                                        </span>
+                                    ),
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => goToPage(page + 1)}
+                                    disabled={page === pagination.totalPages}
+                                    aria-label="Página siguiente"
+                                    className={pageButton}
+                                >
+                                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => goToPage(pagination.totalPages)}
+                                    disabled={page === pagination.totalPages}
+                                    aria-label="Última página"
+                                    className={pageButton}
+                                >
+                                    <ChevronsRight className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                            </nav>
+                            <div className="flex items-center gap-2">
+                                <label htmlFor="page-size" className="text-caption text-neutral-600">
+                                    Filas por página
+                                </label>
+                                <select
+                                    id="page-size"
+                                    value={limit}
+                                    onChange={(e) => handleLimitChange(Number(e.target.value))}
+                                    className="rounded-md border border-neutral-200 px-2 py-1 text-caption text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                                >
+                                    {PAGE_SIZE_OPTIONS.map((n) => (
+                                        <option key={n} value={n}>
+                                            {n}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
                     </>
                 )}
