@@ -217,8 +217,8 @@ export default function ReservationConfirmation() {
                         </span>
                     </div>
 
-                    <div className="mt-4 space-y-4 divide-y divide-neutral-100">
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 first:pt-0">
+                    <div className="mt-4 divide-y divide-neutral-100">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                             <div className="flex min-w-0 items-start gap-3">
                                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
                                     <CalendarCheck className="h-4 w-4" aria-hidden="true" />
@@ -260,7 +260,7 @@ export default function ReservationConfirmation() {
                             </span>
                         </div>
 
-                        <div className="flex flex-wrap items-start justify-between gap-3 pt-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3 py-4">
                             <div className="flex min-w-0 items-start gap-3">
                                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
                                     <MapPin className="h-4 w-4" aria-hidden="true" />
@@ -284,7 +284,7 @@ export default function ReservationConfirmation() {
                             </div>
                         </div>
 
-                        <div className="flex items-start gap-3 pt-4">
+                        <div className="flex items-start gap-3 py-4">
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
                                 <Car className="h-4 w-4" aria-hidden="true" />
                             </span>
@@ -296,7 +296,7 @@ export default function ReservationConfirmation() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 py-4 sm:grid-cols-2">
                             <div className="flex min-w-0 items-start gap-3">
                                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
                                     <LogIn className="h-4 w-4" aria-hidden="true" />
