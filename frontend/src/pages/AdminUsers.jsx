@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Users,
     UserCheck,
@@ -7,25 +7,33 @@ import {
     Search,
     X,
     Filter,
+    UserCog,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
     Activity,
     AlertCircle,
+    CheckCircle2,
 } from 'lucide-react';
-import { getUsers } from '../services/adminService';
+import { useAuth } from '../hooks/useAuth';
+import { getUsers, changeUserRole, changeUserStatus } from '../services/adminService';
+import { translateError } from '../utils/errorMessages';
 import { getInitials, formatDate, formatTime } from '../utils/format';
-import { PAGE_SIZE_OPTIONS, getPageWindow } from '../utils/adminUsersHelpers';
+import { PAGE_SIZE_OPTIONS, ROLE_LABELS, getPageWindow } from '../utils/adminUsersHelpers';
 import MetricCard from '../components/MetricCard';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 // AC-15: the list is paginated when there are more than 10 accounts.
 const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
 const SEARCH_DEBOUNCE_MS = 400;
+const SUCCESS_MESSAGE_MS = 3000;
 
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
 
 export default function AdminUsers() {
+    const { user: currentUser } = useAuth();
+
     // ----- User list -----
     const [users, setUsers] = useState([]);
     const [summary, setSummary] = useState({ total: 0, active: 0, inactive: 0, admins: 0 });
@@ -33,7 +41,8 @@ export default function AdminUsers() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [lastUpdated, setLastUpdated] = useState(null);
-    // Bumped by "Reintentar" to re-run the fetch.
+    // Bumped by "Reintentar" and after every role/status change to re-run the
+    // fetch with the same filters and page.
     const [reloadKey, setReloadKey] = useState(0);
 
     // ----- Filters and pagination (AC-04, AC-15) -----
@@ -43,6 +52,13 @@ export default function AdminUsers() {
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+
+    // ----- Role/status confirmation dialog (AC-05, AC-06, AC-07) -----
+    // { type: 'role' | 'status', user }
+    const [pendingAction, setPendingAction] = useState(null);
+    const [confirming, setConfirming] = useState(false);
+    const [actionError, setActionError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         // Guards against out-of-order responses: a response that arrives after
@@ -93,6 +109,12 @@ export default function AdminUsers() {
         }, SEARCH_DEBOUNCE_MS);
         return () => clearTimeout(timer);
     }, [search, debouncedSearch]);
+
+    useEffect(() => {
+        if (!successMessage) return;
+        const timer = setTimeout(() => setSuccessMessage(''), SUCCESS_MESSAGE_MS);
+        return () => clearTimeout(timer);
+    }, [successMessage]);
 
     // Every change that triggers a new fetch shows the loading state first; it's
     // set here, in the event, rather than inside the effect.
@@ -145,6 +167,64 @@ export default function AdminUsers() {
 
     const hasActiveFilters = Boolean(search || role || status);
 
+    // AC-08 / AC-10: the signed-in admin and the primary admin can't be changed.
+    const lockedReason = (u) => {
+        if (u.id === currentUser?.id) return 'No puedes modificar tu propio rol ni estado.';
+        if (u.isPrimaryAdmin) return 'El administrador principal no puede modificarse.';
+        return '';
+    };
+
+    const openAction = (type, u) => {
+        setActionError('');
+        setPendingAction({ type, user: u });
+    };
+
+    const closeAction = useCallback(() => {
+        setPendingAction(null);
+        setActionError('');
+    }, []);
+
+    const handleConfirmAction = async () => {
+        if (!pendingAction) return;
+        const { type, user: target } = pendingAction;
+        setConfirming(true);
+        setActionError('');
+        try {
+            if (type === 'role') {
+                const nextRole = target.role === 'admin' ? 'user' : 'admin';
+                await changeUserRole(target.id, nextRole);
+                setSuccessMessage(`Se actualizó el rol de ${target.fullName} a ${ROLE_LABELS[nextRole]}.`);
+            } else {
+                await changeUserStatus(target.id, !target.isActive);
+                setSuccessMessage(`${target.fullName} fue ${target.isActive ? 'desactivado' : 'activado'} correctamente.`);
+            }
+            setPendingAction(null);
+            // Refresh without the "Cargando..." state, so the table stays on
+            // screen and only its rows change.
+            setReloadKey((k) => k + 1);
+        } catch (err) {
+            setActionError(translateError(err.response?.data?.code));
+        } finally {
+            setConfirming(false);
+        }
+    };
+
+    // AC-07: the dialog states the account affected and the effect of the change.
+    let dialogTitle = '';
+    let dialogMessage = '';
+    if (pendingAction?.type === 'role') {
+        const { fullName, role: currentRole } = pendingAction.user;
+        const nextRole = currentRole === 'admin' ? 'user' : 'admin';
+        dialogTitle = 'Cambiar rol';
+        dialogMessage = `Vas a cambiar el rol de ${fullName} de ${ROLE_LABELS[currentRole]} a ${ROLE_LABELS[nextRole]}.`;
+    } else if (pendingAction?.type === 'status') {
+        const { fullName, isActive } = pendingAction.user;
+        dialogTitle = isActive ? 'Desactivar cuenta' : 'Activar cuenta';
+        dialogMessage = isActive
+            ? `Vas a desactivar la cuenta de ${fullName}. No podrá iniciar sesión hasta que la vuelvas a activar.`
+            : `Vas a activar la cuenta de ${fullName}.`;
+    }
+
     const rangeStart = pagination.total === 0 ? 0 : (page - 1) * limit + 1;
     const rangeEnd = Math.min(page * limit, pagination.total);
     const pageWindow = getPageWindow(page, pagination.totalPages);
@@ -168,6 +248,17 @@ export default function AdminUsers() {
                         <span className="font-semibold text-neutral-900">
                             {formatDate(lastUpdated)} {formatTime(lastUpdated)}
                         </span>
+                    </p>
+                )}
+            </div>
+
+            {/* AC-14: confirmation after every completed action. The live region
+                is always in the page so screen readers announce the new text. */}
+            <div role="status" aria-live="polite">
+                {successMessage && (
+                    <p className="mt-4 flex items-center gap-2 rounded-md bg-parkea-50 px-3 py-2 text-caption text-parkea-700">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {successMessage}
                     </p>
                 )}
             </div>
@@ -313,12 +404,18 @@ export default function AdminUsers() {
                                         <th scope="col" className="px-4 py-3 font-medium">Estado</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Fecha de registro</th>
                                         <th scope="col" className="px-4 py-3 font-medium">N.º de reservas</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {users.map((u) => {
+                                        const reason = lockedReason(u);
+                                        const locked = Boolean(reason);
                                         return (
-                                            <tr key={u.id} className="border-b border-neutral-100 align-top last:border-0">
+                                            <tr
+                                                key={u.id}
+                                                className={`border-b border-neutral-100 align-top last:border-0 ${locked ? 'bg-neutral-50' : ''}`}
+                                            >
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-2.5">
                                                         <span
@@ -357,6 +454,37 @@ export default function AdminUsers() {
                                                 </td>
                                                 <td className="px-4 py-3 font-mono text-body text-neutral-600">{formatDate(u.createdAt)}</td>
                                                 <td className="px-4 py-3 font-mono text-body tabular-nums text-neutral-900">{u.reservationCount}</td>
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openAction('role', u)}
+                                                            disabled={locked}
+                                                            aria-label={`Cambiar rol de ${u.fullName}`}
+                                                            className="flex items-center gap-1 rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-500 disabled:hover:bg-transparent"
+                                                        >
+                                                            <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
+                                                            Cambiar rol
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            role="switch"
+                                                            aria-checked={u.isActive}
+                                                            aria-label={`Cuenta activa de ${u.fullName}`}
+                                                            onClick={() => openAction('status', u)}
+                                                            disabled={locked}
+                                                            className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${u.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-300 bg-neutral-300'}`}
+                                                        >
+                                                            <span
+                                                                className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${u.isActive ? 'translate-x-4' : 'translate-x-0'}`}
+                                                                aria-hidden="true"
+                                                            />
+                                                        </button>
+                                                    </div>
+                                                    {locked && (
+                                                        <p className="mt-1 max-w-[190px] text-caption text-neutral-600">{reason}</p>
+                                                    )}
+                                                </td>
                                             </tr>
                                         );
                                     })}
@@ -446,6 +574,19 @@ export default function AdminUsers() {
                     </>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={Boolean(pendingAction)}
+                variant={pendingAction?.type === 'status' && pendingAction.user.isActive ? 'danger' : 'default'}
+                title={dialogTitle}
+                message={dialogMessage}
+                confirmLabel="Confirmar cambio"
+                cancelLabel="Cancelar"
+                confirming={confirming}
+                error={actionError}
+                onConfirm={handleConfirmAction}
+                onCancel={closeAction}
+            />
         </div>
     );
 }
