@@ -324,7 +324,9 @@ export default function AdminPanel() {
                         <SectionError onRetry={handleRetryReservationsByZone} />
                     ) : reservationsByZoneLoading ? (
                         <SectionLoading />
-                    ) : reservationsByZone.length === 0 ? (
+                    ) : reservationsByZone.every((zone) => zone.reservationCount === 0) ? (
+                        // AC-10: the backend lists every active zone, even with 0 reservations,
+                        // so "no data" means every count is 0, not an empty list.
                         <SectionEmpty message="No hay reservas en este rango." />
                     ) : (
                         <>
