@@ -126,7 +126,7 @@ export default function ReservationConfirmation() {
 
     if (loading) {
         return (
-            <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <div className="mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6">
                 <h1 className="sr-only">Confirmación de reserva</h1>
                 <p role="status" aria-live="polite" className="text-body text-neutral-600">
                     Cargando…
@@ -137,7 +137,7 @@ export default function ReservationConfirmation() {
 
     if (notFound) {
         return (
-            <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <div className="mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6">
                 <h1 className="sr-only">Confirmación de reserva</h1>
                 <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
                     <p className="flex items-center gap-2 text-body text-neutral-600">
@@ -157,7 +157,7 @@ export default function ReservationConfirmation() {
 
     if (error || !reservation) {
         return (
-            <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <div className="mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6">
                 <h1 className="sr-only">Confirmación de reserva</h1>
                 <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-danger-soft bg-danger-soft p-5">
                     <p className="flex items-center gap-2 text-body text-danger">
@@ -190,7 +190,7 @@ export default function ReservationConfirmation() {
     const mapUrl = hasCoordinates ? `https://www.google.com/maps?q=${latitude},${longitude}` : null;
 
     return (
-        <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+        <div className="mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6">
             <h1 className="sr-only">Confirmación de reserva</h1>
 
             {canPay && (
