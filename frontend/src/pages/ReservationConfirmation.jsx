@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
+    CheckCircle2,
     MapPin,
     SquareParking,
     Car,
@@ -15,6 +16,7 @@ import {
     AlertCircle,
     RefreshCw,
     CalendarCheck,
+    Plus,
     Ban,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
@@ -135,6 +137,7 @@ export default function ReservationConfirmation() {
     const { label: statusLabel = reservation.status, Icon: StatusIcon, badge: statusBadge } =
         RESERVATION_STATUS[reservation.status] ?? FALLBACK_STATUS;
     const isPending = reservation.status === 'Pending';
+    const canPay = isPending;
     const durationLabel = formatDuration(reservation.startTime, reservation.endTime);
     const { latitude, longitude } = reservation.zone;
     const hasCoordinates = latitude != null && longitude != null;
@@ -143,6 +146,20 @@ export default function ReservationConfirmation() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <h1 className="sr-only">Confirmación de reserva</h1>
+
+            {canPay && (
+                <div className="mb-6 flex items-start gap-3 rounded-lg border border-parkea-200 bg-parkea-50 p-5">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-600 text-white">
+                        <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div className="min-w-0">
+                        <p className="text-body font-medium text-neutral-900">¡Reserva realizada con éxito!</p>
+                        <p className="text-body text-neutral-600">
+                            Hemos reservado tu cupo. Completa el pago para asegurar tu espacio.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="rounded-lg border border-neutral-200 bg-white p-6">
@@ -339,6 +356,32 @@ export default function ReservationConfirmation() {
                         </span>
                     </div>
                 </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <Link
+                    to="/reservations"
+                    className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                >
+                    <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+                    Ver mis reservas
+                </Link>
+                <Link
+                    to="/zones"
+                    className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Hacer otra reserva
+                </Link>
+                {canPay && (
+                    <Link
+                        to={`/reservations/${reservation.id}/payment`}
+                        className="flex items-center justify-center gap-1.5 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700"
+                    >
+                        <Wallet className="h-4 w-4" aria-hidden="true" />
+                        Ir al pago
+                    </Link>
+                )}
             </div>
         </div>
     );
