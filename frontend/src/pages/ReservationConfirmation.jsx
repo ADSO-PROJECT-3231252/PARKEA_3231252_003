@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
     MapPin,
@@ -7,6 +7,8 @@ import {
     LogIn,
     LogOut,
     Clock,
+    Copy,
+    Check,
     Banknote,
     Wallet,
     AlertCircle,
@@ -18,6 +20,8 @@ import { getReservation } from '../services/reservationService';
 import { formatDate, formatTime, formatDuration, formatCurrency } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
 
+const COPY_FEEDBACK_MS = 2000;
+
 export default function ReservationConfirmation() {
     const { id } = useParams();
 
@@ -25,6 +29,10 @@ export default function ReservationConfirmation() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [notFound, setNotFound] = useState(false);
+
+    // 'idle' | 'copied' | 'failed'
+    const [copyState, setCopyState] = useState('idle');
+    const copyTimerRef = useRef(null);
 
     const fetchReservation = useCallback(() => {
         getReservation(id)
@@ -51,6 +59,22 @@ export default function ReservationConfirmation() {
         setLoading(true);
         setError(false);
         fetchReservation();
+    };
+
+    useEffect(() => {
+        return () => clearTimeout(copyTimerRef.current);
+    }, []);
+
+    const handleCopy = async () => {
+        clearTimeout(copyTimerRef.current);
+        try {
+            await navigator.clipboard.writeText(reservation.id);
+            setCopyState('copied');
+        } catch {
+            // Clipboard unavailable (e.g. permission denied or non-HTTPS origin).
+            setCopyState('failed');
+        }
+        copyTimerRef.current = setTimeout(() => setCopyState('idle'), COPY_FEEDBACK_MS);
     };
 
     if (loading) {
@@ -137,6 +161,36 @@ export default function ReservationConfirmation() {
                                     <p className="break-all font-mono text-body font-medium text-neutral-900">{reservation.id}</p>
                                 </div>
                             </div>
+                            <button
+                                type="button"
+                                onClick={handleCopy}
+                                aria-label="Copiar código de reserva"
+                                className="flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                            >
+                                {copyState === 'copied' && (
+                                    <>
+                                        <Check className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
+                                        ¡Copiado!
+                                    </>
+                                )}
+                                {copyState === 'failed' && (
+                                    <>
+                                        <AlertCircle className="h-3.5 w-3.5 text-danger" aria-hidden="true" />
+                                        No se pudo copiar
+                                    </>
+                                )}
+                                {copyState === 'idle' && (
+                                    <>
+                                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                                        Copiar
+                                    </>
+                                )}
+                            </button>
+                            {/* The button keeps a fixed aria-label, so the result is announced here. */}
+                            <span role="status" className="sr-only">
+                                {copyState === 'copied' && 'Código copiado'}
+                                {copyState === 'failed' && 'No se pudo copiar el código'}
+                            </span>
                         </div>
 
                         <div className="flex flex-wrap items-start justify-between gap-3 pt-4">
