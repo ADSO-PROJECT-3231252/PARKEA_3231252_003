@@ -7,13 +7,15 @@ import {
     LogIn,
     LogOut,
     Clock,
+    Banknote,
+    Wallet,
     AlertCircle,
     RefreshCw,
     CalendarCheck,
     Ban,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
-import { formatDate, formatTime, formatDuration } from '../utils/format';
+import { formatDate, formatTime, formatDuration, formatCurrency } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
 
 export default function ReservationConfirmation() {
@@ -107,7 +109,7 @@ export default function ReservationConfirmation() {
     // An unknown status shows its own name instead of pretending to be Pending.
     const { label: statusLabel = reservation.status, Icon: StatusIcon, badge: statusBadge } =
         RESERVATION_STATUS[reservation.status] ?? FALLBACK_STATUS;
-
+    const isPending = reservation.status === 'Pending';
     const durationLabel = formatDuration(reservation.startTime, reservation.endTime);
 
     return (
@@ -213,6 +215,57 @@ export default function ReservationConfirmation() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div className="rounded-lg border border-neutral-200 bg-white p-6">
+                    <h2 className="text-title font-display uppercase text-neutral-900">Resumen de pago</h2>
+
+                    <div className="mt-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <span className="flex shrink-0 items-center gap-2 text-body text-neutral-600">
+                                <MapPin className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                                Zona
+                            </span>
+                            <span className="min-w-0 break-words text-right text-body font-medium text-neutral-900">
+                                {reservation.paymentSummary.zoneName}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="flex items-center gap-2 text-body text-neutral-600">
+                                <SquareParking className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                                Cupo asignado
+                            </span>
+                            <span className="font-mono text-body font-medium text-neutral-900">
+                                {reservation.paymentSummary.spotNumber}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="flex items-center gap-2 text-body text-neutral-600">
+                                <Banknote className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                                Tarifa por hora
+                            </span>
+                            <span className="font-mono text-body font-medium text-neutral-900">
+                                {formatCurrency(reservation.paymentSummary.hourlyRate)}
+                            </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="flex items-center gap-2 text-body text-neutral-600">
+                                <Clock className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                                Duración
+                            </span>
+                            <span className="text-body font-medium text-neutral-900">{durationLabel}</span>
+                        </div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-parkea-50 p-4">
+                        <span className="flex items-center gap-2 text-body font-medium text-parkea-700">
+                            <Wallet className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {isPending ? 'Total a pagar' : 'Total de la reserva'}
+                        </span>
+                        <span className="font-mono text-title font-bold text-parkea-700">
+                            {formatCurrency(reservation.paymentSummary.estimatedTotal)}
+                        </span>
                     </div>
                 </div>
             </div>
