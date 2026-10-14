@@ -12,22 +12,25 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
+    History,
     Activity,
     AlertCircle,
     CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { getUsers, changeUserRole, changeUserStatus } from '../services/adminService';
+import { getUsers, getUserLogs, changeUserRole, changeUserStatus } from '../services/adminService';
 import { translateError } from '../utils/errorMessages';
 import { getInitials, formatDate, formatTime } from '../utils/format';
-import { PAGE_SIZE_OPTIONS, ROLE_LABELS, getPageWindow } from '../utils/adminUsersHelpers';
+import { PAGE_SIZE_OPTIONS, ROLE_LABELS, describeLog, getPageWindow } from '../utils/adminUsersHelpers';
 import MetricCard from '../components/MetricCard';
 import ConfirmDialog from '../components/ConfirmDialog';
+import LogDetailsModal from '../components/LogDetailsModal';
 
 // AC-15: the list is paginated when there are more than 10 accounts.
 const DEFAULT_PAGE_SIZE = PAGE_SIZE_OPTIONS[0];
 const SEARCH_DEBOUNCE_MS = 400;
 const SUCCESS_MESSAGE_MS = 3000;
+const VISIBLE_LOGS = 3;
 
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
 
@@ -52,6 +55,14 @@ export default function AdminUsers() {
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+
+    // ----- Recent changes log (AC-14) -----
+    const [logs, setLogs] = useState([]);
+    const [logsLoading, setLogsLoading] = useState(true);
+    const [logsError, setLogsError] = useState(false);
+    const [logsExpanded, setLogsExpanded] = useState(false);
+    const [logsReloadKey, setLogsReloadKey] = useState(0);
+    const [selectedLog, setSelectedLog] = useState(null);
 
     // ----- Role/status confirmation dialog (AC-05, AC-06, AC-07) -----
     // { type: 'role' | 'status', user }
@@ -97,6 +108,25 @@ export default function AdminUsers() {
             active = false;
         };
     }, [debouncedSearch, role, status, page, limit, reloadKey]);
+
+    useEffect(() => {
+        let active = true;
+        getUserLogs()
+            .then(({ data }) => {
+                if (!active) return;
+                setLogs(data.logs);
+                setLogsError(false);
+                setLogsLoading(false);
+            })
+            .catch(() => {
+                if (!active) return;
+                setLogsError(true);
+                setLogsLoading(false);
+            });
+        return () => {
+            active = false;
+        };
+    }, [logsReloadKey]);
 
     // Search is sent to the backend only after the user stops typing.
     useEffect(() => {
@@ -184,6 +214,8 @@ export default function AdminUsers() {
         setActionError('');
     }, []);
 
+    const closeLogDetails = useCallback(() => setSelectedLog(null), []);
+
     const handleConfirmAction = async () => {
         if (!pendingAction) return;
         const { type, user: target } = pendingAction;
@@ -202,6 +234,7 @@ export default function AdminUsers() {
             // Refresh without the "Cargando..." state, so the table stays on
             // screen and only its rows change.
             setReloadKey((k) => k + 1);
+            setLogsReloadKey((k) => k + 1);
         } catch (err) {
             setActionError(translateError(err.response?.data?.code));
         } finally {
@@ -228,6 +261,7 @@ export default function AdminUsers() {
     const rangeStart = pagination.total === 0 ? 0 : (page - 1) * limit + 1;
     const rangeEnd = Math.min(page * limit, pagination.total);
     const pageWindow = getPageWindow(page, pagination.totalPages);
+    const visibleLogs = logsExpanded ? logs : logs.slice(0, VISIBLE_LOGS);
     const pageButton =
         'flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 ' +
         'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
@@ -575,6 +609,68 @@ export default function AdminUsers() {
                 )}
             </div>
 
+            {/* AC-14: recent changes log */}
+            <section aria-labelledby="recent-changes-title" className="mt-6 rounded-lg border border-neutral-200 bg-white p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-parkea-600">
+                            <History className="h-4 w-4 text-white" aria-hidden="true" />
+                        </span>
+                        <div>
+                            <h2 id="recent-changes-title" className="text-body font-semibold text-neutral-900">
+                                Cambios recientes
+                            </h2>
+                            <p className="text-caption text-neutral-600">Actividad de administración de usuarios</p>
+                        </div>
+                    </div>
+                    {logs.length > VISIBLE_LOGS && (
+                        <button
+                            type="button"
+                            onClick={() => setLogsExpanded((v) => !v)}
+                            aria-expanded={logsExpanded}
+                            className="text-label text-parkea-600 hover:underline"
+                        >
+                            {logsExpanded ? 'Ver menos' : 'Ver historial'}
+                        </button>
+                    )}
+                </div>
+
+                <div className="mt-4 divide-y divide-neutral-100">
+                    {logsLoading && <p className="text-body text-neutral-600">Cargando actividad…</p>}
+                    {!logsLoading && logsError && (
+                        <p role="alert" className="flex items-center gap-2 text-body text-danger">
+                            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            No pudimos cargar el historial de cambios.
+                        </p>
+                    )}
+                    {!logsLoading && !logsError && logs.length === 0 && (
+                        <p className="text-body text-neutral-600">Aún no hay cambios registrados.</p>
+                    )}
+                    {!logsLoading &&
+                        !logsError &&
+                        visibleLogs.map((log) => (
+                            <div
+                                key={log.id}
+                                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                            >
+                                <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+                                    <p className="w-48 shrink-0 whitespace-nowrap font-mono text-caption text-neutral-600">
+                                        {formatDate(log.created_at)} {formatTime(log.created_at)}
+                                    </p>
+                                    <p className="break-words text-body text-neutral-800">{describeLog(log)}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedLog(log)}
+                                    className="shrink-0 self-start text-label text-parkea-600 hover:underline"
+                                >
+                                    Ver detalles
+                                </button>
+                            </div>
+                        ))}
+                </div>
+            </section>
+
             <ConfirmDialog
                 open={Boolean(pendingAction)}
                 variant={pendingAction?.type === 'status' && pendingAction.user.isActive ? 'danger' : 'default'}
@@ -587,6 +683,7 @@ export default function AdminUsers() {
                 onConfirm={handleConfirmAction}
                 onCancel={closeAction}
             />
+            <LogDetailsModal log={selectedLog} onClose={closeLogDetails} />
         </div>
     );
 }
