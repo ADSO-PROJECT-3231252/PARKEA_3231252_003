@@ -404,7 +404,8 @@ export default function ReservationConfirmation() {
 
                     {remainingMs !== null && (
                         <div className="mt-4 flex flex-col items-start gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="min-w-0">
+                            {/* Announces "Tiempo agotado" when the text changes; the timer itself stays silent. */}
+                            <div className="min-w-0" aria-live="polite">
                                 <p className="flex items-center gap-1.5 text-label font-medium text-warning">
                                     <Timer className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {isTimeUp ? 'Tiempo agotado' : 'Se libera si no pagas'}
