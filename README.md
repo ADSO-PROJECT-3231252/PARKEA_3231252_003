@@ -10,7 +10,7 @@
 
 ---
 
-##  Table of Contents
+## Table of Contents
 
 - [ Project Description](#-project-description)
 - [ Development Team](#-development-team)
@@ -19,8 +19,7 @@
 - [ Project Branches](#-project-branches)
 - [ Installation and Setup](#-installation-and-setup)
   - [Prerequisites](#prerequisites)
-  - [Database](#database)
-  - [Backend](#backend-1)
+  - [Backend and Database](#backend-and-database)
   - [Frontend](#frontend-1)
 - [ Environment Variables](#️-environment-variables)
 - [ Available Scripts](#-available-scripts)
@@ -36,11 +35,11 @@
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
-- 🔍 Explore available parking zones in their city
-- 📅 Reserve a spot in advance to guarantee their space
-- 💳 Make secure simulated payments
-- 🚗 Manage their registered vehicles
-- 📊 Administrators: manage zones, users, and view real-time metrics
+-  Explore available parking zones in their city
+-  Reserve a spot in advance to guarantee their space
+-  Make secure simulated payments
+-  Manage their registered vehicles
+-  Administrators: manage zones, users, and view real-time metrics
 
 The system is designed under a **MERN-like** architecture (React + Node.js + MySQL) with clear separation between frontend, backend, and persistence layer.
 
@@ -191,25 +190,13 @@ PARKEA_3231252_003/
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) — see version above ⚠️
-- [MySQL](https://mysql.com) ≥ 8.0
+- [Node.js](https://nodejs.org) — the team uses 24.15.0
+- [MySQL](https://mysql.com) ≥ 8.0 (the service must be running)
 - [Git](https://git-scm.com)
 
-### Database
+### Backend and Database
 
-1. Create the database in MySQL:
-```sql
-CREATE DATABASE parkea_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-2. Run the DDL script:
-```bash
-mysql -u root -p parkea_db < database/schema.sql
-```
-
-> The script creates 9 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens, admin_action_logs.
-
-### Backend
+The database is created with the **Sequelize migrations and seeders**. `database/schema.sql` is only a readable reference of the same design: do not run it on the database you use with the migrations.
 
 ```bash
 # 1. Clone the repository
@@ -219,15 +206,36 @@ cd PARKEA_3231252_003/backend
 # 2. Install dependencies
 npm install
 
-# 3. Configure environment variables
+# 3. Create your .env from the example and fill it in (see Environment Variables)
 cp .env.example .env
-# Edit .env with your credentials (see Environment Variables section)
+```
 
-# 4. Start development server
+4. Create the empty database in MySQL:
+
+```sql
+CREATE DATABASE parkea_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+5. Create the tables and load the demo data (run inside `backend/`):
+
+```bash
+npx sequelize-cli db:migrate
+npx sequelize-cli db:seed:all
+```
+
+> The 19 migrations create the 9 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens and admin_action_logs.
+> The seeders add the `admin` and `user` roles, 4 demo zones with their parking spots, and the primary administrator `admin@parkea.com` (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
+
+6. Start the development server:
+
+```bash
 npm run dev
 
 # Server running at: http://localhost:3000
+# Health check:      http://localhost:3000/api/health → {"status":"ok"}
 ```
+
+> If the server stops with `ECONNREFUSED`, the MySQL service is not running.
 
 ### Frontend
 
@@ -247,9 +255,13 @@ npm run dev
 # App running at: http://localhost:5173
 ```
 
+> After every `git pull` that brings frontend changes, run `npm ci` so any new library gets installed.
+
 ---
 
 ## Environment Variables
+
+Never commit a `.env` file: only `.env.example` goes to the repository.
 
 ### Backend (`backend/.env`)
 
@@ -258,23 +270,34 @@ npm run dev
 PORT=3000
 NODE_ENV=development
 
-# Database
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=parkea_db
-DB_USER=root
-DB_PASSWORD=your_password
+# Database (the only database setting the code reads)
+DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/parkea_db
 
 # JWT
-JWT_SECRET=your_very_secure_secret_key
+JWT_SECRET=change_this_to_a_long_random_secret
 JWT_EXPIRES_IN=1h
 
-# Mailtrap (for password recovery)
+# CORS: address of the frontend
+FRONTEND_URL=http://localhost:5173
+
+# Mailtrap (password recovery emails)
 MAILTRAP_HOST=sandbox.smtp.mailtrap.io
 MAILTRAP_PORT=2525
 MAILTRAP_USER=your_mailtrap_user
 MAILTRAP_PASS=your_mailtrap_password
 ```
+
+| Variable | Used for |
+|----------|----------|
+| `PORT` | Port of the API (default 3000) |
+| `NODE_ENV` | Sequelize environment (default `development`) |
+| `DATABASE_URL` | MySQL connection, used by the server and by sequelize-cli |
+| `JWT_SECRET` / `JWT_EXPIRES_IN` | Signing and lifetime of the session token (default 1h) |
+| `FRONTEND_URL` | Origin allowed by CORS (default `http://localhost:5173`) |
+| `MAILTRAP_*` | SMTP account for the password recovery emails |
+
+> If the MySQL password has special characters, encode them in `DATABASE_URL` (for example `$` → `%24`, `@` → `%40`).
+> `.env.example` also lists `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` and `DB_PASSWORD`, but the code does not read them.
 
 ### Frontend (`frontend/.env`)
 
@@ -289,9 +312,16 @@ VITE_API_URL=http://localhost:3000/api
 ### Backend
 | Script | Command | Description |
 |--------|---------|-------------|
-| Development | `npm run dev` | Nodemon + auto-reload |
-| Production | `npm start` | Direct Node |
-| Lint | `npm run lint` | ESLint |
+| Development | `npm run dev` | nodemon + auto-reload |
+| Production | `npm start` | Plain Node |
+
+### Database (run inside `backend/`)
+| Task | Command |
+|------|---------|
+| Create or update the tables | `npx sequelize-cli db:migrate` |
+| Undo the last migration | `npx sequelize-cli db:migrate:undo` |
+| Load the demo data | `npx sequelize-cli db:seed:all` |
+| Remove the demo data | `npx sequelize-cli db:seed:undo:all` |
 
 ### Frontend
 | Script | Command | Description |
