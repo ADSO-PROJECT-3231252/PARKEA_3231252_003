@@ -30,6 +30,13 @@ import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus'
 const EXPIRED_POLL_MS = 5000;
 const COPY_FEEDBACK_MS = 2000;
 
+// Shared class strings, so the same look is written once.
+const ICON_CIRCLE = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600';
+const OUTLINE_BUTTON_SM =
+    'flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600';
+const OUTLINE_ACTION =
+    'flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1';
+
 function formatCountdown(ms) {
     const totalSeconds = Math.max(0, Math.floor(ms / 1000));
     const minutes = Math.floor(totalSeconds / 60);
@@ -220,7 +227,7 @@ export default function ReservationConfirmation() {
                     <div className="mt-4 divide-y divide-neutral-100">
                         <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                             <div className="flex min-w-0 items-start gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                <span className={ICON_CIRCLE}>
                                     <CalendarCheck className="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <div className="min-w-0">
@@ -232,7 +239,7 @@ export default function ReservationConfirmation() {
                                 type="button"
                                 onClick={handleCopy}
                                 aria-label="Copiar código de reserva"
-                                className="flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                                className={OUTLINE_BUTTON_SM}
                             >
                                 {copyState === 'copied' && (
                                     <>
@@ -262,7 +269,7 @@ export default function ReservationConfirmation() {
 
                         <div className="flex flex-wrap items-start justify-between gap-3 py-4">
                             <div className="flex min-w-0 items-start gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                <span className={ICON_CIRCLE}>
                                     <MapPin className="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <div className="min-w-0">
@@ -274,7 +281,7 @@ export default function ReservationConfirmation() {
                                 </div>
                             </div>
                             <div className="flex shrink-0 items-center gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                <span className={ICON_CIRCLE}>
                                     <SquareParking className="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <div>
@@ -285,7 +292,7 @@ export default function ReservationConfirmation() {
                         </div>
 
                         <div className="flex items-start gap-3 py-4">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                            <span className={ICON_CIRCLE}>
                                 <Car className="h-4 w-4" aria-hidden="true" />
                             </span>
                             <div className="min-w-0">
@@ -298,7 +305,7 @@ export default function ReservationConfirmation() {
 
                         <div className="flex flex-wrap items-start justify-between gap-3 py-4">
                             <div className="flex min-w-0 items-start gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                <span className={ICON_CIRCLE}>
                                     <LogIn className="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <div className="min-w-0">
@@ -311,7 +318,7 @@ export default function ReservationConfirmation() {
                                 </div>
                             </div>
                             <div className="flex shrink-0 items-start gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                <span className={ICON_CIRCLE}>
                                     <LogOut className="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <div className="min-w-0">
@@ -327,7 +334,7 @@ export default function ReservationConfirmation() {
 
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
                             <div className="flex min-w-0 items-center gap-3">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                                <span className={ICON_CIRCLE}>
                                     <Clock className="h-4 w-4" aria-hidden="true" />
                                 </span>
                                 <div>
@@ -341,7 +348,7 @@ export default function ReservationConfirmation() {
                                     href={mapUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                                    className={OUTLINE_BUTTON_SM}
                                 >
                                     <MapIcon className="h-3.5 w-3.5" aria-hidden="true" />
                                     Ver en el mapa
@@ -432,14 +439,14 @@ export default function ReservationConfirmation() {
                 <div className={`flex flex-col gap-3 sm:flex-row ${canPay ? '' : 'lg:col-span-2'}`}>
                     <Link
                         to="/reservations"
-                        className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1"
+                        className={OUTLINE_ACTION}
                     >
                         <CalendarCheck className="h-4 w-4" aria-hidden="true" />
                         Ver mis reservas
                     </Link>
                     <Link
                         to="/zones"
-                        className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1"
+                        className={OUTLINE_ACTION}
                     >
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         Hacer otra reserva
