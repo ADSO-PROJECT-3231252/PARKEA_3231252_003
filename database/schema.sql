@@ -1,5 +1,9 @@
 -- PARKEA (SIGMUI) — Official database schema
--- Mirrors the Sequelize migrations in backend/src/migrations
+-- Mirrors the Sequelize migrations in backend/src/migrations (19 migrations,
+-- up to 20260925022623-allow-plate-reuse-after-delete). The application's
+-- database is created with those migrations and seeders (see README); this
+-- file is the readable reference of the same design. The CHECK constraints
+-- below document rules that the backend also validates.
 
 CREATE DATABASE IF NOT EXISTS parkea_db;
 USE parkea_db;
@@ -32,10 +36,13 @@ CREATE TABLE users (
 -- Relation: users (1) - (N) vehicles
 -- Soft delete: deleted_at is set instead of removing the row, so the booking
 -- history keeps showing the correct plate
+-- plate_active is NULL for deleted vehicles and MySQL allows several NULLs in
+-- a unique index, so a plate is unique only among vehicles that are not
+-- deleted: the plate of a deleted vehicle can be registered again (HU-10, AC-04)
 CREATE TABLE vehicles (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     user_id VARCHAR(36) NOT NULL,
-    plate VARCHAR(20) NOT NULL UNIQUE,
+    plate VARCHAR(20) NOT NULL,
     vehicle_type ENUM('car', 'motorcycle', 'truck') NOT NULL DEFAULT 'car',
     brand VARCHAR(50),
     model VARCHAR(50),
@@ -43,6 +50,10 @@ CREATE TABLE vehicles (
     visual_description VARCHAR(255),
     is_default BOOLEAN NOT NULL DEFAULT FALSE,
     deleted_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    plate_active VARCHAR(20)
+        GENERATED ALWAYS AS (IF(deleted_at IS NULL, plate, NULL)) STORED,
+    UNIQUE KEY vehicles_plate_active_unique (plate_active),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -106,12 +117,13 @@ CREATE TABLE reservations (
     CONSTRAINT reservations_vehicle_id_fk FOREIGN KEY (vehicle_id)
         REFERENCES vehicles(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT reservations_parking_spot_id_fk FOREIGN KEY (parking_spot_id)
-        REFERENCES parking_spots(id) ON DELETE RESTRICT ON UPDATE CASCADE
+        REFERENCES parking_spots(id) ON DELETE RESTRICT
 );
 
 -- 7. Table: payments
 -- Relation: reservations (1) - (1) payments (enforced with UNIQUE)
 -- The full card number is never stored, only the last four digits
+-- RESTRICT keeps a reservation from being deleted while it has a payment
 CREATE TABLE payments (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     reservation_id VARCHAR(36) NOT NULL UNIQUE,
@@ -122,7 +134,7 @@ CREATE TABLE payments (
     card_last_four VARCHAR(4),
     paid_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE CASCADE
+    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE RESTRICT
 );
 
 -- 8. Table: password_reset_tokens
@@ -136,4 +148,20 @@ CREATE TABLE password_reset_tokens (
     used_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 9. Table: admin_action_logs
+-- Relation: users (1) - (N) admin_action_logs, twice (admin and target)
+-- Audit trail of role and account-status changes made by administrators
+-- (HU-23, AC-14). RESTRICT keeps the trail even if an account is removed
+CREATE TABLE admin_action_logs (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    admin_id VARCHAR(36) NOT NULL,
+    target_user_id VARCHAR(36) NOT NULL,
+    action ENUM('role_changed', 'status_changed') NOT NULL,
+    details VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX admin_action_logs_created_at_idx (created_at),
+    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE RESTRICT,
+    FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE RESTRICT
 );
