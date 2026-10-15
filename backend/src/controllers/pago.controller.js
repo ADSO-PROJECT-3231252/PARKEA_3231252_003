@@ -31,7 +31,7 @@ const crearPago = async (req, res) => {
       return res.status(403).json({ code: ErrorCodes.RESERVATION_NOT_OWNED, message: 'This reservation does not belong to you' });
     }
     // The expiration job only runs every 60 s, so a reservation can still say
-    // Pending for a few seconds after its hold deadline. The deadline itself is
+    // Pending for up to a minute after its hold deadline. The deadline itself is
     // what decides whether it can still be paid (HU-26, AC-06).
     const holdVencido = reserva.status === 'Pending'
       && reserva.holdExpiresAt
