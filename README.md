@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🅿️ PARKEA
+#  PARKEA
 
 ### *Smart Urban Parking Reservation System*
 
@@ -10,37 +10,37 @@
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
-- [🎯 Project Description](#-project-description)
-- [👥 Development Team](#-development-team)
-- [🛠️ Tech Stack](#️-tech-stack)
-- [📁 Repository Structure](#-repository-structure)
-- [🌿 Project Branches](#-project-branches)
-- [🚀 Installation and Setup](#-installation-and-setup)
+- [ Project Description](#-project-description)
+- [ Development Team](#-development-team)
+- [ Tech Stack](#️-tech-stack)
+- [ Repository Structure](#-repository-structure)
+- [ Project Branches](#-project-branches)
+- [ Installation and Setup](#-installation-and-setup)
   - [Prerequisites](#prerequisites)
   - [Database](#database)
   - [Backend](#backend-1)
   - [Frontend](#frontend-1)
-- [⚙️ Environment Variables](#️-environment-variables)
-- [📜 Available Scripts](#-available-scripts)
-- [🎨 PARKEA Color Palette](#-parkea-color-palette)
-- [📋 User Stories](#-user-stories)
-- [🔐 Code Conventions](#-code-conventions)
-- [📊 Current Project Status](#-current-project-status)
-- [📄 License](#-license-1)
+- [ Environment Variables](#️-environment-variables)
+- [ Available Scripts](#-available-scripts)
+- [ PARKEA Color Palette](#-parkea-color-palette)
+- [ User Stories](#-user-stories)
+- [ Code Conventions](#-code-conventions)
+- [ Current Project Status](#-current-project-status)
+- [ License](#-license-1)
 
 ---
 
-## 🎯 Project Description
+##  Project Description
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
-- 🔍 Explore available parking zones in their city
-- 📅 Reserve a spot in advance to guarantee their space
-- 💳 Make secure simulated payments
-- 🚗 Manage their registered vehicles
-- 📊 Administrators: manage zones, users, and view real-time metrics
+-  Explore available parking zones in their city
+-  Reserve a spot in advance to guarantee their space
+-  Make secure simulated payments
+-  Manage their registered vehicles
+-  Administrators: manage zones, users, and view real-time metrics
 
 The system is designed under a **MERN-like** architecture (React + Node.js + MySQL) with clear separation between frontend, backend, and persistence layer.
 
@@ -50,7 +50,7 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 
 ---
 
-## 👥 Development Team
+## Development Team
 
 | Name | Role | GitHub | Main Branch |
 |------|------|--------|-------------|
@@ -62,31 +62,38 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
+
+Versions are the ranges declared in each `package.json`.
 
 ### Frontend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| React | ^19.2.7 | UI Library |
-| Vite | 8.1.1 | Bundler and dev server |
-| Tailwind CSS | 4.3.3 | Utility-first CSS framework |
-| React Router DOM | 7.18.1 | SPA routing |
-| Axios | 1.18.1 | HTTP client for REST API |
+| React + React DOM | ^19.2.7 | UI library |
+| Vite | ^8.1.1 | Bundler and dev server |
+| Tailwind CSS (+ `@tailwindcss/vite`) | ^4.3.3 | Utility-first CSS, theme tokens via `@theme` |
+| React Router DOM | ^7.18.1 | SPA routing |
+| Axios | ^1.18.1 | HTTP client for the REST API |
+| lucide-react | ^1.33.0 | Icons |
+| Recharts | ^3.10.1 | Charts in the admin dashboard |
 
 ### Backend
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| Node.js | 24.15.0 | JavaScript runtime |
-| Express | 5.2.1 | Web framework |
-| Sequelize | 6.37.8 | MySQL ORM |
-| MySQL2 | 3.23.1 | Database driver |
-| JSON Web Token | 9.0.3 | Stateless authentication |
-| bcrypt | 6.0.0 | Password hashing |
-| express-validator | 7.3.2 | Request validation |
-| Helmet | 8.3.0 | HTTP security |
-| CORS | 2.8.6 | Cross-origin policy |
-| Nodemailer | 6.x | Email sending (Mailtrap) |
-| UUID | 11.x | Unique identifiers |
+| Node.js | 24.15.0 | JavaScript runtime (version used by the team) |
+| Express | ^5.2.1 | Web framework |
+| Sequelize | ^6.37.8 | MySQL ORM |
+| sequelize-cli | ^6.6.5 | Migrations and seeders (dev dependency) |
+| mysql2 | ^3.23.1 | Database driver |
+| jsonwebtoken | ^9.0.3 | Stateless authentication (JWT) |
+| bcrypt | ^6.0.0 | Password hashing |
+| express-validator | ^7.3.2 | Request validation |
+| Helmet | ^8.3.0 | HTTP security headers |
+| CORS | ^2.8.6 | Cross-origin policy |
+| dotenv | ^17.4.2 | Loads the `.env` file |
+| Nodemailer | ^9.0.5 | Password recovery emails (Mailtrap) |
+| UUID | ^14.0.1 | Unique identifiers |
+| nodemon | ^3.1.14 | Auto-reload in development (dev dependency) |
 
 ### Database
 | Technology | Version | Purpose |
@@ -96,14 +103,14 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 ### Development Tools
 | Tool | Use |
 |------|-----|
-| Git + GitHub | Version control and collaboration |
+| Git + GitHub | Version control, pull requests and the GitHub Projects board |
 | Postman | Manual API testing |
 | VS Code | Primary IDE |
-| ESLint | JavaScript linter |
+| ESLint | JavaScript linter (frontend, ^10.6.0) |
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 PARKEA_3231252_003/
 │
@@ -153,7 +160,7 @@ PARKEA_3231252_003/
 
 ---
 
-## 🌿 Project Branches
+## Project Branches
 
 | Branch | Purpose | Members | Status |
 |--------|---------|---------|--------|
@@ -175,7 +182,7 @@ PARKEA_3231252_003/
 
 ---
 
-## 🚀 Installation and Setup
+## Installation and Setup
 
 ### Prerequisites
 
@@ -237,7 +244,7 @@ npm run dev
 
 ---
 
-## ⚙️ Environment Variables
+## Environment Variables
 
 ### Backend (`backend/.env`)
 
@@ -272,7 +279,7 @@ VITE_API_URL=http://localhost:3000/api
 
 ---
 
-## 📜 Available Scripts
+## Available Scripts
 
 ### Backend
 | Script | Command | Description |
@@ -291,7 +298,7 @@ VITE_API_URL=http://localhost:3000/api
 
 ---
 
-## 🎨 PARKEA Color Palette
+## PARKEA Color Palette
 
 Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variables.
 
@@ -342,7 +349,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 
 ---
 
-## 📋 User Stories
+## User Stories
 
 | ID | Name | Author | Backend | Frontend |
 |----|------|--------|---------|----------|
@@ -381,7 +388,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 
 ---
 
-## 🔐 Code Conventions
+## Code Conventions
 
 ### Backend
 - **Naming language (official team decision):** domain/business names — files, models, and controller functions that represent a business entity or action (e.g. `Usuario`, `Zona`, `vehiculo.controller.js`, `cambiarRol`) — stay in **Spanish**, since they reflect the data model vocabulary already defined in the SRS. Everything else (internal variable names, code comments, log/error messages) is in **English**.
@@ -406,7 +413,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 
 ---
 
-## 📊 Current Project Status
+## Current Project Status
 
 | Area | Progress | Status |
 |------|----------|--------|
@@ -429,7 +436,7 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 
 ---
 
-## 📄 License
+## License
 
 This project is developed for educational purposes within the **Software Analysis and Development (ADSO)** program at **SENA**.
 
