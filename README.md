@@ -27,18 +27,18 @@
 - [ PARKEA Color Palette](#-parkea-color-palette)
 - [ User Stories](#-user-stories)
 - [ Code Conventions](#-code-conventions)
-- [ Current Project Status](#-current-project-status)
-- [ License](#-license-1)
+- [ Project Management and Status](#-project-management-and-status)
+- [ License](#-license)
 
 ---
 
-##  Project Description
+## Project Description
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
 -  Explore available parking zones in their city
 -  Reserve a spot in advance to guarantee their space
--  Make secure simulated payments
+-  Make simulated payments (no real money is charged)
 -  Manage their registered vehicles
 -  Administrators: manage zones, users, and view real-time metrics
 
@@ -500,26 +500,37 @@ Each user story is an issue with its acceptance criteria, traceability and Defin
 
 ---
 
-## Current Project Status
+## Project Management and Status
 
-| Area | Progress | Status |
-|------|----------|--------|
-| **Database** | 100% | ✅ Complete |
-| **Backend API** | ~85% | 🟢 Advanced |
-| **Frontend** | ~25% | 🟡 Initial development |
-| **Documentation** | ~40% | 🟡 In progress |
-| **Testing** | 0% | 🔴 Not started |
-| **Deployment** | 0% | 🔴 Not started |
+### Scrum on GitHub Projects
+
+The work is managed with Scrum on the **PARKEA - Sprint Board** (Projects tab of the repository):
+
+- **Columns:** Backlog → To Do → In Progress → In Review (PR) → Done
+- **Item types:** User Story, Technical Task and Audit Finding, with Sprint, Priority (Must / Should / Could) and Points
+- **Definition of Done:** meets the acceptance criteria · PR reviewed and approved by another member · validates input and handles errors · no credentials in the repository · README updated
+
+### Sprints and Key Dates
+
+| Period | Dates | Notes |
+|--------|-------|-------|
+| Sprint 1 | Oct 13 – Oct 26, 2026 | Sprint review on Oct 27 |
+| Sprint 2 | Oct 27 – Nov 9, 2026 | Audit 2 on Nov 10 |
+| Sprint 3 | Nov 10 – Nov 23, 2026 | |
+| Feature freeze | Nov 24, 2026 | From this date only fixes: no new views or features |
+| Final demo | Dec 1, 2026 | Demo and individual presentation |
+
+**Sprint 1 goal:** finish the reservation confirmation, the simulated payment, zone management and creation, user management and the zones map, and close the pending fixes of the stories already delivered.
 
 ### Identified Pending Work
 
 | Task | Priority | Notes |
 |------|----------|-------|
-| Frontend view development | High | Backend is ready to consume |
-| Automated testing (unit + integration) | High | Everything manually verified in Postman |
+| Integrate `backend` and `frontend` into `develop` | High | Rehearsal on Oct 22–23 and tag `v0.1` before Oct 26; then at the end of every sprint |
+| Automated testing (unit + integration) | High | Planned with Jest; today everything is verified manually and with Postman |
 | Performance measurement | Medium | SRS requires < 3s with 50 concurrent users |
-| API documentation (Swagger/OpenAPI) | Medium | No interactive documentation exists |
-| Server/cloud deployment | Low | Pending for final phase |
+| API documentation (Swagger/OpenAPI) | Medium | The endpoint table above is the current reference |
+| Server/cloud deployment | Low | Pending for the final phase |
 
 ---
 
