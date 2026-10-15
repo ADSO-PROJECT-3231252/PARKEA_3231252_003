@@ -134,6 +134,28 @@ export default function Profile() {
 
         setSaving(true);
 
+        // AC-07: the password goes first. If it is rejected (e.g. the current
+        // password is wrong), the profile is not saved either, so a failed
+        // attempt never leaves the account half-updated.
+        if (passwordTouched) {
+            try {
+                await changePassword(pwForm);
+                setPwSuccess('Contraseña actualizada correctamente.');
+                setPwForm(EMPTY_PASSWORD_FORM);
+            } catch (err) {
+                const code = err.response?.data?.code;
+                if (code === 'CURRENT_PASSWORD_INCORRECT') {
+                    setPwErrors((prev) => ({ ...prev, currentPassword: translateError(code) }));
+                } else if (code === 'PASSWORD_UNCHANGED') {
+                    setPwErrors((prev) => ({ ...prev, newPassword: translateError(code) }));
+                } else {
+                    setPwServerError(translateError(code));
+                }
+                setSaving(false);
+                return;
+            }
+        }
+
         if (profileChanged) {
             try {
                 // Only the field(s) that changed go in the request — sending an
@@ -149,23 +171,6 @@ export default function Profile() {
                 setProfileSuccess('Perfil actualizado correctamente.');
             } catch (err) {
                 setProfileServerError(translateError(err.response?.data?.code));
-            }
-        }
-
-        if (passwordTouched) {
-            try {
-                await changePassword(pwForm);
-                setPwSuccess('Contraseña actualizada correctamente.');
-                setPwForm(EMPTY_PASSWORD_FORM);
-            } catch (err) {
-                const code = err.response?.data?.code;
-                if (code === 'CURRENT_PASSWORD_INCORRECT') {
-                    setPwErrors((prev) => ({ ...prev, currentPassword: translateError(code) }));
-                } else if (code === 'PASSWORD_UNCHANGED') {
-                    setPwErrors((prev) => ({ ...prev, newPassword: translateError(code) }));
-                } else {
-                    setPwServerError(translateError(code));
-                }
             }
         }
 
@@ -290,7 +295,7 @@ export default function Profile() {
 
                             <div>
                                 <p className="text-label text-neutral-700 mb-1">Correo electrónico</p>
-                                <p className="text-body text-neutral-600 bg-neutral-100 rounded-md px-3 py-2">
+                                <p className="text-body text-neutral-600 bg-neutral-100 rounded-md px-3 py-2 wrap-anywhere">
                                     {profile?.email}
                                 </p>
                             </div>
@@ -307,7 +312,7 @@ export default function Profile() {
                                 </p>
                             </div>
 
-                            <p className="flex items-start gap-1.5 text-caption text-neutral-500">
+                            <p className="flex items-start gap-1.5 text-caption text-neutral-600">
                                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 Por seguridad, esta información no se puede editar.
                             </p>
