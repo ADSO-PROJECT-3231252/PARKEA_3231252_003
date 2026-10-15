@@ -1,6 +1,6 @@
 <div align="center">
 
-#  PARKEA
+# PARKEA
 
 ### *Smart Urban Parking Reservation System*
 
@@ -10,7 +10,7 @@
 
 ---
 
-## Table of Contents
+##  Table of Contents
 
 - [ Project Description](#-project-description)
 - [ Development Team](#-development-team)
@@ -32,15 +32,15 @@
 
 ---
 
-##  Project Description
+## Project Description
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
--  Explore available parking zones in their city
--  Reserve a spot in advance to guarantee their space
--  Make secure simulated payments
--  Manage their registered vehicles
--  Administrators: manage zones, users, and view real-time metrics
+- 🔍 Explore available parking zones in their city
+- 📅 Reserve a spot in advance to guarantee their space
+- 💳 Make secure simulated payments
+- 🚗 Manage their registered vehicles
+- 📊 Administrators: manage zones, users, and view real-time metrics
 
 The system is designed under a **MERN-like** architecture (React + Node.js + MySQL) with clear separation between frontend, backend, and persistence layer.
 
@@ -112,51 +112,56 @@ Versions are the ranges declared in each `package.json`.
 
 ## Repository Structure
 
+```text
 PARKEA_3231252_003/
 │
 ├── 📁 backend/
-│ ├── src/
-│ │ ├── app.js # Express config (middlewares, routes)
-│ │ ├── server.js # Entry point (sync DB + jobs + listen)
-│ │ ├── 📁 config/ # Sequelize + MySQL config
-│ │ ├── 📁 constants/ # Centralized error codes
-│ │ ├── 📁 controllers/ # Business logic (one per HU module)
-│ │ ├── 📁 jobs/ # Background jobs (expiration, finalization)
-│ │ ├── 📁 middlewares/ # Auth, error handling, and express-validator rules (*.validator.js)
-│ │ ├── 📁 models/ # Sequelize models (9 tables)
-│ │ └── 📁 routes/ # API route definitions
-│ ├── package.json
-│ ├── .env.example
-│ └── README.md
+│   ├── src/
+│   │   ├── app.js            # Express config (middlewares, routes, error handler)
+│   │   ├── server.js         # Entry point (checks the DB connection, starts the jobs, listens)
+│   │   ├── 📁 config/        # Sequelize config (reads DATABASE_URL)
+│   │   ├── 📁 constants/     # Centralized error codes (errorCodes.js)
+│   │   ├── 📁 controllers/   # Business logic (one per module)
+│   │   ├── 📁 jobs/          # Background jobs (reservation expiration and finalization)
+│   │   ├── 📁 middlewares/   # Auth and express-validator rules (*.validator.js)
+│   │   ├── 📁 migrations/    # 19 Sequelize migrations: they create the database
+│   │   ├── 📁 models/        # Sequelize models (9 tables)
+│   │   ├── 📁 routes/        # API route definitions
+│   │   ├── 📁 seeders/       # Demo data: roles, zones and the primary administrator
+│   │   └── 📁 utils/         # Helpers (mailer)
+│   ├── .env.example
+│   ├── .sequelizerc          # Paths used by sequelize-cli
+│   └── package.json
 │
 ├── 📁 frontend/
-│ ├── src/
-│ │ ├── main.jsx # React entry point
-│ │ ├── App.jsx # Router + AuthProvider
-│ │ ├── 📁 assets/ # Images, logos, illustrations
-│ │ ├── 📁 components/ # Reusable UI components
-│ │ ├── 📁 context/ # Global state (AuthContext)
-│ │ ├── 📁 hooks/ # Custom React hooks
-│ │ ├── 📁 pages/ # Route-based views
-│ │ ├── 📁 routes/ # Route definitions
-│ │ ├── 📁 services/ # API calls (Axios)
-│ │ ├── 📁 utils/ # Helpers and validators
-│ │ └── index.css # Tailwind CSS + PARKEA theme (design tokens via @theme)
-│ ├── package.json
-│ ├── vite.config.js
-│ ├── .env.example
-│ └── index.html
+│   ├── public/
+│   ├── src/
+│   │   ├── main.jsx          # React entry point
+│   │   ├── App.jsx           # Router + AuthProvider
+│   │   ├── index.css         # Tailwind CSS + PARKEA theme (design tokens via @theme)
+│   │   ├── 📁 assets/        # Images, logos, illustrations
+│   │   ├── 📁 components/    # Shared UI (Header, Layout, ConfirmDialog, FieldRow, MetricCard)
+│   │   ├── 📁 context/       # Global state (AuthContext)
+│   │   ├── 📁 hooks/         # Custom React hooks (useAuth)
+│   │   ├── 📁 pages/         # Route-based views
+│   │   ├── 📁 routes/        # Route definitions and ProtectedRoute
+│   │   ├── 📁 services/      # API calls (Axios)
+│   │   └── 📁 utils/         # Helpers: format, validators, error messages, statuses
+│   ├── .env.example
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
 │
 ├── 📁 database/
-│ └── schema.sql # Complete DDL script (9 tables)
+│   ├── schema.sql            # Readable reference of the database design (9 tables)
+│   └── README.md
 │
 ├── 📁 docs/
-│ ├── SRS.md # Software Requirements Specification
-│ └── mockups/ # UI designs
+│   └── README.md             # Technical manual and accessibility report (to be added)
 │
-├── .gitignore
-├── README.md # ← This document
-└── LICENSE
+└── README.md                 # ← This document
+```
 
 ---
 
