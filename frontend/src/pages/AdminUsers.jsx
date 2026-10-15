@@ -195,6 +195,11 @@ export default function AdminUsers() {
         setReloadKey((k) => k + 1);
     };
 
+    const handleLogsRetry = () => {
+        setLogsLoading(true);
+        setLogsReloadKey((k) => k + 1);
+    };
+
     const hasActiveFilters = Boolean(search || role || status);
 
     // AC-08 / AC-10: the signed-in admin and the primary admin can't be changed.
@@ -641,10 +646,19 @@ export default function AdminUsers() {
                 <div className="mt-4 divide-y divide-neutral-100">
                     {logsLoading && <p className="text-body text-neutral-600">Cargando actividad…</p>}
                     {!logsLoading && logsError && (
-                        <p role="alert" className="flex items-center gap-2 text-body text-danger">
-                            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                            No pudimos cargar el historial de cambios.
-                        </p>
+                        <div role="alert" className="flex flex-col items-start gap-3">
+                            <p className="flex items-center gap-2 text-body text-danger">
+                                <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                No pudimos cargar el historial de cambios.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleLogsRetry}
+                                className="rounded-md border border-danger px-3 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft"
+                            >
+                                Reintentar
+                            </button>
+                        </div>
                     )}
                     {!logsLoading && !logsError && logs.length === 0 && (
                         <p className="text-body text-neutral-600">Aún no hay cambios registrados.</p>
