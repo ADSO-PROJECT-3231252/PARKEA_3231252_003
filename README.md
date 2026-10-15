@@ -32,7 +32,7 @@
 
 ---
 
-## Project Description
+##  Project Description
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
@@ -402,12 +402,33 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 | `neutral-800` | `#272C2A` | Headings |
 | `neutral-900` | `#161A18` | Maximum contrast text |
 
+### Other Colors
+| Token | Hex | Use |
+|-------|-----|-----|
+| `gold-500` | `#F5C518` | Default vehicle star |
+| `flag-yellow` | `#FCD116` | Colombian plate stripe |
+| `flag-blue` | `#003893` | Colombian plate stripe |
+| `flag-red` | `#CE1126` | Colombian plate stripe |
+
+> A color that is not in this palette is added as a new token in `@theme`, never as a loose value.
+
 ### Typography
 | Token | Family | Use |
 |-------|--------|-----|
 | `font-display` | Barlow Condensed | Headings |
 | `font-sans` | Barlow | Body text |
 | `font-mono` | IBM Plex Mono | Code, IDs, plates, amounts |
+
+| Text size | Size | Use |
+|-----------|------|-----|
+| `text-display` | 34px / 600 | Page titles |
+| `text-title` | 24px / 600 | Section titles |
+| `text-subtitle` | 18px / 600 | Subtitles |
+| `text-body` | 15px / 400 | Body text |
+| `text-label` | 13.5px / 500 | Labels and buttons |
+| `text-caption` | 12.5px / 400 | Helper text |
+
+Radii: `rounded-sm` 6px, `rounded-md` 10px, `rounded-lg` 12px. Spacing uses multiples of 4.
 
 ---
 
@@ -450,24 +471,32 @@ Each user story is an issue with its acceptance criteria, traceability and Defin
 
 ### Backend
 - **Naming language (official team decision):** domain/business names — files, models, and controller functions that represent a business entity or action (e.g. `Usuario`, `Zona`, `vehiculo.controller.js`, `cambiarRol`) — stay in **Spanish**, since they reflect the data model vocabulary already defined in the SRS. Everything else (internal variable names, code comments, log/error messages) is in **English**.
-- **Error codes:** English uppercase with underscores in `constants/errorCodes.js`
+- **Errors:** every error response is `{ code, message }`; the codes are English uppercase with underscores in `constants/errorCodes.js`
 - **Models:** PascalCase singular (e.g., `Usuario`, `Vehiculo`)
 - **Tables:** Plural snake_case in DB (e.g., `users`, `parking_spots`)
-- **Controllers:** async/await with try/catch, errors passed to `next(error)`
+- **Database changes:** always through a new migration in `src/migrations`
+- **Deleted records:** soft delete (`deleted_at`), never removed from the database
+- **Controllers:** async/await with try/catch
 - **Validation:** express-validator rules in separate `*.validator.js` files inside `middlewares/`
 
 ### Frontend
-- **Language:** Spanish for UI text, English for code
+- **Language:** Spanish for UI text, English for code and code comments
 - **Routes (official team decision):** English (e.g. `/login`, `/forgot-password`, `/admin/login`)
+- **Error messages:** always `translateError(code)` from `utils/errorMessages.js`; never compare or show the backend `message`
+- **Icons:** lucide-react with Tailwind classes (`className="h-4 w-4"`), never the `size`/`color` props; decorative icons get `aria-hidden="true"`
+- **Colors:** only the theme tokens; secondary text uses `neutral-600` (`neutral-500` fails contrast)
+- **Shared code:** reuse `utils/` (format, validators) and `components/` (ConfirmDialog, FieldRow) instead of copying them
+- **Accessibility:** WCAG 2.1 AA — keyboard access, visible focus, and status messages announced to screen readers
 - **Components:** PascalCase (e.g., `Login.jsx`)
 - **Hooks:** camelCase with `use` prefix (e.g., `useAuth`)
 - **Services:** camelCase (e.g., `authService.js`)
 - **Styles:** Tailwind CSS utilities, PARKEA theme in `index.css`
 
 ### Git
-- Descriptive commits in English or Spanish
-- One branch per member: `{name}_{area}`
-- Mandatory PR to the area branch (`backend`/`frontend`) before merging to `develop`
+- **Branches:** one per member and area: `{name}_backend`, `{name}_frontend`
+- **Commits:** in English, small (one step or file each), with a prefix: `feat:`, `fix:`, `refactor:` or `docs:`
+- **Pull requests:** title and description in English, to the area branch (`backend`/`frontend`), approved by another member before merging
+- **Linking:** each PR is linked to its issue from the **Development** panel and says `Part of #<issue>` (`Closes` does not work because PRs do not target `main`)
 
 ---
 
