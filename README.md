@@ -51,13 +51,15 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 
 ## Development Team
 
-| Name | Role | GitHub | Main Branch |
-|------|------|--------|-------------|
-| **Michael Isaza** | Scrum Master / Tech Lead | [@MichaelIsaza](https://github.com/MichaelIsaza) | `isaza_backend`, `isaza_frontend` |
-| **Jhoan Marín** | Full Stack Developer | [@jhoanmarin227](https://github.com/jhoanmarin227) | `marin_backend`, `marin_frontend` |
-| **Stiven Sánchez** | Backend Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend` |
-| **David León** | Frontend Developer / DBA | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_sql` |
-| **Jhoan Almario** | Analyst / Backend | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
+| Name | Scrum role | GitHub | Branches |
+|------|------------|--------|----------|
+| **Michael Isaza** | Product Owner · Developer | [@MichaelIsaza](https://github.com/MichaelIsaza) | `isaza_backend`, `isaza_frontend` |
+| **Jhoan Marín** | Scrum Master (Sprint 1) · Developer | [@jhoanmarin227](https://github.com/jhoanmarin227) | `marin_backend`, `marin_frontend` |
+| **Stiven Sánchez** | Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend`, `stiven_frontend` |
+| **David León** | Developer | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_frontend`, `leon_sql` |
+| **Jhoan Almario** | Developer | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
+
+> The Product Owner is the same for the whole project. The Scrum Master rotates every sprint.
 
 ---
 
@@ -166,23 +168,17 @@ PARKEA_3231252_003/
 
 ## Project Branches
 
-| Branch | Purpose | Members | Status |
-|--------|---------|---------|--------|
-| `main` | Stable production code | — | ⚪ Initial README only |
-| `develop` | Continuous integration | Michael (merge) | 🟢 Active |
-| `backend` | Consolidated backend dev | Michael | 🟢 Most advanced |
-| `frontend` | Consolidated frontend dev | Various | 🟡 In progress |
-| `isaza_backend` | Michael's individual work | @MichaelIsaza | 🟢 Active |
-| `isaza_frontend` | Michael's individual work | @MichaelIsaza | 🟡 Active |
-| `stiven_backend` | Stiven's individual work | @Stiven5-ctrl | 🟢 Active |
-| `marin_backend` | Jhoan M.'s individual work | @jhoanmarin227 | 🟢 Active |
-| `marin_frontend` | Jhoan M.'s individual work | @jhoanmarin227 | 🟡 Active |
-| `leon_backend` | David's individual work | @David-Leon1089 | 🟢 Active |
-| `leon_sql` | Database design | @David-Leon1089 | ✅ Complete |
-| `almario_backend` | Almario's individual work | @centinel117 | 🟢 Active |
-| `almario_frontend` | Almario's individual work | @centinel117 | 🔴 Inactive |
+| Branch | Purpose |
+|--------|---------|
+| `main` | Stable releases |
+| `develop` | Integration of backend and frontend; README and `database/schema.sql` go here directly |
+| `backend` | Integrated backend work |
+| `frontend` | Integrated frontend work |
+| `{name}_backend` / `{name}_frontend` | Each member's personal work (see the team table) |
+| `leon_sql` | Original database design |
+| Short-lived branches (e.g. `readme-update`) | Changes that go straight to `develop` |
 
-**Workflow:** Simplified Git Flow. Each member works on their personal branch, makes PR to their area branch (`backend` or `frontend`), and those merge to `develop`. Files not tied to one area (README, `database/schema.sql`) PR directly to `develop`. `develop` merges to `main` only on stable releases.
+**Workflow:** Simplified Git Flow. Each member works on their personal branch and opens a PR to their area branch (`backend` or `frontend`), which needs one approval from another member. The area branches are integrated into `develop` at the end of each sprint. Files not tied to one area (README, `database/schema.sql`) go to `develop` through their own PR. `develop` merges to `main` only for stable releases.
 
 ---
 
@@ -386,40 +382,36 @@ Colors are defined in `frontend/src/index.css` as Tailwind v4 custom CSS variabl
 
 ## User Stories
 
-| ID | Name | Author | Backend | Frontend |
-|----|------|--------|---------|----------|
-| HU-01 | User Registration | @Stiven5-ctrl | ✅ | ✅ |
-| HU-02 | Public Homepage | @Stiven5-ctrl | N/A | 🟡 |
-| HU-03 | Authenticated Homepage | @Stiven5-ctrl | N/A | 🟡 |
-| HU-04 | Administrator Homepage | @Stiven5-ctrl | N/A | 🔴 |
-| HU-05 | User Login | @centinel117 | ✅ | ✅ |
-| HU-06 | Administrator Login | @centinel117 | ✅ | 🔴 |
-| HU-07 | Password Recovery | @centinel117 | ✅ | 🔴 |
-| HU-08 | Profile Management | @jhoanmarin227 | ✅ | 🟡 |
-| HU-09 | Browse Available Zones | @jhoanmarin227 | ✅ | 🟡 |
-| HU-10 | Register Vehicle | @MichaelIsaza | ✅ | 🔴 |
-| HU-11 | View My Vehicles | @MichaelIsaza | ✅ | 🔴 |
-| HU-12 | Edit Vehicle | @MichaelIsaza | ✅ | 🔴 |
-| HU-13 | Delete Vehicle | @MichaelIsaza | ✅ | 🔴 |
-| HU-14 | Reserve a Spot | @MichaelIsaza | ✅ | 🔴 |
-| HU-15 | Reservation Confirmation | @MichaelIsaza | ✅ | 🔴 |
-| HU-16 | Cancel Reservation | @jhoanmarin227 | ✅ | 🔴 |
-| HU-17 | Simulated Payment | @centinel117 | ✅ | 🔴 |
-| HU-18 | Booking History | @Stiven5-ctrl | ✅ | 🔴 |
-| HU-19 | Zone Management (admin) | @Stiven5-ctrl | ✅ | 🔴 |
-| HU-20 | Create Zone | @Stiven5-ctrl | ✅ | 🔴 |
-| HU-21 | Edit Zone | @Stiven5-ctrl | ✅ | 🔴 |
-| HU-22 | Admin Dashboard | @David-Leon1089 | ✅ | 🔴 |
-| HU-23 | User Management (admin) | @David-Leon1089 | ✅ | 🔴 |
-| HU-24 | Sign Out | @centinel117 | N/A | 🟡 |
-| HU-25 | View Zones on Map | @jhoanmarin227 | N/A | 🔴 |
-| HU-26 | Reservation Expiration | @MichaelIsaza | ✅ | N/A |
+Each user story is an issue with its acceptance criteria, traceability and Definition of Done. Its current status and its pull requests are on the issue and on the **PARKEA - Sprint Board** (Projects tab of the repository).
 
-**Legend:**
-- ✅ Implemented and verified
-- 🟡 In development / partial
-- 🔴 Not started
-- N/A Not applicable (automatic process, client-side only, or backend-only)
+| ID | Story | Responsible | Issue |
+|----|-------|-------------|-------|
+| HU-01 | User Registration | @jhoanmarin227 | [#136](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/136) |
+| HU-02 | View the PARKEA Homepage (Public) | @MichaelIsaza | [#137](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/137) |
+| HU-03 | Homepage — Authenticated User | @MichaelIsaza | [#138](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/138) |
+| HU-04 | Homepage — Administrator | @MichaelIsaza | [#139](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/139) |
+| HU-05 | User Login | @jhoanmarin227 | [#140](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/140) |
+| HU-06 | Administrator Login | @jhoanmarin227 | [#141](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/141) |
+| HU-07 | Password Recovery | @jhoanmarin227 | [#142](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/142) |
+| HU-08 | User Profile Management | @jhoanmarin227 | [#143](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/143) |
+| HU-09 | Browse Available Zones | @jhoanmarin227 | [#144](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/144) |
+| HU-10 | Register Vehicle | @MichaelIsaza | [#145](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/145) |
+| HU-11 | View My Registered Vehicles | @MichaelIsaza | [#146](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/146) |
+| HU-12 | Edit Vehicle Information | @centinel117 | [#147](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/147) |
+| HU-13 | Delete a Vehicle | @centinel117 | [#148](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/148) |
+| HU-14 | Reserve a Spot | @MichaelIsaza | [#149](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/149) |
+| HU-15 | View Reservation Confirmation | @MichaelIsaza | [#150](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/150) |
+| HU-16 | Cancel a Reservation | @jhoanmarin227 | [#151](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/151) |
+| HU-17 | Simulated Payment | @centinel117 | [#152](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/152) |
+| HU-18 | View Booking History | @Stiven5-ctrl | [#153](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/153) |
+| HU-19 | Parking Zone Management | @Stiven5-ctrl | [#154](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/154) |
+| HU-20 | Create Parking Zone | @Stiven5-ctrl | [#155](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/155) |
+| HU-21 | Edit Parking Zone | @Stiven5-ctrl | [#156](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/156) |
+| HU-22 | Administrative Dashboard | @David-Leon1089 | [#157](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/157) |
+| HU-23 | User Management | @David-Leon1089 | [#158](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/158) |
+| HU-24 | Sign Out | @MichaelIsaza | [#159](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/159) |
+| HU-25 | View Zones on Map | @jhoanmarin227 | [#160](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/160) |
+| HU-26 | Reservation Expiration | @MichaelIsaza | [#161](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/161) |
 
 ---
 
