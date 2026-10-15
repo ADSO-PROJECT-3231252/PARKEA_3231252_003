@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { Usuario } = require('../models');
+const { Usuario, Rol } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
 function verificarToken(req, res, next) {
@@ -15,17 +15,25 @@ function verificarToken(req, res, next) {
             return res.status(403).json({ code: ErrorCodes.INVALID_TOKEN, message: 'Invalid or expired token' });
         }
 
-        // The token itself can still be valid even if the account was
-        // deactivated after it was issued, check the current state on
-        // every request (HU-23, AC-11: session must end on the next
-        // interaction, not just when the token eventually expires)
-        const usuario = await Usuario.findByPk(payload.id, { attributes: ['isActive'] });
-        if (!usuario || !usuario.isActive) {
-            return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
-        }
+        try {
+            // The token itself can still be valid even if the account was
+            // deactivated or its role changed after it was issued, so the
+            // current state is read on every request (HU-23, AC-05 and AC-11)
+            const usuario = await Usuario.findByPk(payload.id, {
+                attributes: ['isActive'],
+                include: { model: Rol, as: 'role', attributes: ['name'] },
+            });
+            if (!usuario || !usuario.isActive) {
+                return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
+            }
 
-        req.usuario = payload;
-        next();
+            // verificarRol reads req.usuario.rol: use the role stored now, not the one in the token
+            req.usuario = { ...payload, rol: usuario.role.name };
+            next();
+        } catch (error) {
+            console.error('Error checking the session:', error);
+            return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Internal server error' });
+        }
     });
 }
 
