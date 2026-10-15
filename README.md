@@ -23,6 +23,7 @@
   - [Frontend](#frontend-1)
 - [ Environment Variables](#️-environment-variables)
 - [ Available Scripts](#-available-scripts)
+- [ API Endpoints](#-api-endpoints)
 - [ PARKEA Color Palette](#-parkea-color-palette)
 - [ User Stories](#-user-stories)
 - [ Code Conventions](#-code-conventions)
@@ -326,6 +327,36 @@ VITE_API_URL=http://localhost:3000/api
 | Build | `npm run build` | Production build |
 | Preview | `npm run preview` | Build preview |
 | Lint | `npm run lint` | ESLint |
+
+---
+
+## API Endpoints
+
+Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signed-in account. **Admin**: administrator role only. Protected routes expect the header `Authorization: Bearer <token>`.
+
+| Module | Method and route | Access | Story |
+|--------|------------------|--------|-------|
+| Health | `GET /health` | Public | — |
+| Auth | `POST /auth/register` | Public | HU-01 |
+| Auth | `POST /auth/login` | Public | HU-05 |
+| Auth | `POST /auth/login-admin` | Public | HU-06 |
+| Auth | `POST /auth/forgot-password`, `POST /auth/reset-password` | Public | HU-07 |
+| Profile | `GET /users/me`, `PUT /users/me`, `PUT /users/me/password` | User | HU-08 |
+| Vehicles | `POST /vehicles`, `GET /vehicles`, `GET /vehicles/:id` | User | HU-10, HU-11 |
+| Vehicles | `PUT /vehicles/:id`, `PATCH /vehicles/:id/default` | User | HU-11, HU-12 |
+| Vehicles | `DELETE /vehicles/:id` (soft delete) | User | HU-13 |
+| Zones | `GET /zones`, `GET /zones/:id` | Public | HU-09 |
+| Zones | `GET /zones/all`, `GET /zones/:id/spots` | Admin | HU-19 |
+| Zones | `POST /zones`, `PUT /zones/:id`, `PATCH /zones/:id/toggle` | Admin | HU-19, HU-20, HU-21 |
+| Reservations | `POST /reservations` | User | HU-14 |
+| Reservations | `GET /reservations` (paginated), `GET /reservations/:id` | User | HU-15, HU-18 |
+| Reservations | `PATCH /reservations/:id/cancel` | User | HU-16 |
+| Payments | `POST /payments/:reservationId` | User | HU-17 |
+| Dashboard | `GET /admin/dashboard` and `/admin/dashboard/{occupancy, payments-status, recent-payments, reservations-by-zone, alerts}` | Admin | HU-22 |
+| Users | `GET /admin/users`, `GET /admin/users/logs` | Admin | HU-23 |
+| Users | `PATCH /admin/users/:id/role`, `PATCH /admin/users/:id/status` | Admin | HU-23 |
+
+Errors always come back as `{ "code": "...", "message": "..." }`. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`.
 
 ---
 
