@@ -413,7 +413,7 @@ export default function ReservationConfirmation() {
                                 <p className="mt-0.5 text-caption text-warning">
                                     {isTimeUp
                                         ? 'Actualizando el estado de tu reserva…'
-                                        : 'Tienes 15 minutos para realizar el pago. Pasado este tiempo, el cupo se libera.'}
+                                        : 'Completa el pago antes de que el contador llegue a 00:00; si no, el cupo se libera.'}
                                 </p>
                             </div>
                             <span role="timer" className="shrink-0 rounded-md bg-white px-3 py-2 font-mono text-title text-warning">
