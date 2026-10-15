@@ -30,6 +30,8 @@ export default function Login() {
     });
     const [searchParams] = useSearchParams();
     const sessionExpired = searchParams.get('expired') === '1';
+    // HU-23 AC-11: set by api.js when the account was deactivated mid-session.
+    const accountDeactivated = searchParams.get('deactivated') === '1';
 
     useEffect(() => {
         if (!flash) return;
@@ -108,9 +110,11 @@ export default function Login() {
                             {flash}
                         </p>
                     )}
-                    {sessionExpired && !serverError && (
+                    {(sessionExpired || accountDeactivated) && !serverError && (
                         <p role="alert" className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 text-center">
-                            Tu sesión expiró. Inicia sesión de nuevo.
+                            {accountDeactivated
+                                ? translateError('ACCOUNT_DEACTIVATED')
+                                : 'Tu sesión expiró. Inicia sesión de nuevo.'}
                         </p>
                     )}
                     {serverError && (

@@ -29,7 +29,9 @@ api.interceptors.response.use(
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             if (window.location.pathname !== '/login') {
-                window.location.href = '/login?expired=1';
+                // HU-23 AC-11: a deactivated account is told why its session ended.
+                const reason = code === 'ACCOUNT_DEACTIVATED' ? 'deactivated' : 'expired';
+                window.location.href = `/login?${reason}=1`;
             }
         }
         return Promise.reject(error);
