@@ -1,0 +1,40 @@
+/* Leaflet styles that can't be reached with Tailwind classes (HU-25). */
+
+.zone-map.leaflet-container {
+    font: inherit;
+    background: var(--color-neutral-100);
+}
+
+/* Marker: no default white box from Leaflet's divIcon */
+.zone-marker-icon {
+    background: none;
+    border: none;
+}
+
+.zone-marker-icon:focus-visible {
+    outline: none;
+}
+
+.zone-marker-icon:focus-visible .zone-marker-pin {
+    box-shadow: 0 0 0 3px var(--color-white, #fff), 0 0 0 5px var(--color-parkea-600);
+}
+
+/* Teardrop pin: a square with three rounded corners, rotated so the sharp
+   corner points down. The icon inside is rotated back to stay upright. */
+.zone-marker-pin {
+    transform: rotate(-45deg);
+    border-radius: 50% 50% 50% 0;
+}
+
+.zone-marker-pin > svg {
+    transform: rotate(45deg);
+}
+
+.zone-map .leaflet-control-zoom a {
+    color: var(--color-neutral-900);
+}
+
+.zone-map .leaflet-control-zoom a:focus-visible {
+    outline: 2px solid var(--color-parkea-600);
+    outline-offset: 2px;
+}
