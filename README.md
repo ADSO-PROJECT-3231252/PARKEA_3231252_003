@@ -1,6 +1,6 @@
 <div align="center">
 
-# PARKEA
+# 🅿️ PARKEA
 
 ### *Smart Urban Parking Reservation System*
 
@@ -12,23 +12,23 @@
 
 ## Table of Contents
 
-- [ Project Description](#-project-description)
-- [ Development Team](#-development-team)
-- [ Tech Stack](#️-tech-stack)
-- [ Repository Structure](#-repository-structure)
-- [ Project Branches](#-project-branches)
-- [ Installation and Setup](#-installation-and-setup)
+- [Project Description](#project-description)
+- [Development Team](#development-team)
+- [Tech Stack](#tech-stack)
+- [Repository Structure](#repository-structure)
+- [Project Branches](#project-branches)
+- [Installation and Setup](#installation-and-setup)
   - [Prerequisites](#prerequisites)
   - [Backend and Database](#backend-and-database)
   - [Frontend](#frontend-1)
-- [ Environment Variables](#️-environment-variables)
-- [ Available Scripts](#-available-scripts)
-- [ API Endpoints](#-api-endpoints)
-- [ PARKEA Color Palette](#-parkea-color-palette)
-- [ User Stories](#-user-stories)
-- [ Code Conventions](#-code-conventions)
-- [ Project Management and Status](#-project-management-and-status)
-- [ License](#-license)
+- [Environment Variables](#environment-variables)
+- [Available Scripts](#available-scripts)
+- [API Endpoints](#api-endpoints)
+- [PARKEA Color Palette](#parkea-color-palette)
+- [User Stories](#user-stories)
+- [Code Conventions](#code-conventions)
+- [Project Management and Status](#project-management-and-status)
+- [License](#license)
 
 ---
 
@@ -36,11 +36,11 @@
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
--  Explore available parking zones in their city
--  Reserve a spot in advance to guarantee their space
--  Make simulated payments (no real money is charged)
--  Manage their registered vehicles
--  Administrators: manage zones, users, and view real-time metrics
+- Explore available parking zones in their city
+- Reserve a spot in advance to guarantee their space
+- Make simulated payments (no real money is charged)
+- Manage their registered vehicles
+- Administrators: manage zones, users, and view real-time metrics
 
 The system is designed under a **MERN-like** architecture (React + Node.js + MySQL) with clear separation between frontend, backend, and persistence layer.
 
@@ -544,6 +544,6 @@ This project is developed for educational purposes within the **Software Analysi
 
 <div align="center">
 
-**[⬆ Back to top](#-table-of-contents)**
+**[⬆ Back to top](#table-of-contents)**
 
 </div>
