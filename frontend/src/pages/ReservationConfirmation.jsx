@@ -392,12 +392,12 @@ export default function ReservationConfirmation() {
                         </div>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-parkea-50 p-4">
+                    <div className="mt-4 flex flex-col items-start gap-1 rounded-lg bg-parkea-50 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                         <span className="flex items-center gap-2 text-body font-medium text-parkea-700">
                             <Wallet className="h-4 w-4 shrink-0" aria-hidden="true" />
                             {isPending ? 'Total a pagar' : 'Total de la reserva'}
                         </span>
-                        <span className="font-mono text-title font-bold text-parkea-700">
+                        <span className="whitespace-nowrap font-mono text-title font-bold text-parkea-700">
                             {formatCurrency(reservation.paymentSummary.estimatedTotal)}
                         </span>
                     </div>
