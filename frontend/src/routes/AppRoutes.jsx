@@ -17,6 +17,7 @@ import AdminLogin from '../pages/AdminLogin';
 import AdminUsers from '../pages/AdminUsers';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
+import ReservationConfirmation from '../pages/ReservationConfirmation';
 
 export default function AppRoutes() {
     return (
@@ -40,7 +41,7 @@ export default function AppRoutes() {
                 <Route path="/vehicles/:id/edit" element={<ProtectedRoute><EditVehicle /></ProtectedRoute>} />
                 <Route path="/reserve/:zoneId" element={<ProtectedRoute><ReserveSpot /></ProtectedRoute>} />
                 <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-                <Route path="/reservations/:id" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/reservations/:id" element={<ProtectedRoute><ReservationConfirmation /></ProtectedRoute>} />
                 <Route path="/reservations/:id/payment" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
 
                 <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><Home /></ProtectedRoute>} />
