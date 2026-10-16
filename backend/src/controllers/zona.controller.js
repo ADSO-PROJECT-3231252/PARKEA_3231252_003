@@ -288,7 +288,20 @@ async function getZonaPorId(req, res, next) {
 // GET /api/zones/all — admin only, ALL zones regardless of active status (HU-19, AC-01)
 async function getTodasLasZonas(req, res, next) {
   try {
-    const zonas = await Zona.findAll({ order: [['name', 'ASC']] });
+    // activeReservations: Pending or Active reservations of each zone, so the
+    // screen can warn before deactivating it (HU-19, AC-08)
+    const zonas = await Zona.findAll({
+      attributes: {
+        include: [[
+          sequelize.literal(`(
+            SELECT COUNT(*) FROM reservations AS r
+            WHERE r.zone_id = Zona.id AND r.status IN ('Pending', 'Active')
+          )`),
+          'activeReservations',
+        ]],
+      },
+      order: [['name', 'ASC']],
+    });
     return res.status(200).json({ zones: zonas });
   } catch (error) {
     next(error);
