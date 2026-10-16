@@ -6,6 +6,42 @@ import {
     RefreshCw,
 } from 'lucide-react';
 import { getAllZones } from '../services/zoneService';
+import { formatCurrency } from '../utils/format';
+import { getZoneAvailability } from '../utils/zones';
+
+const AVAILABILITY_COLORS = {
+    full: 'text-danger',
+    almost: 'text-warning',
+    available: 'text-parkea-600',
+};
+
+const percentOf = (part, total) => (total > 0 ? Math.round((part / total) * 100) : 0);
+
+// AC-14: the status is always written out, not shown by color alone.
+function StatusBadge({ isActive }) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-caption font-medium ${isActive ? 'bg-parkea-50 text-parkea-700' : 'bg-danger-soft text-danger'}`}
+        >
+            <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-parkea-600' : 'bg-danger'}`} aria-hidden="true" />
+            {isActive ? 'Activa' : 'Inactiva'}
+        </span>
+    );
+}
+
+function Availability({ zone }) {
+    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
+    return (
+        <span className="flex flex-col items-center">
+            <span className={`font-mono text-body font-medium tabular-nums ${AVAILABILITY_COLORS[availability.state]}`}>
+                {zone.availableSlots}
+            </span>
+            <span className="font-mono text-caption tabular-nums text-neutral-600">
+                ({percentOf(zone.availableSlots, zone.totalSlots)}%)
+            </span>
+        </span>
+    );
+}
 
 export default function AdminZones() {
     const [zones, setZones] = useState([]);
@@ -92,6 +128,9 @@ export default function AdminZones() {
                                         <th scope="col" className="px-4 py-3 font-medium">Nombre de la zona</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Dirección</th>
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Capacidad total</th>
+                                        <th scope="col" className="px-4 py-3 text-center font-medium">Cupos disponibles</th>
+                                        <th scope="col" className="px-4 py-3 text-right font-medium">Tarifa por hora</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Estado</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -103,6 +142,15 @@ export default function AdminZones() {
                                             <td className="max-w-[260px] px-4 py-3 text-body text-neutral-600">{zone.address}</td>
                                             <td className="px-4 py-3 text-center font-mono text-body tabular-nums text-neutral-900">
                                                 {zone.totalSlots}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <Availability zone={zone} />
+                                            </td>
+                                            <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-body text-neutral-900">
+                                                {formatCurrency(zone.hourlyRate)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <StatusBadge isActive={zone.isActive} />
                                             </td>
                                         </tr>
                                     ))}
