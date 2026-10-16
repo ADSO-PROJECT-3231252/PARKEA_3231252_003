@@ -231,17 +231,19 @@ export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
     const positions = useMemo(() => JSON.parse(positionsKey), [positionsKey]);
 
     // AC-07: open on a view that includes every zone.
-    const fitAll = useCallback(() => {
+    const fitAll = useCallback((animate = true) => {
         if (!map || positions.length === 0) return;
         if (positions.length === 1) {
-            map.setView(positions[0], SINGLE_ZONE_ZOOM);
+            map.setView(positions[0], SINGLE_ZONE_ZOOM, { animate });
         } else {
-            map.fitBounds(positions, { padding: [56, 56], maxZoom: SINGLE_ZONE_ZOOM });
+            map.fitBounds(positions, { padding: [56, 56], maxZoom: SINGLE_ZONE_ZOOM, animate });
         }
     }, [map, positions]);
 
+    // The first fit is not animated: if the map is closed while a zoom
+    // animation is still running, Leaflet throws on the removed map.
     useEffect(() => {
-        fitAll();
+        fitAll(false);
     }, [fitAll]);
 
     const tileHandlers = useTileFailure(onLoadError);
@@ -285,7 +287,7 @@ export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
                 {placed.length > 0 && (
                     <button
                         type="button"
-                        onClick={fitAll}
+                        onClick={() => fitAll()}
                         aria-label="Ver todas las zonas"
                         title="Ver todas las zonas"
                         className="absolute bottom-3 left-[10px] z-[1000] flex h-[34px] w-[34px] items-center justify-center rounded-md border-2 border-black/20 bg-white bg-clip-padding text-neutral-900 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
