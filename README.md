@@ -356,7 +356,7 @@ Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signe
 | Users | `GET /admin/users`, `GET /admin/users/logs` | Admin | HU-23 |
 | Users | `PATCH /admin/users/:id/role`, `PATCH /admin/users/:id/status` | Admin | HU-23 |
 
-Errors always come back as `{ "code": "...", "message": "..." }`. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`.
+Business errors come back as `{ "code": "...", "message": "..." }`. Validation errors come back as `{ "code": "VALIDATION_ERROR", "errors": [...] }`, without `message`: each item of `errors` names the field (`path`) and its message (`msg`). A route that does not exist returns 404 with `{ "message": "Route not found" }`, without `code`. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`.
 
 ---
 
@@ -471,7 +471,7 @@ Each user story is an issue with its acceptance criteria, traceability and Defin
 
 ### Backend
 - **Naming language (official team decision):** domain/business names — files, models, and controller functions that represent a business entity or action (e.g. `Usuario`, `Zona`, `vehiculo.controller.js`, `cambiarRol`) — stay in **Spanish**, since they reflect the data model vocabulary already defined in the SRS. Everything else (internal variable names, code comments, log/error messages) is in **English**.
-- **Errors:** every error response is `{ code, message }`; the codes are English uppercase with underscores in `constants/errorCodes.js`
+- **Errors:** business errors are `{ code, message }` and validation errors are `{ code: VALIDATION_ERROR, errors }`; the codes are English uppercase with underscores in `constants/errorCodes.js`
 - **Models:** PascalCase singular (e.g., `Usuario`, `Vehiculo`)
 - **Tables:** Plural snake_case in DB (e.g., `users`, `parking_spots`)
 - **Database changes:** always through a new migration in `src/migrations`
