@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Zona, Reserva, ParkingSpot, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
@@ -104,78 +105,110 @@ async function createZona(req, res, next) {
 
 // PUT /api/zones/:id — admin only
 async function updateZona(req, res, next) {
+  const error = validarZona(req.body);
+  if (error) {
+    return res.status(error.status).json({ code: error.code, message: error.message });
+  }
+
+  const { id } = req.params;
+  const name = req.body.name.trim();
+  const address = req.body.address.trim();
+  const { latitude, longitude, totalSlots, hourlyRate } = req.body;
+
+  const t = await sequelize.transaction();
   try {
-    const { id } = req.params;
-    const zona = await Zona.findByPk(id);
+    // Locked so a reservation can't take a spot while the capacity changes
+    const zona = await Zona.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!zona) {
+      await t.rollback();
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
 
-    // HU-21 AC-02: the same rules as creating a zone
-    const error = validarZona(req.body);
-    if (error) {
-      return res.status(error.status).json({ code: error.code, message: error.message });
+    // HU-21 AC-02: the new name must not belong to another zone
+    const mismoNombre = await Zona.findOne({ where: { name, id: { [Op.ne]: id } }, transaction: t });
+    if (mismoNombre) {
+      await t.rollback();
+      return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
     }
 
-    const name = req.body.name.trim();
-    const address = req.body.address.trim();
-    const { latitude, longitude, totalSlots, hourlyRate } = req.body;
-
-    const updates = { name, address, latitude, longitude, hourlyRate };
-
-    if (totalSlots != null) {
+    if (totalSlots < zona.totalSlots) {
       const ocupados = await Reserva.count({
         where: { zoneId: id, status: ['Pending', 'Active'] },
+        transaction: t,
       });
+      // HU-21 AC-03: spotsInUse lets the screen say how many spots are taken
       if (totalSlots < ocupados) {
+        await t.rollback();
         return res.status(400).json({
           code: ErrorCodes.CAPACITY_BELOW_IN_USE,
           message: `Cannot reduce capacity below ${ocupados} spots currently in use`,
+          spotsInUse: ocupados,
         });
       }
 
-      if (totalSlots > zona.totalSlots) {
-        const nuevos = Array.from(
-          { length: totalSlots - zona.totalSlots },
-          (_, i) => ({
-            zoneId: id,
-            spotNumber: zona.totalSlots + i + 1,
-            status: 'Available',
-          })
-        );
-        await ParkingSpot.bulkCreate(nuevos);
-      } else if (totalSlots < zona.totalSlots) {
-        const delta = zona.totalSlots - totalSlots;
-        const candidatos = await ParkingSpot.findAll({
-          where: { zoneId: id, status: 'Available' },
-          order: [['spotNumber', 'DESC']],
-          limit: delta,
+      const delta = zona.totalSlots - totalSlots;
+      const candidatos = await ParkingSpot.findAll({
+        where: { zoneId: id, status: 'Available' },
+        order: [['spotNumber', 'DESC']],
+        limit: delta,
+        transaction: t,
+      });
+      if (candidatos.length < delta) {
+        await t.rollback();
+        return res.status(400).json({
+          code: ErrorCodes.INSUFFICIENT_AVAILABLE_SPOTS,
+          message: 'Cannot reduce capacity: not enough available spots to disable',
         });
-
-        if (candidatos.length < delta) {
-          return res.status(400).json({
-            code: ErrorCodes.INSUFFICIENT_AVAILABLE_SPOTS,
-            message: 'Cannot reduce capacity: some of the highest-numbered spots are currently occupied',
-          });
-        }
-
+      }
+      await ParkingSpot.update(
+        { status: 'Disabled' },
+        { where: { id: candidatos.map((c) => c.id) }, transaction: t }
+      );
+    } else if (totalSlots > zona.totalSlots) {
+      // HU-21 AC-04: spots disabled by an earlier reduction are reused first;
+      // new ones continue after the highest number, so numbers never repeat
+      const delta = totalSlots - zona.totalSlots;
+      const deshabilitados = await ParkingSpot.findAll({
+        where: { zoneId: id, status: 'Disabled' },
+        order: [['spotNumber', 'ASC']],
+        limit: delta,
+        transaction: t,
+      });
+      if (deshabilitados.length > 0) {
         await ParkingSpot.update(
-          { status: 'Disabled' },
-          { where: { id: candidatos.map((c) => c.id) } }
+          { status: 'Available' },
+          { where: { id: deshabilitados.map((s) => s.id) }, transaction: t }
         );
       }
 
-      updates.totalSlots = totalSlots;
+      const faltan = delta - deshabilitados.length;
+      if (faltan > 0) {
+        const mayorNumero = (await ParkingSpot.max('spotNumber', { where: { zoneId: id }, transaction: t })) || 0;
+        const nuevos = Array.from({ length: faltan }, (_, i) => ({
+          zoneId: id,
+          spotNumber: mayorNumero + i + 1,
+          status: 'Available',
+        }));
+        await ParkingSpot.bulkCreate(nuevos, { transaction: t });
+      }
     }
 
-    await zona.update(updates);
+    const disponibles = await ParkingSpot.count({ where: { zoneId: id, status: 'Available' }, transaction: t });
+    await zona.update({
+      name,
+      address,
+      latitude,
+      longitude,
+      totalSlots,
+      hourlyRate,
+      availableSlots: disponibles,
+    }, { transaction: t });
 
-    const disponibles = await ParkingSpot.count({ where: { zoneId: id, status: 'Available' } });
-    await zona.update({ availableSlots: disponibles });
-
+    await t.commit();
     return res.status(200).json({ message: 'Zone updated successfully', zone: zona });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    await t.rollback();
+    next(err);
   }
 }
 
