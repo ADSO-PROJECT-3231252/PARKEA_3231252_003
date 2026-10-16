@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     CheckCircle2,
     MapPin,
@@ -30,6 +30,13 @@ import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus'
 const EXPIRED_POLL_MS = 5000;
 const COPY_FEEDBACK_MS = 2000;
 
+// HU-17: messages sent by the payment screen through location.state.flash
+// (AC-10 after a successful payment, AC-13 when it was already paid).
+const FLASH_MESSAGES = {
+    paymentApproved: 'Pago aprobado. Tu reserva quedó activa.',
+    alreadyPaid: 'Esta reserva ya fue pagada.',
+};
+
 // Shared class strings, so the same look is written once.
 const ICON_CIRCLE = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600';
 const OUTLINE_BUTTON_SM =
@@ -46,6 +53,11 @@ function formatCountdown(ms) {
 
 export default function ReservationConfirmation() {
     const { id } = useParams();
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Read once; the state is then cleared so a page refresh doesn't show it again.
+    const [flash] = useState(() => FLASH_MESSAGES[location.state?.flash] ?? '');
 
     const [reservation, setReservation] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -118,6 +130,10 @@ export default function ReservationConfirmation() {
     useEffect(() => {
         return () => clearTimeout(copyTimerRef.current);
     }, []);
+
+    useEffect(() => {
+        if (location.state?.flash) navigate(location.pathname, { replace: true, state: null });
+    }, [location.state, location.pathname, navigate]);
 
     const handleCopy = async () => {
         clearTimeout(copyTimerRef.current);
@@ -199,6 +215,13 @@ export default function ReservationConfirmation() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6">
             <h1 className="sr-only">Confirmación de reserva</h1>
+
+            {flash && (
+                <p role="status" className="mb-6 flex items-center gap-2 rounded-lg border border-parkea-200 bg-parkea-50 px-4 py-3 text-body font-medium text-parkea-700">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {flash}
+                </p>
+            )}
 
             {canPay && (
                 <div className="mb-6 flex items-start gap-3 rounded-lg border border-parkea-200 bg-parkea-50 p-5">
