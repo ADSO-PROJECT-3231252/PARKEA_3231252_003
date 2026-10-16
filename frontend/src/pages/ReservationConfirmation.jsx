@@ -21,7 +21,7 @@ import {
     Ban,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
-import { formatDate, formatTime, formatDuration, formatCurrency } from '../utils/format';
+import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
 
 // Once the 15-minute hold runs out, the backend job (every 60 s) is what
@@ -44,12 +44,7 @@ const OUTLINE_BUTTON_SM =
 const OUTLINE_ACTION =
     'flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1';
 
-function formatCountdown(ms) {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
+
 
 export default function ReservationConfirmation() {
     const { id } = useParams();

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
 import { payReservation } from '../services/paymentService';
-import { formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
+import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
 import { translateError } from '../utils/errorMessages';
 import { RESERVATION_STATUS } from '../utils/reservationStatus';
 
@@ -91,13 +91,6 @@ function validateCard(card) {
         errors.name = 'Este campo es obligatorio.';
     }
     return errors;
-}
-
-function formatCountdown(ms) {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
