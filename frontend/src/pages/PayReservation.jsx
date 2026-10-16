@@ -4,6 +4,7 @@ import {
     AlertCircle,
     ArrowLeft,
     Ban,
+    Calendar,
     CreditCard,
     Info,
     Landmark,
@@ -24,10 +25,62 @@ const METHODS = [
     { value: METHOD_PSE, label: 'PSE', description: 'Paga desde tu cuenta bancaria', Icon: Landmark },
 ];
 
+// AC-04: test values loaded by default. AC-11: a card ending in 0002 is
+// always declined by the backend, so the user can try a rejection.
+const TEST_CARD = {
+    number: '4242 4242 4242 4242',
+    expiry: '12/28',
+    cvv: '123',
+    name: 'Usuario de prueba',
+};
+const DECLINE_TEST_NUMBER = '4000 0000 0000 0002';
+
 const PAGE_SHELL = 'mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6';
 const CARD = 'rounded-lg border border-neutral-200 bg-white p-6';
 const OUTLINE_BUTTON_SM =
     'flex items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600';
+
+const onlyDigits = (value) => value.replace(/\D/g, '');
+
+// "4242424242424242" -> "4242 4242 4242 4242"
+const formatCardNumber = (value) =>
+    onlyDigits(value)
+        .slice(0, 19)
+        .replace(/(\d{4})(?=\d)/g, '$1 ');
+
+// "1228" -> "12/28"
+const formatExpiry = (value) => {
+    const digits = onlyDigits(value).slice(0, 4);
+    return digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+};
+
+function validateCard(card) {
+    const errors = {};
+    const digits = onlyDigits(card.number);
+    if (digits.length < 13 || digits.length > 19) {
+        errors.number = 'Ingresa un número de tarjeta de 13 a 19 dígitos.';
+    }
+
+    const match = /^(0[1-9]|1[0-2])\/(\d{2})$/.exec(card.expiry);
+    if (!match) {
+        errors.expiry = 'Usa el formato MM/AA.';
+    } else {
+        const year = 2000 + Number(match[2]);
+        const month = Number(match[1]);
+        const today = new Date();
+        if (year < today.getFullYear() || (year === today.getFullYear() && month < today.getMonth() + 1)) {
+            errors.expiry = 'La tarjeta está vencida.';
+        }
+    }
+
+    if (!/^\d{3,4}$/.test(card.cvv)) {
+        errors.cvv = 'El CVV debe tener 3 o 4 dígitos.';
+    }
+    if (!card.name.trim()) {
+        errors.name = 'Este campo es obligatorio.';
+    }
+    return errors;
+}
 
 // groupStart draws the line that separates the groups of the mockup.
 function SummaryItem({ label, children, groupStart = false }) {
@@ -35,6 +88,41 @@ function SummaryItem({ label, children, groupStart = false }) {
         <div className={`py-3 ${groupStart ? 'border-t border-neutral-100' : ''}`}>
             <dt className="text-caption text-neutral-500">{label}</dt>
             <dd className="mt-0.5 break-words text-body text-neutral-900">{children}</dd>
+        </div>
+    );
+}
+
+function CardField({ id, label, Icon, error, className = '', ...inputProps }) {
+    return (
+        <div className={className}>
+            <label htmlFor={id} className="block text-label text-neutral-700">
+                {label}
+            </label>
+            <div className="relative mt-1">
+                <input
+                    id={id}
+                    name={id}
+                    type="text"
+                    autoComplete="off"
+                    aria-invalid={Boolean(error)}
+                    aria-describedby={error ? `${id}-error` : undefined}
+                    className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                        Icon ? 'pr-10' : ''
+                    } ${error ? 'border-danger' : 'border-neutral-200'}`}
+                    {...inputProps}
+                />
+                {Icon && (
+                    <Icon
+                        className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-neutral-500"
+                        aria-hidden="true"
+                    />
+                )}
+            </div>
+            {error && (
+                <p id={`${id}-error`} className="mt-1 text-caption text-danger">
+                    {error}
+                </p>
+            )}
         </div>
     );
 }
@@ -49,6 +137,8 @@ export default function PayReservation() {
     const [notFound, setNotFound] = useState(false);
 
     const [method, setMethod] = useState(METHOD_CARD); // AC-03: card by default
+    const [card, setCard] = useState(TEST_CARD);
+    const [fieldErrors, setFieldErrors] = useState({});
 
     const fetchReservation = useCallback(() => {
         getReservation(id)
@@ -80,6 +170,16 @@ export default function PayReservation() {
 
     // AC-09: back to the confirmation without touching the reservation.
     const goToConfirmation = () => navigate(`/reservations/${id}`);
+
+    const handleCardChange = (e) => {
+        const { name, value } = e.target;
+        let next = value;
+        if (name === 'number') next = formatCardNumber(value);
+        if (name === 'expiry') next = formatExpiry(value);
+        if (name === 'cvv') next = onlyDigits(value).slice(0, 4);
+        setCard((prev) => ({ ...prev, [name]: next }));
+        setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+    };
 
     if (loading) {
         return (
@@ -159,12 +259,18 @@ export default function PayReservation() {
     const total = paymentSummary.estimatedTotal;
     const pendingStatus = RESERVATION_STATUS.Pending;
 
+    // The payment itself is sent in a later step; for now the form is only checked.
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (method === METHOD_CARD) setFieldErrors(validateCard(card));
+    };
+
     return (
         <div className={PAGE_SHELL}>
             <h1 className="text-title font-display uppercase text-neutral-900">Pago de reserva</h1>
             <p className="mt-1 text-body text-neutral-600">Completa el pago para confirmar tu reserva.</p>
 
-            <div className="mt-6">
+            <form onSubmit={handleSubmit} noValidate className="mt-6">
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
                     {/* AC-01, section 1: payment method */}
                     <section aria-labelledby="method-title" className={CARD}>
@@ -207,6 +313,68 @@ export default function PayReservation() {
                                 })}
                             </div>
                         </fieldset>
+
+                        {method === METHOD_CARD ? (
+                            <div className="mt-6">
+                                <h3 className="text-subtitle-sm text-neutral-900">Datos de la tarjeta</h3>
+                                {/* AC-04: the pre-filled values are labelled as test data */}
+                                <p className="mt-1 text-caption text-neutral-600">Ya están cargados datos de prueba.</p>
+
+                                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                    <CardField
+                                        id="number"
+                                        label="Número de tarjeta"
+                                        Icon={CreditCard}
+                                        inputMode="numeric"
+                                        value={card.number}
+                                        onChange={handleCardChange}
+                                        error={fieldErrors.number}
+                                        className="sm:col-span-2"
+                                    />
+                                    <CardField
+                                        id="expiry"
+                                        label="Fecha de vencimiento"
+                                        Icon={Calendar}
+                                        inputMode="numeric"
+                                        placeholder="MM/AA"
+                                        value={card.expiry}
+                                        onChange={handleCardChange}
+                                        error={fieldErrors.expiry}
+                                    />
+                                    {/* AC-06: no lock icon, the app does not encrypt anything */}
+                                    <CardField
+                                        id="cvv"
+                                        label="CVV"
+                                        inputMode="numeric"
+                                        value={card.cvv}
+                                        onChange={handleCardChange}
+                                        error={fieldErrors.cvv}
+                                    />
+                                    <CardField
+                                        id="name"
+                                        label="Nombre en la tarjeta"
+                                        value={card.name}
+                                        onChange={handleCardChange}
+                                        error={fieldErrors.name}
+                                        className="sm:col-span-2"
+                                    />
+                                </div>
+
+                                <p className="mt-4 flex items-start gap-2 rounded-md border border-parkea-200 bg-parkea-50 px-3 py-2.5 text-caption text-parkea-700">
+                                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    La información se usa únicamente para esta transacción de prueba.
+                                </p>
+                                <p className="mt-2 text-caption text-neutral-600">
+                                    Para simular un pago rechazado, usa la tarjeta{' '}
+                                    <span className="whitespace-nowrap font-mono">{DECLINE_TEST_NUMBER}</span>.
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="mt-6 flex items-start gap-2 rounded-md border border-parkea-200 bg-parkea-50 px-3 py-2.5 text-caption text-parkea-700">
+                                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                Con PSE no necesitas ingresar datos. Al confirmar, el pago se aprueba de forma simulada.
+                            </p>
+                        )}
                     </section>
 
                     {/* AC-01/AC-07, section 2: reservation summary */}
@@ -264,18 +432,26 @@ export default function PayReservation() {
                     </div>
                 </div>
 
-                {/* AC-09: back to the confirmation without touching the reservation */}
-                <div className="mt-6">
+                {/* AC-09: same columns as the cards; on mobile "Confirmar pago" goes first */}
+                <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
                     <button
                         type="button"
                         onClick={goToConfirmation}
-                        className="flex items-center justify-center gap-1.5 rounded-md border border-parkea-600 bg-white px-5 py-2.5 text-label text-parkea-700 transition-colors hover:bg-parkea-50"
+                        className="order-last flex items-center justify-center gap-1.5 rounded-md border border-parkea-600 bg-white px-5 py-2.5 text-label text-parkea-700 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:opacity-60 lg:order-none"
                     >
                         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                         Cancelar pago
                     </button>
+                    <button
+                        type="submit"
+                        className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2.5 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <CreditCard className="h-4 w-4" aria-hidden="true" />
+                        Confirmar pago
+                        <span className="font-mono">{formatCurrency(total)}</span>
+                    </button>
                 </div>
-            </div>
+            </form>
         </div>
     );
 }
