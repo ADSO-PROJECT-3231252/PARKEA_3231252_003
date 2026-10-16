@@ -22,7 +22,7 @@ function ZoneCard({ zone, onReserve }) {
     const full = zone.availableSlots === 0;
 
     return (
-        <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
+        <div className="@container flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
             <div className="flex items-start justify-between gap-3">
                 <h3 className="flex items-center gap-1.5 text-subtitle-sm font-display uppercase text-neutral-900">
                     <MapPin className="h-4 w-4 shrink-0 text-parkea-600" aria-hidden="true" />
@@ -35,7 +35,7 @@ function ZoneCard({ zone, onReserve }) {
 
             {zone.address && <p className="mt-1 pl-[22px] text-body text-neutral-600">{zone.address}</p>}
 
-            <div className="mt-4 flex items-end justify-between">
+            <div className="mt-4 flex flex-col gap-3 @sm:flex-row @sm:items-end @sm:justify-between">
                 <span className="flex items-center gap-1.5 text-body text-neutral-900">
                     <Users className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                     <span className="font-mono tabular-nums">{zone.availableSlots}</span>
@@ -43,9 +43,9 @@ function ZoneCard({ zone, onReserve }) {
                     <span className="font-mono tabular-nums">{zone.totalSlots}</span>
                     <span className="text-caption text-neutral-500">cupos disponibles</span>
                 </span>
-                <span className="flex flex-col items-end">
+                <span className="flex flex-col @sm:items-end">
                     <span className="text-caption text-neutral-500">Tarifa por hora</span>
-                    <span className="flex items-center gap-1 font-mono text-body text-neutral-900">
+                    <span className="flex items-center gap-1 whitespace-nowrap font-mono text-body text-neutral-900">
                         <Banknote className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                         {formatCurrency(zone.hourlyRate)}
                     </span>
