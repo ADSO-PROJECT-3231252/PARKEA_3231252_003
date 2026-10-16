@@ -78,6 +78,8 @@ Versions are the ranges declared in each `package.json`.
 | Axios | ^1.18.1 | HTTP client for the REST API |
 | lucide-react | ^1.33.0 | Icons |
 | Recharts | ^3.10.1 | Charts in the admin dashboard |
+| Leaflet | ^1.9.4 | Interactive map (OpenStreetMap tiles) |
+| React Leaflet | ^5.0.0 | React components for the zones map |
 
 ### Backend
 | Technology | Version | Purpose |
