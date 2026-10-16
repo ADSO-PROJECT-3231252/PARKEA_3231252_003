@@ -1,18 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useParams, Link } from 'react-router-dom';
 import {
     AlertCircle,
     ArrowLeft,
     Ban,
     Calendar,
+    CircleCheck,
     Clock,
     CreditCard,
     Info,
     Landmark,
+    Loader2,
     RefreshCw,
     TriangleAlert,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
+import { payReservation } from '../services/paymentService';
 import { formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
 import { translateError } from '../utils/errorMessages';
 import { RESERVATION_STATUS } from '../utils/reservationStatus';
@@ -36,6 +39,12 @@ const TEST_CARD = {
     name: 'Usuario de prueba',
 };
 const DECLINE_TEST_NUMBER = '4000 0000 0000 0002';
+
+// Simulated payment: the overlay stays at least this long so it can be read
+// and feels like a real payment. Change this one value to make it shorter.
+const PROCESSING_MIN_MS = 3000;
+// Time the "Pago aprobado" message stays before going to the confirmation.
+const REDIRECT_DELAY_MS = 1500;
 
 const PAGE_SHELL = 'mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6';
 const CARD = 'rounded-lg border border-neutral-200 bg-white p-6';
@@ -91,6 +100,8 @@ function formatCountdown(ms) {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // groupStart draws the line that separates the groups of the mockup.
 function SummaryItem({ label, children, groupStart = false }) {
     return (
@@ -137,6 +148,46 @@ function CardField({ id, label, Icon, error, className = '', ...inputProps }) {
     );
 }
 
+// Covers the whole screen, header included, while the payment is processed,
+// so nothing behind it can be clicked or focused (AC-12).
+function ProcessingOverlay({ amount }) {
+    const boxRef = useRef(null);
+
+    useEffect(() => {
+        boxRef.current?.focus();
+        // There is nothing to tab to inside, so Tab must not leave the overlay.
+        const blockTab = (event) => {
+            if (event.key === 'Tab') event.preventDefault();
+        };
+        document.addEventListener('keydown', blockTab);
+        return () => document.removeEventListener('keydown', blockTab);
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-neutral-900/50" aria-hidden="true" />
+            <div
+                ref={boxRef}
+                tabIndex={-1}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="processing-title"
+                aria-describedby="processing-message"
+                className="relative flex w-full max-w-sm flex-col items-center rounded-lg bg-white p-8 text-center shadow-lg focus:outline-none"
+            >
+                <Loader2 className="h-10 w-10 animate-spin text-parkea-600 motion-reduce:animate-none" aria-hidden="true" />
+                <h2 id="processing-title" className="mt-4 text-title font-display uppercase text-neutral-900">
+                    Procesando pago
+                </h2>
+                <p id="processing-message" className="mt-2 text-body text-neutral-600">
+                    Estamos confirmando tu pago de <span className="whitespace-nowrap font-mono">{formatCurrency(amount)}</span>.
+                    No cierres ni recargues esta página.
+                </p>
+            </div>
+        </div>
+    );
+}
+
 export default function PayReservation() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -153,6 +204,13 @@ export default function PayReservation() {
     // Current time for the countdown. Only updated from callbacks (the fetch
     // and the 1-second interval), never directly inside an effect.
     const [now, setNow] = useState(null);
+
+    const [processing, setProcessing] = useState(false);
+    const [approved, setApproved] = useState(false);
+    const [expiredByServer, setExpiredByServer] = useState(false);
+    const [message, setMessage] = useState(null); // { type: 'error' | 'success', text }
+    const messageRef = useRef(null);
+    const redirectTimerRef = useRef(null);
 
     const fetchReservation = useCallback(() => {
         getReservation(id)
@@ -185,6 +243,13 @@ export default function PayReservation() {
         const interval = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(interval);
     }, [holdExpiresAt]);
+
+    useEffect(() => () => clearTimeout(redirectTimerRef.current), []);
+
+    // Move focus to the result once the overlay closes, so it is read out.
+    useEffect(() => {
+        if (message) messageRef.current?.focus();
+    }, [message]);
 
     const handleRetry = () => {
         setLoading(true);
@@ -257,12 +322,12 @@ export default function PayReservation() {
 
     // AC-13: an already paid reservation goes to its confirmation, which
     // explains why. After a payment made here the redirect is done below.
-    if (reservation.status === 'Active') {
+    if (reservation.status === 'Active' && !approved) {
         return <Navigate to={`/reservations/${reservation.id}`} replace state={{ flash: 'alreadyPaid' }} />;
     }
 
     // Expired, Cancelled or Finished: nothing left to pay.
-    if (reservation.status !== 'Pending') {
+    if (reservation.status !== 'Pending' && !approved) {
         return (
             <div className={PAGE_SHELL}>
                 <h1 className="sr-only">Pago de reserva</h1>
@@ -283,12 +348,55 @@ export default function PayReservation() {
     const total = paymentSummary.estimatedTotal;
     const pendingStatus = RESERVATION_STATUS.Pending;
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
-    const isTimeUp = remainingMs !== null && remainingMs <= 0;
+    const isTimeUp = expiredByServer || (remainingMs !== null && remainingMs <= 0);
+    const payDisabled = processing || approved || isTimeUp;
 
-    // The payment itself is sent in a later step; for now the form is only checked.
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (method === METHOD_CARD) setFieldErrors(validateCard(card));
+        if (payDisabled) return;
+        setMessage(null);
+
+        if (method === METHOD_CARD) {
+            const errors = validateCard(card);
+            setFieldErrors(errors);
+            const firstInvalid = Object.keys(errors)[0];
+            if (firstInvalid) {
+                document.getElementById(firstInvalid)?.focus();
+                return;
+            }
+        }
+
+        setProcessing(true);
+        // AC-05: only the method and the last four digits leave the form.
+        const payload =
+            method === METHOD_CARD
+                ? { paymentMethod: method, cardLastFour: onlyDigits(card.number).slice(-4) }
+                : { paymentMethod: method };
+
+        const [result] = await Promise.allSettled([payReservation(id, payload), wait(PROCESSING_MIN_MS)]);
+        setProcessing(false);
+
+        if (result.status === 'fulfilled') {
+            // AC-10: message, then the confirmation with the new status.
+            setApproved(true);
+            setMessage({ type: 'success', text: 'Pago aprobado' });
+            redirectTimerRef.current = setTimeout(
+                () => navigate(`/reservations/${id}`, { replace: true, state: { flash: 'paymentApproved' } }),
+                REDIRECT_DELAY_MS,
+            );
+            return;
+        }
+
+        const code = result.reason.response?.data?.code;
+        if (code === 'PAYMENT_ALREADY_EXISTS') {
+            // AC-13: paid meanwhile, for example in another tab.
+            navigate(`/reservations/${id}`, { replace: true, state: { flash: 'alreadyPaid' } });
+            return;
+        }
+        if (code === 'RESERVATION_EXPIRED') setExpiredByServer(true);
+        // AC-11: on PAYMENT_DECLINED the reservation stays Pending and the
+        // user can try again right away.
+        setMessage({ type: 'error', text: translateError(code) });
     };
 
     return (
@@ -341,7 +449,10 @@ export default function PayReservation() {
                                                 name="method"
                                                 value={value}
                                                 checked={selected}
-                                                onChange={() => setMethod(value)}
+                                                onChange={() => {
+                                                    setMethod(value);
+                                                    setMessage(null);
+                                                }}
                                                 className="mt-1 h-4 w-4 shrink-0 accent-parkea-600"
                                             />
                                             <span className="min-w-0">
@@ -497,11 +608,37 @@ export default function PayReservation() {
                     </div>
                 </div>
 
+                {/* AC-16: results inline and announced */}
+                {message && (
+                    <p
+                        ref={messageRef}
+                        tabIndex={-1}
+                        role={message.type === 'error' ? 'alert' : 'status'}
+                        className={`mt-6 flex items-center gap-2 rounded-md px-4 py-3 text-body focus:outline-none ${
+                            message.type === 'error' ? 'bg-danger-soft text-danger' : 'bg-parkea-50 font-medium text-parkea-700'
+                        }`}
+                    >
+                        {message.type === 'error' ? (
+                            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        ) : (
+                            <CircleCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        )}
+                        {message.text}
+                    </p>
+                )}
+                {isTimeUp && !message && (
+                    <p role="alert" className="mt-6 flex items-center gap-2 rounded-md bg-danger-soft px-4 py-3 text-body text-danger">
+                        <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {translateError('RESERVATION_EXPIRED')}
+                    </p>
+                )}
+
                 {/* AC-09: same columns as the cards; on mobile "Confirmar pago" goes first */}
                 <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-6">
                     <button
                         type="button"
                         onClick={goToConfirmation}
+                        disabled={processing || approved}
                         className="order-last flex items-center justify-center gap-1.5 rounded-md border border-parkea-600 bg-white px-5 py-2.5 text-label text-parkea-700 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:opacity-60 lg:order-none"
                     >
                         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -509,6 +646,7 @@ export default function PayReservation() {
                     </button>
                     <button
                         type="submit"
+                        disabled={payDisabled}
                         className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2.5 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <CreditCard className="h-4 w-4" aria-hidden="true" />
@@ -522,6 +660,8 @@ export default function PayReservation() {
                 <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 Este es un entorno de prueba. Ningún pago real será procesado.
             </p>
+
+            {processing && <ProcessingOverlay amount={total} />}
         </div>
     );
 }
