@@ -147,6 +147,7 @@ function ZoneSummary({ zone, availability, onReserve }) {
                 type="button"
                 data-reserve
                 onClick={() => onReserve(zone)}
+                aria-label={full ? `Sin cupos disponibles en ${zone.name}` : `Reservar en ${zone.name}`}
                 aria-disabled={full || undefined}
                 aria-describedby={full ? `full-${zone.id}` : undefined}
                 className={`mt-4 w-full rounded-md px-4 py-2.5 text-label font-medium transition-colors ${full
