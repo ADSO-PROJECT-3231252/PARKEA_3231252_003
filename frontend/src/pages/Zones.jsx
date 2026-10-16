@@ -296,7 +296,7 @@ export default function Zones() {
                                 onShowList={showList}
                             />
                         </Suspense>
-                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
+                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-600">
                             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             La disponibilidad se actualiza cada vez que recargas la página o buscas.
                         </p>
@@ -342,7 +342,7 @@ export default function Zones() {
                             </nav>
                         )}
 
-                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
+                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-600">
                             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             La disponibilidad se actualiza cada vez que recargas la página o buscas.
                         </p>
