@@ -1,11 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
-import ZoneMap from '../components/ZoneMap';
+
+// HU-25: Leaflet is only downloaded when the map view is opened. If that
+// download fails, the page falls back to the list like any other map error.
+function ZoneMapUnavailable({ onLoadError }) {
+    useEffect(() => {
+        onLoadError?.();
+    }, [onLoadError]);
+    return null;
+}
+
+const ZoneMap = lazy(() =>
+    import('../components/ZoneMap').catch(() => ({ default: ZoneMapUnavailable })),
+);
 
 // AC-11: the list must be paginated when there are more than 9 zones.
 const PAGE_SIZE = 9;
@@ -268,12 +280,22 @@ export default function Zones() {
 
                 {!loading && !error && filteredZones.length > 0 && view === 'map' && (
                     <>
-                        <ZoneMap
-                            zones={filteredZones}
-                            onReserve={handleReserve}
-                            onLoadError={handleMapError}
-                            onShowList={showList}
-                        />
+                        <Suspense
+                            fallback={
+                                <div className="flex h-[65vh] min-h-[380px] items-center justify-center rounded-lg border border-neutral-200 bg-neutral-100">
+                                    <p role="status" aria-live="polite" className="text-body text-neutral-600">
+                                        Cargando mapa…
+                                    </p>
+                                </div>
+                            }
+                        >
+                            <ZoneMap
+                                zones={filteredZones}
+                                onReserve={handleReserve}
+                                onLoadError={handleMapError}
+                                onShowList={showList}
+                            />
+                        </Suspense>
                         <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
                             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             La disponibilidad se actualiza cada vez que recargas la página o buscas.
