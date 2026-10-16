@@ -400,7 +400,13 @@ function AdminHome() {
                         </Link>
                     </div>
                 </div>
-                <HeroIllustration src={heroAdminIllustration} height={250} right={250} />
+                {/* HU-04 AC-08: the illustration scales with the screen so it never
+                    covers the headline on laptop widths (1024 to 1366 px). */}
+                <HeroIllustration
+                    src={heroAdminIllustration}
+                    height="clamp(150px, 16vw, 250px)"
+                    right="clamp(24px, 30vw - 300px, 250px)"
+                />
             </section>
 
             <section className="mt-8">
