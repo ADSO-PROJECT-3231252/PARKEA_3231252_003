@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
@@ -34,7 +34,7 @@ export default function AppRoutes() {
             <Route element={<Layout />}>
                 <Route path="/" element={<Home />} />
                 <Route path="/zones" element={<Zones />} />
-                <Route path="/zones/map" element={<ComingSoon />} />
+                <Route path="/zones/map" element={<Navigate to="/zones?view=map" replace />} />
 
                 <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/vehicles" element={<ProtectedRoute><VehicleList /></ProtectedRoute>} />
