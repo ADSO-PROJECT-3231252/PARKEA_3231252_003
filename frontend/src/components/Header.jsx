@@ -129,12 +129,12 @@ export default function Header() {
 
                 {user && (
                     <nav
-                        className="hidden h-16 flex-1 items-center gap-6 md:flex"
+                        className="hidden h-16 flex-1 items-center gap-4 md:flex lg:gap-6"
                         aria-label="Navegación principal"
                     >
                         {navItems.map(({ to, label, icon: Icon, end }) => (
                             <NavLink key={to} to={to} end={end} className={desktopNavLinkClass}>
-                                <Icon className="h-4 w-4" aria-hidden="true" />
+                                <Icon className="hidden h-4 w-4 lg:block" aria-hidden="true" />
                                 {label}
                             </NavLink>
                         ))}
@@ -166,7 +166,7 @@ export default function Header() {
                     {user && (
                         <>
                             {isAdmin && (
-                                <span className="hidden rounded-full border border-parkea-600 bg-parkea-50 px-3 py-1 text-label text-parkea-600 lg:inline-block">
+                                <span className="hidden rounded-full border border-parkea-600 bg-parkea-50 px-3 py-1 text-label text-parkea-600 sm:inline-block">
                                     Administrador
                                 </span>
                             )}
