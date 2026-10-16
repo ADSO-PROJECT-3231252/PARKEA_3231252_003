@@ -235,8 +235,8 @@ export default function AdminZones() {
 
                 {!loading && !error && filteredZones.length > 0 && (
                     <>
-                        {/* AC-01 / AC-02 */}
-                        <div className="overflow-x-auto">
+                        {/* AC-01 / AC-02: table on computers */}
+                        <div className="hidden overflow-x-auto lg:block">
                             <table className="w-full border-collapse text-left">
                                 <thead>
                                     <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900 xl:[&>th]:whitespace-nowrap">
@@ -276,6 +276,38 @@ export default function AdminZones() {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* AC-15: one card per zone on phones and tablets */}
+                        <ul className="divide-y divide-neutral-100 lg:hidden">
+                            {pageZones.map((zone) => (
+                                <li key={zone.id} className="flex flex-col gap-3 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <ZoneName zone={zone} />
+                                        <StatusBadge isActive={zone.isActive} />
+                                    </div>
+                                    {zone.address && <p className="text-body text-neutral-600">{zone.address}</p>}
+                                    <dl className="grid grid-cols-3 gap-2 rounded-md bg-neutral-50 p-3 text-center">
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Capacidad</dt>
+                                            <dd className="font-mono text-body tabular-nums text-neutral-900">{zone.totalSlots}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Disponibles</dt>
+                                            <dd>
+                                                <Availability zone={zone} />
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Tarifa/hora</dt>
+                                            <dd className="whitespace-nowrap font-mono text-body text-neutral-900">
+                                                {formatCurrency(zone.hourlyRate)}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                    <ZoneActions zone={zone} />
+                                </li>
+                            ))}
+                        </ul>
 
                         {/* AC-11: pagination */}
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
