@@ -11,10 +11,12 @@ import {
     ChevronRight,
     RefreshCw,
 } from 'lucide-react';
-import { getAllZones } from '../services/zoneService';
+import { getAllZones, toggleZone } from '../services/zoneService';
+import { translateError } from '../utils/errorMessages';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { getPageWindow } from '../utils/adminUsersHelpers';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 // AC-11: the list is paginated when there are more than 10 zones.
 const PAGE_SIZE = 10;
@@ -53,8 +55,8 @@ function Availability({ zone }) {
     );
 }
 
-// AC-05: edit opens the edit form (HU-21).
-function ZoneActions({ zone }) {
+// AC-05: edit opens the edit form (HU-21). AC-06: activate or deactivate.
+function ZoneActions({ zone, onToggle }) {
     return (
         <div className="flex items-center gap-3">
             <Link
@@ -65,6 +67,21 @@ function ZoneActions({ zone }) {
                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 Editar
             </Link>
+            {/* AC-14: the "off" state uses neutral-500 so the switch keeps a 3:1
+                contrast against the white background (WCAG 1.4.11). */}
+            <button
+                type="button"
+                role="switch"
+                aria-checked={zone.isActive}
+                aria-label={`Zona activa: ${zone.name}`}
+                onClick={() => onToggle(zone)}
+                className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600 focus-visible:ring-offset-2 ${zone.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-500 bg-neutral-500'}`}
+            >
+                <span
+                    className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${zone.isActive ? 'translate-x-4' : 'translate-x-0'}`}
+                    aria-hidden="true"
+                />
+            </button>
         </div>
     );
 }
@@ -92,6 +109,11 @@ export default function AdminZones() {
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
+
+    // AC-08: confirmation dialog
+    const [pendingZone, setPendingZone] = useState(null);
+    const [confirming, setConfirming] = useState(false);
+    const [actionError, setActionError] = useState('');
 
     const fetchZones = useCallback(() => {
         getAllZones()
@@ -140,6 +162,51 @@ export default function AdminZones() {
         setStatus(value);
         setPage(1);
     };
+
+    const openToggle = (zone) => {
+        setActionError('');
+        setPendingZone(zone);
+    };
+
+    const closeToggle = useCallback(() => {
+        setPendingZone(null);
+        setActionError('');
+    }, []);
+
+    const handleConfirmToggle = async () => {
+        if (!pendingZone) return;
+        setConfirming(true);
+        setActionError('');
+        try {
+            const { data } = await toggleZone(pendingZone.id);
+            // Keep the table on screen: only the changed zone is replaced, and
+            // activeReservations (not returned by the toggle) is kept.
+            setZones((prev) => prev.map((z) => (z.id === data.zone.id ? { ...z, ...data.zone } : z)));
+            setPendingZone(null);
+        } catch (err) {
+            setActionError(translateError(err.response?.data?.code));
+        } finally {
+            setConfirming(false);
+        }
+    };
+
+    // AC-07 / AC-08: the dialog explains the effect; if the zone has Pending or
+    // Active reservations it warns that they stay valid until they end.
+    let dialogTitle = '';
+    let dialogMessage = '';
+    if (pendingZone) {
+        const inUse = Number(pendingZone.activeReservations) || 0;
+        if (pendingZone.isActive) {
+            dialogTitle = 'Desactivar zona';
+            dialogMessage = `Vas a desactivar la zona ${pendingZone.name}. Dejará de aparecer en la lista pública y no aceptará reservas nuevas.`;
+            if (inUse > 0) {
+                dialogMessage += ` Tiene ${inUse} ${inUse === 1 ? 'reserva pendiente o activa, que seguirá válida' : 'reservas pendientes o activas, que seguirán válidas'} hasta que termine${inUse === 1 ? '' : 'n'}.`;
+            }
+        } else {
+            dialogTitle = 'Activar zona';
+            dialogMessage = `Vas a activar la zona ${pendingZone.name}. Volverá a aparecer en la lista pública y aceptará reservas.`;
+        }
+    }
 
     const pageButton =
         'flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
@@ -269,7 +336,7 @@ export default function AdminZones() {
                                                 <StatusBadge isActive={zone.isActive} />
                                             </td>
                                             <td className="px-4 py-3">
-                                                <ZoneActions zone={zone} />
+                                                <ZoneActions zone={zone} onToggle={openToggle} />
                                             </td>
                                         </tr>
                                     ))}
@@ -304,7 +371,7 @@ export default function AdminZones() {
                                             </dd>
                                         </div>
                                     </dl>
-                                    <ZoneActions zone={zone} />
+                                    <ZoneActions zone={zone} onToggle={openToggle} />
                                 </li>
                             ))}
                         </ul>
@@ -356,6 +423,19 @@ export default function AdminZones() {
                     </>
                 )}
             </div>
+
+            <ConfirmDialog
+                open={Boolean(pendingZone)}
+                variant={pendingZone?.isActive ? 'danger' : 'default'}
+                title={dialogTitle}
+                message={dialogMessage}
+                confirmLabel={pendingZone?.isActive ? 'Desactivar zona' : 'Activar zona'}
+                cancelLabel="Cancelar"
+                confirming={confirming}
+                error={actionError}
+                onConfirm={handleConfirmToggle}
+                onCancel={closeToggle}
+            />
         </div>
     );
 }
