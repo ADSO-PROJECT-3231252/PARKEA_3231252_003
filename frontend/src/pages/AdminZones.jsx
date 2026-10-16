@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Plus,
@@ -7,6 +7,7 @@ import {
     SquareParking,
     Pencil,
     AlertCircle,
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
     RefreshCw,
@@ -20,6 +21,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 
 // AC-11: the list is paginated when there are more than 10 zones.
 const PAGE_SIZE = 10;
+const SUCCESS_MESSAGE_MS = 3000;
 
 const AVAILABILITY_COLORS = {
     full: 'text-danger',
@@ -110,10 +112,13 @@ export default function AdminZones() {
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
 
-    // AC-08: confirmation dialog
+    // AC-08 / AC-10: confirmation dialog and outcome messages
     const [pendingZone, setPendingZone] = useState(null);
     const [confirming, setConfirming] = useState(false);
     const [actionError, setActionError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const titleRef = useRef(null);
+    const toggledRef = useRef(false);
 
     const fetchZones = useCallback(() => {
         getAllZones()
@@ -128,6 +133,22 @@ export default function AdminZones() {
     useEffect(() => {
         fetchZones();
     }, [fetchZones]);
+
+    useEffect(() => {
+        if (!successMessage) return;
+        const timer = setTimeout(() => setSuccessMessage(''), SUCCESS_MESSAGE_MS);
+        return () => clearTimeout(timer);
+    }, [successMessage]);
+
+    // After a change, the dialog returns focus to the switch. If the status
+    // filter now hides that zone, the switch is gone and focus would fall to
+    // the page body, so it goes to the title instead. This runs after the
+    // dialog's own cleanup, which is the one that restores focus.
+    useEffect(() => {
+        if (pendingZone || !toggledRef.current) return;
+        toggledRef.current = false;
+        if (document.activeElement === document.body) titleRef.current?.focus();
+    }, [pendingZone]);
 
     // AC-12: retry after a failed load
     const handleRetry = () => {
@@ -182,6 +203,12 @@ export default function AdminZones() {
             // Keep the table on screen: only the changed zone is replaced, and
             // activeReservations (not returned by the toggle) is kept.
             setZones((prev) => prev.map((z) => (z.id === data.zone.id ? { ...z, ...data.zone } : z)));
+            setSuccessMessage(
+                data.zone.isActive
+                    ? `La zona ${data.zone.name} fue activada y vuelve a aparecer en la lista pública.`
+                    : `La zona ${data.zone.name} fue desactivada. Ya no aparece en la lista pública ni acepta reservas nuevas.`,
+            );
+            toggledRef.current = true;
             setPendingZone(null);
         } catch (err) {
             setActionError(translateError(err.response?.data?.code));
@@ -216,7 +243,9 @@ export default function AdminZones() {
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-title font-display uppercase text-neutral-900">Gestión de zonas</h1>
+                    <h1 ref={titleRef} tabIndex={-1} className="text-title font-display uppercase text-neutral-900 focus:outline-none">
+                        Gestión de zonas
+                    </h1>
                     <p className="mt-1 text-body text-neutral-600">Administra las zonas de parqueo registradas en el sistema.</p>
                 </div>
                 {/* AC-04: opens the creation form (HU-20) */}
@@ -227,6 +256,17 @@ export default function AdminZones() {
                     <Plus className="h-4 w-4" aria-hidden="true" />
                     Crear zona
                 </Link>
+            </div>
+
+            {/* AC-10: outcome of every action. The live region is always in the
+                page so screen readers announce the new text. */}
+            <div role="status" aria-live="polite">
+                {successMessage && (
+                    <p className="mt-4 flex items-center gap-2 rounded-md bg-parkea-50 px-3 py-2 text-caption text-parkea-700">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {successMessage}
+                    </p>
+                )}
             </div>
 
             {/* AC-03: search and status filter */}
