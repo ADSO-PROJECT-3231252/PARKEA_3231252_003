@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Plus,
+    Search,
+    X,
     SquareParking,
     Pencil,
     AlertCircle,
@@ -80,6 +82,9 @@ export default function AdminZones() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
+    // AC-03: search by name or address
+    const [search, setSearch] = useState('');
+
     const fetchZones = useCallback(() => {
         getAllZones()
             .then(({ data }) => {
@@ -101,6 +106,18 @@ export default function AdminZones() {
         fetchZones();
     };
 
+    const filteredZones = useMemo(() => {
+        const term = search.trim().toLowerCase();
+        if (!term) return zones;
+        return zones.filter(
+            (zone) => zone.name.toLowerCase().includes(term) || (zone.address ?? '').toLowerCase().includes(term),
+        );
+    }, [zones, search]);
+
+
+    const handleSearchChange = (value) => {
+        setSearch(value);
+    };
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -117,6 +134,34 @@ export default function AdminZones() {
                     <Plus className="h-4 w-4" aria-hidden="true" />
                     Crear zona
                 </Link>
+            </div>
+
+            {/* AC-03: search */}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="relative w-full sm:max-w-md">
+                    <Search
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600"
+                        aria-hidden="true"
+                    />
+                    <input
+                        type="search"
+                        value={search}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        placeholder="Buscar por nombre o dirección…"
+                        aria-label="Buscar zona por nombre o dirección"
+                        className="w-full rounded-md border border-neutral-200 bg-white py-2.5 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                    />
+                    {search && (
+                        <button
+                            type="button"
+                            onClick={() => handleSearchChange('')}
+                            aria-label="Limpiar búsqueda"
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
+                        >
+                            <X className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
@@ -144,13 +189,15 @@ export default function AdminZones() {
                     </div>
                 )}
 
-                {!loading && !error && zones.length === 0 && (
+                {!loading && !error && filteredZones.length === 0 && (
                     <p className="p-6 text-body text-neutral-600">
-                        Aún no hay zonas registradas. Usa "Crear zona" para agregar la primera.
+                        {zones.length === 0
+                            ? 'Aún no hay zonas registradas. Usa "Crear zona" para agregar la primera.'
+                            : 'No se encontraron zonas con esa búsqueda.'}
                     </p>
                 )}
 
-                {!loading && !error && zones.length > 0 && (
+                {!loading && !error && filteredZones.length > 0 && (
                     <>
                         {/* AC-01 / AC-02 */}
                         <div className="overflow-x-auto">
@@ -167,7 +214,7 @@ export default function AdminZones() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {zones.map((zone) => (
+                                    {filteredZones.map((zone) => (
                                         <tr key={zone.id} className="border-b border-neutral-100 last:border-0">
                                             <td className="px-4 py-3">
                                                 <ZoneName zone={zone} />
