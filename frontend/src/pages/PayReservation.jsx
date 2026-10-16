@@ -656,7 +656,7 @@ export default function PayReservation() {
                 </div>
             </form>
 
-            <p className="mt-8 flex items-center justify-center gap-1.5 border-t border-neutral-200 pt-4 text-center text-caption text-neutral-500">
+            <p className="mt-8 flex items-center justify-center gap-1.5 border-t border-neutral-200 pt-4 text-center text-caption text-neutral-600">
                 <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 Este es un entorno de prueba. Ningún pago real será procesado.
             </p>
