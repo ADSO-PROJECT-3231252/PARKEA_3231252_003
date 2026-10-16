@@ -32,27 +32,31 @@ const MAX_HOURLY_RATE = 99999999.99;
 
 const textoVacio = (valor) => typeof valor !== 'string' || valor.trim() === '';
 
-// Same rules for create (HU-20) and edit (HU-21, AC-02). Returns the error to
-// send, or null when the body is valid.
+// Same rules for create (HU-20) and edit (HU-21, AC-02). Returns the status
+// and body of the error to send, or null when the body is valid. Format errors
+// use the same shape as express-validator: { code: VALIDATION_ERROR, errors }.
 function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRate }) {
   if (textoVacio(name) || textoVacio(address) || latitude == null || longitude == null
     || totalSlots == null || hourlyRate == null) {
-    return { status: 400, code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, address, latitude, longitude, totalSlots, and hourlyRate are required' };
+    return { status: 400, body: { code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, address, latitude, longitude, totalSlots, and hourlyRate are required' } };
   }
-  if (name.trim().length > 100 || address.trim().length > 255) {
-    return { status: 400, code: ErrorCodes.VALIDATION_ERROR, message: 'name must be at most 100 characters and address at most 255' };
+  if (name.trim().length > 100) {
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'name', msg: 'name must be at most 100 characters' }] } };
+  }
+  if (address.trim().length > 255) {
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'address', msg: 'address must be at most 255 characters' }] } };
   }
   if (!Number.isInteger(totalSlots) || totalSlots <= 0 || totalSlots > MAX_TOTAL_SLOTS) {
-    return { status: 400, code: ErrorCodes.INVALID_CAPACITY, message: `totalSlots must be a whole number between 1 and ${MAX_TOTAL_SLOTS}` };
+    return { status: 400, body: { code: ErrorCodes.INVALID_CAPACITY, message: `totalSlots must be a whole number between 1 and ${MAX_TOTAL_SLOTS}` } };
   }
   if (typeof hourlyRate !== 'number' || !Number.isFinite(hourlyRate) || hourlyRate > MAX_HOURLY_RATE) {
-    return { status: 400, code: ErrorCodes.VALIDATION_ERROR, message: `hourlyRate must be a number up to ${MAX_HOURLY_RATE}` };
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'hourlyRate', msg: `hourlyRate must be a number up to ${MAX_HOURLY_RATE}` }] } };
   }
   if (hourlyRate < 0) {
-    return { status: 400, code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' };
+    return { status: 400, body: { code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' } };
   }
   if (!coordenadasValidas(latitude, longitude)) {
-    return { status: 400, code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' };
+    return { status: 400, body: { code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' } };
   }
   return null;
 }
@@ -61,7 +65,7 @@ function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRat
 async function createZona(req, res, next) {
   const error = validarZona(req.body);
   if (error) {
-    return res.status(error.status).json({ code: error.code, message: error.message });
+    return res.status(error.status).json(error.body);
   }
 
   const name = req.body.name.trim();
@@ -107,7 +111,7 @@ async function createZona(req, res, next) {
 async function updateZona(req, res, next) {
   const error = validarZona(req.body);
   if (error) {
-    return res.status(error.status).json({ code: error.code, message: error.message });
+    return res.status(error.status).json(error.body);
   }
 
   const { id } = req.params;
