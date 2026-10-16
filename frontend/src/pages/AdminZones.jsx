@@ -236,8 +236,8 @@ export default function AdminZones() {
     }
 
     const pageButton =
-        'flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
-        'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent';
+        'flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
+        'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent sm:px-2.5';
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -277,7 +277,7 @@ export default function AdminZones() {
                         aria-hidden="true"
                     />
                     <input
-                        type="search"
+                        type="text"
                         value={search}
                         onChange={(e) => handleSearchChange(e.target.value)}
                         placeholder="Buscar por nombre o dirección…"
@@ -417,11 +417,11 @@ export default function AdminZones() {
                         </ul>
 
                         {/* AC-11: pagination */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-3 py-3 sm:px-4">
                             <p className="text-caption text-neutral-600">
                                 Mostrando {rangeStart} a {rangeEnd} de {filteredZones.length} zonas
                             </p>
-                            <nav aria-label="Paginación de zonas" className="flex items-center gap-1">
+                            <nav aria-label="Paginación de zonas" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
                                     onClick={() => setPage(currentPage - 1)}
@@ -429,7 +429,7 @@ export default function AdminZones() {
                                     className={pageButton}
                                 >
                                     <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                                    Anterior
+                                    <span className="sr-only sm:not-sr-only">Anterior</span>
                                 </button>
                                 {pageWindow.map((item) =>
                                     typeof item === 'number' ? (
@@ -439,12 +439,12 @@ export default function AdminZones() {
                                             onClick={() => setPage(item)}
                                             aria-label={`Página ${item}`}
                                             aria-current={item === currentPage ? 'page' : undefined}
-                                            className={`flex h-7 w-7 items-center justify-center rounded-md text-label transition-colors ${item === currentPage ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
+                                            className={`flex h-7 w-6 items-center justify-center rounded-md text-label transition-colors sm:w-7 ${item === currentPage ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
                                         >
                                             {item}
                                         </button>
                                     ) : (
-                                        <span key={item} className="px-1 text-neutral-600" aria-hidden="true">
+                                        <span key={item} className="px-0.5 text-neutral-600 sm:px-1" aria-hidden="true">
                                             …
                                         </span>
                                     ),
@@ -455,7 +455,7 @@ export default function AdminZones() {
                                     disabled={currentPage === totalPages}
                                     className={pageButton}
                                 >
-                                    Siguiente
+                                    <span className="sr-only sm:not-sr-only">Siguiente</span>
                                     <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                                 </button>
                             </nav>
