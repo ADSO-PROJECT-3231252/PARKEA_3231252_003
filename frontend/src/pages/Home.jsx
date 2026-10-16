@@ -387,8 +387,8 @@ function AdminHome() {
                             Bienvenido, Administrador
                         </h1>
                         <p className="mt-2 text-subtitle-sm text-neutral-900">
-                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,
-                            <br className="hidden md:block" />
+                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,{' '}
+                            <br className="hidden xl:block" />
                             usuarios y consultar el rendimiento del servicio.
                         </p>
                         <Link
@@ -422,8 +422,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Panel de control</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Consulta estadísticas generales, reservas, ocupación de
-                            <br className="hidden md:block" />
+                            Consulta estadísticas generales, reservas, ocupación de{' '}
+                            <br className="hidden 2xl:block" />
                             zonas y actividad del sistema en tiempo real.
                         </p>
                         <Link
@@ -441,8 +441,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de zonas</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Crea, edita y administra las zonas de parqueo, tarifas,
-                            <br className="hidden md:block" />
+                            Crea, edita y administra las zonas de parqueo, tarifas,{' '}
+                            <br className="hidden 2xl:block" />
                             cupos disponibles y horarios de operación.
                         </p>
                         <Link
@@ -460,8 +460,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de usuarios</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Administra los usuarios del sistema, asigna roles y
-                            <br className="hidden md:block" />
+                            Administra los usuarios del sistema, asigna roles y{' '}
+                            <br className="hidden 2xl:block" />
                             consulta la información de las cuentas registradas.
                         </p>
                         <Link
