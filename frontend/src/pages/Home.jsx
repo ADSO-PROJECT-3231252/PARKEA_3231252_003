@@ -131,7 +131,7 @@ function VisitorHome() {
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Reservas</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
                         Reserva tu cupo de parqueo con{' '}
-                        <br className="hidden md:block" />
+                        <br className="hidden xl:block" />
                         anticipación y asegura tu espacio.
                     </p>
                 </div>
@@ -142,7 +142,7 @@ function VisitorHome() {
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Zonas</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
                         Explora zonas de parqueo cercanas,{' '}
-                        <br className="hidden md:block" />
+                        <br className="hidden xl:block" />
                         con información clara y actualizada.
                     </p>
                 </div>
@@ -153,7 +153,7 @@ function VisitorHome() {
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Historial</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
                         Consulta tus reservas pasadas{' '}
-                        <br className="hidden md:block" />
+                        <br className="hidden xl:block" />
                         y próximas en un solo lugar.
                     </p>
                 </div>
