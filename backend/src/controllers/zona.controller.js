@@ -1,4 +1,4 @@
-const { Zona, Reserva, ParkingSpot } = require('../models');
+const { Zona, Reserva, ParkingSpot, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
 // GET /api/zones — public, list only active zones, ordered by highest availability first
@@ -58,18 +58,22 @@ function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRat
 
 // POST /api/zones — admin only
 async function createZona(req, res, next) {
+  const error = validarZona(req.body);
+  if (error) {
+    return res.status(error.status).json({ code: error.code, message: error.message });
+  }
+
+  const name = req.body.name.trim();
+  const address = req.body.address.trim();
+  const { latitude, longitude, totalSlots, hourlyRate } = req.body;
+
+  // The zone and its spots are created together: if the spots fail, the zone
+  // must not stay behind without them
+  const t = await sequelize.transaction();
   try {
-    const error = validarZona(req.body);
-    if (error) {
-      return res.status(error.status).json({ code: error.code, message: error.message });
-    }
-
-    const name = req.body.name.trim();
-    const address = req.body.address.trim();
-    const { latitude, longitude, totalSlots, hourlyRate } = req.body;
-
-    const existente = await Zona.findOne({ where: { name } });
+    const existente = await Zona.findOne({ where: { name }, transaction: t });
     if (existente) {
+      await t.rollback();
       return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
     }
 
@@ -81,18 +85,20 @@ async function createZona(req, res, next) {
       totalSlots,
       availableSlots: totalSlots,
       hourlyRate,
-    });
+    }, { transaction: t });
 
     const spots = Array.from({ length: totalSlots }, (_, i) => ({
       zoneId: zona.id,
       spotNumber: i + 1,
       status: 'Available',
     }));
-    await ParkingSpot.bulkCreate(spots);
+    await ParkingSpot.bulkCreate(spots, { transaction: t });
 
+    await t.commit();
     return res.status(201).json({ message: 'Zone created successfully', zone: zona });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    await t.rollback();
+    next(err);
   }
 }
 
