@@ -82,8 +82,9 @@ export default function AdminZones() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
 
-    // AC-03: search by name or address
+    // AC-03: search by name or address and filter by status
     const [search, setSearch] = useState('');
+    const [status, setStatus] = useState('');
 
     const fetchZones = useCallback(() => {
         getAllZones()
@@ -108,15 +109,21 @@ export default function AdminZones() {
 
     const filteredZones = useMemo(() => {
         const term = search.trim().toLowerCase();
-        if (!term) return zones;
-        return zones.filter(
-            (zone) => zone.name.toLowerCase().includes(term) || (zone.address ?? '').toLowerCase().includes(term),
-        );
-    }, [zones, search]);
+        return zones.filter((zone) => {
+            if (status === 'active' && !zone.isActive) return false;
+            if (status === 'inactive' && zone.isActive) return false;
+            if (!term) return true;
+            return zone.name.toLowerCase().includes(term) || (zone.address ?? '').toLowerCase().includes(term);
+        });
+    }, [zones, search, status]);
 
 
     const handleSearchChange = (value) => {
         setSearch(value);
+    };
+
+    const handleStatusChange = (value) => {
+        setStatus(value);
     };
 
     return (
@@ -136,7 +143,7 @@ export default function AdminZones() {
                 </Link>
             </div>
 
-            {/* AC-03: search */}
+            {/* AC-03: search and status filter */}
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="relative w-full sm:max-w-md">
                     <Search
@@ -162,6 +169,16 @@ export default function AdminZones() {
                         </button>
                     )}
                 </div>
+                <select
+                    value={status}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    aria-label="Filtrar por estado"
+                    className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2.5 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 sm:w-56"
+                >
+                    <option value="">Todos los estados</option>
+                    <option value="active">Activas</option>
+                    <option value="inactive">Inactivas</option>
+                </select>
             </div>
 
             <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
@@ -193,7 +210,7 @@ export default function AdminZones() {
                     <p className="p-6 text-body text-neutral-600">
                         {zones.length === 0
                             ? 'Aún no hay zonas registradas. Usa "Crear zona" para agregar la primera.'
-                            : 'No se encontraron zonas con esa búsqueda.'}
+                            : 'No se encontraron zonas con esa búsqueda o estado.'}
                     </p>
                 )}
 
