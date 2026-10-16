@@ -23,6 +23,10 @@ import heroVisitorIllustration from '../assets/hero-visitor.png';
 import heroUserIllustration from '../assets/hero-user.png';
 import heroAdminIllustration from '../assets/hero-admin.png';
 
+// height and right accept a number (px) or any CSS length, e.g. clamp(), so an
+// illustration can shrink with the viewport instead of covering the headline.
+const toCssLength = (value) => (typeof value === 'number' ? `${value}px` : value);
+
 function HeroIllustration({ src, height = 132, right = 32, top }) {
     if (!src) return null;
     return (
@@ -32,8 +36,8 @@ function HeroIllustration({ src, height = 132, right = 32, top }) {
             aria-hidden="true"
             style={
                 top !== undefined
-                    ? { height: `${height}px`, right: `${right}px`, top: `${top}px` }
-                    : { height: `${height}px`, right: `${right}px`, top: '50%', transform: 'translateY(-50%)' }
+                    ? { height: toCssLength(height), right: toCssLength(right), top: `${top}px` }
+                    : { height: toCssLength(height), right: toCssLength(right), top: '50%', transform: 'translateY(-50%)' }
             }
             className="hidden absolute w-auto lg:block"
         />
@@ -92,9 +96,9 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
 function VisitorHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="text-hero font-display uppercase text-parkea-700">
+                    <h1 className="text-hero-sm font-display uppercase text-parkea-700 sm:text-hero lg:text-hero-sm xl:text-hero">
                         Reserva tu parqueo
                         <br />
                         fácil, rápido y seguro
@@ -104,13 +108,19 @@ function VisitorHome() {
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-6 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12"
                     >
                         <MapPin className="h-6 w-6" aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
-                <HeroIllustration src={heroVisitorIllustration} height={520} right={110} />
+                {/* HU-02 AC-08: the illustration scales with the screen so it never
+                    covers the headline on laptop widths (1024 to 1366 px). */}
+                <HeroIllustration
+                    src={heroVisitorIllustration}
+                    height="clamp(280px, 27vw, 520px)"
+                    right="clamp(32px, 6vw, 110px)"
+                />
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -120,8 +130,8 @@ function VisitorHome() {
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Reservas</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
-                        Reserva tu cupo de parqueo con
-                        <br className="hidden md:block" />
+                        Reserva tu cupo de parqueo con{' '}
+                        <br className="hidden xl:block" />
                         anticipación y asegura tu espacio.
                     </p>
                 </div>
@@ -131,8 +141,8 @@ function VisitorHome() {
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Zonas</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
-                        Explora zonas de parqueo cercanas,
-                        <br className="hidden md:block" />
+                        Explora zonas de parqueo cercanas,{' '}
+                        <br className="hidden xl:block" />
                         con información clara y actualizada.
                     </p>
                 </div>
@@ -142,8 +152,8 @@ function VisitorHome() {
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Historial</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
-                        Consulta tus reservas pasadas
-                        <br className="hidden md:block" />
+                        Consulta tus reservas pasadas{' '}
+                        <br className="hidden xl:block" />
                         y próximas en un solo lugar.
                     </p>
                 </div>
@@ -365,30 +375,38 @@ function AuthenticatedHome({ user }) {
 function AdminHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
-                <div className="flex items-start gap-5">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
+                {/* HU-04 AC-08: on phones the shield goes above the headline so the
+                    text and the button get the full width of the card. */}
+                <div className="flex flex-col items-start gap-4 sm:flex-row sm:gap-5">
                     <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-800 text-white">
                         <ShieldCheck className="h-8 w-8" aria-hidden="true" />
                     </span>
-                    <div className="max-w-xl">
-                        <h1 className="text-hero-sm font-display uppercase text-neutral-900">
+                    <div className="min-w-0 max-w-xl">
+                        <h1 className="text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
                             Bienvenido, Administrador
                         </h1>
                         <p className="mt-2 text-subtitle-sm text-neutral-900">
-                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,
-                            <br className="hidden md:block" />
+                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,{' '}
+                            <br className="hidden xl:block" />
                             usuarios y consultar el rendimiento del servicio.
                         </p>
                         <Link
                             to="/admin/panel"
-                            className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
+                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-6 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12"
                         >
                             <LayoutGrid className="h-6 w-6" aria-hidden="true" />
                             Ir al panel de administración
                         </Link>
                     </div>
                 </div>
-                <HeroIllustration src={heroAdminIllustration} height={250} right={250} />
+                {/* HU-04 AC-08: the illustration scales with the screen so it never
+                    covers the headline on laptop widths (1024 to 1366 px). */}
+                <HeroIllustration
+                    src={heroAdminIllustration}
+                    height="clamp(150px, 16vw, 250px)"
+                    right="clamp(24px, 30vw - 300px, 250px)"
+                />
             </section>
 
             <section className="mt-8">
@@ -404,8 +422,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Panel de control</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Consulta estadísticas generales, reservas, ocupación de
-                            <br className="hidden md:block" />
+                            Consulta estadísticas generales, reservas, ocupación de{' '}
+                            <br className="hidden 2xl:block" />
                             zonas y actividad del sistema en tiempo real.
                         </p>
                         <Link
@@ -423,8 +441,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de zonas</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Crea, edita y administra las zonas de parqueo, tarifas,
-                            <br className="hidden md:block" />
+                            Crea, edita y administra las zonas de parqueo, tarifas,{' '}
+                            <br className="hidden 2xl:block" />
                             cupos disponibles y horarios de operación.
                         </p>
                         <Link
@@ -442,8 +460,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de usuarios</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Administra los usuarios del sistema, asigna roles y
-                            <br className="hidden md:block" />
+                            Administra los usuarios del sistema, asigna roles y{' '}
+                            <br className="hidden 2xl:block" />
                             consulta la información de las cuentas registradas.
                         </p>
                         <Link
