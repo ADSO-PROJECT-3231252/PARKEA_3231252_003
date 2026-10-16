@@ -144,7 +144,7 @@ PARKEA_3231252_003/
 │   │   ├── App.jsx           # Router + AuthProvider
 │   │   ├── index.css         # Tailwind CSS + PARKEA theme (design tokens via @theme)
 │   │   ├── 📁 assets/        # Images, logos, illustrations
-│   │   ├── 📁 components/    # Shared UI (Header, Layout, ConfirmDialog, FieldRow, MetricCard, LogDetailsModal)
+│   │   ├── 📁 components/    # Shared UI (Header, Layout, ConfirmDialog, FieldRow, MetricCard, LogDetailsModal, ZoneMap)
 │   │   ├── 📁 context/       # Global state (AuthContext)
 │   │   ├── 📁 hooks/         # Custom React hooks (useAuth)
 │   │   ├── 📁 pages/         # Route-based views
