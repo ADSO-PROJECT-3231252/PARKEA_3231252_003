@@ -229,7 +229,7 @@ npx sequelize-cli db:seed:all
 npm run dev
 
 # Server running at: http://localhost:3000
-# Health check:      http://localhost:3000/api/health → {"status":"ok"}
+# Health check:      http://localhost:3000/api/health → {"status":"ok","service":"PARKEA API"}
 ```
 
 > If the server stops with `ECONNREFUSED`, the MySQL service is not running.
