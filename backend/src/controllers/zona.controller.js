@@ -23,23 +23,50 @@ function coordenadasValidas(lat, lng) {
   );
 }
 
+// Upper limit so a typo (e.g. 50000 instead of 50) can't create thousands of
+// parking spots in a single request
+const MAX_TOTAL_SLOTS = 500;
+// DECIMAL(10, 2) in the database
+const MAX_HOURLY_RATE = 99999999.99;
+
+const textoVacio = (valor) => typeof valor !== 'string' || valor.trim() === '';
+
+// Same rules for create (HU-20) and edit (HU-21, AC-02). Returns the error to
+// send, or null when the body is valid.
+function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRate }) {
+  if (textoVacio(name) || textoVacio(address) || latitude == null || longitude == null
+    || totalSlots == null || hourlyRate == null) {
+    return { status: 400, code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, address, latitude, longitude, totalSlots, and hourlyRate are required' };
+  }
+  if (name.trim().length > 100 || address.trim().length > 255) {
+    return { status: 400, code: ErrorCodes.VALIDATION_ERROR, message: 'name must be at most 100 characters and address at most 255' };
+  }
+  if (!Number.isInteger(totalSlots) || totalSlots <= 0 || totalSlots > MAX_TOTAL_SLOTS) {
+    return { status: 400, code: ErrorCodes.INVALID_CAPACITY, message: `totalSlots must be a whole number between 1 and ${MAX_TOTAL_SLOTS}` };
+  }
+  if (typeof hourlyRate !== 'number' || !Number.isFinite(hourlyRate) || hourlyRate > MAX_HOURLY_RATE) {
+    return { status: 400, code: ErrorCodes.VALIDATION_ERROR, message: `hourlyRate must be a number up to ${MAX_HOURLY_RATE}` };
+  }
+  if (hourlyRate < 0) {
+    return { status: 400, code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' };
+  }
+  if (!coordenadasValidas(latitude, longitude)) {
+    return { status: 400, code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' };
+  }
+  return null;
+}
+
 // POST /api/zones — admin only
 async function createZona(req, res, next) {
   try {
-    const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
+    const error = validarZona(req.body);
+    if (error) {
+      return res.status(error.status).json({ code: error.code, message: error.message });
+    }
 
-    if (!name || totalSlots == null || hourlyRate == null || latitude == null || longitude == null) {
-      return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, latitude, longitude, totalSlots, and hourlyRate are required' });
-    }
-    if (!Number.isInteger(totalSlots) || totalSlots <= 0) {
-      return res.status(400).json({ code: ErrorCodes.INVALID_CAPACITY, message: 'totalSlots must be a whole number greater than zero' });
-    }
-    if (hourlyRate < 0) {
-      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' });
-    }
-    if (!coordenadasValidas(latitude, longitude)) {
-      return res.status(400).json({ code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' });
-    }
+    const name = req.body.name.trim();
+    const address = req.body.address.trim();
+    const { latitude, longitude, totalSlots, hourlyRate } = req.body;
 
     const existente = await Zona.findOne({ where: { name } });
     if (existente) {
@@ -78,17 +105,15 @@ async function updateZona(req, res, next) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
 
-    const { name, address, latitude, longitude, totalSlots, hourlyRate } = req.body;
+    // HU-21 AC-02: the same rules as creating a zone
+    const error = validarZona(req.body);
+    if (error) {
+      return res.status(error.status).json({ code: error.code, message: error.message });
+    }
 
-    if (totalSlots != null && (!Number.isInteger(totalSlots) || totalSlots <= 0)) {
-      return res.status(400).json({ code: ErrorCodes.INVALID_CAPACITY, message: 'totalSlots must be a whole number greater than zero' });
-    }
-    if (hourlyRate != null && hourlyRate < 0) {
-      return res.status(400).json({ code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' });
-    }
-    if ((latitude != null || longitude != null) && !coordenadasValidas(latitude, longitude)) {
-      return res.status(400).json({ code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' });
-    }
+    const name = req.body.name.trim();
+    const address = req.body.address.trim();
+    const { latitude, longitude, totalSlots, hourlyRate } = req.body;
 
     const updates = { name, address, latitude, longitude, hourlyRate };
 
