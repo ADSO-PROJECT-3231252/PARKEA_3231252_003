@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import ZoneMap from '../components/ZoneMap';
 
 // AC-11: the list must be paginated when there are more than 9 zones.
 const PAGE_SIZE = 9;
@@ -78,6 +79,11 @@ export default function Zones() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
 
+    // HU-25: list and map share this screen, so the search is kept when the
+    // user switches views (AC-01). The view lives in the URL (?view=map).
+    const [searchParams] = useSearchParams();
+    const view = searchParams.get('view') === 'map' ? 'map' : 'list';
+
     const fetchZones = useCallback(() => {
         getZones()
             .then(({ data }) => {
@@ -141,23 +147,32 @@ export default function Zones() {
                 <div>
                     <h1 className="text-title font-display uppercase text-neutral-900">Zonas de parqueo</h1>
                     <p className="mt-1 text-body text-neutral-600">
-                        Selecciona una zona para ver disponibilidad y realizar tu reserva.
+                        {view === 'map'
+                            ? 'Explora las zonas disponibles en el mapa.'
+                            : 'Selecciona una zona para ver disponibilidad y realizar tu reserva.'}
                     </p>
                 </div>
 
-                {/* View toggle — this screen is the "Lista" side; "Mapa" is HU-25 (still ComingSoon) */}
+                {/* View toggle (HU-25 AC-01) */}
                 <div className="flex overflow-hidden rounded-md border border-neutral-200" role="group" aria-label="Cambiar entre lista y mapa">
                     <Link
-                        to="/zones/map"
-                        className="flex items-center gap-1.5 bg-white px-3 py-1.5 text-label text-neutral-700 transition-colors hover:bg-neutral-50"
+                        to={{ search: '?view=map' }}
+                        aria-current={view === 'map' ? 'page' : undefined}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-label transition-colors ${view === 'map'
+                            ? 'bg-parkea-600 text-white'
+                            : 'bg-white text-neutral-700 hover:bg-neutral-50'
+                            }`}
                     >
                         <Map className="h-4 w-4" aria-hidden="true" />
                         Mapa
                     </Link>
                     <Link
-                        to="/zones"
-                        aria-current="page"
-                        className="flex items-center gap-1.5 bg-parkea-600 px-3 py-1.5 text-label text-white"
+                        to={{ search: '' }}
+                        aria-current={view === 'list' ? 'page' : undefined}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-label transition-colors ${view === 'list'
+                            ? 'bg-parkea-600 text-white'
+                            : 'bg-white text-neutral-700 hover:bg-neutral-50'
+                            }`}
                     >
                         <List className="h-4 w-4" aria-hidden="true" />
                         Lista
@@ -234,7 +249,20 @@ export default function Zones() {
                     </div>
                 )}
 
-                {!loading && !error && paginatedZones.length > 0 && (
+                {!loading && !error && filteredZones.length > 0 && view === 'map' && (
+                    <>
+                        <ZoneMap
+                            zones={filteredZones}
+                            onReserve={handleReserve}
+                        />
+                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
+                            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            La disponibilidad se actualiza cada vez que recargas la página o buscas.
+                        </p>
+                    </>
+                )}
+
+                {!loading && !error && paginatedZones.length > 0 && view === 'list' && (
                     <>
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                             {paginatedZones.map((zone) => (
