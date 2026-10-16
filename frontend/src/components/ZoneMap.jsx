@@ -264,43 +264,47 @@ export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
             )}
 
             {/* isolate: Leaflet's panes use z-index up to 1000; this keeps them
-                below the sticky header and the dialogs. */}
-            <div className="relative isolate h-[65vh] min-h-[380px] overflow-hidden rounded-lg border border-neutral-200">
-                <MapContainer
-                    ref={setMap}
-                    center={DEFAULT_CENTER}
-                    zoom={DEFAULT_ZOOM}
-                    zoomControl={false}
-                    className="zone-map h-full w-full"
-                >
-                    <TileLayer
-                        url={TILE_URL}
-                        attribution={TILE_ATTRIBUTION}
-                        maxZoom={19}
-                        eventHandlers={tileHandlers}
-                    />
-                    <ZoomControl position="bottomleft" zoomInTitle="Acercar" zoomOutTitle="Alejar" />
-                    {placed.map(({ zone, position }) => (
-                        <ZoneMarker key={zone.id} zone={zone} position={position} onReserve={onReserve} />
-                    ))}
-                </MapContainer>
-
-                {placed.length > 0 && (
-                    <button
-                        type="button"
-                        onClick={() => fitAll()}
-                        aria-label="Ver todas las zonas"
-                        title="Ver todas las zonas"
-                        className="absolute bottom-3 left-[10px] z-[1000] flex h-[34px] w-[34px] items-center justify-center rounded-md border-2 border-black/20 bg-white bg-clip-padding text-neutral-900 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
+                and the legend below the sticky header and the dialogs. */}
+            <div className="relative isolate">
+                <div className="relative h-[65vh] min-h-[380px] overflow-hidden rounded-lg border border-neutral-200">
+                    <MapContainer
+                        ref={setMap}
+                        center={DEFAULT_CENTER}
+                        zoom={DEFAULT_ZOOM}
+                        zoomControl={false}
+                        className="zone-map h-full w-full"
                     >
-                        <LocateFixed className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                )}
+                        <TileLayer
+                            url={TILE_URL}
+                            attribution={TILE_ATTRIBUTION}
+                            maxZoom={19}
+                            eventHandlers={tileHandlers}
+                        />
+                        <ZoomControl position="bottomleft" zoomInTitle="Acercar" zoomOutTitle="Alejar" />
+                        {placed.map(({ zone, position }) => (
+                            <ZoneMarker key={zone.id} zone={zone} position={position} onReserve={onReserve} />
+                        ))}
+                    </MapContainer>
 
-                {/* Legend: states are named in text, not by color alone */}
-                <div className="absolute right-2 top-2 z-[1000] rounded-md border border-neutral-200 bg-white/95 px-3 py-2 shadow-sm sm:bottom-6 sm:top-auto">
+                    {placed.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => fitAll()}
+                            aria-label="Ver todas las zonas"
+                            title="Ver todas las zonas"
+                            className="absolute bottom-3 left-[10px] z-[1000] flex h-[34px] w-[34px] items-center justify-center rounded-md border-2 border-black/20 bg-white bg-clip-padding text-neutral-900 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
+                        >
+                            <LocateFixed className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                    )}
+                </div>
+
+                {/* Legend: states are named in text, not by color alone. Below 768px
+                    it goes under the map: over the map the zone card can't fit
+                    on a phone without the legend covering it. */}
+                <div className="mt-2 rounded-md border border-neutral-200 bg-white px-3 py-2 md:absolute md:bottom-6 md:right-2 md:z-[1000] md:mt-0 md:bg-white/95 md:shadow-sm">
                     <p className="text-caption font-medium text-neutral-900">Convenciones</p>
-                    <ul className="mt-1 space-y-1 text-caption text-neutral-700">
+                    <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-caption text-neutral-700 md:block md:space-y-1">
                         <li className="flex items-center gap-2">
                             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-parkea-600" aria-hidden="true">
                                 <SquareParking className="h-2.5 w-2.5 text-white" aria-hidden="true" />
