@@ -23,6 +23,10 @@ import heroVisitorIllustration from '../assets/hero-visitor.png';
 import heroUserIllustration from '../assets/hero-user.png';
 import heroAdminIllustration from '../assets/hero-admin.png';
 
+// height and right accept a number (px) or any CSS length, e.g. clamp(), so an
+// illustration can shrink with the viewport instead of covering the headline.
+const toCssLength = (value) => (typeof value === 'number' ? `${value}px` : value);
+
 function HeroIllustration({ src, height = 132, right = 32, top }) {
     if (!src) return null;
     return (
@@ -32,8 +36,8 @@ function HeroIllustration({ src, height = 132, right = 32, top }) {
             aria-hidden="true"
             style={
                 top !== undefined
-                    ? { height: `${height}px`, right: `${right}px`, top: `${top}px` }
-                    : { height: `${height}px`, right: `${right}px`, top: '50%', transform: 'translateY(-50%)' }
+                    ? { height: toCssLength(height), right: toCssLength(right), top: `${top}px` }
+                    : { height: toCssLength(height), right: toCssLength(right), top: '50%', transform: 'translateY(-50%)' }
             }
             className="hidden absolute w-auto lg:block"
         />
@@ -92,9 +96,9 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
 function VisitorHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="text-hero font-display uppercase text-parkea-700">
+                    <h1 className="text-hero-sm font-display uppercase text-parkea-700 sm:text-hero lg:text-hero-sm xl:text-hero">
                         Reserva tu parqueo
                         <br />
                         fácil, rápido y seguro
@@ -104,13 +108,19 @@ function VisitorHome() {
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-6 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12"
                     >
                         <MapPin className="h-6 w-6" aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
-                <HeroIllustration src={heroVisitorIllustration} height={520} right={110} />
+                {/* HU-02 AC-08: the illustration scales with the screen so it never
+                    covers the headline on laptop widths (1024 to 1366 px). */}
+                <HeroIllustration
+                    src={heroVisitorIllustration}
+                    height="clamp(280px, 27vw, 520px)"
+                    right="clamp(32px, 6vw, 110px)"
+                />
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -120,8 +130,8 @@ function VisitorHome() {
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Reservas</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
-                        Reserva tu cupo de parqueo con
-                        <br className="hidden md:block" />
+                        Reserva tu cupo de parqueo con{' '}
+                        <br className="hidden xl:block" />
                         anticipación y asegura tu espacio.
                     </p>
                 </div>
@@ -131,8 +141,8 @@ function VisitorHome() {
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Zonas</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
-                        Explora zonas de parqueo cercanas,
-                        <br className="hidden md:block" />
+                        Explora zonas de parqueo cercanas,{' '}
+                        <br className="hidden xl:block" />
                         con información clara y actualizada.
                     </p>
                 </div>
@@ -142,8 +152,8 @@ function VisitorHome() {
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Historial</h2>
                     <p className="mt-2 text-subtitle text-neutral-900">
-                        Consulta tus reservas pasadas
-                        <br className="hidden md:block" />
+                        Consulta tus reservas pasadas{' '}
+                        <br className="hidden xl:block" />
                         y próximas en un solo lugar.
                     </p>
                 </div>
