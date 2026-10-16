@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { getInitials } from '../utils/format';
 import logo from '../assets/logo.png';
+import logoMark from '../assets/logo-mark.png';
 
 const NAV_ITEMS_USER = [
     { to: '/', label: 'Inicio', icon: Home, end: true },
@@ -106,13 +107,22 @@ export default function Header() {
 
     return (
         <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white">
-            <div className="mx-auto flex h-16 w-[92%] max-w-[1800px] items-center gap-4 px-4 sm:px-6">
+            <div className="mx-auto flex h-16 w-[92%] max-w-[1800px] items-center gap-3 px-4 sm:gap-4 sm:px-6">
                 <NavLink
                     to={homeLink}
                     className={`flex shrink-0 items-center rounded-md ${FOCUS_RING}`}
                     aria-label="Ir al inicio"
                 >
-                    <img src={logo} alt="PARKEA" className="h-15 w-auto" />
+                    {user ? (
+                        <img src={logo} alt="PARKEA" className="h-10 w-auto sm:h-15" />
+                    ) : (
+                        <>
+                            {/* HU-02 AC-08: below 400px the full logo leaves no room for
+                                the two visitor actions, so only the mark is shown there. */}
+                            <img src={logoMark} alt="PARKEA" className="h-10 w-10 min-[400px]:hidden" />
+                            <img src={logo} alt="PARKEA" className="hidden h-10 w-auto min-[400px]:block sm:h-15" />
+                        </>
+                    )}
                 </NavLink>
 
                 <div className="hidden h-8 w-px bg-neutral-200 sm:block" aria-hidden="true" />
@@ -133,21 +143,21 @@ export default function Header() {
 
                 {!user && <div className="flex-1" />}
 
-                <div className="ml-auto flex items-center gap-3">
+                <div className="ml-auto flex items-center gap-2 sm:gap-3">
                     {!user && (
                         <>
                             <NavLink
                                 to="/login"
-                                className={`flex items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 ${FOCUS_RING}`}
+                                className={`flex items-center gap-1.5 whitespace-nowrap rounded-md border border-neutral-200 px-2.5 py-1.5 text-label text-neutral-900 sm:px-3 transition-colors hover:border-parkea-600 hover:text-parkea-600 ${FOCUS_RING}`}
                             >
-                                <LogIn className="h-4 w-4" aria-hidden="true" />
+                                <LogIn className="hidden h-4 w-4 sm:block" aria-hidden="true" />
                                 Iniciar sesión
                             </NavLink>
                             <NavLink
                                 to="/register"
-                                className={`flex items-center gap-1.5 rounded-md bg-parkea-600 px-3 py-1.5 text-label text-white transition-colors hover:bg-parkea-700 ${FOCUS_RING}`}
+                                className={`flex items-center gap-1.5 whitespace-nowrap rounded-md bg-parkea-600 px-2.5 py-1.5 text-label text-white sm:px-3 transition-colors hover:bg-parkea-700 ${FOCUS_RING}`}
                             >
-                                <UserPlus className="h-4 w-4" aria-hidden="true" />
+                                <UserPlus className="hidden h-4 w-4 sm:block" aria-hidden="true" />
                                 Crear cuenta
                             </NavLink>
                         </>
@@ -156,7 +166,7 @@ export default function Header() {
                     {user && (
                         <>
                             {isAdmin && (
-                                <span className="hidden rounded-full border border-parkea-600 bg-parkea-50 px-3 py-1 text-label text-parkea-600 sm:inline-block">
+                                <span className="hidden rounded-full border border-parkea-600 bg-parkea-50 px-3 py-1 text-label text-parkea-600 lg:inline-block">
                                     Administrador
                                 </span>
                             )}
