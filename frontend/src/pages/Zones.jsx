@@ -81,7 +81,7 @@ export default function Zones() {
 
     // HU-25: list and map share this screen, so the search is kept when the
     // user switches views (AC-01). The view lives in the URL (?view=map).
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const view = searchParams.get('view') === 'map' ? 'map' : 'list';
 
     const fetchZones = useCallback(() => {
@@ -131,6 +131,8 @@ export default function Zones() {
         setSearch('');
         setPage(1);
     };
+
+    const showList = () => setSearchParams({});
 
     const handleReserve = (zone) => {
         if (zone.availableSlots === 0) return;
@@ -254,6 +256,7 @@ export default function Zones() {
                         <ZoneMap
                             zones={filteredZones}
                             onReserve={handleReserve}
+                            onShowList={showList}
                         />
                         <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
                             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'rea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './ZoneMap.css';
-import { SquareParking, Ban, MapPin, Users, Banknote, X } from 'lucide-react';
+import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 
@@ -191,13 +191,14 @@ function ZoneMarker({ zone, position, onReserve }) {
     );
 }
 
-export default function ZoneMap({ zones, onReserve }) {
+export default function ZoneMap({ zones, onReserve, onShowList }) {
     const [map, setMap] = useState(null);
 
     const placed = useMemo(
         () => zones.map((zone) => ({ zone, position: getPosition(zone) })).filter((z) => z.position),
         [zones],
     );
+    const missing = zones.length - placed.length;
     // Serialized so the view is only re-fitted when the pins actually change,
     // not on every background refresh of the same zones.
     const positionsKey = JSON.stringify(placed.map((p) => p.position));
@@ -219,6 +220,18 @@ export default function ZoneMap({ zones, onReserve }) {
 
     return (
         <div>
+            {missing > 0 && (
+                <p className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-info-soft px-3 py-2 text-caption text-info">
+                    <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {missing === 1
+                        ? '1 zona no tiene ubicación registrada.'
+                        : `${missing} zonas no tienen ubicación registrada.`}
+                    <button type="button" onClick={onShowList} className="font-medium underline underline-offset-2">
+                        Verlas en la lista
+                    </button>
+                </p>
+            )}
+
             {/* isolate: Leaflet's panes use z-index up to 1000; this keeps them
                 below the sticky header and the dialogs. */}
             <div className="relative isolate h-[65vh] min-h-[380px] overflow-hidden rounded-lg border border-neutral-200">
@@ -240,6 +253,42 @@ export default function ZoneMap({ zones, onReserve }) {
                     ))}
                 </MapContainer>
 
+                {placed.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={fitAll}
+                        aria-label="Ver todas las zonas"
+                        title="Ver todas las zonas"
+                        className="absolute bottom-3 left-[10px] z-[1000] flex h-[34px] w-[34px] items-center justify-center rounded-md border-2 border-black/20 bg-white bg-clip-padding text-neutral-900 hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
+                    >
+                        <LocateFixed className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                )}
+
+                {/* Legend: states are named in text, not by color alone */}
+                <div className="absolute bottom-6 right-2 z-[1000] rounded-md border border-neutral-200 bg-white/95 px-3 py-2 shadow-sm">
+                    <p className="text-caption font-medium text-neutral-900">Convenciones</p>
+                    <ul className="mt-1 space-y-1 text-caption text-neutral-700">
+                        <li className="flex items-center gap-2">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-parkea-600" aria-hidden="true">
+                                <SquareParking className="h-2.5 w-2.5 text-white" aria-hidden="true" />
+                            </span>
+                            Disponible
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-warning" aria-hidden="true">
+                                <SquareParking className="h-2.5 w-2.5 text-white" aria-hidden="true" />
+                            </span>
+                            Casi llena
+                        </li>
+                        <li className="flex items-center gap-2">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-danger" aria-hidden="true">
+                                <Ban className="h-2.5 w-2.5 text-white" aria-hidden="true" />
+                            </span>
+                            Llena (sin cupos)
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
     );
