@@ -298,7 +298,7 @@ export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
                 )}
 
                 {/* Legend: states are named in text, not by color alone */}
-                <div className="absolute bottom-6 right-2 z-[1000] rounded-md border border-neutral-200 bg-white/95 px-3 py-2 shadow-sm">
+                <div className="absolute right-2 top-2 z-[1000] rounded-md border border-neutral-200 bg-white/95 px-3 py-2 shadow-sm sm:bottom-6 sm:top-auto">
                     <p className="text-caption font-medium text-neutral-900">Convenciones</p>
                     <ul className="mt-1 space-y-1 text-caption text-neutral-700">
                         <li className="flex items-center gap-2">
