@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Plus,
+    SquareParking,
+    Pencil,
     AlertCircle,
     RefreshCw,
 } from 'lucide-react';
@@ -40,6 +42,36 @@ function Availability({ zone }) {
                 ({percentOf(zone.availableSlots, zone.totalSlots)}%)
             </span>
         </span>
+    );
+}
+
+// AC-05: edit opens the edit form (HU-21).
+function ZoneActions({ zone }) {
+    return (
+        <div className="flex items-center gap-3">
+            <Link
+                to={`/admin/zones/${zone.id}/edit`}
+                aria-label={`Editar ${zone.name}`}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50"
+            >
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                Editar
+            </Link>
+        </div>
+    );
+}
+
+function ZoneName({ zone }) {
+    return (
+        <div className="flex min-w-0 items-center gap-3">
+            <span
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${zone.isActive ? 'bg-parkea-50 text-parkea-600' : 'bg-danger-soft text-danger'}`}
+                aria-hidden="true"
+            >
+                <SquareParking className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 break-words text-body font-medium text-neutral-900">{zone.name}</span>
+        </div>
     );
 }
 
@@ -131,13 +163,14 @@ export default function AdminZones() {
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Cupos disponibles</th>
                                         <th scope="col" className="px-4 py-3 text-right font-medium">Tarifa por hora</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Estado</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {zones.map((zone) => (
                                         <tr key={zone.id} className="border-b border-neutral-100 last:border-0">
                                             <td className="px-4 py-3">
-                                                <span className="text-body font-medium text-neutral-900">{zone.name}</span>
+                                                <ZoneName zone={zone} />
                                             </td>
                                             <td className="max-w-[260px] px-4 py-3 text-body text-neutral-600">{zone.address}</td>
                                             <td className="px-4 py-3 text-center font-mono text-body tabular-nums text-neutral-900">
@@ -151,6 +184,9 @@ export default function AdminZones() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <StatusBadge isActive={zone.isActive} />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <ZoneActions zone={zone} />
                                             </td>
                                         </tr>
                                     ))}
