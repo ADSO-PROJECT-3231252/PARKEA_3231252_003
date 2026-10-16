@@ -5,10 +5,12 @@ import {
     ArrowLeft,
     Ban,
     Calendar,
+    Clock,
     CreditCard,
     Info,
     Landmark,
     RefreshCw,
+    TriangleAlert,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
 import { formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
@@ -82,6 +84,13 @@ function validateCard(card) {
     return errors;
 }
 
+function formatCountdown(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 // groupStart draws the line that separates the groups of the mockup.
 function SummaryItem({ label, children, groupStart = false }) {
     return (
@@ -92,6 +101,7 @@ function SummaryItem({ label, children, groupStart = false }) {
     );
 }
 
+// Below 360 px the icon is hidden so the full card number still fits.
 function CardField({ id, label, Icon, error, className = '', ...inputProps }) {
     return (
         <div className={className}>
@@ -107,13 +117,13 @@ function CardField({ id, label, Icon, error, className = '', ...inputProps }) {
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? `${id}-error` : undefined}
                     className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                        Icon ? 'pr-10' : ''
+                        Icon ? 'min-[360px]:pr-10' : ''
                     } ${error ? 'border-danger' : 'border-neutral-200'}`}
                     {...inputProps}
                 />
                 {Icon && (
                     <Icon
-                        className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-neutral-500"
+                        className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-neutral-500 max-[359px]:hidden"
                         aria-hidden="true"
                     />
                 )}
@@ -140,9 +150,14 @@ export default function PayReservation() {
     const [card, setCard] = useState(TEST_CARD);
     const [fieldErrors, setFieldErrors] = useState({});
 
+    // Current time for the countdown. Only updated from callbacks (the fetch
+    // and the 1-second interval), never directly inside an effect.
+    const [now, setNow] = useState(null);
+
     const fetchReservation = useCallback(() => {
         getReservation(id)
             .then(({ data }) => {
+                setNow(Date.now());
                 setReservation(data.reservation);
                 setLoadError(false);
                 setNotFound(false);
@@ -161,6 +176,15 @@ export default function PayReservation() {
     useEffect(() => {
         fetchReservation();
     }, [fetchReservation]);
+
+    // AC-08: only a Pending reservation has a hold running.
+    const holdExpiresAt = reservation?.status === 'Pending' ? reservation.holdExpiresAt : null;
+
+    useEffect(() => {
+        if (!holdExpiresAt) return;
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, [holdExpiresAt]);
 
     const handleRetry = () => {
         setLoading(true);
@@ -258,6 +282,8 @@ export default function PayReservation() {
     const { zone, vehicle, paymentSummary } = reservation;
     const total = paymentSummary.estimatedTotal;
     const pendingStatus = RESERVATION_STATUS.Pending;
+    const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
+    const isTimeUp = remainingMs !== null && remainingMs <= 0;
 
     // The payment itself is sent in a later step; for now the form is only checked.
     const handleSubmit = (e) => {
@@ -267,6 +293,23 @@ export default function PayReservation() {
 
     return (
         <div className={PAGE_SHELL}>
+            {/* AC-02: simulated environment notice, with the time left (AC-08) */}
+            <div className="mb-6 flex flex-col gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                    <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
+                    <div>
+                        <p className="text-label font-medium text-warning">Entorno de prueba</p>
+                        <p className="text-caption text-warning">Este es un entorno de prueba. Ningún pago real será procesado.</p>
+                    </div>
+                </div>
+                {remainingMs !== null && (
+                    <p className="flex shrink-0 items-center gap-1.5 text-caption font-medium text-warning" aria-hidden="true">
+                        <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {isTimeUp ? 'El tiempo para pagar terminó' : `Se libera en ${formatCountdown(remainingMs)} si no pagas`}
+                    </p>
+                )}
+            </div>
+
             <h1 className="text-title font-display uppercase text-neutral-900">Pago de reserva</h1>
             <p className="mt-1 text-body text-neutral-600">Completa el pago para confirmar tu reserva.</p>
 
@@ -429,6 +472,28 @@ export default function PayReservation() {
                                 </div>
                             </dl>
                         </section>
+
+                        {remainingMs !== null && (
+                            <div className="rounded-lg border border-warning/30 bg-warning-soft p-4">
+                                {/* AC-08: the timer stays silent; the text change is announced once */}
+                                <div aria-live="polite">
+                                    <p className="flex items-center gap-1.5 text-label font-medium text-warning">
+                                        <Clock className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        {isTimeUp ? 'El tiempo para pagar terminó' : 'Se libera si no pagas'}
+                                    </p>
+                                </div>
+                                {!isTimeUp && (
+                                    <p className="mt-1 text-caption text-warning">
+                                        Tiempo restante:{' '}
+                                        <span role="timer" className="font-mono text-label font-medium">
+                                            {formatCountdown(remainingMs)}
+                                        </span>
+                                    </p>
+                                )}
+                                <p className="mt-3 text-label font-medium text-warning">Entorno de prueba</p>
+                                <p className="text-caption text-warning">Este es un entorno de prueba. Ningún pago real será procesado.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -452,6 +517,11 @@ export default function PayReservation() {
                     </button>
                 </div>
             </form>
+
+            <p className="mt-8 flex items-center justify-center gap-1.5 border-t border-neutral-200 pt-4 text-center text-caption text-neutral-500">
+                <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                Este es un entorno de prueba. Ningún pago real será procesado.
+            </p>
         </div>
     );
 }
