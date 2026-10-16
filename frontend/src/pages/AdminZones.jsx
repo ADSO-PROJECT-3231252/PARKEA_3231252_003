@@ -1,12 +1,44 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import {
+    Plus,
+    AlertCircle,
+    RefreshCw,
+} from 'lucide-react';
+import { getAllZones } from '../services/zoneService';
 
 export default function AdminZones() {
+    const [zones, setZones] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+
+    const fetchZones = useCallback(() => {
+        getAllZones()
+            .then(({ data }) => {
+                setZones(data.zones);
+                setError(false);
+            })
+            .catch(() => setError(true))
+            .finally(() => setLoading(false));
+    }, []);
+
+    useEffect(() => {
+        fetchZones();
+    }, [fetchZones]);
+
+    // AC-12: retry after a failed load
+    const handleRetry = () => {
+        setLoading(true);
+        setError(false);
+        fetchZones();
+    };
+
+
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-title font-display uppercase text-neutral-900">GestiÃ³n de zonas</h1>
+                    <h1 className="text-title font-display uppercase text-neutral-900">Gestión de zonas</h1>
                     <p className="mt-1 text-body text-neutral-600">Administra las zonas de parqueo registradas en el sistema.</p>
                 </div>
                 {/* AC-04: opens the creation form (HU-20) */}
@@ -17,6 +49,68 @@ export default function AdminZones() {
                     <Plus className="h-4 w-4" aria-hidden="true" />
                     Crear zona
                 </Link>
+            </div>
+
+            <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
+                {loading && (
+                    <p role="status" aria-live="polite" className="p-6 text-body text-neutral-600">
+                        Cargando zonas…
+                    </p>
+                )}
+
+                {/* AC-12: clear error with a retry action */}
+                {!loading && error && (
+                    <div role="alert" className="flex flex-col items-start gap-3 p-6">
+                        <p className="flex items-center gap-2 text-body text-danger">
+                            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            No pudimos cargar las zonas. Intenta de nuevo.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleRetry}
+                            className="flex items-center gap-1.5 rounded-md border border-danger px-3 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft"
+                        >
+                            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                            Reintentar
+                        </button>
+                    </div>
+                )}
+
+                {!loading && !error && zones.length === 0 && (
+                    <p className="p-6 text-body text-neutral-600">
+                        Aún no hay zonas registradas. Usa "Crear zona" para agregar la primera.
+                    </p>
+                )}
+
+                {!loading && !error && zones.length > 0 && (
+                    <>
+                        {/* AC-01 / AC-02 */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-left">
+                                <thead>
+                                    <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900 xl:[&>th]:whitespace-nowrap">
+                                        <th scope="col" className="px-4 py-3 font-medium">Nombre de la zona</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Dirección</th>
+                                        <th scope="col" className="px-4 py-3 text-center font-medium">Capacidad total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {zones.map((zone) => (
+                                        <tr key={zone.id} className="border-b border-neutral-100 last:border-0">
+                                            <td className="px-4 py-3">
+                                                <span className="text-body font-medium text-neutral-900">{zone.name}</span>
+                                            </td>
+                                            <td className="max-w-[260px] px-4 py-3 text-body text-neutral-600">{zone.address}</td>
+                                            <td className="px-4 py-3 text-center font-mono text-body tabular-nums text-neutral-900">
+                                                {zone.totalSlots}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
