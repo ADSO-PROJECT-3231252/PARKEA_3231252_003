@@ -44,8 +44,6 @@ const OUTLINE_BUTTON_SM =
 const OUTLINE_ACTION =
     'flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1';
 
-
-
 export default function ReservationConfirmation() {
     const { id } = useParams();
     const location = useLocation();
