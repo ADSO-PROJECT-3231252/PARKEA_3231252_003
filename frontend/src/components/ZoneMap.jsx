@@ -19,6 +19,9 @@ const DEFAULT_CENTER = [4.83, -75.67];
 const DEFAULT_ZOOM = 13;
 const SINGLE_ZONE_ZOOM = 16;
 
+// AC-08: if this many tiles fail before any tile loads, the map is unusable.
+const MAX_TILE_ERRORS = 3;
+
 const PIN_CLASSES = {
     available: 'bg-parkea-600',
     almost: 'bg-warning',
@@ -191,7 +194,30 @@ function ZoneMarker({ zone, position, onReserve }) {
     );
 }
 
-export default function ZoneMap({ zones, onReserve, onShowList }) {
+// Reports the map as failed when tiles keep erroring and none has loaded.
+function useTileFailure(onLoadError) {
+    const loaded = useRef(false);
+    const errors = useRef(0);
+    const reported = useRef(false);
+
+    return useMemo(
+        () => ({
+            tileload: () => {
+                loaded.current = true;
+            },
+            tileerror: () => {
+                errors.current += 1;
+                if (!loaded.current && !reported.current && errors.current >= MAX_TILE_ERRORS) {
+                    reported.current = true;
+                    onLoadError?.();
+                }
+            },
+        }),
+        [onLoadError],
+    );
+}
+
+export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
     const [map, setMap] = useState(null);
 
     const placed = useMemo(
@@ -217,6 +243,8 @@ export default function ZoneMap({ zones, onReserve, onShowList }) {
     useEffect(() => {
         fitAll();
     }, [fitAll]);
+
+    const tileHandlers = useTileFailure(onLoadError);
 
     return (
         <div>
@@ -246,6 +274,7 @@ export default function ZoneMap({ zones, onReserve, onShowList }) {
                         url={TILE_URL}
                         attribution={TILE_ATTRIBUTION}
                         maxZoom={19}
+                        eventHandlers={tileHandlers}
                     />
                     <ZoomControl position="bottomleft" zoomInTitle="Acercar" zoomOutTitle="Alejar" />
                     {placed.map(({ zone, position }) => (

@@ -83,6 +83,7 @@ export default function Zones() {
     // user switches views (AC-01). The view lives in the URL (?view=map).
     const [searchParams, setSearchParams] = useSearchParams();
     const view = searchParams.get('view') === 'map' ? 'map' : 'list';
+    const [mapFailed, setMapFailed] = useState(false);
 
     const fetchZones = useCallback(() => {
         getZones()
@@ -132,6 +133,12 @@ export default function Zones() {
         setPage(1);
     };
 
+    // AC-08: if the map can't load, explain it and fall back to the list.
+    const handleMapError = useCallback(() => {
+        setMapFailed(true);
+        setSearchParams({}, { replace: true });
+    }, [setSearchParams]);
+
     const showList = () => setSearchParams({});
 
     const handleReserve = (zone) => {
@@ -159,6 +166,7 @@ export default function Zones() {
                 <div className="flex overflow-hidden rounded-md border border-neutral-200" role="group" aria-label="Cambiar entre lista y mapa">
                     <Link
                         to={{ search: '?view=map' }}
+                        onClick={() => setMapFailed(false)}
                         aria-current={view === 'map' ? 'page' : undefined}
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-label transition-colors ${view === 'map'
                             ? 'bg-parkea-600 text-white'
@@ -208,6 +216,13 @@ export default function Zones() {
             </div>
 
             <div className="mt-6">
+                {mapFailed && view === 'list' && (
+                    <p role="alert" className="mb-4 flex items-center gap-2 rounded-md bg-warning-soft px-3 py-2 text-body text-warning">
+                        <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        No pudimos cargar el mapa. Te mostramos la lista de zonas.
+                    </p>
+                )}
+
                 {loading && (
                     <p role="status" aria-live="polite" className="text-body text-neutral-600">
                         Cargando zonas…
@@ -256,6 +271,7 @@ export default function Zones() {
                         <ZoneMap
                             zones={filteredZones}
                             onReserve={handleReserve}
+                            onLoadError={handleMapError}
                             onShowList={showList}
                         />
                         <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
