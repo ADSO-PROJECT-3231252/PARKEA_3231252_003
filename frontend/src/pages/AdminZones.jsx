@@ -7,11 +7,17 @@ import {
     SquareParking,
     Pencil,
     AlertCircle,
+    ChevronLeft,
+    ChevronRight,
     RefreshCw,
 } from 'lucide-react';
 import { getAllZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { getPageWindow } from '../utils/adminUsersHelpers';
+
+// AC-11: the list is paginated when there are more than 10 zones.
+const PAGE_SIZE = 10;
 
 const AVAILABILITY_COLORS = {
     full: 'text-danger',
@@ -85,6 +91,7 @@ export default function AdminZones() {
     // AC-03: search by name or address and filter by status
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState('');
+    const [page, setPage] = useState(1);
 
     const fetchZones = useCallback(() => {
         getAllZones()
@@ -117,14 +124,26 @@ export default function AdminZones() {
         });
     }, [zones, search, status]);
 
+    const totalPages = Math.max(1, Math.ceil(filteredZones.length / PAGE_SIZE));
+    const currentPage = Math.min(page, totalPages);
+    const pageZones = filteredZones.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const rangeStart = filteredZones.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+    const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredZones.length);
+    const pageWindow = getPageWindow(currentPage, totalPages);
 
     const handleSearchChange = (value) => {
         setSearch(value);
+        setPage(1);
     };
 
     const handleStatusChange = (value) => {
         setStatus(value);
+        setPage(1);
     };
+
+    const pageButton =
+        'flex items-center gap-1 rounded-md border border-neutral-200 px-2.5 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
+        'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent';
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -231,7 +250,7 @@ export default function AdminZones() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredZones.map((zone) => (
+                                    {pageZones.map((zone) => (
                                         <tr key={zone.id} className="border-b border-neutral-100 last:border-0">
                                             <td className="px-4 py-3">
                                                 <ZoneName zone={zone} />
@@ -256,6 +275,51 @@ export default function AdminZones() {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+
+                        {/* AC-11: pagination */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
+                            <p className="text-caption text-neutral-600">
+                                Mostrando {rangeStart} a {rangeEnd} de {filteredZones.length} zonas
+                            </p>
+                            <nav aria-label="Paginación de zonas" className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className={pageButton}
+                                >
+                                    <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Anterior
+                                </button>
+                                {pageWindow.map((item) =>
+                                    typeof item === 'number' ? (
+                                        <button
+                                            key={item}
+                                            type="button"
+                                            onClick={() => setPage(item)}
+                                            aria-label={`Página ${item}`}
+                                            aria-current={item === currentPage ? 'page' : undefined}
+                                            className={`flex h-7 w-7 items-center justify-center rounded-md text-label transition-colors ${item === currentPage ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
+                                        >
+                                            {item}
+                                        </button>
+                                    ) : (
+                                        <span key={item} className="px-1 text-neutral-600" aria-hidden="true">
+                                            …
+                                        </span>
+                                    ),
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className={pageButton}
+                                >
+                                    Siguiente
+                                    <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                                </button>
+                            </nav>
                         </div>
                     </>
                 )}
