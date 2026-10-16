@@ -119,7 +119,7 @@ function ZoneSummary({ zone, availability, onReserve }) {
                 </p>
             )}
 
-            <div className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-200 pt-3">
+            <div className="mt-3 flex items-center justify-between gap-x-3 gap-y-2 border-t border-neutral-200 pt-3 max-[319px]:flex-wrap">
                 <span className="flex items-center gap-2 text-body text-neutral-900">
                     <Users className="h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
                     <span>
@@ -132,7 +132,7 @@ function ZoneSummary({ zone, availability, onReserve }) {
                 </span>
             </div>
 
-            <div className="mt-3 flex items-center justify-between gap-3 border-t border-neutral-200 pt-3">
+            <div className="mt-3 flex items-center justify-between gap-x-3 gap-y-2 border-t border-neutral-200 pt-3 max-[319px]:flex-wrap">
                 <span className="flex items-center gap-2 text-body text-neutral-900">
                     <Banknote className="h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
                     Tarifa por hora
