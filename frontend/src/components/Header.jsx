@@ -113,12 +113,13 @@ export default function Header() {
                     className={`flex shrink-0 items-center rounded-md ${FOCUS_RING}`}
                     aria-label="Ir al inicio"
                 >
-                    {user ? (
+                    {user && !isAdmin ? (
                         <img src={logo} alt="PARKEA" className="h-10 w-auto sm:h-15" />
                     ) : (
                         <>
-                            {/* HU-02 AC-08: below 400px the full logo leaves no room for
-                                the two visitor actions, so only the mark is shown there. */}
+                            {/* HU-02 and HU-04 AC-08: below 400px the full logo leaves no room
+                                for the visitor actions or the administrator badge, so only
+                                the mark is shown there. */}
                             <img src={logoMark} alt="PARKEA" className="h-10 w-10 min-[400px]:hidden" />
                             <img src={logo} alt="PARKEA" className="hidden h-10 w-auto min-[400px]:block sm:h-15" />
                         </>
@@ -165,8 +166,10 @@ export default function Header() {
 
                     {user && (
                         <>
+                            {/* HU-04 AC-03: the badge stays visible on every screen size,
+                                smaller on phones so it fits next to the user menu. */}
                             {isAdmin && (
-                                <span className="hidden rounded-full border border-parkea-600 bg-parkea-50 px-3 py-1 text-label text-parkea-600 sm:inline-block">
+                                <span className="inline-block whitespace-nowrap rounded-full border border-parkea-600 bg-parkea-50 px-2 py-0.5 text-caption text-parkea-600 sm:px-3 sm:py-1 sm:text-label">
                                     Administrador
                                 </span>
                             )}

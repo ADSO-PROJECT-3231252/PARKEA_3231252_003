@@ -375,30 +375,38 @@ function AuthenticatedHome({ user }) {
 function AdminHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
-                <div className="flex items-start gap-5">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
+                {/* HU-04 AC-08: on phones the shield goes above the headline so the
+                    text and the button get the full width of the card. */}
+                <div className="flex flex-col items-start gap-4 sm:flex-row sm:gap-5">
                     <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-800 text-white">
                         <ShieldCheck className="h-8 w-8" aria-hidden="true" />
                     </span>
-                    <div className="max-w-xl">
-                        <h1 className="text-hero-sm font-display uppercase text-neutral-900">
+                    <div className="min-w-0 max-w-xl">
+                        <h1 className="text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
                             Bienvenido, Administrador
                         </h1>
                         <p className="mt-2 text-subtitle-sm text-neutral-900">
-                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,
-                            <br className="hidden md:block" />
+                            Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,{' '}
+                            <br className="hidden xl:block" />
                             usuarios y consultar el rendimiento del servicio.
                         </p>
                         <Link
                             to="/admin/panel"
-                            className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
+                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-6 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12"
                         >
                             <LayoutGrid className="h-6 w-6" aria-hidden="true" />
                             Ir al panel de administración
                         </Link>
                     </div>
                 </div>
-                <HeroIllustration src={heroAdminIllustration} height={250} right={250} />
+                {/* HU-04 AC-08: the illustration scales with the screen so it never
+                    covers the headline on laptop widths (1024 to 1366 px). */}
+                <HeroIllustration
+                    src={heroAdminIllustration}
+                    height="clamp(150px, 16vw, 250px)"
+                    right="clamp(24px, 30vw - 300px, 250px)"
+                />
             </section>
 
             <section className="mt-8">
@@ -414,8 +422,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Panel de control</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Consulta estadísticas generales, reservas, ocupación de
-                            <br className="hidden md:block" />
+                            Consulta estadísticas generales, reservas, ocupación de{' '}
+                            <br className="hidden 2xl:block" />
                             zonas y actividad del sistema en tiempo real.
                         </p>
                         <Link
@@ -433,8 +441,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de zonas</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Crea, edita y administra las zonas de parqueo, tarifas,
-                            <br className="hidden md:block" />
+                            Crea, edita y administra las zonas de parqueo, tarifas,{' '}
+                            <br className="hidden 2xl:block" />
                             cupos disponibles y horarios de operación.
                         </p>
                         <Link
@@ -452,8 +460,8 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de usuarios</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Administra los usuarios del sistema, asigna roles y
-                            <br className="hidden md:block" />
+                            Administra los usuarios del sistema, asigna roles y{' '}
+                            <br className="hidden 2xl:block" />
                             consulta la información de las cuentas registradas.
                         </p>
                         <Link
