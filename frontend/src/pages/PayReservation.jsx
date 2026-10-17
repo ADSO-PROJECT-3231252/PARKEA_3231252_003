@@ -203,6 +203,7 @@ export default function PayReservation() {
     const [expiredByServer, setExpiredByServer] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'error' | 'success', text }
     const messageRef = useRef(null);
+    const expiredRef = useRef(null);
     const redirectTimerRef = useRef(null);
 
     const fetchReservation = useCallback(() => {
@@ -243,6 +244,12 @@ export default function PayReservation() {
     useEffect(() => {
         if (message) messageRef.current?.focus();
     }, [message]);
+
+    // Same when the backend says the hold already expired (not when the
+    // countdown ends, so the user is not pulled away from what they type).
+    useEffect(() => {
+        if (expiredByServer) expiredRef.current?.focus();
+    }, [expiredByServer]);
 
     const handleRetry = () => {
         setLoading(true);
@@ -329,9 +336,17 @@ export default function PayReservation() {
                         <Info className="h-4 w-4 shrink-0 text-info" aria-hidden="true" />
                         {translateError(reservation.status === 'Expired' ? 'RESERVATION_EXPIRED' : 'RESERVATION_NOT_PENDING')}
                     </p>
-                    <Link to={`/reservations/${reservation.id}`} className={OUTLINE_BUTTON_SM}>
-                        Ver la reserva
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                        <Link to={`/reservations/${reservation.id}`} className={OUTLINE_BUTTON_SM}>
+                            Ver la reserva
+                        </Link>
+                        {/* HU-26 AC-06: an expired reservation can only be booked again */}
+                        {reservation.status === 'Expired' && (
+                            <Link to="/zones" className={OUTLINE_BUTTON_SM}>
+                                Ver zonas disponibles
+                            </Link>
+                        )}
+                    </div>
                 </div>
             </div>
         );
@@ -386,7 +401,11 @@ export default function PayReservation() {
             navigate(`/reservations/${id}`, { replace: true, state: { flash: 'alreadyPaid' } });
             return;
         }
-        if (code === 'RESERVATION_EXPIRED') setExpiredByServer(true);
+        if (code === 'RESERVATION_EXPIRED') {
+            // HU-26 AC-06: shown by the expired notice below, with its link to the zones.
+            setExpiredByServer(true);
+            return;
+        }
         // AC-11: on PAYMENT_DECLINED the reservation stays Pending and the
         // user can try again right away.
         setMessage({ type: 'error', text: translateError(code) });
@@ -619,11 +638,22 @@ export default function PayReservation() {
                         {message.text}
                     </p>
                 )}
+                {/* HU-26 AC-06 and AC-09: expired, with a link to book again */}
                 {isTimeUp && !message && (
-                    <p role="alert" className="mt-6 flex items-center gap-2 rounded-md bg-danger-soft px-4 py-3 text-body text-danger">
-                        <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {translateError('RESERVATION_EXPIRED')}
-                    </p>
+                    <div
+                        ref={expiredRef}
+                        tabIndex={-1}
+                        role="alert"
+                        className="mt-6 flex flex-col items-start gap-3 rounded-md bg-danger-soft px-4 py-3 text-body text-danger focus:outline-none"
+                    >
+                        <p className="flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {translateError('RESERVATION_EXPIRED')}
+                        </p>
+                        <Link to="/zones" className={OUTLINE_BUTTON_SM}>
+                            Ver zonas disponibles
+                        </Link>
+                    </div>
                 )}
 
                 {/* AC-09: same columns as the cards; on mobile "Confirmar pago" goes first */}
