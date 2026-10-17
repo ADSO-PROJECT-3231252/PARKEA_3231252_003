@@ -136,7 +136,7 @@ export default function LocationPicker({ position, onPick, focusKey }) {
                 </button>
             ) : (
                 !failed && (
-                    <p className="pointer-events-none absolute left-1/2 top-3 z-[1000] flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-white/95 px-3 py-1 text-caption font-medium text-neutral-900 shadow-sm">
+                    <p className="pointer-events-none absolute bottom-10 left-1/2 z-[1000] sm:bottom-auto sm:top-3 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-white/95 px-3 py-1 text-caption font-medium text-neutral-900 shadow-sm">
                         <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
                         Haz clic donde está la zona
                     </p>
