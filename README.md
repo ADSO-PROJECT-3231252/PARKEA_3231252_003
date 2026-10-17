@@ -78,6 +78,8 @@ Versions are the ranges declared in each `package.json`.
 | Axios | ^1.18.1 | HTTP client for the REST API |
 | lucide-react | ^1.33.0 | Icons |
 | Recharts | ^3.10.1 | Charts in the admin dashboard |
+| Leaflet | ^1.9.4 | Interactive map (OpenStreetMap tiles) |
+| React Leaflet | ^5.0.0 | React components for the zones map |
 
 ### Backend
 | Technology | Version | Purpose |
@@ -142,7 +144,7 @@ PARKEA_3231252_003/
 │   │   ├── App.jsx           # Router + AuthProvider
 │   │   ├── index.css         # Tailwind CSS + PARKEA theme (design tokens via @theme)
 │   │   ├── 📁 assets/        # Images, logos, illustrations
-│   │   ├── 📁 components/    # Shared UI (Header, Layout, ConfirmDialog, FieldRow, MetricCard, LogDetailsModal)
+│   │   ├── 📁 components/    # Shared UI (Header, Layout, ConfirmDialog, FieldRow, MetricCard, LogDetailsModal, ZoneMap)
 │   │   ├── 📁 context/       # Global state (AuthContext)
 │   │   ├── 📁 hooks/         # Custom React hooks (useAuth)
 │   │   ├── 📁 pages/         # Route-based views
