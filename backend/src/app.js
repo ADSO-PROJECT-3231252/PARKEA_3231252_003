@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const ErrorCodes = require('./constants/errorCodes');
 
 const app = express();
 
@@ -22,6 +23,9 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'PARKEA API' });
 });
 
+// Mount all API routes under /api
+app.use('/api', require('./routes'));
+
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });
@@ -31,6 +35,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(err.status || 500).json({
+        code: err.code || ErrorCodes.INTERNAL_ERROR,
         message: err.message || 'Internal server error',
     });
 });
