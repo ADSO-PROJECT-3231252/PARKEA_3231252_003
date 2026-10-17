@@ -51,6 +51,7 @@ export default function ReservationConfirmation() {
 
     // Read once; the state is then cleared so a page refresh doesn't show it again.
     const [flash] = useState(() => FLASH_MESSAGES[location.state?.flash] ?? '');
+    const flashRef = useRef(null);
 
     const [reservation, setReservation] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -127,6 +128,12 @@ export default function ReservationConfirmation() {
     useEffect(() => {
         if (location.state?.flash) navigate(location.pathname, { replace: true, state: null });
     }, [location.state, location.pathname, navigate]);
+
+    // The message is already on screen when it mounts, so a live region alone
+    // may not be read; moving the focus to it makes sure it is announced.
+    useEffect(() => {
+        if (flash && !loading) flashRef.current?.focus();
+    }, [flash, loading]);
 
     const handleCopy = async () => {
         clearTimeout(copyTimerRef.current);
@@ -210,7 +217,12 @@ export default function ReservationConfirmation() {
             <h1 className="sr-only">Confirmación de reserva</h1>
 
             {flash && (
-                <p role="status" className="mb-6 flex items-center gap-2 rounded-lg border border-parkea-200 bg-parkea-50 px-4 py-3 text-body font-medium text-parkea-700">
+                <p
+                    ref={flashRef}
+                    tabIndex={-1}
+                    role="status"
+                    className="mb-6 flex items-center gap-2 rounded-lg border border-parkea-200 bg-parkea-50 px-4 py-3 text-body font-medium text-parkea-700 focus:outline-none"
+                >
                     <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {flash}
                 </p>
