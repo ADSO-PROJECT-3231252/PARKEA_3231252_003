@@ -15,6 +15,7 @@ import AdminPanel from '../pages/AdminPanel';
 import ReserveSpot from '../pages/ReserveSpot';
 import AdminLogin from '../pages/AdminLogin';
 import AdminUsers from '../pages/AdminUsers';
+import AdminZones from '../pages/AdminZones';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ReservationConfirmation from '../pages/ReservationConfirmation';
@@ -46,7 +47,7 @@ export default function AppRoutes() {
 
                 <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><Home /></ProtectedRoute>} />
                 <Route path="/admin/panel" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />
-                <Route path="/admin/zones" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
+                <Route path="/admin/zones" element={<ProtectedRoute role="admin"><AdminZones /></ProtectedRoute>} />
                 <Route path="/admin/zones/new" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/zones/:id/edit" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
                 <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} />
