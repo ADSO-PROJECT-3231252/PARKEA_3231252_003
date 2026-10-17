@@ -1,8 +1,17 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Save } from 'lucide-react';
+import { X, Save, Info } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
-import { ZONE_LIMITS, EMPTY_ZONE_FORM, onlyDigits } from '../utils/zoneForm';
+import {
+    ZONE_LIMITS,
+    EMPTY_ZONE_FORM,
+    onlyDigits,
+    cleanCoordinate,
+    parseCoordinatePair,
+    formatCoordinate,
+    getValidPosition,
+} from '../utils/zoneForm';
+import LocationPicker from '../components/LocationPicker';
 
 const inputClass = (hasError) =>
     `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
@@ -37,9 +46,31 @@ export default function CreateZone() {
 
     const [form, setForm] = useState(EMPTY_ZONE_FORM);
     const [errors] = useState({});
+    // Grows when the coordinates were typed or pasted, so the map moves to them
+    const [focusKey, setFocusKey] = useState(0);
+
+    const position = useMemo(() => getValidPosition(form.latitude, form.longitude), [form.latitude, form.longitude]);
 
     const setField = (name, value) => {
         setForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    // AC-05: a click on the map (or dragging the pin) fills both coordinates.
+    const handlePick = useCallback((latlng) => {
+        setForm((prev) => ({
+            ...prev,
+            latitude: formatCoordinate(latlng.lat),
+            longitude: formatCoordinate(latlng.lng),
+        }));
+    }, []);
+
+    // "4.8284, -75.6912" pasted in either coordinate fills both.
+    const handleCoordinatePaste = (e) => {
+        const pair = parseCoordinatePair(e.clipboardData.getData('text'));
+        if (!pair) return;
+        e.preventDefault();
+        setForm((prev) => ({ ...prev, ...pair }));
+        setFocusKey((k) => k + 1);
     };
 
     // The zone is validated and saved in the next step
@@ -172,6 +203,71 @@ export default function CreateZone() {
                         </Field>
                     </div>
 
+                    {/* AC-05: coordinates, typed or picked on the map */}
+                    <fieldset className="min-w-0 border-t border-neutral-200 p-5 sm:p-8 lg:border-l lg:border-t-0">
+                        <legend className="float-left w-full text-subtitle font-display uppercase text-neutral-900">
+                            Coordenadas <span className="text-danger" aria-hidden="true">*</span>
+                        </legend>
+                        <p className="clear-both pt-1 text-body text-neutral-600">
+                            Haz clic en el mapa para ubicar la zona o escribe las coordenadas.
+                        </p>
+
+                        <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+                            <Field id="latitude" label="Latitud" error={errors.latitude}>
+                                {(a11y) => (
+                                    <input
+                                        id="latitude"
+                                        type="text"
+                                        inputMode="decimal"
+                                        required
+                                        maxLength={20}
+                                        value={form.latitude}
+                                        onChange={(e) => setField('latitude', cleanCoordinate(e.target.value))}
+                                        onPaste={handleCoordinatePaste}
+                                        onBlur={() => setFocusKey((k) => k + 1)}
+                                        placeholder="Ej. 4.8284"
+                                        autoComplete="off"
+                                        className={`${inputClass(errors.latitude)} font-mono placeholder:font-sans`}
+                                        {...a11y}
+                                    />
+                                )}
+                            </Field>
+                            <Field id="longitude" label="Longitud" error={errors.longitude}>
+                                {(a11y) => (
+                                    <input
+                                        id="longitude"
+                                        type="text"
+                                        inputMode="decimal"
+                                        required
+                                        maxLength={20}
+                                        value={form.longitude}
+                                        onChange={(e) => setField('longitude', cleanCoordinate(e.target.value))}
+                                        onPaste={handleCoordinatePaste}
+                                        onBlur={() => setFocusKey((k) => k + 1)}
+                                        placeholder="Ej. -75.6912"
+                                        autoComplete="off"
+                                        className={`${inputClass(errors.longitude)} font-mono placeholder:font-sans`}
+                                        {...a11y}
+                                    />
+                                )}
+                            </Field>
+                        </div>
+
+                        <div className="mt-4">
+                            <LocationPicker position={position} onPick={handlePick} focusKey={focusKey} />
+                        </div>
+
+                        <div className="mt-4 flex items-start gap-3 rounded-md border border-parkea-100 bg-parkea-50 px-4 py-3">
+                            <Info className="mt-0.5 h-4 w-4 shrink-0 text-parkea-600" aria-hidden="true" />
+                            <div>
+                                <p className="text-label text-neutral-900">Consejo</p>
+                                <p className="mt-0.5 text-caption text-neutral-700">
+                                    Arrastra el marcador para ajustar la ubicación. Si copiaste las coordenadas de Google
+                                    Maps, pégalas en Latitud y se llenan los dos campos.
+                                </p>
+                            </div>
+                        </div>
+                    </fieldset>
                 </div>
 
                 {/* AC-07: cancel and save */}
