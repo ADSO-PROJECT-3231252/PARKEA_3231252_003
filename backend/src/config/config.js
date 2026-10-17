@@ -12,5 +12,9 @@ module.exports = {
   production: {
     use_env_variable: 'DATABASE_URL',
     dialect: 'mysql',
+    // Azure Database for MySQL only accepts encrypted (TLS) connections.
+    dialectOptions: {
+      ssl: { rejectUnauthorized: true },
+    },
   },
 };
