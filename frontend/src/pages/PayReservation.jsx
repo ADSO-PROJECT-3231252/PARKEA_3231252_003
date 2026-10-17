@@ -99,7 +99,7 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 function SummaryItem({ label, children, groupStart = false }) {
     return (
         <div className={`py-3 ${groupStart ? 'border-t border-neutral-100' : ''}`}>
-            <dt className="text-caption text-neutral-500">{label}</dt>
+            <dt className="text-caption text-neutral-600">{label}</dt>
             <dd className="mt-0.5 break-words text-body text-neutral-900">{children}</dd>
         </div>
     );
@@ -566,7 +566,7 @@ export default function PayReservation() {
                                     </dd>
                                 </div>
                                 <div className="flex items-center justify-between gap-3 border-t border-neutral-100 pt-3">
-                                    <dt className="text-caption text-neutral-500">Estado</dt>
+                                    <dt className="text-caption text-neutral-600">Estado</dt>
                                     <dd>
                                         <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-medium ${pendingStatus.badge}`}>
                                             <pendingStatus.Icon className="h-3.5 w-3.5" aria-hidden="true" />
