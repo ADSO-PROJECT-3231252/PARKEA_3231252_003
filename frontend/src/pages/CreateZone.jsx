@@ -1,15 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Info } from 'lucide-react';
+import { createZone } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import {
     ZONE_LIMITS,
+    ZONE_FIELDS,
     EMPTY_ZONE_FORM,
     onlyDigits,
     cleanCoordinate,
     parseCoordinatePair,
     formatCoordinate,
     getValidPosition,
+    validateZoneForm,
+    buildZonePayload,
+    mapZoneApiError,
 } from '../utils/zoneForm';
 import LocationPicker from '../components/LocationPicker';
 
@@ -45,14 +50,40 @@ export default function CreateZone() {
     const navigate = useNavigate();
 
     const [form, setForm] = useState(EMPTY_ZONE_FORM);
-    const [errors] = useState({});
+    const [errors, setErrors] = useState({});
+    const [serverError, setServerError] = useState('');
+    const [saving, setSaving] = useState(false);
     // Grows when the coordinates were typed or pasted, so the map moves to them
     const [focusKey, setFocusKey] = useState(0);
 
+    const fieldRefs = useRef({});
+    const serverErrorRef = useRef(null);
+    const pendingFocus = useRef(null);
+
+    // AC-06 / AC-11: after a failed save, the first field with an error gets
+    // the focus, once its message is on screen.
+    useEffect(() => {
+        if (!pendingFocus.current) return;
+        const target = pendingFocus.current === 'server' ? serverErrorRef.current : fieldRefs.current[pendingFocus.current];
+        pendingFocus.current = null;
+        target?.focus();
+    }, [errors, serverError]);
+
     const position = useMemo(() => getValidPosition(form.latitude, form.longitude), [form.latitude, form.longitude]);
+
+    // A field's error goes away as soon as it is edited.
+    const clearErrors = useCallback((...fields) => {
+        setErrors((prev) => {
+            if (!fields.some((f) => prev[f])) return prev;
+            const next = { ...prev };
+            for (const f of fields) delete next[f];
+            return next;
+        });
+    }, []);
 
     const setField = (name, value) => {
         setForm((prev) => ({ ...prev, [name]: value }));
+        clearErrors(name);
     };
 
     // AC-05: a click on the map (or dragging the pin) fills both coordinates.
@@ -62,7 +93,8 @@ export default function CreateZone() {
             latitude: formatCoordinate(latlng.lat),
             longitude: formatCoordinate(latlng.lng),
         }));
-    }, []);
+        clearErrors('latitude', 'longitude');
+    }, [clearErrors]);
 
     // "4.8284, -75.6912" pasted in either coordinate fills both.
     const handleCoordinatePaste = (e) => {
@@ -70,16 +102,46 @@ export default function CreateZone() {
         if (!pair) return;
         e.preventDefault();
         setForm((prev) => ({ ...prev, ...pair }));
+        clearErrors('latitude', 'longitude');
         setFocusKey((k) => k + 1);
     };
 
-    // The zone is validated and saved in the next step
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        if (saving) return;
+        setServerError('');
+
+        const newErrors = validateZoneForm(form);
+        if (Object.keys(newErrors).length > 0) {
+            pendingFocus.current = ZONE_FIELDS.find((f) => newErrors[f]);
+            setErrors(newErrors);
+            return;
+        }
+
+        setSaving(true);
+        try {
+            const { data } = await createZone(buildZonePayload(form));
+            // AC-09: back to the list, which shows the confirmation and the new zone
+            navigate('/admin/zones', { state: { zoneCreated: { id: data.zone.id, name: data.zone.name } } });
+        } catch (err) {
+            const { fields, general } = mapZoneApiError(err);
+            if (fields) {
+                pendingFocus.current = ZONE_FIELDS.find((f) => fields[f]);
+                setErrors(fields);
+            } else {
+                pendingFocus.current = 'server';
+                setServerError(general);
+            }
+            setSaving(false);
+        }
     };
 
     // AC-07: discards what was typed and goes back to the list
     const handleCancel = () => navigate('/admin/zones');
+
+    const fieldRef = (name) => (el) => {
+        fieldRefs.current[name] = el;
+    };
 
     const rate = form.hourlyRate === '' ? null : Number(form.hourlyRate);
 
@@ -93,6 +155,17 @@ export default function CreateZone() {
             </p>
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 rounded-lg border border-neutral-200 bg-white">
+                {serverError && (
+                    <p
+                        ref={serverErrorRef}
+                        tabIndex={-1}
+                        role="alert"
+                        className="mx-5 mt-5 rounded-md bg-danger-soft px-3 py-2 text-center text-caption text-danger focus:outline-none sm:mx-8 sm:mt-8"
+                    >
+                        {serverError}
+                    </p>
+                )}
+
                 <div className="grid grid-cols-1 lg:grid-cols-2">
                     {/* AC-01: zone details */}
                     <div className="space-y-5 p-5 sm:p-8">
@@ -104,6 +177,7 @@ export default function CreateZone() {
                         >
                             {(a11y) => (
                                 <input
+                                    ref={fieldRef('name')}
                                     id="name"
                                     type="text"
                                     required
@@ -126,6 +200,7 @@ export default function CreateZone() {
                         >
                             {(a11y) => (
                                 <input
+                                    ref={fieldRef('address')}
                                     id="address"
                                     type="text"
                                     required
@@ -149,6 +224,7 @@ export default function CreateZone() {
                         >
                             {(a11y) => (
                                 <input
+                                    ref={fieldRef('totalSlots')}
                                     id="totalSlots"
                                     type="text"
                                     inputMode="numeric"
@@ -186,6 +262,7 @@ export default function CreateZone() {
                                         $
                                     </span>
                                     <input
+                                        ref={fieldRef('hourlyRate')}
                                         id="hourlyRate"
                                         type="text"
                                         inputMode="numeric"
@@ -216,6 +293,7 @@ export default function CreateZone() {
                             <Field id="latitude" label="Latitud" error={errors.latitude}>
                                 {(a11y) => (
                                     <input
+                                        ref={fieldRef('latitude')}
                                         id="latitude"
                                         type="text"
                                         inputMode="decimal"
@@ -235,6 +313,7 @@ export default function CreateZone() {
                             <Field id="longitude" label="Longitud" error={errors.longitude}>
                                 {(a11y) => (
                                     <input
+                                        ref={fieldRef('longitude')}
                                         id="longitude"
                                         type="text"
                                         inputMode="decimal"
@@ -282,10 +361,11 @@ export default function CreateZone() {
                     </button>
                     <button
                         type="submit"
+                        disabled={saving}
                         className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2.5 text-label font-medium text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <Save className="h-4 w-4" aria-hidden="true" />
-                        Guardar zona
+                        {saving ? 'Guardando…' : 'Guardar zona'}
                     </button>
                 </div>
             </form>
