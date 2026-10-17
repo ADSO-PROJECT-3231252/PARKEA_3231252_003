@@ -19,6 +19,7 @@ import AdminZones from '../pages/AdminZones';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ReservationConfirmation from '../pages/ReservationConfirmation';
+import PayReservation from '../pages/PayReservation';
 
 export default function AppRoutes() {
     return (
@@ -43,7 +44,7 @@ export default function AppRoutes() {
                 <Route path="/reserve/:zoneId" element={<ProtectedRoute><ReserveSpot /></ProtectedRoute>} />
                 <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
                 <Route path="/reservations/:id" element={<ProtectedRoute><ReservationConfirmation /></ProtectedRoute>} />
-                <Route path="/reservations/:id/payment" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/reservations/:id/payment" element={<ProtectedRoute><PayReservation /></ProtectedRoute>} />
 
                 <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><Home /></ProtectedRoute>} />
                 <Route path="/admin/panel" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />

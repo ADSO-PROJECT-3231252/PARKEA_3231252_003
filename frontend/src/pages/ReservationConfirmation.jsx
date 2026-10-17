@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     CheckCircle2,
     MapPin,
@@ -21,7 +21,7 @@ import {
     Ban,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
-import { formatDate, formatTime, formatDuration, formatCurrency } from '../utils/format';
+import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
 
 // Once the 15-minute hold runs out, the backend job (every 60 s) is what
@@ -30,6 +30,13 @@ import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus'
 const EXPIRED_POLL_MS = 5000;
 const COPY_FEEDBACK_MS = 2000;
 
+// HU-17: messages sent by the payment screen through location.state.flash
+// (AC-10 after a successful payment, AC-13 when it was already paid).
+const FLASH_MESSAGES = {
+    paymentApproved: 'Pago aprobado. Tu reserva quedó activa.',
+    alreadyPaid: 'Esta reserva ya fue pagada.',
+};
+
 // Shared class strings, so the same look is written once.
 const ICON_CIRCLE = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600';
 const OUTLINE_BUTTON_SM =
@@ -37,15 +44,14 @@ const OUTLINE_BUTTON_SM =
 const OUTLINE_ACTION =
     'flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1';
 
-function formatCountdown(ms) {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
 export default function ReservationConfirmation() {
     const { id } = useParams();
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Read once; the state is then cleared so a page refresh doesn't show it again.
+    const [flash] = useState(() => FLASH_MESSAGES[location.state?.flash] ?? '');
+    const flashRef = useRef(null);
 
     const [reservation, setReservation] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -118,6 +124,16 @@ export default function ReservationConfirmation() {
     useEffect(() => {
         return () => clearTimeout(copyTimerRef.current);
     }, []);
+
+    useEffect(() => {
+        if (location.state?.flash) navigate(location.pathname, { replace: true, state: null });
+    }, [location.state, location.pathname, navigate]);
+
+    // The message is already on screen when it mounts, so a live region alone
+    // may not be read; moving the focus to it makes sure it is announced.
+    useEffect(() => {
+        if (flash && !loading) flashRef.current?.focus();
+    }, [flash, loading]);
 
     const handleCopy = async () => {
         clearTimeout(copyTimerRef.current);
@@ -199,6 +215,18 @@ export default function ReservationConfirmation() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 pt-6 pb-4 sm:px-6">
             <h1 className="sr-only">Confirmación de reserva</h1>
+
+            {flash && (
+                <p
+                    ref={flashRef}
+                    tabIndex={-1}
+                    role="status"
+                    className="mb-6 flex items-center gap-2 rounded-lg border border-parkea-200 bg-parkea-50 px-4 py-3 text-body font-medium text-parkea-700 focus:outline-none"
+                >
+                    <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {flash}
+                </p>
+            )}
 
             {canPay && (
                 <div className="mb-6 flex items-start gap-3 rounded-lg border border-parkea-200 bg-parkea-50 p-5">

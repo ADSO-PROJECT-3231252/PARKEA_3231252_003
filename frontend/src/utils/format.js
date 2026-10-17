@@ -37,3 +37,11 @@ export const formatDuration = (startIso, endIso) => {
     if (hours === 0) return `${minutes} minutos`;
     return `${hours} ${hours === 1 ? 'hora' : 'horas'} ${paddedMinutes} minutos`;
 };
+
+// "mm:ss" for the 15-minute payment hold (HU-15, HU-17).
+export function formatCountdown(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
