@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Info } from 'lucide-react';
 import { createZone } from '../services/zoneService';
@@ -16,7 +16,21 @@ import {
     buildZonePayload,
     mapZoneApiError,
 } from '../utils/zoneForm';
-import LocationPicker from '../components/LocationPicker';
+
+// Leaflet is only downloaded when this screen opens (like the zones map in
+// HU-25), so it doesn't add weight to every other page.
+const LocationPicker = lazy(() =>
+    import('../components/LocationPicker').catch(() => ({ default: MapUnavailable })),
+);
+
+// If the map code can't be downloaded, the coordinates can still be typed.
+function MapUnavailable() {
+    return (
+        <p role="alert" className="rounded-lg border border-neutral-200 bg-neutral-50 px-6 py-8 text-center text-caption text-neutral-600">
+            No pudimos cargar el mapa. Puedes escribir la latitud y la longitud en los campos de arriba.
+        </p>
+    );
+}
 
 const inputClass = (hasError) =>
     `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
@@ -333,7 +347,17 @@ export default function CreateZone() {
                         </div>
 
                         <div className="mt-4">
-                            <LocationPicker position={position} onPick={handlePick} focusKey={focusKey} />
+                            <Suspense
+                                fallback={
+                                    <div className="flex h-[280px] items-center justify-center rounded-lg border border-neutral-200 bg-neutral-100 sm:h-[320px]">
+                                        <p role="status" aria-live="polite" className="text-body text-neutral-600">
+                                            Cargando mapa…
+                                        </p>
+                                    </div>
+                                }
+                            >
+                                <LocationPicker position={position} onPick={handlePick} focusKey={focusKey} />
+                            </Suspense>
                         </div>
 
                         <div className="mt-4 flex items-start gap-3 rounded-md border border-parkea-100 bg-parkea-50 px-4 py-3">
