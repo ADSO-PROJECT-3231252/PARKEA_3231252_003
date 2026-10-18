@@ -1,0 +1,57 @@
+/* Leaflet styles that can't be reached with Tailwind classes (HU-20). */
+
+.location-picker-map.leaflet-container {
+    font: inherit;
+    background: var(--color-neutral-100);
+    cursor: crosshair;
+}
+
+/* While the map is dragged, the usual hand cursor */
+.location-picker-map.leaflet-container.leaflet-dragging {
+    cursor: grabbing;
+}
+
+/* Marker: no default white box from Leaflet's divIcon */
+.location-picker-icon {
+    background: none;
+    border: none;
+    cursor: grab;
+}
+
+/* Teardrop pin with a white dot: a square with three rounded corners,
+   rotated so the sharp corner points down. */
+.location-picker-pin {
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--color-white, #fff);
+    border-radius: 50% 50% 50% 0;
+    background: var(--color-parkea-600);
+    box-shadow: 0 2px 6px rgb(22 26 24 / 0.35);
+    transform: rotate(-45deg);
+}
+
+.location-picker-pin::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    background: var(--color-white, #fff);
+}
+
+.location-picker-map .leaflet-control-zoom a {
+    color: var(--color-neutral-900);
+}
+
+.location-picker-map .leaflet-control-zoom a:focus-visible {
+    outline: 2px solid var(--color-parkea-600);
+    outline-offset: 2px;
+}
+
+/* Leaflet's own size for the credits, so they fit on one line on phones */
+.location-picker-map .leaflet-control-attribution {
+    font-size: 12px;
+}
