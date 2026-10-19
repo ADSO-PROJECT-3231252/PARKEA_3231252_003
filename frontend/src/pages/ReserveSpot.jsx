@@ -499,11 +499,11 @@ export default function ReserveSpot() {
                     )}
                 </div>
 
-                <div className="mt-8 flex items-center justify-between border-t border-neutral-200 pt-6">
+                <div className="mt-8 flex flex-col-reverse gap-3 border-t border-neutral-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
                     <button
                         type="button"
                         onClick={handleBack}
-                        className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                        className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
                     >
                         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                         Volver a zonas
@@ -511,7 +511,7 @@ export default function ReserveSpot() {
                     <button
                         type="submit"
                         disabled={submitting}
-                        className="flex items-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <CalendarCheck className="h-4 w-4" aria-hidden="true" />
                         {submitting ? 'Reservando…' : 'Reservar cupo'}
