@@ -348,8 +348,8 @@ focus:ring-2 focus:ring-parkea-600 ${errors.color ? 'border-danger' : 'border-ne
                     </FieldRow>
                 </div>
                 <div
-                    className={`mt-8 flex items-center justify-between border-t
-border-neutral-200 pt-6`}
+                    className={`mt-8 flex flex-col-reverse gap-3 border-t border-neutral-200
+pt-6 sm:flex-row sm:items-center sm:justify-between`}
                 >
                     <button
                         type="button"
@@ -363,7 +363,7 @@ hover:text-parkea-600`}
                     <button
                         type="submit"
                         disabled={saving}
-                        className={`flex items-center gap-2 rounded-md bg-parkea-600 px-5 py-2
+                        className={`flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2
 text-label text-white transition-colors hover:bg-parkea-700
 disabled:cursor-not-allowed disabled:opacity-60`}
                     >
