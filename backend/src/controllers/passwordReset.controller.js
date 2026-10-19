@@ -40,7 +40,10 @@ async function solicitarRecuperacion(req, res, next) {
             expiresAt,
         });
 
-        const resetUrl = `http://localhost:5173/reset-password?token=${tokenPlano}`;
+        // Link to the web app that sent the request: the hosted site in
+        // production, the local Vite server in development.
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const resetUrl = `${frontendUrl}/reset-password?token=${tokenPlano}`;
         await enviarCorreoRecuperacion(usuario.email, resetUrl);
 
         return res.status(200).json(respuestaGenerica);
