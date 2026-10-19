@@ -290,7 +290,7 @@ export default function RegisterVehicle() {
                     </FieldRow>
                 </div>
 
-                <div className="mt-8 flex items-center justify-between border-t border-neutral-200 pt-6">
+                <div className="mt-8 flex flex-col-reverse gap-3 border-t border-neutral-200 pt-6 sm:flex-row sm:items-center sm:justify-between">
                     <button
                         type="button"
                         onClick={handleCancel}
@@ -301,7 +301,7 @@ export default function RegisterVehicle() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="flex items-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <Car className="h-4 w-4" aria-hidden="true" />
                         {loading ? 'Registrando…' : 'Registrar vehículo'}
