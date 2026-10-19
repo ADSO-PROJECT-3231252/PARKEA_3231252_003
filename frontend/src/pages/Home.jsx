@@ -487,4 +487,4 @@ export default function Home() {
     if (!user) return <VisitorHome />;
     if (user.role === 'admin') return <AdminHome />;
     return <AuthenticatedHome user={user} />;
-} 
+}
