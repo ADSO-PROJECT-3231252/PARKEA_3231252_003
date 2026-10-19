@@ -14,7 +14,8 @@ const crearPago = async (req, res) => {
     return res.status(400).json({ code: ErrorCodes.INVALID_PAYMENT_METHOD, message: 'Invalid payment method' });
   }
   if (paymentMethod === 'card') {
-    if (!cardLastFour || !/^\d{4}$/.test(cardLastFour)) {
+    // Only text: a list or a number would pass the regular expression below
+    if (typeof cardLastFour !== 'string' || !/^\d{4}$/.test(cardLastFour)) {
       return res.status(400).json({ code: ErrorCodes.CARD_DIGITS_REQUIRED, message: 'The last 4 digits of the card are required' });
     }
   }
