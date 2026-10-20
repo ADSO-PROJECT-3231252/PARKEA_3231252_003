@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     Plus,
     Search,
@@ -103,6 +103,8 @@ function ZoneName({ zone }) {
 }
 
 export default function AdminZones() {
+    const location = useLocation();
+    const navigate = useNavigate();
     const [zones, setZones] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
@@ -120,19 +122,48 @@ export default function AdminZones() {
     const titleRef = useRef(null);
     const toggledRef = useRef(false);
 
+    // HU-20 AC-09: zone just created in the form. The ref keeps it until the
+    // list loads; the state keeps its row marked while the admin stays here,
+    // since the row may be further down than the message.
+    const createdRef = useRef(location.state?.zoneCreated ?? null);
+    const [createdZoneId, setCreatedZoneId] = useState(null);
+
     const fetchZones = useCallback(() => {
         getAllZones()
             .then(({ data }) => {
                 setZones(data.zones);
                 setError(false);
+                // The list is ordered by name, so the new zone may be on
+                // another page: the list opens on that page.
+                const created = createdRef.current;
+                const index = created ? data.zones.findIndex((z) => z.id === created.id) : -1;
+                if (index >= 0) {
+                    setPage(Math.floor(index / PAGE_SIZE) + 1);
+                    setCreatedZoneId(created.id);
+                }
             })
             .catch(() => setError(true))
-            .finally(() => setLoading(false));
+            .finally(() => {
+                setLoading(false);
+                // Set once the page is on screen, so the live region already
+                // exists and screen readers announce it.
+                const created = createdRef.current;
+                if (created) {
+                    createdRef.current = null;
+                    setSuccessMessage(`La zona ${created.name} fue creada. Ya aparece en la lista pública y acepta reservas.`);
+                }
+            });
     }, []);
 
     useEffect(() => {
         fetchZones();
     }, [fetchZones]);
+
+    // The redirect state is cleared so a page refresh doesn't show the
+    // confirmation again.
+    useEffect(() => {
+        if (location.state?.zoneCreated) navigate(location.pathname, { replace: true, state: null });
+    }, [location, navigate]);
 
     useEffect(() => {
         if (!successMessage) return;
@@ -358,7 +389,10 @@ export default function AdminZones() {
                                 </thead>
                                 <tbody>
                                     {pageZones.map((zone) => (
-                                        <tr key={zone.id} className="border-b border-neutral-100 last:border-0">
+                                        <tr
+                                            key={zone.id}
+                                            className={`border-b border-neutral-100 transition-colors last:border-0 ${zone.id === createdZoneId ? 'bg-parkea-50' : ''}`}
+                                        >
                                             <td className="px-4 py-3">
                                                 <ZoneName zone={zone} />
                                             </td>
@@ -387,7 +421,10 @@ export default function AdminZones() {
                         {/* AC-15: one card per zone on phones and tablets */}
                         <ul className="divide-y divide-neutral-100 lg:hidden">
                             {pageZones.map((zone) => (
-                                <li key={zone.id} className="flex flex-col gap-3 p-4">
+                                <li
+                                    key={zone.id}
+                                    className={`flex flex-col gap-3 p-4 transition-colors ${zone.id === createdZoneId ? 'bg-parkea-50' : ''}`}
+                                >
                                     <div className="flex items-start justify-between gap-3">
                                         <ZoneName zone={zone} />
                                         <StatusBadge isActive={zone.isActive} />

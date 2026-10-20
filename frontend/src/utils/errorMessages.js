@@ -38,12 +38,13 @@ const errorMessages = {
     ZONE_INACTIVE: 'Esta zona ya no acepta reservas',
     MISSING_REQUIRED_FIELDS: 'Completa todos los campos obligatorios',
     NEGATIVE_VALUE: 'Los valores no pueden ser negativos',
-    INVALID_CAPACITY: 'La capacidad debe ser un número entero mayor que cero',
+    INVALID_CAPACITY: 'La capacidad debe ser un número entero entre 1 y 500',
     INVALID_COORDINATES: 'Las coordenadas ingresadas no son válidas',
     CAPACITY_BELOW_IN_USE: 'No puedes reducir la capacidad por debajo de los cupos en uso',
     INSUFFICIENT_AVAILABLE_SPOTS: 'No hay suficientes cupos disponibles para reducir la capacidad',
 
     // Reservations
+    INVALID_DATE: 'La fecha u hora no es válida',
     START_TIME_IN_PAST: 'La hora de inicio debe ser en el futuro',
     END_BEFORE_START: 'La hora de fin debe ser posterior a la de inicio',
     INVALID_DURATION: 'La reserva debe durar entre 30 minutos y 24 horas',
@@ -65,6 +66,9 @@ const errorMessages = {
 
     // Generic
     VALIDATION_ERROR: 'Revisa los campos marcados',
+    INVALID_JSON: 'No pudimos leer los datos enviados. Intenta de nuevo',
+    PAYLOAD_TOO_LARGE: 'Los datos enviados son demasiado grandes',
+    ROUTE_NOT_FOUND: 'No encontramos lo que buscas',
     INTERNAL_ERROR: 'Ocurrió un error inesperado. Intenta de nuevo',
 };
 

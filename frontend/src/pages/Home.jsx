@@ -108,9 +108,9 @@ function VisitorHome() {
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-6 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle"
                     >
-                        <MapPin className="h-6 w-6" aria-hidden="true" />
+                        <MapPin className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
@@ -218,9 +218,9 @@ function AuthenticatedHome({ user }) {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
-            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-8 lg:flex-row lg:items-center">
+            <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="break-words text-hero-sm font-display uppercase text-neutral-900">
+                    <h1 className="break-words text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
                         ¡Bienvenido, {user.fullName?.split(' ')[0]}!
                     </h1>
                     <p className="mt-3 text-subtitle-sm text-neutral-900">
@@ -228,9 +228,9 @@ function AuthenticatedHome({ user }) {
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 inline-flex items-center gap-2 rounded-md bg-parkea-600 px-12 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle"
                     >
-                        <MapPin className="h-6 w-6" aria-hidden="true" />
+                        <MapPin className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
@@ -393,10 +393,13 @@ function AdminHome() {
                         </p>
                         <Link
                             to="/admin/panel"
-                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-6 py-3 text-subtitle text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12"
+                            aria-label="Ir al panel de administración"
+                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle"
                         >
-                            <LayoutGrid className="h-6 w-6" aria-hidden="true" />
-                            Ir al panel de administración
+                            <LayoutGrid className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
+                            {/* The full label doesn't fit in one line on phones */}
+                            <span className="sm:hidden">Ir al panel</span>
+                            <span className="hidden sm:inline">Ir al panel de administración</span>
                         </Link>
                     </div>
                 </div>
