@@ -97,7 +97,7 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                         )}
                     </Field>
 
-                    <Field id="address" label="DirecciÃ³n" hint={hints.address} error={errors.address}>
+                    <Field id="address" label="Dirección" hint={hints.address} error={errors.address}>
                         {(a11y) => (
                             <input
                                 ref={fieldRef('address')}
@@ -223,7 +223,7 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                             fallback={
                                 <div className="flex h-[280px] items-center justify-center rounded-lg border border-neutral-200 bg-neutral-100 sm:h-[320px]">
                                     <p role="status" aria-live="polite" className="text-body text-neutral-600">
-                                        Cargando mapaâ€¦
+                                        Cargando mapa…
                                     </p>
                                 </div>
                             }
@@ -237,8 +237,8 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                         <div>
                             <p className="text-label text-neutral-900">Consejo</p>
                             <p className="mt-0.5 text-caption text-neutral-700">
-                                Arrastra el marcador para ajustar la ubicaciÃ³n. Si copiaste las coordenadas de Google
-                                Maps, pÃ©galas en Latitud y se llenan los dos campos.
+                                Arrastra el marcador para ajustar la ubicación. Si copiaste las coordenadas de Google
+                                Maps, pégalas en Latitud y se llenan los dos campos.
                             </p>
                         </div>
                     </div>
