@@ -2,25 +2,31 @@ const router = require('express').Router();
 const { body } = require('express-validator');
 const { verificarToken } = require('../middlewares/auth.middleware');
 const vehiculoController = require('../controllers/vehiculo.controller');
+const { isTextOrMissing } = require('../utils/validation');
 
 const validarCamposVehiculo = [
     body('vehicleType')
+        .custom(isTextOrMissing).withMessage('Vehicle type must be text').bail()
         .notEmpty().withMessage('Vehicle type is required')
         .isIn(['car', 'motorcycle', 'truck']).withMessage('Invalid vehicle type'),
     body('brand')
+        .custom(isTextOrMissing).withMessage('Brand must be text').bail()
         .trim()
         .notEmpty().withMessage('Brand is required')
         .isLength({ max: 50 }).withMessage('Brand must be at most 50 characters'),
     body('model')
+        .custom(isTextOrMissing).withMessage('Model must be text').bail()
         .trim()
         .notEmpty().withMessage('Model is required')
         .isLength({ max: 50 }).withMessage('Model must be at most 50 characters'),
     body('color')
+        .custom(isTextOrMissing).withMessage('Color must be text').bail()
         .trim()
         .notEmpty().withMessage('Color is required')
         .isLength({ max: 30 }).withMessage('Color must be at most 30 characters'),
     body('visualDescription')
         .optional({ checkFalsy: true })
+        .custom(isTextOrMissing).withMessage('Visual description must be text').bail()
         .trim()
         .isLength({ max: 255 }).withMessage('Visual description must be at most 255 characters'),
 ];
@@ -30,7 +36,9 @@ router.post(
     '/',
     verificarToken,
     [
-        body('plate').notEmpty().withMessage('Plate is required'),
+        body('plate')
+            .custom(isTextOrMissing).withMessage('Plate must be text').bail()
+            .notEmpty().withMessage('Plate is required'),
         ...validarCamposVehiculo,
     ],
     vehiculoController.registrar
