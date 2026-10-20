@@ -43,10 +43,18 @@ app.use((err, req, res, next) => {
         return res.status(413).json({ code: ErrorCodes.PAYLOAD_TOO_LARGE, message: 'The request body is too large' });
     }
 
-    console.error(err.stack);
-    res.status(err.status || 500).json({
+    const status = err.status || 500;
+
+    // Unexpected errors keep their details in the server log only: the
+    // message can include database or file system details.
+    if (status >= 500) {
+        console.error(err.stack);
+        return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Internal server error' });
+    }
+
+    res.status(status).json({
         code: err.code || ErrorCodes.INTERNAL_ERROR,
-        message: err.message || 'Internal server error',
+        message: err.message,
     });
 });
 
