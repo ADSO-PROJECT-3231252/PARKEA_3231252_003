@@ -18,7 +18,7 @@ import { formatCurrency } from '../utils/format';
 import { getZoneAvailability, getZoneToggleDialog, getZoneToggleSuccess } from '../utils/zones';
 import { getPageWindow } from '../utils/adminUsersHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
-import StatusBadge from '../components/ZoneStatusBadge';
+import ZoneStatusBadge from '../components/ZoneStatusBadge';
 
 // AC-11: the list is paginated when there are more than 10 zones.
 const PAGE_SIZE = 10;
@@ -144,7 +144,7 @@ export default function AdminZones() {
                 if (saved) {
                     savedRef.current = null;
                     if (saved.created) {
-                        setSuccessMessage(`La zona ${saved.name} fue creada. Ya aparece en la lista pública y acepta reservas.`);
+                        setSuccessMessage(`La zona ${saved.name} fue creada. Ya aparece en la lista pÃºblica y acepta reservas.`);
                     } else {
                         // HU-21 AC-05: a new rate only applies to new reservations
                         setSuccessMessage(
@@ -258,7 +258,7 @@ export default function AdminZones() {
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h1 ref={titleRef} tabIndex={-1} className="text-title font-display uppercase text-neutral-900 focus:outline-none">
-                        Gestión de zonas
+                        GestiÃ³n de zonas
                     </h1>
                     <p className="mt-1 text-body text-neutral-600">Administra las zonas de parqueo registradas en el sistema.</p>
                 </div>
@@ -294,15 +294,15 @@ export default function AdminZones() {
                         type="text"
                         value={search}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Buscar por nombre o dirección…"
-                        aria-label="Buscar zona por nombre o dirección"
+                        placeholder="Buscar por nombre o direcciÃ³nâ€¦"
+                        aria-label="Buscar zona por nombre o direcciÃ³n"
                         className="w-full rounded-md border border-neutral-200 bg-white py-2.5 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                     />
                     {search && (
                         <button
                             type="button"
                             onClick={() => handleSearchChange('')}
-                            aria-label="Limpiar búsqueda"
+                            aria-label="Limpiar bÃºsqueda"
                             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
@@ -324,7 +324,7 @@ export default function AdminZones() {
             <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
                 {loading && (
                     <p role="status" aria-live="polite" className="p-6 text-body text-neutral-600">
-                        Cargando zonas…
+                        Cargando zonasâ€¦
                     </p>
                 )}
 
@@ -349,8 +349,8 @@ export default function AdminZones() {
                 {!loading && !error && filteredZones.length === 0 && (
                     <p className="p-6 text-body text-neutral-600">
                         {zones.length === 0
-                            ? 'Aún no hay zonas registradas. Usa "Crear zona" para agregar la primera.'
-                            : 'No se encontraron zonas con esa búsqueda o estado.'}
+                            ? 'AÃºn no hay zonas registradas. Usa "Crear zona" para agregar la primera.'
+                            : 'No se encontraron zonas con esa bÃºsqueda o estado.'}
                     </p>
                 )}
 
@@ -362,7 +362,7 @@ export default function AdminZones() {
                                 <thead>
                                     <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900 xl:[&>th]:whitespace-nowrap">
                                         <th scope="col" className="px-4 py-3 font-medium">Nombre de la zona</th>
-                                        <th scope="col" className="px-4 py-3 font-medium">Dirección</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">DirecciÃ³n</th>
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Capacidad total</th>
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Cupos disponibles</th>
                                         <th scope="col" className="px-4 py-3 text-right font-medium">Tarifa por hora</th>
@@ -390,7 +390,7 @@ export default function AdminZones() {
                                                 {formatCurrency(zone.hourlyRate)}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <StatusBadge isActive={zone.isActive} />
+                                                <ZoneStatusBadge isActive={zone.isActive} />
                                             </td>
                                             <td className="px-4 py-3">
                                                 <ZoneActions zone={zone} onToggle={openToggle} />
@@ -410,7 +410,7 @@ export default function AdminZones() {
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <ZoneName zone={zone} />
-                                        <StatusBadge isActive={zone.isActive} />
+                                        <ZoneStatusBadge isActive={zone.isActive} />
                                     </div>
                                     {zone.address && <p className="text-body text-neutral-600">{zone.address}</p>}
                                     <dl className="grid grid-cols-3 gap-2 rounded-md bg-neutral-50 p-3 text-center">
@@ -441,7 +441,7 @@ export default function AdminZones() {
                             <p className="text-caption text-neutral-600">
                                 Mostrando {rangeStart} a {rangeEnd} de {filteredZones.length} zonas
                             </p>
-                            <nav aria-label="Paginación de zonas" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
+                            <nav aria-label="PaginaciÃ³n de zonas" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
                                     onClick={() => setPage(currentPage - 1)}
@@ -457,7 +457,7 @@ export default function AdminZones() {
                                             key={item}
                                             type="button"
                                             onClick={() => setPage(item)}
-                                            aria-label={`Página ${item}`}
+                                            aria-label={`PÃ¡gina ${item}`}
                                             aria-current={item === currentPage ? 'page' : undefined}
                                             className={`flex h-7 w-6 items-center justify-center rounded-md text-label transition-colors sm:w-7 ${item === currentPage ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
                                         >
@@ -465,7 +465,7 @@ export default function AdminZones() {
                                         </button>
                                     ) : (
                                         <span key={item} className="px-0.5 text-neutral-600 sm:px-1" aria-hidden="true">
-                                            …
+                                            â€¦
                                         </span>
                                     ),
                                 )}

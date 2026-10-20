@@ -9,6 +9,7 @@ export function getZoneAvailability(availableSlots, totalSlots) {
     }
     return { state: 'available', text: 'Disponible' };
 }
+
 // HU-19 AC-07 / AC-08: texts of the activate/deactivate confirmation, shared by
 // the zone list (HU-19) and the edit form (HU-21 AC-07). activeReservations is
 // the number of Pending or Active reservations; when it is unknown the warning
