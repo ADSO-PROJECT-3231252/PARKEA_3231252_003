@@ -237,7 +237,7 @@ function AuthenticatedHome({ user }) {
                 <HeroIllustration src={heroUserIllustration} height={315} right={160} />
             </section>
 
-            <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <CardShell
                     title="Reservas"
                     icon={CalendarCheck}
@@ -418,7 +418,7 @@ function AdminHome() {
                     Accede rápidamente a las funcionalidades más importantes del sistema.
                 </p>
 
-                <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <BarChart3 className="h-5 w-5" aria-hidden="true" />
