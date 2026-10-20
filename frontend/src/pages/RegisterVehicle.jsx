@@ -15,11 +15,11 @@ const PLATE_PLACEHOLDER = {
 };
 
 // #217: Reserve a spot sends the user here when they have no vehicles, and
-// passes where to come back. Only a reservation path is accepted, so the
-// state can't send the user to any other page.
+// passes where to come back. Only "/reserve/" plus a zone id is accepted, so
+// the state can't send the user to any other page (not even with "../").
 function getReturnTo(state) {
     const returnTo = state?.returnTo;
-    return typeof returnTo === 'string' && returnTo.startsWith('/reserve/') ? returnTo : null;
+    return typeof returnTo === 'string' && /^\/reserve\/[0-9a-f-]{36}$/i.test(returnTo) ? returnTo : null;
 }
 
 export default function RegisterVehicle() {
