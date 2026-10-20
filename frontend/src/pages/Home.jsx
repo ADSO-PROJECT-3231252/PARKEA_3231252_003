@@ -220,7 +220,7 @@ function AuthenticatedHome({ user }) {
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="break-words text-hero-sm font-display uppercase text-neutral-900">
+                    <h1 className="break-words text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
                         ¡Bienvenido, {user.fullName?.split(' ')[0]}!
                     </h1>
                     <p className="mt-3 text-subtitle-sm text-neutral-900">
