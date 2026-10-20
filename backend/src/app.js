@@ -26,9 +26,9 @@ app.get('/api/health', (req, res) => {
 // Mount all API routes under /api
 app.use('/api', require('./routes'));
 
-// 404 handler
+// 404 handler, with a code like every other error
 app.use((req, res) => {
-    res.status(404).json({ message: 'Route not found' });
+    res.status(404).json({ code: ErrorCodes.ROUTE_NOT_FOUND, message: 'Route not found' });
 });
 
 // Centralized error handler
