@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { X, Save, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
-import { getZone, updateZone } from '../services/zoneService';
+import { getZone, getAllZones, updateZone } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { ZONE_LIMITS, zoneToForm, validateZoneForm, buildZonePayload } from '../utils/zoneForm';
 import useZoneForm from '../hooks/useZoneForm';
@@ -26,21 +26,30 @@ function PageTitle({ zone }) {
     );
 }
 
+const plural = (n, one, many) => (n === 1 ? one : many);
+
+// Loads the zone and, apart, how many of its spots are in use. That number
+// only comes in the admin list (/zones/all), so if that request fails the form
+// still opens: the backend checks the capacity anyway (AC-03).
 export default function EditZone() {
     const { id } = useParams();
     const [zone, setZone] = useState(null);
+    const [spotsInUse, setSpotsInUse] = useState(null);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null); // null | 'not_found' | 'generic'
 
     const fetchZone = useCallback(() => {
-        getZone(id)
-            .then(({ data }) => {
-                setZone(data.zone);
+        Promise.allSettled([getZone(id), getAllZones()])
+            .then(([one, all]) => {
+                if (one.status === 'rejected') {
+                    const code = one.reason.response?.data?.code;
+                    setFetchError(code === 'ZONE_NOT_FOUND' ? 'not_found' : 'generic');
+                    return;
+                }
+                setZone(one.value.data.zone);
+                const listed = all.status === 'fulfilled' ? all.value.data.zones.find((z) => z.id === id) : null;
+                setSpotsInUse(listed ? Number(listed.activeReservations) || 0 : null);
                 setFetchError(null);
-            })
-            .catch((err) => {
-                const code = err.response?.data?.code;
-                setFetchError(code === 'ZONE_NOT_FOUND' ? 'not_found' : 'generic');
             })
             .finally(() => setLoading(false));
     }, [id]);
@@ -101,13 +110,14 @@ export default function EditZone() {
         );
     }
 
-    return <EditZoneForm initialZone={zone} />;
+    return <EditZoneForm initialZone={zone} initialSpotsInUse={spotsInUse} />;
 }
 
-function EditZoneForm({ initialZone }) {
+function EditZoneForm({ initialZone, initialSpotsInUse }) {
     const navigate = useNavigate();
     const [zone] = useState(initialZone);
     const [original] = useState(() => zoneToForm(initialZone));
+    const [spotsInUse, setSpotsInUse] = useState(initialSpotsInUse);
     const zoneForm = useZoneForm(original);
     const { form, setServerError, showErrors, showApiError } = zoneForm;
     const [saving, setSaving] = useState(false);
@@ -120,8 +130,8 @@ function EditZoneForm({ initialZone }) {
         if (saving) return;
         setServerError('');
 
-        // AC-02: the same rules as HU-20
-        const newErrors = validateZoneForm(form);
+        // AC-02 / AC-03: the HU-20 rules, and no capacity below the spots in use
+        const newErrors = validateZoneForm(form, { spotsInUse: spotsInUse ?? 0 });
         if (Object.keys(newErrors).length > 0) {
             showErrors(newErrors);
             return;
@@ -135,6 +145,9 @@ function EditZoneForm({ initialZone }) {
                 state: { zoneUpdated: { id: data.zone.id, name: data.zone.name, rateChanged } },
             });
         } catch (err) {
+            // Someone may have booked meanwhile: the hint shows the new number
+            const inUse = err.response?.data?.spotsInUse;
+            if (Number.isInteger(inUse)) setSpotsInUse(inUse);
             showApiError(err);
             setSaving(false);
         }
@@ -143,14 +156,30 @@ function EditZoneForm({ initialZone }) {
     // AC-06: discards the changes and goes back to the list
     const handleCancel = () => navigate('/admin/zones');
 
+    // AC-03 / AC-04: the capacity hint says how many spots are in use and,
+    // when it changes, how many will stay available.
+    const slots = Number(form.totalSlots);
+    const validSlots = form.totalSlots !== '' && slots >= 1 && slots <= ZONE_LIMITS.maxSlots;
+    let capacityHint = `Número total de cupos de la zona, entre 1 y ${ZONE_LIMITS.maxSlots}.`;
+    if (spotsInUse > 0) {
+        capacityHint = `Entre ${spotsInUse} y ${ZONE_LIMITS.maxSlots}. ${plural(spotsInUse, 'Hay 1 cupo en uso', `Hay ${spotsInUse} cupos en uso`)} por reservas pendientes o activas.`;
+    }
+    if (spotsInUse !== null && validSlots && slots >= spotsInUse && form.totalSlots !== original.totalSlots) {
+        const free = slots - spotsInUse;
+        capacityHint += ` Con ${slots} ${plural(slots, 'cupo', 'cupos')} ${plural(free, 'quedará 1 disponible', `quedarán ${free} disponibles`)}.`;
+    }
+
+    // AC-05: a new rate only applies to reservations made from now on
     const hints = {
         name: 'Nombre con el que los usuarios verán la zona. No puede repetirse.',
         address: 'Dirección exacta de la zona de parqueo.',
-        totalSlots: `Número total de cupos de la zona, entre 1 y ${ZONE_LIMITS.maxSlots}.`,
+        totalSlots: capacityHint,
         hourlyRate:
             rate === null
                 ? 'Valor en pesos que se cobrará por cada hora de parqueo.'
-                : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
+                : rateChanged
+                  ? `Las reservas nuevas pagarán ${formatCurrency(rate)} por hora. Las que ya existen mantienen ${formatCurrency(original.hourlyRate)}.`
+                  : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
     };
 
     return (
