@@ -672,7 +672,8 @@ export default function AdminUsers() {
                             >
                                 <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
                                     <p className="shrink-0 font-mono text-caption text-neutral-600 sm:min-w-60 sm:whitespace-nowrap">
-                                        {formatDate(log.created_at)} {formatTime(log.created_at)}
+                                        {formatDate(log.created_at)}{' '}
+                                        <span className="whitespace-nowrap">{formatTime(log.created_at)}</span>
                                     </p>
                                     <p className="break-words text-body text-neutral-800">{describeLog(log)}</p>
                                 </div>
