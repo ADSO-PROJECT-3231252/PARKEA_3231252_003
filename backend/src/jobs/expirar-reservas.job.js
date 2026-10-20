@@ -58,7 +58,13 @@ async function expirarReservasVencidas() {
 
 function iniciarJobExpiracion() {
     console.log('[expirar-reservas] Job de expiración iniciado (revisa cada 60s)');
-    setInterval(expirarReservasVencidas, INTERVALO_MS);
+    // If the database stops answering, the error is logged and the next run
+    // tries again; without the catch, Node stops the whole API
+    setInterval(() => {
+        expirarReservasVencidas().catch((error) => {
+            console.error('[expirar-reservas] Error reading reservations:', error.message);
+        });
+    }, INTERVALO_MS);
 }
 
 module.exports = { iniciarJobExpiracion, expirarReservasVencidas };
