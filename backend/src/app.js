@@ -33,6 +33,16 @@ app.use((req, res) => {
 
 // Centralized error handler
 app.use((err, req, res, next) => {
+    // Errors from express.json(): a body that is not valid JSON, or one larger
+    // than its limit (100 kB). They are the client's fault, so they are not
+    // logged, and the parser's own message is not sent.
+    if (err.type === 'entity.parse.failed') {
+        return res.status(400).json({ code: ErrorCodes.INVALID_JSON, message: 'The request body is not valid JSON' });
+    }
+    if (err.type === 'entity.too.large') {
+        return res.status(413).json({ code: ErrorCodes.PAYLOAD_TOO_LARGE, message: 'The request body is too large' });
+    }
+
     console.error(err.stack);
     res.status(err.status || 500).json({
         code: err.code || ErrorCodes.INTERNAL_ERROR,
