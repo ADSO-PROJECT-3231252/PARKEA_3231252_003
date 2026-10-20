@@ -44,6 +44,7 @@ const errorMessages = {
     INSUFFICIENT_AVAILABLE_SPOTS: 'No hay suficientes cupos disponibles para reducir la capacidad',
 
     // Reservations
+    INVALID_DATE: 'La fecha u hora no es válida',
     START_TIME_IN_PAST: 'La hora de inicio debe ser en el futuro',
     END_BEFORE_START: 'La hora de fin debe ser posterior a la de inicio',
     INVALID_DURATION: 'La reserva debe durar entre 30 minutos y 24 horas',
