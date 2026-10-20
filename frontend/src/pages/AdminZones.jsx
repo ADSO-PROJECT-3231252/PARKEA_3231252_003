@@ -15,9 +15,10 @@ import {
 import { getAllZones, toggleZone } from '../services/zoneService';
 import { translateError } from '../utils/errorMessages';
 import { formatCurrency } from '../utils/format';
-import { getZoneAvailability } from '../utils/zones';
+import { getZoneAvailability, getZoneToggleDialog, getZoneToggleSuccess } from '../utils/zones';
 import { getPageWindow } from '../utils/adminUsersHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
+import StatusBadge from '../components/ZoneStatusBadge';
 
 // AC-11: the list is paginated when there are more than 10 zones.
 const PAGE_SIZE = 10;
@@ -30,18 +31,6 @@ const AVAILABILITY_COLORS = {
 };
 
 const percentOf = (part, total) => (total > 0 ? Math.round((part / total) * 100) : 0);
-
-// AC-14: the status is always written out, not shown by color alone.
-function StatusBadge({ isActive }) {
-    return (
-        <span
-            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-caption font-medium ${isActive ? 'bg-parkea-50 text-parkea-700' : 'bg-danger-soft text-danger'}`}
-        >
-            <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-parkea-600' : 'bg-danger'}`} aria-hidden="true" />
-            {isActive ? 'Activa' : 'Inactiva'}
-        </span>
-    );
-}
 
 function Availability({ zone }) {
     const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
@@ -122,24 +111,28 @@ export default function AdminZones() {
     const titleRef = useRef(null);
     const toggledRef = useRef(false);
 
-    // HU-20 AC-09: zone just created in the form. The ref keeps it until the
-    // list loads; the state keeps its row marked while the admin stays here,
-    // since the row may be further down than the message.
-    const createdRef = useRef(location.state?.zoneCreated ?? null);
-    const [createdZoneId, setCreatedZoneId] = useState(null);
+    // HU-20 AC-09 / HU-21 AC-08: zone just created or edited in the form. The
+    // ref keeps it until the list loads; the state keeps its row marked while
+    // the admin stays here, since the row may be further down than the message.
+    const savedRef = useRef(
+        location.state?.zoneCreated
+            ? { ...location.state.zoneCreated, created: true }
+            : (location.state?.zoneUpdated ?? null),
+    );
+    const [savedZoneId, setSavedZoneId] = useState(null);
 
     const fetchZones = useCallback(() => {
         getAllZones()
             .then(({ data }) => {
                 setZones(data.zones);
                 setError(false);
-                // The list is ordered by name, so the new zone may be on
+                // The list is ordered by name, so the saved zone may be on
                 // another page: the list opens on that page.
-                const created = createdRef.current;
-                const index = created ? data.zones.findIndex((z) => z.id === created.id) : -1;
+                const saved = savedRef.current;
+                const index = saved ? data.zones.findIndex((z) => z.id === saved.id) : -1;
                 if (index >= 0) {
                     setPage(Math.floor(index / PAGE_SIZE) + 1);
-                    setCreatedZoneId(created.id);
+                    setSavedZoneId(saved.id);
                 }
             })
             .catch(() => setError(true))
@@ -147,10 +140,18 @@ export default function AdminZones() {
                 setLoading(false);
                 // Set once the page is on screen, so the live region already
                 // exists and screen readers announce it.
-                const created = createdRef.current;
-                if (created) {
-                    createdRef.current = null;
-                    setSuccessMessage(`La zona ${created.name} fue creada. Ya aparece en la lista pública y acepta reservas.`);
+                const saved = savedRef.current;
+                if (saved) {
+                    savedRef.current = null;
+                    if (saved.created) {
+                        setSuccessMessage(`La zona ${saved.name} fue creada. Ya aparece en la lista pÃºblica y acepta reservas.`);
+                    } else {
+                        // HU-21 AC-05: a new rate only applies to new reservations
+                        setSuccessMessage(
+                            `Los cambios de la zona ${saved.name} se guardaron.` +
+                                (saved.rateChanged ? ' La nueva tarifa aplica solo a las reservas nuevas.' : ''),
+                        );
+                    }
                 }
             });
     }, []);
@@ -162,7 +163,7 @@ export default function AdminZones() {
     // The redirect state is cleared so a page refresh doesn't show the
     // confirmation again.
     useEffect(() => {
-        if (location.state?.zoneCreated) navigate(location.pathname, { replace: true, state: null });
+        if (location.state?.zoneCreated || location.state?.zoneUpdated) navigate(location.pathname, { replace: true, state: null });
     }, [location, navigate]);
 
     useEffect(() => {
@@ -234,11 +235,7 @@ export default function AdminZones() {
             // Keep the table on screen: only the changed zone is replaced, and
             // activeReservations (not returned by the toggle) is kept.
             setZones((prev) => prev.map((z) => (z.id === data.zone.id ? { ...z, ...data.zone } : z)));
-            setSuccessMessage(
-                data.zone.isActive
-                    ? `La zona ${data.zone.name} fue activada y vuelve a aparecer en la lista pública.`
-                    : `La zona ${data.zone.name} fue desactivada. Ya no aparece en la lista pública ni acepta reservas nuevas.`,
-            );
+            setSuccessMessage(getZoneToggleSuccess(data.zone));
             toggledRef.current = true;
             setPendingZone(null);
         } catch (err) {
@@ -250,21 +247,7 @@ export default function AdminZones() {
 
     // AC-07 / AC-08: the dialog explains the effect; if the zone has Pending or
     // Active reservations it warns that they stay valid until they end.
-    let dialogTitle = '';
-    let dialogMessage = '';
-    if (pendingZone) {
-        const inUse = Number(pendingZone.activeReservations) || 0;
-        if (pendingZone.isActive) {
-            dialogTitle = 'Desactivar zona';
-            dialogMessage = `Vas a desactivar la zona ${pendingZone.name}. Dejará de aparecer en la lista pública y no aceptará reservas nuevas.`;
-            if (inUse > 0) {
-                dialogMessage += ` Tiene ${inUse} ${inUse === 1 ? 'reserva pendiente o activa, que seguirá válida' : 'reservas pendientes o activas, que seguirán válidas'} hasta que termine${inUse === 1 ? '' : 'n'}.`;
-            }
-        } else {
-            dialogTitle = 'Activar zona';
-            dialogMessage = `Vas a activar la zona ${pendingZone.name}. Volverá a aparecer en la lista pública y aceptará reservas.`;
-        }
-    }
+    const dialog = pendingZone ? getZoneToggleDialog(pendingZone) : null;
 
     const pageButton =
         'flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
@@ -275,7 +258,7 @@ export default function AdminZones() {
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h1 ref={titleRef} tabIndex={-1} className="text-title font-display uppercase text-neutral-900 focus:outline-none">
-                        Gestión de zonas
+                        GestiÃ³n de zonas
                     </h1>
                     <p className="mt-1 text-body text-neutral-600">Administra las zonas de parqueo registradas en el sistema.</p>
                 </div>
@@ -311,15 +294,15 @@ export default function AdminZones() {
                         type="text"
                         value={search}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Buscar por nombre o dirección…"
-                        aria-label="Buscar zona por nombre o dirección"
+                        placeholder="Buscar por nombre o direcciÃ³nâ€¦"
+                        aria-label="Buscar zona por nombre o direcciÃ³n"
                         className="w-full rounded-md border border-neutral-200 bg-white py-2.5 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                     />
                     {search && (
                         <button
                             type="button"
                             onClick={() => handleSearchChange('')}
-                            aria-label="Limpiar búsqueda"
+                            aria-label="Limpiar bÃºsqueda"
                             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
@@ -341,7 +324,7 @@ export default function AdminZones() {
             <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
                 {loading && (
                     <p role="status" aria-live="polite" className="p-6 text-body text-neutral-600">
-                        Cargando zonas…
+                        Cargando zonasâ€¦
                     </p>
                 )}
 
@@ -366,8 +349,8 @@ export default function AdminZones() {
                 {!loading && !error && filteredZones.length === 0 && (
                     <p className="p-6 text-body text-neutral-600">
                         {zones.length === 0
-                            ? 'Aún no hay zonas registradas. Usa "Crear zona" para agregar la primera.'
-                            : 'No se encontraron zonas con esa búsqueda o estado.'}
+                            ? 'AÃºn no hay zonas registradas. Usa "Crear zona" para agregar la primera.'
+                            : 'No se encontraron zonas con esa bÃºsqueda o estado.'}
                     </p>
                 )}
 
@@ -379,7 +362,7 @@ export default function AdminZones() {
                                 <thead>
                                     <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900 xl:[&>th]:whitespace-nowrap">
                                         <th scope="col" className="px-4 py-3 font-medium">Nombre de la zona</th>
-                                        <th scope="col" className="px-4 py-3 font-medium">Dirección</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">DirecciÃ³n</th>
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Capacidad total</th>
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Cupos disponibles</th>
                                         <th scope="col" className="px-4 py-3 text-right font-medium">Tarifa por hora</th>
@@ -391,7 +374,7 @@ export default function AdminZones() {
                                     {pageZones.map((zone) => (
                                         <tr
                                             key={zone.id}
-                                            className={`border-b border-neutral-100 transition-colors last:border-0 ${zone.id === createdZoneId ? 'bg-parkea-50' : ''}`}
+                                            className={`border-b border-neutral-100 transition-colors last:border-0 ${zone.id === savedZoneId ? 'bg-parkea-50' : ''}`}
                                         >
                                             <td className="px-4 py-3">
                                                 <ZoneName zone={zone} />
@@ -423,7 +406,7 @@ export default function AdminZones() {
                             {pageZones.map((zone) => (
                                 <li
                                     key={zone.id}
-                                    className={`flex flex-col gap-3 p-4 transition-colors ${zone.id === createdZoneId ? 'bg-parkea-50' : ''}`}
+                                    className={`flex flex-col gap-3 p-4 transition-colors ${zone.id === savedZoneId ? 'bg-parkea-50' : ''}`}
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <ZoneName zone={zone} />
@@ -458,7 +441,7 @@ export default function AdminZones() {
                             <p className="text-caption text-neutral-600">
                                 Mostrando {rangeStart} a {rangeEnd} de {filteredZones.length} zonas
                             </p>
-                            <nav aria-label="Paginación de zonas" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
+                            <nav aria-label="PaginaciÃ³n de zonas" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
                                     onClick={() => setPage(currentPage - 1)}
@@ -474,7 +457,7 @@ export default function AdminZones() {
                                             key={item}
                                             type="button"
                                             onClick={() => setPage(item)}
-                                            aria-label={`Página ${item}`}
+                                            aria-label={`PÃ¡gina ${item}`}
                                             aria-current={item === currentPage ? 'page' : undefined}
                                             className={`flex h-7 w-6 items-center justify-center rounded-md text-label transition-colors sm:w-7 ${item === currentPage ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
                                         >
@@ -482,7 +465,7 @@ export default function AdminZones() {
                                         </button>
                                     ) : (
                                         <span key={item} className="px-0.5 text-neutral-600 sm:px-1" aria-hidden="true">
-                                            …
+                                            â€¦
                                         </span>
                                     ),
                                 )}
@@ -503,10 +486,10 @@ export default function AdminZones() {
 
             <ConfirmDialog
                 open={Boolean(pendingZone)}
-                variant={pendingZone?.isActive ? 'danger' : 'default'}
-                title={dialogTitle}
-                message={dialogMessage}
-                confirmLabel={pendingZone?.isActive ? 'Desactivar zona' : 'Activar zona'}
+                variant={dialog?.variant}
+                title={dialog?.title}
+                message={dialog?.message}
+                confirmLabel={dialog?.confirmLabel}
                 cancelLabel="Cancelar"
                 confirming={confirming}
                 error={actionError}
