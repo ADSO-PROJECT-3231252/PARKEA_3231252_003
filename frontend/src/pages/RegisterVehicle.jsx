@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Car, IdCard, Tag, Layers, Palette, Eye, ChevronDown } from 'lucide-react';
 import { isNotEmpty, isValidPlate, REQUIRED_MESSAGE } from '../utils/validators';
 import { createVehicle } from '../services/vehicleService';
@@ -14,8 +14,18 @@ const PLATE_PLACEHOLDER = {
     motorcycle: 'Ejemplo: GHT42D',
 };
 
+// #217: Reserve a spot sends the user here when they have no vehicles, and
+// passes where to come back. Only a reservation path is accepted, so the
+// state can't send the user to any other page.
+function getReturnTo(state) {
+    const returnTo = state?.returnTo;
+    return typeof returnTo === 'string' && returnTo.startsWith('/reserve/') ? returnTo : null;
+}
+
 export default function RegisterVehicle() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const returnTo = getReturnTo(location.state);
 
     const [form, setForm] = useState({
         vehicleType: '',
@@ -96,8 +106,9 @@ export default function RegisterVehicle() {
 
             await createVehicle(payload);
             // AC-07: success message + redirect, via the same flash-state pattern
-            // Login.jsx uses for "Registro completado".
-            navigate('/vehicles', { state: { vehicleAdded: true } });
+            // Login.jsx uses for "Registro completado". Coming from a reservation,
+            // it goes back to it, where the new vehicle is already selected.
+            navigate(returnTo ?? '/vehicles', { state: { vehicleAdded: true } });
         } catch (err) {
             const code = err.response?.data?.code;
             // AC-04: plate-already-registered must show inline on the plate field,
@@ -112,7 +123,8 @@ export default function RegisterVehicle() {
         }
     };
 
-    const handleCancel = () => navigate('/vehicles'); // AC-06: explicit route, not navigate(-1)
+    // AC-06: explicit route, not navigate(-1)
+    const handleCancel = () => navigate(returnTo ?? '/vehicles');
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
