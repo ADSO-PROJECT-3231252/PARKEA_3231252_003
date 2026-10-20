@@ -22,6 +22,12 @@ async function crear(req, res, next) {
         const start = new Date(startTime);
         const end = new Date(endTime);
         const now = new Date();
+        // A value that is not a date ("abc") gives an invalid Date, and every
+        // comparison below would let it through until the database rejects it
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.INVALID_DATE, message: 'startTime and endTime must be valid dates' });
+        }
 
         if (start <= now) {
             await t.rollback();
