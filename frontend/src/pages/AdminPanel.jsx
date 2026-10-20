@@ -345,24 +345,28 @@ export default function AdminPanel() {
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-                            {/* AC-13: accessible text alternative for the chart above */}
-                            <table className="sr-only">
-                                <caption>Reservas por zona en el rango seleccionado</caption>
-                                <thead>
-                                    <tr>
-                                        <th scope="col">Zona</th>
-                                        <th scope="col">Reservas</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {reservationsByZone.map((zona) => (
-                                        <tr key={zona.zoneId}>
-                                            <td>{zona.zoneName}</td>
-                                            <td>{zona.reservationCount}</td>
+                            {/* AC-13: accessible text alternative for the chart above. The
+                                div hides it: a table ignores the 1 px width of sr-only and,
+                                with long zone names, made the page scroll sideways. */}
+                            <div className="sr-only">
+                                <table>
+                                    <caption>Reservas por zona en el rango seleccionado</caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">Zona</th>
+                                            <th scope="col">Reservas</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {reservationsByZone.map((zona) => (
+                                            <tr key={zona.zoneId}>
+                                                <td>{zona.zoneName}</td>
+                                                <td>{zona.reservationCount}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </>
                     )}
                 </section>
