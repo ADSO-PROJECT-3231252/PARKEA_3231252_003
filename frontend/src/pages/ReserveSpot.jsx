@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
     MapPin,
     Banknote,
@@ -43,6 +43,14 @@ function combineDateTime(date, time) {
 export default function ReserveSpot() {
     const { zoneId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // #217: back from adding the first vehicle (HU-10 AC-07). The redirect
+    // state is cleared so a page refresh doesn't show the message again.
+    const [vehicleAdded] = useState(() => Boolean(location.state?.vehicleAdded));
+    useEffect(() => {
+        if (location.state?.vehicleAdded) navigate(location.pathname, { replace: true, state: null });
+    }, [location, navigate]);
 
     const [zone, setZone] = useState(null);
     const [zoneLoading, setZoneLoading] = useState(true);
@@ -251,8 +259,10 @@ export default function ReserveSpot() {
                     <p className="text-body text-neutral-600">
                         Necesitas registrar un vehículo antes de hacer una reserva.
                     </p>
+                    {/* #217: after saving the vehicle, the app comes back here */}
                     <Link
                         to="/vehicles/new"
+                        state={{ returnTo: `/reserve/${zoneId}` }}
                         className="flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2 text-label text-white transition-colors hover:bg-parkea-700"
                     >
                         <Car className="h-4 w-4" aria-hidden="true" />
@@ -351,6 +361,10 @@ export default function ReserveSpot() {
                         {errors.vehicle ? (
                             <p id="vehicleId-error" role="alert" className="mt-1 text-caption text-danger">
                                 {errors.vehicle}
+                            </p>
+                        ) : vehicleAdded ? (
+                            <p role="status" className="mt-1 text-caption text-parkea-700">
+                                Vehículo registrado correctamente. Ya quedó seleccionado para tu reserva.
                             </p>
                         ) : (
                             <p className="mt-1 text-caption text-neutral-500">Este vehículo se usará para tu reserva.</p>
