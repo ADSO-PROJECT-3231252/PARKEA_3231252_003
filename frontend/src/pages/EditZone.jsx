@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { X, Save, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
-import { getZone, getAllZones, updateZone } from '../services/zoneService';
+import { X, Save, Power, PowerOff, AlertCircle, RefreshCw, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { getZone, getAllZones, updateZone, toggleZone } from '../services/zoneService';
+import { translateError } from '../utils/errorMessages';
 import { formatCurrency } from '../utils/format';
+import { getZoneToggleDialog, getZoneToggleSuccess } from '../utils/zones';
 import { ZONE_LIMITS, zoneToForm, validateZoneForm, buildZonePayload } from '../utils/zoneForm';
 import useZoneForm from '../hooks/useZoneForm';
 import ZoneFormFields from '../components/ZoneFormFields';
 import ZoneStatusBadge from '../components/ZoneStatusBadge';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const PAGE_CLASS = 'mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6';
 
@@ -115,19 +118,26 @@ export default function EditZone() {
 
 function EditZoneForm({ initialZone, initialSpotsInUse }) {
     const navigate = useNavigate();
-    const [zone] = useState(initialZone);
+    // The zone as saved: the form may hold changes not saved yet
+    const [zone, setZone] = useState(initialZone);
     const [original] = useState(() => zoneToForm(initialZone));
     const [spotsInUse, setSpotsInUse] = useState(initialSpotsInUse);
     const zoneForm = useZoneForm(original);
     const { form, setServerError, showErrors, showApiError } = zoneForm;
     const [saving, setSaving] = useState(false);
 
+    // AC-07: activate or deactivate, with the HU-19 confirmation
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [toggling, setToggling] = useState(false);
+    const [toggleError, setToggleError] = useState('');
+    const [toggleMessage, setToggleMessage] = useState('');
+
     const rate = form.hourlyRate === '' ? null : Number(form.hourlyRate);
     const rateChanged = rate !== null && rate !== Number(original.hourlyRate);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (saving) return;
+        if (saving || toggling) return;
         setServerError('');
 
         // AC-02 / AC-03: the HU-20 rules, and no capacity below the spots in use
@@ -156,6 +166,32 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
     // AC-06: discards the changes and goes back to the list
     const handleCancel = () => navigate('/admin/zones');
 
+    const openDialog = () => {
+        setToggleError('');
+        setDialogOpen(true);
+    };
+
+    const closeDialog = useCallback(() => {
+        setDialogOpen(false);
+        setToggleError('');
+    }, []);
+
+    const handleConfirmToggle = async () => {
+        setToggling(true);
+        setToggleError('');
+        try {
+            const { data } = await toggleZone(zone.id);
+            // Only the status changes: what was typed in the form stays there
+            setZone((prev) => ({ ...prev, isActive: data.zone.isActive }));
+            setToggleMessage(getZoneToggleSuccess(data.zone));
+            setDialogOpen(false);
+        } catch (err) {
+            setToggleError(translateError(err.response?.data?.code));
+        } finally {
+            setToggling(false);
+        }
+    };
+
     // AC-03 / AC-04: the capacity hint says how many spots are in use and,
     // when it changes, how many will stay available.
     const slots = Number(form.totalSlots);
@@ -182,6 +218,8 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
                   : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
     };
 
+    const dialog = getZoneToggleDialog({ ...zone, activeReservations: spotsInUse });
+
     return (
         <div className={PAGE_CLASS}>
             <PageTitle zone={zone} />
@@ -189,7 +227,17 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
             <form onSubmit={handleSubmit} noValidate className="mt-6 rounded-lg border border-neutral-200 bg-white">
                 <ZoneFormFields zoneForm={zoneForm} hints={hints} />
 
-                {/* AC-06: cancel and save */}
+                {/* AC-07: outcome of activating or deactivating, next to the button */}
+                <div role="status" aria-live="polite">
+                    {toggleMessage && (
+                        <p className="mx-5 mb-5 flex items-start gap-2 rounded-md bg-parkea-50 px-3 py-2 text-caption text-parkea-700 sm:mx-8 sm:mb-8">
+                            <CheckCircle2 className="mt-px h-4 w-4 shrink-0" aria-hidden="true" />
+                            {toggleMessage}
+                        </p>
+                    )}
+                </div>
+
+                {/* AC-06 / AC-07: cancel, activate or deactivate, and save */}
                 <div className="flex flex-col-reverse gap-3 border-t border-neutral-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                     <button
                         type="button"
@@ -199,16 +247,44 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
                         <X className="h-4 w-4" aria-hidden="true" />
                         Cancelar
                     </button>
-                    <button
-                        type="submit"
-                        disabled={saving}
-                        className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2.5 text-label font-medium text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        <Save className="h-4 w-4" aria-hidden="true" />
-                        {saving ? 'Guardando…' : 'Guardar cambios'}
-                    </button>
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
+                        <button
+                            type="button"
+                            onClick={openDialog}
+                            disabled={saving}
+                            className={`flex items-center justify-center gap-2 rounded-md border bg-white px-5 py-2.5 text-label transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${zone.isActive ? 'border-danger text-danger hover:bg-danger-soft' : 'border-parkea-600 text-parkea-600 hover:bg-parkea-50'}`}
+                        >
+                            {zone.isActive ? (
+                                <PowerOff className="h-4 w-4" aria-hidden="true" />
+                            ) : (
+                                <Power className="h-4 w-4" aria-hidden="true" />
+                            )}
+                            {zone.isActive ? 'Desactivar zona' : 'Activar zona'}
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saving || toggling}
+                            className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2.5 text-label font-medium text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <Save className="h-4 w-4" aria-hidden="true" />
+                            {saving ? 'Guardando…' : 'Guardar cambios'}
+                        </button>
+                    </div>
                 </div>
             </form>
+
+            <ConfirmDialog
+                open={dialogOpen}
+                variant={dialog.variant}
+                title={dialog.title}
+                message={dialog.message}
+                confirmLabel={dialog.confirmLabel}
+                cancelLabel="Cancelar"
+                confirming={toggling}
+                error={toggleError}
+                onConfirm={handleConfirmToggle}
+                onCancel={closeDialog}
+            />
         </div>
     );
 }
