@@ -671,7 +671,7 @@ export default function AdminUsers() {
                                 className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
                             >
                                 <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
-                                    <p className="w-48 shrink-0 whitespace-nowrap font-mono text-caption text-neutral-600">
+                                    <p className="shrink-0 font-mono text-caption text-neutral-600 sm:min-w-60 sm:whitespace-nowrap">
                                         {formatDate(log.created_at)} {formatTime(log.created_at)}
                                     </p>
                                     <p className="break-words text-body text-neutral-800">{describeLog(log)}</p>
