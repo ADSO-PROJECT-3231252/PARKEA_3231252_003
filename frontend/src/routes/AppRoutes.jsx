@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from '../pages/Home';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
-import ComingSoon from '../pages/ComingSoon';
 import Profile from '../pages/Profile';
 import Zones from '../pages/Zones';
 import ProtectedRoute from './ProtectedRoute';
@@ -17,6 +16,7 @@ import AdminLogin from '../pages/AdminLogin';
 import AdminUsers from '../pages/AdminUsers';
 import AdminZones from '../pages/AdminZones';
 import CreateZone from '../pages/CreateZone';
+import EditZone from '../pages/EditZone';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ReservationConfirmation from '../pages/ReservationConfirmation';
@@ -51,7 +51,7 @@ export default function AppRoutes() {
                 <Route path="/admin/panel" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />
                 <Route path="/admin/zones" element={<ProtectedRoute role="admin"><AdminZones /></ProtectedRoute>} />
                 <Route path="/admin/zones/new" element={<ProtectedRoute role="admin"><CreateZone /></ProtectedRoute>} />
-                <Route path="/admin/zones/:id/edit" element={<ProtectedRoute role="admin"><ComingSoon /></ProtectedRoute>} />
+                <Route path="/admin/zones/:id/edit" element={<ProtectedRoute role="admin"><EditZone /></ProtectedRoute>} />
                 <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} />
 
                 <Route path="*" element={<Home />} />

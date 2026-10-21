@@ -9,3 +9,6 @@ export const toggleZone = (id) => api.patch(`/zones/${id}/toggle`);
 
 // HU-20: create a zone (admin)
 export const createZone = (zone) => api.post('/zones', zone);
+
+// HU-21: edit a zone (admin)
+export const updateZone = (id, zone) => api.put(`/zones/${id}`, zone);
