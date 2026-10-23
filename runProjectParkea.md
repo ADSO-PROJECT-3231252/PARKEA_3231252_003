@@ -87,3 +87,14 @@ npm run db:reset
 
 - Run `npm ci` in `backend` and in `frontend`, so any new library gets installed.
 - Run `npm run db:migrate` in `backend`, so any new migration is applied.
+
+## Run the tests
+
+The backend tests use Jest and Supertest. They don't need MySQL running.
+
+```bash
+cd backend
+npm test
+```
+
+Every test is listed with ✓ when it passes. They are in `backend/tests/`.
