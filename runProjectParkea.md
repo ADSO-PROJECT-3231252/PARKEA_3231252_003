@@ -55,3 +55,21 @@ npm run dev
 It is ready when it prints `PARKEA server running on http://localhost:3000`. Open http://localhost:3000/api/health: it must answer `{"status":"ok","service":"PARKEA API"}`.
 
 If it stops with `ECONNREFUSED`, the MySQL service is not running.
+
+## 4. Run the frontend
+
+In a second terminal, from the repository root:
+
+```bash
+cd frontend
+cp .env.example .env
+npm ci
+npm run dev
+```
+
+Open http://localhost:5173.
+
+## 5. Sign in
+
+- Administrator: `admin@parkea.com`, at http://localhost:5173/admin/login. Its password is in `backend/src/seeders/20260808234824-demo-primary-admin.js`.
+- User: create an account with “Crear cuenta” at http://localhost:5173/register.
