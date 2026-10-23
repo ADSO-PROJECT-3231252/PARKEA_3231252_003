@@ -187,6 +187,8 @@ PARKEA_3231252_003/
 
 ## Installation and Setup
 
+The short version, step by step: [runProjectParkea.md](runProjectParkea.md).
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) — the team uses 24.15.0
