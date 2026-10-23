@@ -32,6 +32,13 @@ const SEARCH_DEBOUNCE_MS = 400;
 const SUCCESS_MESSAGE_MS = 3000;
 const VISIBLE_LOGS = 3;
 
+// #230: when the table is wider than its card (laptops from 640 to about
+// 1440 px), the Actions column stays fixed on the right, so "Cambiar rol",
+// the status switch and the locked reason are always in sight. The shadow
+// shows that the other columns continue underneath. Phones (below 640 px)
+// keep the table as it is; #195 turns it into cards.
+const STICKY_ACTIONS = 'sm:sticky sm:right-0 sm:z-10 sm:shadow-[inset_8px_0_8px_-8px_rgb(0_0_0/0.12)]';
+
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
 
 export default function AdminUsers() {
@@ -55,6 +62,20 @@ export default function AdminUsers() {
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
+
+    // #230: true while the table doesn't fit in its card. The observer also
+    // reports the first size, so nothing is set during render. React 19 calls
+    // the returned function when the table leaves the page.
+    const [tableScrolls, setTableScrolls] = useState(false);
+    const watchTableWidth = useCallback((scroller) => {
+        if (!scroller) return undefined;
+        const observer = new ResizeObserver(() => {
+            setTableScrolls(scroller.scrollWidth > scroller.clientWidth + 1);
+        });
+        observer.observe(scroller);
+        observer.observe(scroller.firstElementChild);
+        return () => observer.disconnect();
+    }, []);
 
     // ----- Recent changes log (AC-14) -----
     const [logs, setLogs] = useState([]);
@@ -432,7 +453,7 @@ export default function AdminUsers() {
 
                 {!loading && !error && users.length > 0 && (
                     <>
-                        <div className="overflow-x-auto">
+                        <div ref={watchTableWidth} className="overflow-x-auto">
                             <table className="w-full min-w-[900px] border-collapse text-left">
                                 <thead>
                                     <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900">
@@ -443,7 +464,9 @@ export default function AdminUsers() {
                                         <th scope="col" className="px-4 py-3 font-medium">Estado</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Fecha de registro</th>
                                         <th scope="col" className="px-4 py-3 font-medium">N.º de reservas</th>
-                                        <th scope="col" className="px-4 py-3 font-medium">Acciones</th>
+                                        <th scope="col" className={`px-4 py-3 font-medium ${tableScrolls ? `${STICKY_ACTIONS} sm:bg-neutral-50` : ''}`}>
+                                            Acciones
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -496,7 +519,9 @@ export default function AdminUsers() {
                                                 </td>
                                                 <td className="whitespace-nowrap px-4 py-3 font-mono text-body text-neutral-600">{formatDate(u.createdAt)}</td>
                                                 <td className="px-4 py-3 font-mono text-body tabular-nums text-neutral-900">{u.reservationCount}</td>
-                                                <td className="px-4 py-3">
+                                                <td
+                                                    className={`px-4 py-3 ${tableScrolls ? `${STICKY_ACTIONS} ${locked ? 'sm:bg-neutral-50' : 'sm:bg-white'}` : ''}`}
+                                                >
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             type="button"
