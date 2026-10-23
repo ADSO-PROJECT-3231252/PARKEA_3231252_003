@@ -73,3 +73,17 @@ Open http://localhost:5173.
 
 - Administrator: `admin@parkea.com`, at http://localhost:5173/admin/login. Its password is in `backend/src/seeders/20260808234824-demo-primary-admin.js`.
 - User: create an account with “Crear cuenta” at http://localhost:5173/register.
+
+## 6. Start over with a clean database
+
+```bash
+cd backend
+npm run db:reset
+```
+
+> **Warning:** `db:reset` deletes the whole database with all its data, and then builds it again with the migrations and the demo data. Use it only on your local database: check that `DATABASE_URL` in `backend/.env` points to `localhost`, never to the Azure database.
+
+## 7. After a `git pull`
+
+- Run `npm ci` in `backend` and in `frontend`, so any new library gets installed.
+- Run `npm run db:migrate` in `backend`, so any new migration is applied.
