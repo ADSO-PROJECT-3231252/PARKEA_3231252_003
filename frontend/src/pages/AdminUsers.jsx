@@ -37,7 +37,7 @@ const VISIBLE_LOGS = 3;
 // the status switch and the locked reason are always in sight. The shadow
 // shows that the other columns continue underneath. Phones (below 640 px)
 // keep the table as it is; #195 turns it into cards.
-const STICKY_ACTIONS = 'sm:sticky sm:right-0 sm:z-10 sm:shadow-[-8px_0_8px_-6px_rgb(0_0_0/0.12)]';
+const STICKY_ACTIONS = 'sm:sticky sm:right-0 sm:z-10 sm:shadow-[inset_8px_0_8px_-8px_rgb(0_0_0/0.12)]';
 
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
 
