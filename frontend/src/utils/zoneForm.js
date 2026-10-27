@@ -1,7 +1,7 @@
 import { isNotEmpty, REQUIRED_MESSAGE } from './validators';
 import { translateError } from './errorMessages';
 
-// Rules of the zone form, shared by create (HU-20) and, later, edit (HU-21).
+// Rules of the zone form, shared by create (HU-20) and edit (HU-21).
 // They mirror validarZona in the backend (zona.controller.js), so most
 // mistakes are caught before the request is sent.
 export const ZONE_LIMITS = {
@@ -56,14 +56,37 @@ function coordinateError(value, min, max, label) {
     return '';
 }
 
+// HU-21 AC-01: the zone as the API returns it, as the form holds it. Numbers
+// become text; String(Number()) drops the zeros the DB adds ("4.8284000",
+// "2500.00") but keeps every decimal, so saving without changes moves nothing.
+export function zoneToForm(zone) {
+    return {
+        name: zone.name ?? '',
+        address: zone.address ?? '',
+        totalSlots: String(zone.totalSlots ?? ''),
+        hourlyRate: zone.hourlyRate == null ? '' : String(Number(zone.hourlyRate)),
+        latitude: zone.latitude == null ? '' : String(Number(zone.latitude)),
+        longitude: zone.longitude == null ? '' : String(Number(zone.longitude)),
+    };
+}
+
+// HU-21 AC-03: the capacity can't go below the spots taken by Pending or
+// Active reservations. Same text whether the form or the API catches it.
+export function capacityInUseError(spotsInUse) {
+    return spotsInUse === 1
+        ? 'Hay 1 cupo en uso por una reserva pendiente o activa. La capacidad no puede ser menor.'
+        : `Hay ${spotsInUse} cupos en uso por reservas pendientes o activas. La capacidad no puede ser menor.`;
+}
+
 // Returns the coordinates as numbers when both are valid, or null.
 export function getValidPosition(latitude, longitude) {
     if (coordinateError(latitude, -90, 90, 'latitud') || coordinateError(longitude, -180, 180, 'longitud')) return null;
     return [Number(latitude), Number(longitude)];
 }
 
-// AC-01 to AC-06: one message per field, or none when the field is valid.
-export function validateZoneForm(form) {
+// HU-20 AC-01 to AC-06: one message per field, or none when the field is
+// valid. spotsInUse (HU-21 AC-03) is only known when editing.
+export function validateZoneForm(form, { spotsInUse = 0 } = {}) {
     const errors = {};
 
     if (!isNotEmpty(form.name)) errors.name = REQUIRED_MESSAGE;
@@ -75,6 +98,8 @@ export function validateZoneForm(form) {
         const slots = Number(form.totalSlots);
         if (!Number.isInteger(slots) || slots < 1 || slots > ZONE_LIMITS.maxSlots) {
             errors.totalSlots = `La capacidad debe ser un número entero entre 1 y ${ZONE_LIMITS.maxSlots}.`;
+        } else if (slots < spotsInUse) {
+            errors.totalSlots = capacityInUseError(spotsInUse);
         }
     }
 
@@ -106,6 +131,8 @@ const FIELD_BY_CODE = {
     INVALID_CAPACITY: ['totalSlots'],
     NEGATIVE_VALUE: ['hourlyRate'],
     INVALID_COORDINATES: ['latitude', 'longitude'],
+    CAPACITY_BELOW_IN_USE: ['totalSlots'],
+    INSUFFICIENT_AVAILABLE_SPOTS: ['totalSlots'],
 };
 
 const VALIDATION_MESSAGES = {
@@ -114,14 +141,18 @@ const VALIDATION_MESSAGES = {
     hourlyRate: 'Ingresa una tarifa válida en pesos.',
 };
 
-// AC-02 / AC-11: errors returned by the API go under their field when there
-// is one. Returns { fields } for those, or { general } for anything else.
+// HU-20 AC-02 / AC-11: errors returned by the API go under their field when
+// there is one. Returns { fields } for those, or { general } for anything else.
 export function mapZoneApiError(err) {
     const data = err.response?.data ?? {};
     const fields = {};
 
     if (FIELD_BY_CODE[data.code]) {
         for (const field of FIELD_BY_CODE[data.code]) fields[field] = translateError(data.code);
+        // HU-21 AC-03: the message says how many spots are in use
+        if (data.code === 'CAPACITY_BELOW_IN_USE' && Number.isInteger(data.spotsInUse)) {
+            fields.totalSlots = capacityInUseError(data.spotsInUse);
+        }
     } else if (data.code === 'VALIDATION_ERROR' && Array.isArray(data.errors)) {
         for (const { path } of data.errors) {
             if (VALIDATION_MESSAGES[path]) fields[path] = VALIDATION_MESSAGES[path];

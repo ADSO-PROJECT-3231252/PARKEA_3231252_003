@@ -237,7 +237,7 @@ function AuthenticatedHome({ user }) {
                 <HeroIllustration src={heroUserIllustration} height={315} right={160} />
             </section>
 
-            <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
                 <CardShell
                     title="Reservas"
                     icon={CalendarCheck}
@@ -309,13 +309,13 @@ function AuthenticatedHome({ user }) {
                                 return (
                                     <li
                                         key={zone.id}
-                                        className="flex flex-col gap-1 rounded-md bg-parkea-50 p-3 lg:flex-row lg:items-center lg:justify-between lg:gap-2"
+                                        className="flex flex-col gap-1 rounded-md bg-parkea-50 p-3 xl:flex-row xl:items-center xl:justify-between xl:gap-2"
                                     >
                                         <p className="flex min-w-0 items-center gap-1 text-body text-neutral-900">
                                             <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
                                             <span className="truncate">{zone.name}</span>
                                         </p>
-                                        <div className="flex items-center justify-between gap-3 pl-[18px] lg:shrink-0 lg:justify-end lg:pl-0">
+                                        <div className="flex items-center justify-between gap-3 pl-[18px] xl:shrink-0 xl:justify-end xl:pl-0">
                                             <span className="flex items-baseline gap-1 font-mono text-caption text-neutral-600">
                                                 <span className="text-right tabular-nums">{zone.availableSlots}</span>
                                                 <span>de</span>
@@ -418,7 +418,7 @@ function AdminHome() {
                     Accede rápidamente a las funcionalidades más importantes del sistema.
                 </p>
 
-                <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <BarChart3 className="h-5 w-5" aria-hidden="true" />
