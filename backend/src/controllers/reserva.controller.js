@@ -1,0 +1,317 @@
+const { Op } = require('sequelize');
+const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
+const { sequelize } = require('../models');
+const ErrorCodes = require('../constants/errorCodes');
+
+const DURACION_MIN_MS = 30 * 60 * 1000;
+const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
+const ANTICIPACION_MAX_MS = 48 * 60 * 60 * 1000;
+
+// HU-14: Reserve a Spot
+async function crear(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+        const userId = req.usuario.id;
+        const { zoneId, vehicleId, startTime, endTime } = req.body;
+
+        if (!zoneId || !vehicleId || !startTime || !endTime) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'zoneId, vehicleId, startTime, and endTime are required' });
+        }
+
+        const start = new Date(startTime);
+        const end = new Date(endTime);
+        const now = new Date();
+        // A value that is not a date ("abc") gives an invalid Date, and every
+        // comparison below would let it through until the database rejects it
+        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.INVALID_DATE, message: 'startTime and endTime must be valid dates' });
+        }
+
+        if (start <= now) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.START_TIME_IN_PAST, message: 'The start time must be in the future' });
+        }
+        if (start - now > ANTICIPACION_MAX_MS) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.RESERVATION_TOO_FAR_AHEAD, message: 'Reservations can only be made up to 48 hours in advance' });
+        }
+        if (end <= start) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.END_BEFORE_START, message: 'The end time must be after the start time' });
+        }
+
+        const duracionMs = end - start;
+        if (duracionMs < DURACION_MIN_MS || duracionMs > DURACION_MAX_MS) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.INVALID_DURATION, message: 'The reservation must last between 30 minutes and 24 hours' });
+        }
+
+        // Locked until the transaction ends: if the same vehicle is booked twice
+        // at the same moment (double click, two tabs), the second request waits
+        // here and the overlap check below then sees the first reservation
+        const vehiculo = await Vehiculo.findOne({
+            where: { id: vehicleId, userId },
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        if (!vehiculo) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
+        // Reject if this vehicle already has a Pending/Active reservation
+        // that overlaps the requested time range
+        const solapada = await Reserva.findOne({
+            where: {
+                vehicleId,
+                status: ['Pending', 'Active'],
+                startTime: { [Op.lt]: end },
+                endTime: { [Op.gt]: start },
+            },
+            transaction: t,
+        });
+        if (solapada) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
+        }
+
+        const zona = await Zona.findByPk(zoneId, { transaction: t });
+        if (!zona) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
+        }
+        if (!zona.isActive) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
+        }
+
+        // Lock and claim one available physical spot, skipping locked rows so two
+        // concurrent requests never grab the same spot
+        const cupo = await ParkingSpot.findOne({
+            where: { zoneId, status: 'Available' },
+            order: [['spotNumber', 'ASC']],
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+            skipLocked: true,
+        });
+
+        if (!cupo) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.NO_SPOTS_AVAILABLE, message: 'This spot is no longer available. Please select another zone or time.' });
+        }
+
+        const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
+
+        const reserva = await Reserva.create({
+            userId,
+            zoneId,
+            vehicleId,
+            parkingSpotId: cupo.id,
+            spotNumber: cupo.spotNumber,
+            startTime: start,
+            endTime: end,
+            status: 'Pending',
+            holdExpiresAt,
+            appliedHourlyRate: zona.hourlyRate,
+        }, { transaction: t });
+
+        await cupo.update({ status: 'Occupied' }, { transaction: t });
+        await zona.decrement('availableSlots', { by: 1, transaction: t });
+
+        await t.commit();
+
+        const reservaCompleta = await Reserva.findByPk(reserva.id, {
+            include: [
+                { model: Zona, as: 'zone' },
+                { model: Vehiculo, as: 'vehicle' },
+            ],
+        });
+
+        return res.status(201).json({ message: 'Reservation created successfully', reservation: reservaCompleta });
+    } catch (error) {
+        await t.rollback();
+        next(error);
+    }
+}
+
+// HU-15: View Reservation Confirmation
+async function obtenerConfirmacion(req, res, next) {
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+
+        const reserva = await Reserva.findOne({
+            where: { id, userId },
+            include: [
+                { model: Zona, as: 'zone' },
+                { model: Vehiculo, as: 'vehicle', paranoid: false },
+            ],
+        });
+
+        if (!reserva) {
+            return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
+        }
+
+        const durationMs = new Date(reserva.endTime) - new Date(reserva.startTime);
+        const durationHours = durationMs / (1000 * 60 * 60);
+        const estimatedTotal = Number((durationHours * Number(reserva.appliedHourlyRate)).toFixed(2));
+
+        return res.status(200).json({
+            reservation: {
+                id: reserva.id,
+                status: reserva.status,
+                spotNumber: reserva.spotNumber,
+                startTime: reserva.startTime,
+                endTime: reserva.endTime,
+                durationHours: Number(durationHours.toFixed(2)),
+                holdExpiresAt: reserva.holdExpiresAt,
+                zone: {
+                    id: reserva.zone.id,
+                    name: reserva.zone.name,
+                    address: reserva.zone.address,
+                    hourlyRate: reserva.zone.hourlyRate,
+                    latitude: reserva.zone.latitude,
+                    longitude: reserva.zone.longitude,
+                },
+                vehicle: {
+                    id: reserva.vehicle.id,
+                    plate: reserva.vehicle.plate,
+                    brand: reserva.vehicle.brand,
+                    model: reserva.vehicle.model,
+                    color: reserva.vehicle.color,
+                },
+                paymentSummary: {
+                    zoneName: reserva.zone.name,
+                    spotNumber: reserva.spotNumber,
+                    hourlyRate: Number(reserva.appliedHourlyRate),
+                    durationHours: Number(durationHours.toFixed(2)),
+                    estimatedTotal,
+                },
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// HU-16: Cancel a Reservation
+async function cancelar(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+        const reserva = await Reserva.findOne({
+            where: { id, userId },
+            include: [{ model: Pago, as: 'payment' }],
+            transaction: t,
+        });
+        if (!reserva) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
+        }
+        const now = new Date();
+        const yaEmpezo = new Date(reserva.startTime) <= now;
+        if (yaEmpezo) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.RESERVATION_ALREADY_STARTED, message: 'This reservation has already started and cannot be cancelled' });
+        }
+        if (reserva.status !== 'Pending' && reserva.status !== 'Active') {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.RESERVATION_NOT_CANCELLABLE, message: `A reservation with status "${reserva.status}" cannot be cancelled` });
+        }
+
+        // Release the physical spot, not just the zone counter
+        if (reserva.parkingSpotId) {
+            const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
+            if (cupo && cupo.status === 'Occupied') {
+                await cupo.update({ status: 'Available' }, { transaction: t });
+            }
+        }
+
+        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+        await zona.increment('availableSlots', { by: 1, transaction: t });
+        await reserva.update({ status: 'Cancelled' }, { transaction: t });
+        if (reserva.payment && reserva.payment.paymentStatus === 'Paid') {
+            await reserva.payment.update({ paymentStatus: 'Refunded' }, { transaction: t });
+        }
+        await t.commit();
+        return res.status(200).json({ message: 'Reservation cancelled successfully' });
+    } catch (error) {
+        await t.rollback();
+        next(error);
+    }
+}
+
+// HU-18: View Booking History
+async function misReservas(req, res, next) {
+    try {
+        const userId = req.usuario.id;
+        const { status } = req.query;
+
+        const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+        const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
+        const offset = (page - 1) * limit;
+
+        const where = { userId };
+        if (status && status !== 'All') {
+            where.status = status;
+        }
+
+        const { count, rows } = await Reserva.findAndCountAll({
+            where,
+            order: [['startTime', 'DESC']],
+            limit,
+            offset,
+            include: [
+                { model: Zona, as: 'zone', attributes: ['id', 'name', 'address'] },
+                { model: Vehiculo, as: 'vehicle', paranoid: false, attributes: ['id', 'plate', 'brand', 'model', 'color'] },
+                { model: Pago, as: 'payment', attributes: ['amount', 'paymentStatus'] },
+            ],
+        });
+
+        const reservations = rows.map((r) => {
+            const yaTienePago = r.payment && ['Paid', 'Refunded'].includes(r.payment.paymentStatus);
+
+            let amount;
+            let amountType;
+            if (yaTienePago) {
+                amount = Number(r.payment.amount);
+                amountType = 'paid';
+            } else {
+                const horas = (new Date(r.endTime) - new Date(r.startTime)) / (1000 * 60 * 60);
+                amount = Number((horas * Number(r.appliedHourlyRate)).toFixed(2));
+                amountType = 'estimated';
+            }
+
+            return {
+                id: r.id,
+                status: r.status,
+                spotNumber: r.spotNumber,
+                startTime: r.startTime,
+                endTime: r.endTime,
+                zone: r.zone,
+                vehicle: r.vehicle,
+                amount,
+                amountType,
+                appliedHourlyRate: Number(r.appliedHourlyRate),
+                paymentStatus: r.payment ? r.payment.paymentStatus : 'Pending',
+            };
+        });
+
+        return res.status(200).json({
+            reservations,
+            pagination: {
+                page,
+                limit,
+                total: count,
+                totalPages: Math.ceil(count / limit),
+            },
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+module.exports = { crear, obtenerConfirmacion, cancelar, misReservas };

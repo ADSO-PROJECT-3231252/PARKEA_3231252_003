@@ -1,0 +1,405 @@
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+    Car,
+    Truck,
+    Motorbike,
+    Star,
+    Pencil,
+    Trash2,
+    Plus,
+    RefreshCw,
+    AlertCircle,
+    ChevronLeft,
+    ChevronRight,
+    Info,
+} from 'lucide-react';
+import { getVehicles, setDefaultVehicle, deleteVehicle } from '../services/vehicleService';
+import { translateError } from '../utils/errorMessages';
+import ConfirmDialog from '../components/ConfirmDialog';
+import { VEHICLE_TYPE_LABELS } from '../utils/vehicleTypes';
+
+// AC-10: the list must be paginated when there are more than 9 vehicles.
+const PAGE_SIZE = 9;
+
+// One flash message slot for the whole page (same idea as FLASH_MESSAGES in
+// Login.jsx). Added/updated arrive through location.state after a redirect;
+// deleted is set here, since deleting never leaves the page.
+const FLASH_MESSAGES = {
+    vehicleAdded: 'Vehículo registrado correctamente.',
+    vehicleUpdated: 'Vehículo actualizado correctamente.',
+    vehicleDeleted: 'Vehículo eliminado correctamente.',
+};
+
+const VEHICLE_TYPE_ICONS = { car: Car, motorcycle: Motorbike, truck: Truck };
+
+// Uses a single neutral color for all plates, regardless of vehicle type.
+// Colombian plate colors depend on the type of service (private/public/
+// official), not vehicle type, a fact the system doesn't track, so
+// coloring by vehicleType would misrepresent something we can't verify.
+function LicensePlate({ plate }) {
+    return (
+        <div className="flex w-[128px] shrink-0 flex-col items-center overflow-hidden rounded-md border-2 border-neutral-900 bg-neutral-200">
+            <p className="mt-1 font-mono text-subtitle font-bold tracking-wider text-neutral-900">{plate}</p>
+            <div className="flex w-full items-center justify-center gap-1 bg-neutral-900 py-0.5">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-white">Colombia</span>
+                <span className="flex h-2 w-3 flex-col overflow-hidden rounded-[1px]" aria-hidden="true">
+                    <span className="h-1 bg-flag-yellow" />
+                    <span className="h-[2px] bg-flag-blue" />
+                    <span className="h-[2px] bg-flag-red" />
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete }) {
+    const Icon = VEHICLE_TYPE_ICONS[vehicle.vehicleType] ?? Car;
+    const typeLabel = VEHICLE_TYPE_LABELS[vehicle.vehicleType] ?? vehicle.vehicleType;
+    const isSettingThis = settingDefaultId === vehicle.id;
+    const vehicleDescription = `${vehicle.brand} ${vehicle.model}, placa ${vehicle.plate}`;
+
+    return (
+        <div
+            className={`relative rounded-lg border-2 bg-white p-6 pt-8 ${vehicle.isDefault ? 'border-parkea-600' : 'border-neutral-200'
+                }`}
+        >
+            <div className="absolute -top-3 left-4">
+                {vehicle.isDefault ? (
+                    <span className="flex items-center gap-1.5 rounded-full border border-parkea-600 bg-white px-3 py-1 text-label font-medium text-parkea-600">
+                        <Star className="h-3.5 w-3.5 fill-gold-500 text-gold-500" aria-hidden="true" />
+                        Predeterminado
+                    </span>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => onSetDefault(vehicle.id)}
+                        disabled={settingDefaultId !== null}
+                        aria-label={`Marcar ${vehicleDescription} como vehículo predeterminado`}
+                        className="flex items-center gap-1.5 rounded-full border border-neutral-300 bg-white px-3 py-1 text-label font-medium text-neutral-600 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <Star className="h-3.5 w-3.5 text-neutral-400" aria-hidden="true" />
+                        {isSettingThis ? 'Marcando…' : 'Marcar como predeterminado'}
+                    </button>
+                )}
+            </div>
+
+            <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[auto_1fr_auto] lg:items-center">
+                <div className="flex items-center gap-3">
+                    <LicensePlate plate={vehicle.plate} />
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                        <Icon className="h-7 w-7" aria-hidden="true" />
+                    </span>
+                </div>
+
+                <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-2 lg:grid-cols-[130px_140px_minmax(0,1fr)]">
+                    <div className="lg:col-start-1 lg:row-start-1">
+                        <p className="text-caption text-neutral-500">Marca</p>
+                        <p className="text-body font-medium text-neutral-900">{vehicle.brand}</p>
+                    </div>
+                    <div className="lg:col-start-2 lg:row-start-1">
+                        <p className="text-caption text-neutral-500">Modelo</p>
+                        <p className="text-body font-medium text-neutral-900">{vehicle.model}</p>
+                    </div>
+                    <div className="lg:col-start-1 lg:row-start-2">
+                        <p className="text-caption text-neutral-500">Color</p>
+                        <p className="text-body font-medium text-neutral-900">{vehicle.color}</p>
+                    </div>
+                    <div className="lg:col-start-2 lg:row-start-2">
+                        <p className="text-caption text-neutral-500">Tipo</p>
+                        <p className="text-body font-medium text-neutral-900">{typeLabel}</p>
+                    </div>
+                    {vehicle.visualDescription && (
+                        <div className="col-span-2 min-w-0 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
+                            <p className="text-caption text-neutral-500">Descripción visual</p>
+                            <p className="text-body font-medium break-words text-neutral-900">
+                                {vehicle.visualDescription}
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex shrink-0 gap-2 lg:flex-col">
+                    <button
+                        type="button"
+                        onClick={() => onEdit(vehicle.id)}
+                        aria-label={`Editar ${vehicleDescription}`}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-4 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 lg:flex-none"
+                    >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                        Editar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onDelete(vehicle)}
+                        aria-label={`Eliminar ${vehicleDescription}`}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-danger px-4 py-1.5 text-label text-danger transition-colors hover:bg-danger-soft lg:flex-none"
+                    >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export default function VehicleList() {
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    const [vehicles, setVehicles] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    const [page, setPage] = useState(1);
+    const [settingDefaultId, setSettingDefaultId] = useState(null);
+    const [setDefaultError, setSetDefaultError] = useState('');
+
+    // HU-13: delete confirmation dialog state. deleteTarget holds the whole
+    // vehicle object (not just the id) so the dialog can show its brand/model/
+    // plate in the confirmation message.
+    const [deleteTarget, setDeleteTarget] = useState(null);
+    const [deleting, setDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+
+    // AC-07 (HU-10) / AC-08 (HU-12) / HU-13: a single success message, shown
+    // for 3 seconds. The redirect state is cleared once so a page refresh
+    // doesn't show the message again.
+    const [flash, setFlash] = useState(() => {
+        if (location.state?.vehicleAdded) return FLASH_MESSAGES.vehicleAdded;
+        if (location.state?.vehicleUpdated) return FLASH_MESSAGES.vehicleUpdated;
+        return '';
+    });
+
+    useEffect(() => {
+        if (!flash) return;
+        if (location.state) navigate(location.pathname + location.search, { replace: true, state: null });
+        const timer = setTimeout(() => setFlash(''), 3000);
+        return () => clearTimeout(timer);
+        // Intentional: only runs when the message changes, not on every navigate/location change.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flash]);
+
+    const fetchVehicles = useCallback(() => {
+        getVehicles()
+            .then(({ data }) => {
+                setVehicles(data.vehicles);
+                setError(false);
+            })
+            .catch(() => setError(true))
+            .finally(() => setLoading(false));
+    }, []);
+
+    useEffect(() => {
+        fetchVehicles();
+    }, [fetchVehicles]);
+
+    const handleRetry = () => {
+        setLoading(true);
+        setError(false);
+        fetchVehicles();
+    };
+
+    // AC-05 / AC-06: sets a new default vehicle. The backend clears the
+    // previous default; the frontend just re-fetches to reflect the new order
+    // (AC-07/AC-08 ordering is already handled server-side, see vehicleService).
+    const handleSetDefault = (id) => {
+        setSettingDefaultId(id);
+        setSetDefaultError('');
+        setDefaultVehicle(id)
+            .then(() => fetchVehicles())
+            .catch((err) => {
+                setSetDefaultError(translateError(err.response?.data?.code));
+            })
+            .finally(() => setSettingDefaultId(null));
+    };
+
+    const handleEdit = (id) => navigate(`/vehicles/${id}/edit`);
+
+    // AC-01: opens the confirmation dialog for this specific vehicle.
+    const handleDelete = (vehicle) => {
+        setDeleteTarget(vehicle);
+        setDeleteError('');
+    };
+
+    const handleCancelDelete = () => {
+        if (deleting) return;
+        setDeleteTarget(null);
+        setDeleteError('');
+    };
+
+    // AC-02/AC-03/AC-04/AC-06 are already enforced by the backend's eliminar()
+    // controller (blocks active reservations, soft-deletes, reassigns the
+    // default vehicle, scopes the query to the authenticated owner) -- this
+    // just calls it and reacts to the result.
+    const handleConfirmDelete = () => {
+        if (!deleteTarget) return;
+        setDeleting(true);
+        setDeleteError('');
+        deleteVehicle(deleteTarget.id)
+            .then(() => {
+                // AC-05: no full page reload -- closing the dialog and
+                // re-fetching updates the list and the reassigned default
+                // (if any) in place.
+                setDeleteTarget(null);
+                setFlash(FLASH_MESSAGES.vehicleDeleted);
+                fetchVehicles();
+            })
+            .catch((err) => {
+                // AC-02/AC-07: shown inside the dialog, not as a page banner --
+                // the user is mid-confirmation and this is the direct result of
+                // the action they just took. VEHICLE_HAS_ACTIVE_RESERVATION
+                // already has its own message in errorMessages.js; anything
+                // else falls back to translateError's generic message.
+                setDeleteError(translateError(err.response?.data?.code));
+            })
+            .finally(() => setDeleting(false));
+    };
+
+    const totalPages = Math.max(1, Math.ceil(vehicles.length / PAGE_SIZE));
+    const currentPage = Math.min(page, totalPages);
+    const paginatedVehicles = vehicles.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    return (
+        <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h1 className="text-title font-display uppercase text-neutral-900">Mis vehículos</h1>
+                    <p className="mt-1 text-body text-neutral-600">
+                        Administra los vehículos que tienes registrados para tus reservas.
+                    </p>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={() => navigate('/vehicles/new')}
+                    className="flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2 text-label text-white transition-colors hover:bg-parkea-700"
+                >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Agregar vehículo
+                </button>
+            </div>
+
+            {flash && (
+                <p role="status" className="mt-4 rounded-md bg-parkea-50 px-3 py-2 text-center text-caption text-parkea-700">
+                    {flash}
+                </p>
+            )}
+
+            {setDefaultError && (
+                <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
+                    {setDefaultError}
+                </p>
+            )}
+
+            <div className="mt-6">
+                {loading && (
+                    <p role="status" aria-live="polite" className="text-body text-neutral-600">
+                        Cargando vehículos…
+                    </p>
+                )}
+
+                {!loading && error && (
+                    <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-danger-soft bg-danger-soft p-5">
+                        <p className="flex items-center gap-2 text-body text-danger">
+                            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            No pudimos cargar tus vehículos. Intenta de nuevo.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleRetry}
+                            className="flex items-center gap-1.5 rounded-md border border-danger px-3 py-1.5 text-label text-danger transition-colors hover:bg-white"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                            Reintentar
+                        </button>
+                    </div>
+                )}
+
+                {!loading && !error && vehicles.length === 0 && (
+                    <div className="flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
+                        <p className="text-body text-neutral-600">Aún no tienes vehículos registrados.</p>
+                        <button
+                            type="button"
+                            onClick={() => navigate('/vehicles/new')}
+                            className="flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2 text-label text-white transition-colors hover:bg-parkea-700"
+                        >
+                            <Plus className="h-4 w-4" aria-hidden="true" />
+                            Agregar vehículo
+                        </button>
+                    </div>
+                )}
+
+                {!loading && !error && paginatedVehicles.length > 0 && (
+                    <>
+                        <div className="grid grid-cols-1 gap-5">
+                            {paginatedVehicles.map((vehicle) => (
+                                <VehicleCard
+                                    key={vehicle.id}
+                                    vehicle={vehicle}
+                                    onSetDefault={handleSetDefault}
+                                    settingDefaultId={settingDefaultId}
+                                    onEdit={handleEdit}
+                                    onDelete={handleDelete}
+                                />
+                            ))}
+                        </div>
+
+                        {totalPages > 1 && (
+                            <nav aria-label="Paginación de vehículos" className="mt-6 flex items-center justify-center gap-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    aria-label="Página anterior"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                >
+                                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                                    Anterior
+                                </button>
+                                <span className="text-label text-neutral-600" aria-live="polite">
+                                    Página {currentPage} de {totalPages}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    aria-label="Página siguiente"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                >
+                                    Siguiente
+                                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                            </nav>
+                        )}
+
+                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
+                            <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            El vehículo predeterminado se seleccionará automáticamente al realizar una reserva.
+                        </p>
+                    </>
+                )}
+            </div>
+
+            <ConfirmDialog
+                open={Boolean(deleteTarget)}
+                variant="danger"
+                title="Eliminar vehículo"
+                message={
+                    deleteTarget
+                        ? `¿Estás seguro de que deseas eliminar tu ` +
+                        `${deleteTarget.brand} ${deleteTarget.model} ` +
+                        `(placa ${deleteTarget.plate})? Esta acción no ` +
+                        `se puede deshacer.`
+                        : ''
+                }
+                confirmLabel="Confirmar"
+                cancelLabel="Cancelar"
+                confirming={deleting}
+                error={deleteError}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+            />
+        </div>
+    );
+} 

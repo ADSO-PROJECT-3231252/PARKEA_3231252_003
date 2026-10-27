@@ -8,6 +8,14 @@ export const login = (credentials) => {
     return api.post('/auth/login', credentials);
 };
 
-export const logout = () => {
-    localStorage.removeItem('token');
+export const loginAdmin = (credentials) => {
+    return api.post('/auth/login-admin', credentials);
+};
+
+export const forgotPassword = (data) => {
+    return api.post('/auth/forgot-password', data);
+};
+
+export const resetPassword = (data) => {
+    return api.post('/auth/reset-password', data);
 };

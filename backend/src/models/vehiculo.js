@@ -1,0 +1,70 @@
+'use strict';
+const { Model } = require('sequelize');
+
+module.exports = (sequelize, DataTypes) => {
+  class Vehiculo extends Model {
+    static associate(models) {
+      Vehiculo.belongsTo(models.Usuario, { foreignKey: 'userId', as: 'user' });
+      Vehiculo.hasMany(models.Reserva, { foreignKey: 'vehicleId', as: 'reservations' });
+    }
+  }
+  Vehiculo.init({
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    plate: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      // Not `unique: true` here: the real uniqueness constraint lives on the
+      // generated `plate_active` column (NULL for soft-deleted vehicles), added
+      // by the 20260925022623 migration, so a deleted vehicle's plate can be
+      // reused. `plate` itself has no DB-level unique index anymore.
+    },
+    vehicleType: {
+      type: DataTypes.ENUM('car', 'motorcycle', 'truck'),
+      allowNull: false,
+      defaultValue: 'car',
+      field: 'vehicle_type',
+    },
+    brand: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    model: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    color: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+    },
+    visualDescription: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: 'visual_description',
+    },
+    isDefault: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'is_default',
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'user_id',
+    },
+  }, {
+    sequelize,
+    modelName: 'Vehiculo',
+    tableName: 'vehicles',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: false,
+    deletedAt: 'deleted_at',
+    paranoid: true,
+  });
+  return Vehiculo;
+};
