@@ -6,6 +6,8 @@
 
 **ADSO 3231252 · Group 003 · SENA CDITI**
 
+**[Project wiki](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/wiki)**: requirements, user stories, diagrams, API reference, data dictionary and more
+
 </div>
 
 ---
