@@ -6,6 +6,8 @@
 
 **ADSO 3231252 · Group 003 · SENA CDITI**
 
+**[Project wiki](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/wiki)**: requirements, user stories, diagrams, API reference, data dictionary and more
+
 </div>
 
 ---
@@ -187,6 +189,8 @@ PARKEA_3231252_003/
 
 ## Installation and Setup
 
+The short version, step by step: [runProjectParkea.md](runProjectParkea.md).
+
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) — the team uses 24.15.0
@@ -313,13 +317,16 @@ VITE_API_URL=http://localhost:3000/api
 |--------|---------|-------------|
 | Development | `npm run dev` | nodemon + auto-reload |
 | Production | `npm start` | Plain Node |
+| Tests | `npm test` | Jest + Supertest, no MySQL needed |
 
 ### Database (run inside `backend/`)
 | Task | Command |
 |------|---------|
-| Create or update the tables | `npx sequelize-cli db:migrate` |
+| Create the database | `npm run db:create` |
+| Create or update the tables | `npm run db:migrate` |
+| Load the demo data (only once) | `npm run db:seed` |
+| Start over: delete the database and build it again (local only) | `npm run db:reset` |
 | Undo the last migration | `npx sequelize-cli db:migrate:undo` |
-| Load the demo data | `npx sequelize-cli db:seed:all` |
 | Remove the demo data | `npx sequelize-cli db:seed:undo:all` |
 
 ### Frontend
