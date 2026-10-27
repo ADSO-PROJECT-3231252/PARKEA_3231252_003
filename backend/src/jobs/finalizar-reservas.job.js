@@ -60,7 +60,13 @@ async function finalizarReservasVencidas() {
 
 function iniciarJobFinalizacion() {
     console.log('[finalizar-reservas] Job de finalización iniciado (revisa cada 60s)');
-    setInterval(finalizarReservasVencidas, INTERVALO_MS);
+    // If the database stops answering, the error is logged and the next run
+    // tries again; without the catch, Node stops the whole API
+    setInterval(() => {
+        finalizarReservasVencidas().catch((error) => {
+            console.error('[finalizar-reservas] Error reading reservations:', error.message);
+        });
+    }, INTERVALO_MS);
 }
 
 module.exports = { iniciarJobFinalizacion, finalizarReservasVencidas };
