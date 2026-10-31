@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Car,
@@ -10,10 +10,12 @@ import {
     Search,
     RefreshCw,
     AlertCircle,
+    CheckCircle2,
 } from 'lucide-react';
 import { getReservations } from '../services/reservationService';
-import { formatCurrency, formatDuration } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
+import CancelReservationDialog from '../components/CancelReservationDialog';
+import { formatCurrency, formatDuration, formatReservationCode as shortCode } from '../utils/format';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
 // done by the backend: GET /reservations?status=&page=&limit=
@@ -43,10 +45,6 @@ function formatDateTime(isoString) {
     const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     return `${fecha} ${hora}`;
 }
-// The backend has no human-readable reservation code, only the UUID. The
-// first 8 characters are shown as a short code; the full ID is still what
-// the confirmation screen (HU-15) displays, and the short code is a prefix of it.
-const shortCode = (id) => String(id).slice(0, 8).toUpperCase();
 function StatusBadge({ status }) {
     const { label = status, Icon, badge } = RESERVATION_STATUS[status] ?? FALLBACK_STATUS;
     return (
@@ -119,8 +117,9 @@ function StatusInfo({ reservation }) {
         </div>
     );
 }
-function Actions({ reservation, onViewDetails, onPay, onCancel, inline = false }) {
+function Actions({ reservation, now, onViewDetails, onPay, onCancel, inline = false }) {
     const isPending = reservation.status === 'Pending';
+    const canCancel = canCancelReservation(reservation, now);
     // Used in aria-labels so a screen reader announces which reservation each
     // repeated action belongs to (AC-13, WCAG 2.1 AA).
     const which = `reserva ${shortCode(reservation.id)} en ${reservation.zone?.name ?? 'la zona'}`;
@@ -133,28 +132,29 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
         : 'flex w-full flex-col gap-1.5 sm:w-36';
     return (
         <div className={wrapper}>
-            {/* AC-06: only Pending reservations can be paid (HU-17) or cancelled (HU-16). */}
+            {/* AC-06: only Pending reservations can be paid (HU-17). */}
             {isPending && (
-                <>
-                    <button
-                        type="button"
-                        onClick={() => onPay(reservation.id)}
-                        aria-label={`Pagar la ${which}`}
-                        className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
-                    >
-                        <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
-                        Pagar
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onCancel(reservation.id)}
-                        aria-label={`Cancelar la ${which}`}
-                        className={`${base} border-danger text-danger hover:bg-danger-soft`}
-                    >
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                        Cancelar
-                    </button>
-                </>
+                <button
+                    type="button"
+                    onClick={() => onPay(reservation.id)}
+                    aria-label={`Pagar la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
+                    Pagar
+                </button>
+            )}
+            {/* HU-16 AC-01: Pending or Active (already paid) reservations that have not started. */}
+            {canCancel && (
+                <button
+                    type="button"
+                    onClick={() => onCancel(reservation)}
+                    aria-label={`Cancelar la ${which}`}
+                    className={`${base} border-danger text-danger hover:bg-danger-soft`}
+                >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    Cancelar
+                </button>
             )}
             {/* AC-07: every entry — including Pending, which the mockup omits — opens its confirmation (HU-15). */}
             <button
@@ -222,6 +222,14 @@ export default function Reservations() {
     const [error, setError] = useState(false);
     // Bumped by "Reintentar" to re-run the fetch with the same filter/page.
     const [reloadKey, setReloadKey] = useState(0);
+    // Time of the last load, used to decide which reservations already started.
+    // Set from the fetch callback, never during render.
+    const [now, setNow] = useState(null);
+    // HU-16: the reservation in the cancel dialog (null = closed) and the
+    // AC-06 message shown after cancelling.
+    const [cancelTarget, setCancelTarget] = useState(null);
+    const [cancelMessage, setCancelMessage] = useState('');
+    const cancelMessageRef = useRef(null);
     useEffect(() => {
         // Guards against out-of-order responses: if the user switches filter or
         // page while a request is still in flight, the older response must not
@@ -237,6 +245,7 @@ export default function Reservations() {
                     setPage(totalPages);
                     return;
                 }
+                setNow(Date.now());
                 setReservations(data.reservations);
                 setPagination({ total: data.pagination?.total ?? data.reservations.length, totalPages });
                 setLoading(false);
@@ -258,11 +267,13 @@ export default function Reservations() {
     };
     const handleFilterChange = (value) => {
         if (value === statusFilter) return;
+        setCancelMessage('');
         startLoading();
         setStatusFilter(value);
         setPage(1);
     };
     const goToPage = (target) => {
+        setCancelMessage('');
         startLoading();
         setPage(target);
     };
@@ -272,11 +283,26 @@ export default function Reservations() {
     };
     const handleViewDetails = (id) => navigate(`/reservations/${id}`);
     const handlePay = (id) => navigate(`/reservations/${id}/payment`);
-    // HU-16 not built yet — placeholder only; the confirmation dialog and the
-    // cancel request are built in their own PR on top of this screen.
-    const handleCancel = (id) => {
-        console.log('TODO: HU-16 — open cancel confirmation dialog for reservation', id);
+    // HU-16
+    const handleCancel = (reservation) => setCancelTarget(reservation);
+    const handleCancelClose = ({ stale }) => {
+        setCancelTarget(null);
+        // The reservation changed since the list was loaded (e.g. it started):
+        // load it again so the list shows its current status.
+        if (stale) setReloadKey((k) => k + 1);
     };
+    const handleCancelled = (message) => {
+        setCancelTarget(null);
+        setCancelMessage(message);
+        // AC-07: reloaded without the loading state, so the list stays on screen
+        // and the reservation shows up as "Cancelada".
+        setReloadKey((k) => k + 1);
+    };
+    // The "Cancelar" button disappears once the reservation is cancelled, so
+    // the focus goes to the message, which also makes sure it is read aloud.
+    useEffect(() => {
+        if (cancelMessage) cancelMessageRef.current?.focus();
+    }, [cancelMessage]);
     const isFiltered = statusFilter !== 'All';
     const isEmpty = !loading && !error && reservations.length === 0;
     const showList = !loading && !error && reservations.length > 0;
@@ -334,6 +360,19 @@ text-body text-neutral-900"
                     })}
                 </div>
             </div>
+            {/* HU-16 AC-06 */}
+            {cancelMessage && (
+                <p
+                    ref={cancelMessageRef}
+                    tabIndex={-1}
+                    role="status"
+                    className="mt-4 flex items-start gap-2 rounded-md bg-parkea-50 px-3 py-2 text-caption
+text-parkea-700 focus:outline-none"
+                >
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {cancelMessage}
+                </p>
+            )}
             <div className="mt-4">
                 {loading && (
                     <p role="status" aria-live="polite" className="text-body text-neutral-600">
@@ -468,6 +507,7 @@ text-neutral-900"
                                             <td className="px-4 py-4">
                                                 <Actions
                                                     reservation={r}
+                                                    now={now}
                                                     onViewDetails={handleViewDetails}
                                                     onPay={handlePay}
                                                     onCancel={handleCancel}
@@ -502,6 +542,7 @@ p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
                                     <div className="mt-4">
                                         <Actions
                                             reservation={r}
+                                            now={now}
                                             onViewDetails={handleViewDetails}
                                             onPay={handlePay}
                                             onCancel={handleCancel}
@@ -570,6 +611,11 @@ text-center text-caption font-medium text-white"
                     </>
                 )}
             </div>
+            <CancelReservationDialog
+                reservation={cancelTarget}
+                onClose={handleCancelClose}
+                onCancelled={handleCancelled}
+            />
         </div>
     );
 }
