@@ -45,3 +45,8 @@ export function formatCountdown(ms) {
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
+
+// The backend has no human-readable reservation code, only the UUID. The first
+// 8 characters are shown as a short code (a prefix of the full ID that the
+// confirmation screen displays). Shared by HU-16 and HU-18.
+export const formatReservationCode = (id) => String(id).slice(0, 8).toUpperCase();
