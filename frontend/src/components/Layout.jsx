@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 
 export default function Layout() {
     return (
@@ -9,7 +10,7 @@ export default function Layout() {
                 <Outlet />
             </main>
             <footer>
-                {/* Footer real pendiente, se agrega aquí más adelante */}
+                <Footer />
             </footer>
         </div>
     );
