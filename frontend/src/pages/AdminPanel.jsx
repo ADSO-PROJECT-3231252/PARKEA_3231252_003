@@ -495,7 +495,7 @@ export default function AdminPanel() {
                                             <td className="py-2.5 pr-3 text-label text-neutral-900">
                                                 {formatCurrency(pago.amount)}
                                             </td>
-                                            <td className="py-2.5 pr-3 text-label text-neutral-900">
+                                            <td className="whitespace-nowrap py-2.5 pr-3 text-label text-neutral-900">
                                                 {pago.paidAt
                                                     ? `${formatDate(pago.paidAt)} ${formatTime(pago.paidAt)}`
                                                     : '—'}
