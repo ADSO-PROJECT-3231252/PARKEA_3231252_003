@@ -2,21 +2,21 @@ import { useState } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import { cancelReservation } from '../services/reservationService';
 import { translateError } from '../utils/errorMessages';
-import { formatDate, formatReservationCode, formatTime } from '../utils/format';
+import { formatDateTime, formatReservationCode } from '../utils/format';
 
 // Codes that mean the screen behind the dialog is out of date (the reservation
 // started, changed status or no longer exists), so it should be loaded again.
 const STALE_CODES = ['RESERVATION_ALREADY_STARTED', 'RESERVATION_NOT_CANCELLABLE', 'RESERVATION_NOT_FOUND'];
 
-// "10 jun 2026, de 08:30 a. m. a 09:30 a. m." or, across two days,
-// "del 10 jun 2026, 11:00 p. m. al 11 jun 2026, 01:00 a. m."
+// Same date format as the booking history (HU-18): "10/06/2026, de 08:30 a 09:30"
+// or, across two days, "del 10/06/2026 23:00 al 11/06/2026 01:00".
 function formatRange(startIso, endIso) {
-    const startDate = formatDate(startIso);
-    const endDate = formatDate(endIso);
+    const [startDate, startTime] = formatDateTime(startIso).split(' ');
+    const [endDate, endTime] = formatDateTime(endIso).split(' ');
     if (startDate === endDate) {
-        return `${startDate}, de ${formatTime(startIso)} a ${formatTime(endIso)}`;
+        return `${startDate}, de ${startTime} a ${endTime}`;
     }
-    return `del ${startDate}, ${formatTime(startIso)} al ${endDate}, ${formatTime(endIso)}`;
+    return `del ${startDate} ${startTime} al ${endDate} ${endTime}`;
 }
 
 // HU-16: the cancel confirmation, shared by the booking history (HU-18) and the
