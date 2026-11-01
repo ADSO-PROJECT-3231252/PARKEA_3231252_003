@@ -6,6 +6,11 @@ const ErrorCodes = require('./constants/errorCodes');
 
 const app = express();
 
+// On Azure the API runs behind one proxy. Trusting that one hop makes req.ip
+// the visitor's address instead of the proxy's, so the attempt limits
+// (middlewares/rateLimit.js) count each visitor separately.
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet());
 
