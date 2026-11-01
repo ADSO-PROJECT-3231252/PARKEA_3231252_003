@@ -68,6 +68,7 @@ const errorMessages = {
     VALIDATION_ERROR: 'Revisa los campos marcados',
     INVALID_JSON: 'No pudimos leer los datos enviados. Intenta de nuevo',
     PAYLOAD_TOO_LARGE: 'Los datos enviados son demasiado grandes',
+    TOO_MANY_REQUESTS: 'Hiciste demasiados intentos. Espera unos minutos e intenta de nuevo',
     ROUTE_NOT_FOUND: 'No encontramos lo que buscas',
     INTERNAL_ERROR: 'Ocurrió un error inesperado. Intenta de nuevo',
 };
