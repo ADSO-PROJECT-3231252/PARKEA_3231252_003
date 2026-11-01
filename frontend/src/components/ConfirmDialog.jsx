@@ -117,13 +117,15 @@ export default function ConfirmDialog({
           </p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3">
+        {/* Below 400px the buttons are stacked at full width, so long labels
+            never break into several lines; from 400px up they sit side by side. */}
+        <div className="mt-6 flex flex-col gap-3 min-[400px]:flex-row min-[400px]:justify-end">
           <button
             ref={cancelButtonRef}
             type="button"
             onClick={onCancel}
             disabled={confirming}
-            className={`rounded-md border border-neutral-200 px-4 py-2 text-label
+            className={`whitespace-nowrap rounded-md border border-neutral-200 px-4 py-2 text-label
                             text-neutral-900 transition-colors hover:border-parkea-600
                             hover:text-parkea-600 disabled:cursor-not-allowed
                             disabled:opacity-60`}
@@ -134,7 +136,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={confirming}
-            className={`rounded-md px-4 py-2 text-label font-medium text-white
+            className={`whitespace-nowrap rounded-md border border-transparent px-4 py-2 text-label font-medium text-white
                             transition-colors disabled:cursor-not-allowed
                             disabled:opacity-60 ${
                               variant === 'danger'
