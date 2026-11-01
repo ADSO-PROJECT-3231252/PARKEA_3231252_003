@@ -528,7 +528,7 @@ export default function AdminUsers() {
                                                             onClick={() => openAction('role', u)}
                                                             disabled={locked}
                                                             aria-label={`Cambiar rol de ${u.fullName}`}
-                                                            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-500 disabled:hover:bg-transparent"
+                                                            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-600 disabled:hover:bg-transparent"
                                                         >
                                                             <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
                                                             Cambiar rol

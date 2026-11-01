@@ -211,7 +211,7 @@ export default function Profile() {
                                 {profile?.fullName}
                             </p>
                             {memberSince && (
-                                <p className="flex items-center gap-1 text-caption text-neutral-500 mt-3">
+                                <p className="flex items-center gap-1 text-caption text-neutral-600 mt-3">
                                     <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
                                     Miembro desde {memberSince}
                                 </p>
@@ -324,7 +324,7 @@ export default function Profile() {
                             <Lock className="h-4 w-4" aria-hidden="true" />
                             Cambiar contraseña
                         </div>
-                        <p className="text-caption text-neutral-500 -mt-2">
+                        <p className="text-caption text-neutral-600 -mt-2">
                             Asegúrate de usar una contraseña segura que solo tú conozcas.
                         </p>
 
@@ -363,7 +363,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowCurrent((v) => !v)}
                                     aria-label={showCurrent ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showCurrent ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
@@ -401,7 +401,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowNew((v) => !v)}
                                     aria-label={showNew ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showNew ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
@@ -412,7 +412,7 @@ export default function Profile() {
                                     {pwErrors.newPassword}
                                 </p>
                             ) : (
-                                <p id="newPassword-hint" className="mt-1 text-caption text-neutral-500">
+                                <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
                                     Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
                                 </p>
                             )}
@@ -445,7 +445,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowConfirm((v) => !v)}
                                     aria-label={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showConfirm ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
