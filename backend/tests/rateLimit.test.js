@@ -1,8 +1,8 @@
 const request = require('supertest');
 const app = require('../src/app');
 
-// Limits on repeated attempts (card #191). Every request here fails in the
-// validators (empty fields), so none of them reads the database. Each test
+// Limits on repeated attempts (card #191). Almost every request here fails in
+// the validators (empty fields), so it never reads the database. Each test
 // comes from its own IP address (X-Forwarded-For, trusted because of
 // "trust proxy" in app.js), so the counts of one test never affect another.
 const send = (path, ip, body = {}) => request(app).post(path).set('X-Forwarded-For', ip).send(body);
@@ -94,6 +94,36 @@ describe('Sign-in limit (10 failed attempts per email, 100 per network, every 15
         expect(res.status).toBe(400);
     });
 
+    test('a person who keeps trying after being blocked does not block the network', async () => {
+        // Arrange: 10 failed attempts, then 100 more that are already rejected
+        const ip = '203.0.113.9';
+        await sendTimes(110, '/api/auth/login', ip, { email: 'beto@correo.test' });
+
+        // Act
+        const res = await send('/api/auth/login', ip, { email: 'ana@correo.test' });
+
+        // Assert
+        expect(res.status).toBe(400);
+    });
+
+    test('server errors do not count (the database is down)', async () => {
+        // Arrange: here the database never answers (tests/setup.js), so a
+        // valid sign-in ends in a 500. Its log is hidden to keep the output clean.
+        const hideLog = jest.spyOn(console, 'error').mockImplementation(() => {});
+        const ip = '203.0.113.14';
+        const body = { email: 'laura@correo.test', password: 'Clave#123' };
+        const statuses = [];
+
+        // Act
+        for (let i = 0; i < 12; i++) {
+            statuses.push((await send('/api/auth/login', ip, body)).status);
+        }
+        hideLog.mockRestore();
+
+        // Assert
+        expect(statuses.every((status) => status === 500)).toBe(true);
+    });
+
     test('one network cannot try more than 100 failed sign-ins with different emails', async () => {
         // Arrange
         const ip = '203.0.113.8';
@@ -138,6 +168,18 @@ describe('Password recovery limit (5 per email every 15 minutes, 20 per network 
 
         // Act
         const res = await send('/api/auth/forgot-password', ip, { email: 'andres' });
+
+        // Assert
+        expect(res.status).toBe(400);
+    });
+
+    test('the requests rejected for one email do not use the quota of the network', async () => {
+        // Arrange: 5 requests, then 20 more that are already rejected
+        const ip = '203.0.113.13';
+        await sendTimes(25, '/api/auth/forgot-password', ip, { email: 'beto' });
+
+        // Act
+        const res = await send('/api/auth/forgot-password', ip, { email: 'ana' });
 
         // Assert
         expect(res.status).toBe(400);
