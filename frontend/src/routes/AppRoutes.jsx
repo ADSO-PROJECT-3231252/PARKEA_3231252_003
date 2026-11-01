@@ -21,6 +21,7 @@ import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ReservationConfirmation from '../pages/ReservationConfirmation';
 import PayReservation from '../pages/PayReservation';
+import NotFound from '../pages/NotFound';
 
 export default function AppRoutes() {
     return (
@@ -53,9 +54,10 @@ export default function AppRoutes() {
                 <Route path="/admin/zones/new" element={<ProtectedRoute role="admin"><CreateZone /></ProtectedRoute>} />
                 <Route path="/admin/zones/:id/edit" element={<ProtectedRoute role="admin"><EditZone /></ProtectedRoute>} />
                 <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} />
-
-                <Route path="*" element={<Home />} />
             </Route>
+
+            {/* Unknown address: full-screen 404, no shared Header */}
+            <Route path="*" element={<NotFound />} />
         </Routes>
     );
 }
