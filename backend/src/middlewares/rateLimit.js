@@ -4,49 +4,65 @@ const ErrorCodes = require('../constants/errorCodes');
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 const ONE_HOUR = 60 * 60 * 1000;
 
-// Each visitor is counted by their IP address. Some Azure proxies send an
-// IPv4 address with the port of the connection ("190.1.2.3:54321"), and the
-// port changes on every connection, so it is removed: otherwise every attempt
+// The visitor's IP address. Some Azure proxies add the port of the
+// connection ("190.1.2.3:54321" or "[2800:e2::1]:4000"), and the port
+// changes on every connection, so it is removed: otherwise every attempt
 // would look like a new visitor and the limit would never be reached.
-function visitorKey(req) {
+function clientIp(req) {
     const ip = req.ip || req.socket.remoteAddress || '';
-    return ipKeyGenerator(ip.replace(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/, '$1'));
+    const ipv6 = ip.match(/^\[([^\]]+)\](?::\d+)?$/);
+    if (ipv6) return ipv6[1];
+    return ip.replace(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/, '$1');
+}
+
+// Counts by network: everyone behind the same IP shares it.
+function networkKey(req) {
+    return ipKeyGenerator(clientIp(req));
+}
+
+// Counts by network and email, so on a shared network (for example the SENA
+// Wi-Fi during the demo) each person has their own tries.
+function accountKey(req) {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return `${networkKey(req)}|${email}`;
 }
 
 // Options shared by every limit. Over the limit the API answers 429 with a
 // code, like every other error. The RateLimit headers tell the client how
 // many tries are left and when the count starts again.
 const common = {
-    keyGenerator: visitorKey,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { code: ErrorCodes.TOO_MANY_REQUESTS, message: 'Too many attempts. Please try again later' },
 };
 
-// HU-05 and HU-06: 10 failed sign-ins every 15 minutes. A sign-in that works
-// is not counted, so people who type their password well never use tries.
-// The user and admin sign-ins share this count.
-const loginLimiter = rateLimit({
-    ...common,
-    windowMs: FIFTEEN_MINUTES,
-    limit: 10,
-    skipSuccessfulRequests: true,
-});
+// HU-05 and HU-06: only failed sign-ins are counted, so people who type their
+// password well never use tries. The user and admin sign-ins share the counts.
+// - 10 failed sign-ins every 15 minutes for each email on a network.
+// - 100 failed sign-ins every 15 minutes for the whole network, so one
+//   computer cannot try many different emails.
+const loginLimiter = [
+    rateLimit({ ...common, keyGenerator: networkKey, windowMs: FIFTEEN_MINUTES, limit: 100, skipSuccessfulRequests: true }),
+    rateLimit({ ...common, keyGenerator: accountKey, windowMs: FIFTEEN_MINUTES, limit: 10, skipSuccessfulRequests: true }),
+];
 
 // HU-07: every request can send an email, so all of them are counted.
-const forgotPasswordLimiter = rateLimit({
-    ...common,
-    windowMs: FIFTEEN_MINUTES,
-    limit: 5,
-});
+// - 5 requests every 15 minutes for each email on a network.
+// - 20 requests every hour for the whole network, to protect the daily
+//   email quota.
+const forgotPasswordLimiter = [
+    rateLimit({ ...common, keyGenerator: networkKey, windowMs: ONE_HOUR, limit: 20 }),
+    rateLimit({ ...common, keyGenerator: accountKey, windowMs: FIFTEEN_MINUTES, limit: 5 }),
+];
 
-// HU-01 (Audit 1): 10 new accounts every hour. Only accounts that are
-// created are counted, so people who share a network (for example the
-// SENA Wi-Fi during the demo) are not blocked by someone else's mistakes.
+// HU-01 (Audit 1): 30 new accounts every hour for each network. Only accounts
+// that are created are counted, so mistakes in the form never use tries, and
+// a class or the demo can sign up from the same Wi-Fi.
 const registerLimiter = rateLimit({
     ...common,
+    keyGenerator: networkKey,
     windowMs: ONE_HOUR,
-    limit: 10,
+    limit: 30,
     skipFailedRequests: true,
 });
 
