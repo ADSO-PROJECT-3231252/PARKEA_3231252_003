@@ -55,6 +55,13 @@ function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRat
   if (hourlyRate < 0) {
     return { status: 400, body: { code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' } };
   }
+  // hourly_rate is DECIMAL(10, 2): the database would round a third decimal
+  // without any warning, so a rate is valid only when rounding it to 2
+  // decimals does not change it. Checking rate * 100 for a whole number is not
+  // safe: floating point makes 1.005 * 100 equal 100.49999999999999.
+  if (Number(hourlyRate.toFixed(2)) !== hourlyRate) {
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'hourlyRate', msg: 'hourlyRate must have at most 2 decimals' }] } };
+  }
   if (!coordenadasValidas(latitude, longitude)) {
     return { status: 400, body: { code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' } };
   }
@@ -312,4 +319,5 @@ async function getTodasLasZonas(req, res, next) {
   }
 }
 
-module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId };
+// validarZona is exported only so the tests can call it without a database
+module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId, validarZona };
