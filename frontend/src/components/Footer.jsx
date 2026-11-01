@@ -24,7 +24,7 @@ export default function Footer() {
                     <Separator />
                     <span>Sistema de Reservas de Parqueo Urbano</span>
                     <Separator />
-                    <span>Dosquebradas, Risaralda - Colombia</span>
+                    <span>Colombia</span>
                 </p>
                 {isAdmin && (
                     <p className="flex items-center gap-1.5 whitespace-nowrap">
