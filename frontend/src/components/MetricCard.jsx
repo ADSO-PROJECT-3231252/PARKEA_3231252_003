@@ -11,7 +11,7 @@ export default function MetricCard({ icon: Icon, label, value, sublabel }) {
             <div className="min-w-0">
                 <p className="text-label text-neutral-600">{label}</p>
                 <p className="text-title font-display text-neutral-900">{value}</p>
-                {sublabel && <p className="text-caption text-neutral-500">{sublabel}</p>}
+                {sublabel && <p className="text-caption text-neutral-600">{sublabel}</p>}
             </div>
         </div>
     );

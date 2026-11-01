@@ -307,7 +307,7 @@ export default function ReserveSpot() {
                         <Banknote className="h-5 w-5" aria-hidden="true" />
                     </span>
                     <div>
-                        <p className="text-caption text-neutral-500">Tarifa por hora</p>
+                        <p className="text-caption text-neutral-600">Tarifa por hora</p>
                         <p className="font-mono text-subtitle-sm text-neutral-900">{formatCurrency(zone.hourlyRate)}</p>
                     </div>
                 </div>
@@ -367,7 +367,7 @@ export default function ReserveSpot() {
                                 Vehículo registrado correctamente. Ya quedó seleccionado para tu reserva.
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">Este vehículo se usará para tu reserva.</p>
+                            <p className="mt-1 text-caption text-neutral-600">Este vehículo se usará para tu reserva.</p>
                         )}
                     </div>
 
@@ -417,7 +417,7 @@ export default function ReserveSpot() {
                                 {errors.start}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">Selecciona cuándo vas a ingresar al parqueadero.</p>
+                            <p className="mt-1 text-caption text-neutral-600">Selecciona cuándo vas a ingresar al parqueadero.</p>
                         )}
                     </div>
 
@@ -467,7 +467,7 @@ export default function ReserveSpot() {
                                 {errors.end}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">Selecciona cuándo planeas salir del parqueadero.</p>
+                            <p className="mt-1 text-caption text-neutral-600">Selecciona cuándo planeas salir del parqueadero.</p>
                         )}
                     </div>
 
@@ -481,7 +481,7 @@ export default function ReserveSpot() {
                                         <Clock className="h-4 w-4" aria-hidden="true" />
                                     </span>
                                     <div className="min-w-0">
-                                        <p className="text-caption text-neutral-500">Duración</p>
+                                        <p className="text-caption text-neutral-600">Duración</p>
                                         <p className="break-words text-body font-medium text-neutral-900">{durationLabel}</p>
                                     </div>
                                 </div>
@@ -490,9 +490,9 @@ export default function ReserveSpot() {
                                         <Banknote className="h-4 w-4" aria-hidden="true" />
                                     </span>
                                     <div className="min-w-0">
-                                        <p className="text-caption text-neutral-500">Costo total estimado</p>
+                                        <p className="text-caption text-neutral-600">Costo total estimado</p>
                                         <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(estimatedCost)}</p>
-                                        <p className="text-caption text-neutral-500">
+                                        <p className="text-caption text-neutral-600">
                                             (Tarifa: {formatCurrency(zone.hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
                                         </p>
                                     </div>
@@ -501,7 +501,7 @@ export default function ReserveSpot() {
                         </div>
                     )}
 
-                    <p className="flex items-center gap-1.5 text-caption text-neutral-500">
+                    <p className="flex items-center gap-1.5 text-caption text-neutral-600">
                         <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         El costo final puede variar según el tiempo real de uso.
                     </p>

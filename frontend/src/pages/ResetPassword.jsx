@@ -151,7 +151,7 @@ ${errors.newPassword ? 'border-danger' : 'border-neutral-200'}`}
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showPassword ? (
@@ -166,7 +166,7 @@ hover:text-neutral-700"
                                 {errors.newPassword}
                             </p>
                         ) : (
-                            <p id="newPassword-hint" className="mt-1 text-caption text-neutral-500">
+                            <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
                                 Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
                             </p>
                         )}
@@ -199,7 +199,7 @@ ${errors.confirmNewPassword ? 'border-danger' : 'border-neutral-200'}`}
                                 type="button"
                                 onClick={() => setShowConfirm((v) => !v)}
                                 aria-label={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showConfirm ? (
