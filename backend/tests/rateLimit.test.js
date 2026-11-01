@@ -7,15 +7,15 @@ const app = require('../src/app');
 // "trust proxy" in app.js), so the counts of one test never affect another.
 const send = (path, ip, body = {}) => request(app).post(path).set('X-Forwarded-For', ip).send(body);
 
-async function sendTimes(times, path, ip) {
+async function sendTimes(times, path, ip, body = {}) {
     const statuses = [];
     for (let i = 0; i < times; i++) {
-        statuses.push((await send(path, ip)).status);
+        statuses.push((await send(path, ip, body)).status);
     }
     return statuses;
 }
 
-describe('Sign-in limit (10 failed attempts every 15 minutes)', () => {
+describe('Sign-in limit (10 failed attempts per email, 100 per network, every 15 minutes)', () => {
     test('answers 429 TOO_MANY_REQUESTS after 10 failed attempts', async () => {
         // Arrange
         const ip = '203.0.113.1';
@@ -67,6 +67,48 @@ describe('Sign-in limit (10 failed attempts every 15 minutes)', () => {
         expect(res.status).toBe(429);
     });
 
+    test('the port is also ignored in an IPv6 address ("[2800:e2::1]:4000")', async () => {
+        // Arrange
+        for (let port = 4001; port <= 4010; port++) {
+            await send('/api/auth/login', `[2001:db8::7]:${port}`);
+        }
+
+        // Act
+        const res = await send('/api/auth/login', '[2001:db8::7]:4011');
+
+        // Assert
+        expect(res.status).toBe(429);
+    });
+
+    test('on a shared network, the mistakes of one person do not block another one', async () => {
+        // Arrange: the same Wi-Fi, someone else fails 10 times
+        const ip = '203.0.113.7';
+        await sendTimes(10, '/api/auth/login', ip, { email: 'laura@correo.test' });
+        const blocked = await send('/api/auth/login', ip, { email: 'laura@correo.test' });
+
+        // Act
+        const res = await send('/api/auth/login', ip, { email: 'andres@correo.test' });
+
+        // Assert
+        expect(blocked.status).toBe(429);
+        expect(res.status).toBe(400);
+    });
+
+    test('one network cannot try more than 100 failed sign-ins with different emails', async () => {
+        // Arrange
+        const ip = '203.0.113.8';
+        for (let i = 1; i <= 100; i++) {
+            await send('/api/auth/login', ip, { email: `user${i}@correo.test` });
+        }
+
+        // Act
+        const res = await send('/api/auth/login', ip, { email: 'user101@correo.test' });
+
+        // Assert
+        expect(res.status).toBe(429);
+        expect(res.body.code).toBe('TOO_MANY_REQUESTS');
+    });
+
     test('tells the client how many tries are left', async () => {
         // Act
         const res = await send('/api/auth/login', '203.0.113.6');
@@ -76,7 +118,7 @@ describe('Sign-in limit (10 failed attempts every 15 minutes)', () => {
     });
 });
 
-describe('Password recovery limit (5 requests every 15 minutes)', () => {
+describe('Password recovery limit (5 per email every 15 minutes, 20 per network every hour)', () => {
     test('answers 429 TOO_MANY_REQUESTS after 5 requests', async () => {
         // Arrange
         const ip = '203.0.113.10';
@@ -89,9 +131,34 @@ describe('Password recovery limit (5 requests every 15 minutes)', () => {
         expect(res.status).toBe(429);
         expect(res.body.code).toBe('TOO_MANY_REQUESTS');
     });
+    test('another email on the same network can still ask', async () => {
+        // Arrange
+        const ip = '203.0.113.11';
+        await sendTimes(6, '/api/auth/forgot-password', ip, { email: 'laura' });
+
+        // Act
+        const res = await send('/api/auth/forgot-password', ip, { email: 'andres' });
+
+        // Assert
+        expect(res.status).toBe(400);
+    });
+
+    test('one network cannot ask more than 20 times in an hour', async () => {
+        // Arrange
+        const ip = '203.0.113.12';
+        for (let i = 1; i <= 20; i++) {
+            await send('/api/auth/forgot-password', ip, { email: `user${i}` });
+        }
+
+        // Act
+        const res = await send('/api/auth/forgot-password', ip, { email: 'user21' });
+
+        // Assert
+        expect(res.status).toBe(429);
+    });
 });
 
-describe('Sign-up limit (10 created accounts every hour)', () => {
+describe('Sign-up limit (30 created accounts every hour)', () => {
     test('attempts that fail do not count', async () => {
         // Arrange
         const ip = '203.0.113.20';
