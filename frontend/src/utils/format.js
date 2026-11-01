@@ -50,3 +50,14 @@ export function formatCountdown(ms) {
 // 8 characters are shown as a short code (a prefix of the full ID that the
 // confirmation screen displays). Shared by HU-16 and HU-18.
 export const formatReservationCode = (id) => String(id).slice(0, 8).toUpperCase();
+
+const pad = (n) => String(n).padStart(2, '0');
+
+// "10/06/2026 08:30", 24-hour clock, in the user's local time (mockup format of
+// the booking history). Shared by HU-18 and the HU-16 cancel dialog.
+export function formatDateTime(isoString) {
+    const d = new Date(isoString);
+    const fecha = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${fecha} ${hora}`;
+}

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { getReservations } from '../services/reservationService';
 import CancelReservationDialog from '../components/CancelReservationDialog';
-import { formatCurrency, formatDuration, formatReservationCode as shortCode } from '../utils/format';
+import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
@@ -37,14 +37,6 @@ const PAYMENT_STATUS_LABELS = {
     Cancelled: 'Cancelado',
     Refunded: 'Reembolsado',
 };
-const pad = (n) => String(n).padStart(2, '0');
-// "10/06/2026 08:30", 24-hour clock, in the user's local time (mockup format).
-function formatDateTime(isoString) {
-    const d = new Date(isoString);
-    const fecha = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-    const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    return `${fecha} ${hora}`;
-}
 function StatusBadge({ status }) {
     const { label = status, Icon, badge } = RESERVATION_STATUS[status] ?? FALLBACK_STATUS;
     return (
