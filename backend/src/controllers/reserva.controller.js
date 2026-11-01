@@ -202,10 +202,14 @@ async function cancelar(req, res, next) {
     try {
         const { id } = req.params;
         const userId = req.usuario.id;
+        // Lock the row: two cancel requests at the same time would otherwise
+        // both see it as Pending/Active and add the spot back to the zone twice.
+        // The second one waits here and then finds it already Cancelled.
         const reserva = await Reserva.findOne({
             where: { id, userId },
             include: [{ model: Pago, as: 'payment' }],
             transaction: t,
+            lock: t.LOCK.UPDATE,
         });
         if (!reserva) {
             await t.rollback();
