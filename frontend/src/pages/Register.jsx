@@ -291,7 +291,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowPassword((v) => !v)}
                                         aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -328,7 +328,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowConfirmPassword((v) => !v)}
                                         aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showConfirmPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -346,7 +346,7 @@ export default function Register() {
                         </div>
 
                         {!errors.password && !errors.confirmPassword && (
-                            <p id="password-hint" className="-mt-1 text-caption text-neutral-500">
+                            <p id="password-hint" className="-mt-1 text-caption text-neutral-600">
                                 Entre 8 y 20 caracteres, una mayúscula, un número y un carácter especial.
                             </p>
                         )}

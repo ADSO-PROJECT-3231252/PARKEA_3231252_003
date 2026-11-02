@@ -220,7 +220,7 @@ focus:ring-2 focus:ring-parkea-600 ${errors.vehicleType ? 'border-danger' : 'bor
                                 {errors.vehicleType}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">
+                            <p className="mt-1 text-caption text-neutral-600">
                                 Elige el tipo que corresponde a tu vehículo.
                             </p>
                         )}
@@ -238,9 +238,9 @@ focus:ring-2 focus:ring-parkea-600 ${errors.vehicleType ? 'border-danger' : 'bor
                             aria-describedby="plate-note"
                             className={`mt-1 w-full cursor-not-allowed rounded-md border
 border-neutral-200 bg-neutral-100 px-3 py-2.5 font-mono
-text-body text-neutral-500`}
+text-body text-neutral-600`}
                         />
-                        <p id="plate-note" className="mt-1 text-caption text-neutral-500">
+                        <p id="plate-note" className="mt-1 text-caption text-neutral-600">
                             La placa no se puede editar. Para cambiarla, elimina este vehículo y regístralo de
                             nuevo.
                         </p>
@@ -295,7 +295,7 @@ focus:ring-2 focus:ring-parkea-600 ${errors.model ? 'border-danger' : 'border-ne
                     </FieldRow>
                     <FieldRow icon={Eye}>
                         <label htmlFor="visualDescription" className="block text-label text-neutral-700">
-                            Descripción visual <span className="text-neutral-500">(opcional)</span>
+                            Descripción visual <span className="text-neutral-600">(opcional)</span>
                         </label>
                         <textarea
                             id="visualDescription"
@@ -313,7 +313,7 @@ border-neutral-200 px-3 py-2.5 text-body text-neutral-900
 placeholder:text-neutral-400 focus:outline-none focus:ring-2
 focus:ring-parkea-600`}
                         />
-                        <p className="mt-1 text-caption text-neutral-500">
+                        <p className="mt-1 text-caption text-neutral-600">
                             Información adicional para identificar tu vehículo fácilmente.
                         </p>
                     </FieldRow>
@@ -340,7 +340,7 @@ focus:ring-2 focus:ring-parkea-600 ${errors.color ? 'border-danger' : 'border-ne
                                 {errors.color}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">
+                            <p className="mt-1 text-caption text-neutral-600">
                                 Los campos rellenados con <span className="text-danger">*</span> son
                                 obligatorios
                             </p>
@@ -374,4 +374,4 @@ disabled:cursor-not-allowed disabled:opacity-60`}
             </form>
         </div>
     );
-} 
+}

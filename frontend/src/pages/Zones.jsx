@@ -51,12 +51,12 @@ function ZoneCard({ zone, onReserve }) {
                 <span className="flex items-center gap-1.5 text-body text-neutral-900">
                     <Users className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                     <span className="font-mono tabular-nums">{zone.availableSlots}</span>
-                    <span className="text-neutral-500">de</span>
+                    <span className="text-neutral-600">de</span>
                     <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                    <span className="text-caption text-neutral-500">cupos disponibles</span>
+                    <span className="text-caption text-neutral-600">cupos disponibles</span>
                 </span>
                 <span className="flex flex-col @sm:items-end">
-                    <span className="text-caption text-neutral-500">Tarifa por hora</span>
+                    <span className="text-caption text-neutral-600">Tarifa por hora</span>
                     <span className="flex items-center gap-1 whitespace-nowrap font-mono text-body text-neutral-900">
                         <Banknote className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                         {formatCurrency(zone.hourlyRate)}
@@ -71,7 +71,7 @@ function ZoneCard({ zone, onReserve }) {
                 aria-label={full ? `Reservar en ${zone.name} (no disponible: esta zona no tiene cupos)` : `Reservar en ${zone.name}`}
                 title={full ? 'Esta zona no tiene cupos disponibles' : undefined}
                 className={`mt-4 w-full rounded-md px-4 py-2 text-label font-medium transition-colors ${full
-                    ? 'cursor-not-allowed bg-neutral-200 text-neutral-500'
+                    ? 'cursor-not-allowed bg-neutral-200 text-neutral-600'
                     : 'bg-parkea-600 text-white hover:bg-parkea-700'
                     }`}
             >
@@ -220,7 +220,7 @@ export default function Zones() {
                         type="button"
                         onClick={handleClearSearch}
                         aria-label="Limpiar búsqueda"
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
                     >
                         <X className="h-4 w-4" aria-hidden="true" />
                     </button>

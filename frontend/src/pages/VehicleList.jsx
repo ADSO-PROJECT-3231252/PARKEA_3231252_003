@@ -94,24 +94,24 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
 
                 <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-2 lg:grid-cols-[130px_140px_minmax(0,1fr)]">
                     <div className="lg:col-start-1 lg:row-start-1">
-                        <p className="text-caption text-neutral-500">Marca</p>
+                        <p className="text-caption text-neutral-600">Marca</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.brand}</p>
                     </div>
                     <div className="lg:col-start-2 lg:row-start-1">
-                        <p className="text-caption text-neutral-500">Modelo</p>
+                        <p className="text-caption text-neutral-600">Modelo</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.model}</p>
                     </div>
                     <div className="lg:col-start-1 lg:row-start-2">
-                        <p className="text-caption text-neutral-500">Color</p>
+                        <p className="text-caption text-neutral-600">Color</p>
                         <p className="text-body font-medium text-neutral-900">{vehicle.color}</p>
                     </div>
                     <div className="lg:col-start-2 lg:row-start-2">
-                        <p className="text-caption text-neutral-500">Tipo</p>
+                        <p className="text-caption text-neutral-600">Tipo</p>
                         <p className="text-body font-medium text-neutral-900">{typeLabel}</p>
                     </div>
                     {vehicle.visualDescription && (
                         <div className="col-span-2 min-w-0 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
-                            <p className="text-caption text-neutral-500">Descripción visual</p>
+                            <p className="text-caption text-neutral-600">Descripción visual</p>
                             <p className="text-body font-medium break-words text-neutral-900">
                                 {vehicle.visualDescription}
                             </p>
@@ -373,7 +373,7 @@ export default function VehicleList() {
                             </nav>
                         )}
 
-                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-500">
+                        <p className="mt-6 flex items-center justify-center gap-1.5 text-caption text-neutral-600">
                             <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             El vehículo predeterminado se seleccionará automáticamente al realizar una reserva.
                         </p>
@@ -402,4 +402,4 @@ export default function VehicleList() {
             />
         </div>
     );
-} 
+}
