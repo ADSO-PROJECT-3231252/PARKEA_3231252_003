@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
-const { Vehiculo, Reserva, sequelize } = require('../models');
+const { UniqueConstraintError } = require('sequelize');
+const { Vehiculo, Reserva, Usuario, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
 const PLATE_FORMATS = {
@@ -11,6 +12,13 @@ const PLATE_FORMATS = {
 function plateMatchesType(plate, vehicleType) {
     const regex = PLATE_FORMATS[vehicleType];
     return regex ? regex.test(plate.toUpperCase()) : false;
+}
+
+// Only active vehicles have a unique plate (plate_active index), so a unique
+// violation here always means the plate is already registered. It can happen
+// even after the existence check below when two requests arrive together.
+function plateAlreadyRegistered(res) {
+    return res.status(409).json({ code: ErrorCodes.PLATE_ALREADY_REGISTERED, message: 'This plate is already registered' });
 }
 
 // HU-10: Register Vehicle
@@ -33,29 +41,51 @@ async function registrar(req, res, next) {
 
         const existente = await Vehiculo.findOne({ where: { plate } });
         if (existente) {
-            return res.status(409).json({ code: ErrorCodes.PLATE_ALREADY_REGISTERED, message: 'This plate is already registered' });
+            return plateAlreadyRegistered(res);
         }
 
-        // First vehicle for this user is automatically the default (HU-10, AC-09)
-        const cantidadExistente = await Vehiculo.count({ where: { userId } });
-        const isDefault = cantidadExistente === 0;
+        // Counting and creating happen in one transaction that holds the user's
+        // row locked. Without it, two simultaneous requests from the same user
+        // both count 0 vehicles and both become the default (HU-10, AC-09).
+        // The second request waits at the lock and then counts the first one.
+        const vehiculo = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, {
+                attributes: ['id'],
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+            if (!usuario) {
+                return null;
+            }
 
-        const vehiculo = await Vehiculo.create({
-            plate: plate.toUpperCase(),
-            vehicleType,
-            brand,
-            model,
-            color,
-            visualDescription,
-            isDefault,
-            userId,
+            // First vehicle for this user is automatically the default (HU-10, AC-09)
+            const cantidadExistente = await Vehiculo.count({ where: { userId }, transaction: t });
+            const isDefault = cantidadExistente === 0;
+
+            return Vehiculo.create({
+                plate: plate.toUpperCase(),
+                vehicleType,
+                brand,
+                model,
+                color,
+                visualDescription,
+                isDefault,
+                userId,
+            }, { transaction: t });
         });
+
+        if (!vehiculo) {
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
 
         return res.status(201).json({
             message: 'Vehicle registered successfully',
             vehicle: vehiculo,
         });
     } catch (error) {
+        if (error instanceof UniqueConstraintError) {
+            return plateAlreadyRegistered(res);
+        }
         next(error);
     }
 }
@@ -113,6 +143,9 @@ async function editar(req, res, next) {
             vehicle: vehiculo,
         });
     } catch (error) {
+        if (error instanceof UniqueConstraintError) {
+            return plateAlreadyRegistered(res);
+        }
         next(error);
     }
 }
