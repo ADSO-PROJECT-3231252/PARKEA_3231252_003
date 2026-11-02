@@ -40,6 +40,8 @@
     --color-flag-yellow: #FCD116;
     --color-flag-blue: #003893;
     --color-flag-red: #CE1126;
+    /* Light green at the edges of the 404 picture, so the page around it blends in (NotFound) */
+    --color-illustration: #F1F8F1;
 
     /* Familias tipográficas */
     --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;

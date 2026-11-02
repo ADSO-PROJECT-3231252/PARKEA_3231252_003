@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import { AuthContext } from './authContextValue';
+import { readSavedSession } from '../utils/session';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-        const storedUser = localStorage.getItem('user');
-        if (token && storedUser) {
+        // A broken saved session is dropped here instead of crashing the app
+        const savedSession = readSavedSession();
+        if (savedSession) {
             // eslint-disable-next-line react-hooks/set-state-in-effect
-            setUser({ token, ...JSON.parse(storedUser) });
+            setUser(savedSession);
         }
         setLoading(false);
     }, []);
