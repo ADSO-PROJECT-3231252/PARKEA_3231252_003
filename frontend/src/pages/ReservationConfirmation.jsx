@@ -19,10 +19,12 @@ import {
     CalendarCheck,
     Plus,
     Ban,
+    X,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
+import CancelReservationDialog from '../components/CancelReservationDialog';
 import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
 
 // Once the 15-minute hold runs out, the backend job (every 60 s) is what
 // actually marks the reservation as Expired, so the screen asks again every
@@ -43,6 +45,10 @@ const OUTLINE_BUTTON_SM =
     'flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600';
 const OUTLINE_ACTION =
     'flex items-center justify-center gap-1.5 rounded-md border border-neutral-200 px-5 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 sm:flex-1';
+// Same size as the other actions, in the danger colors of the "Cancelar" button
+// of the booking history (HU-18).
+const DANGER_ACTION =
+    'flex items-center justify-center gap-1.5 rounded-md border border-danger px-5 py-2 text-label text-danger transition-colors hover:bg-danger-soft sm:flex-1';
 
 export default function ReservationConfirmation() {
     const { id } = useParams();
@@ -67,6 +73,11 @@ export default function ReservationConfirmation() {
     // 'idle' | 'copied' | 'failed'
     const [copyState, setCopyState] = useState('idle');
     const copyTimerRef = useRef(null);
+
+    // HU-16: the cancel dialog and the AC-06 message shown after cancelling.
+    const [cancelOpen, setCancelOpen] = useState(false);
+    const [cancelMessage, setCancelMessage] = useState('');
+    const cancelMessageRef = useRef(null);
 
     // silent = background refresh after the hold expires: a network error
     // there must not replace the whole screen with the error state.
@@ -134,6 +145,24 @@ export default function ReservationConfirmation() {
     useEffect(() => {
         if (flash && !loading) flashRef.current?.focus();
     }, [flash, loading]);
+
+    // HU-16: after cancelling, the reservation is loaded again in the
+    // background, so the screen shows it as "Cancelada" without the loading state.
+    const handleCancelled = (message) => {
+        setCancelOpen(false);
+        setCancelMessage(message);
+        fetchReservation(true);
+    };
+    const handleCancelClose = ({ stale }) => {
+        setCancelOpen(false);
+        if (stale) fetchReservation(true);
+    };
+
+    // The "Cancelar reserva" button disappears once it is cancelled, so the
+    // focus goes to the message, which also makes sure it is read aloud.
+    useEffect(() => {
+        if (cancelMessage) cancelMessageRef.current?.focus();
+    }, [cancelMessage]);
 
     const handleCopy = async () => {
         clearTimeout(copyTimerRef.current);
@@ -207,6 +236,7 @@ export default function ReservationConfirmation() {
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = remainingMs !== null && remainingMs <= 0;
     const canPay = isPending && !isTimeUp;
+    const canCancel = canCancelReservation(reservation, now);
     const durationLabel = formatDuration(reservation.startTime, reservation.endTime);
     const { latitude, longitude } = reservation.zone;
     const hasCoordinates = latitude != null && longitude != null;
@@ -225,6 +255,19 @@ export default function ReservationConfirmation() {
                 >
                     <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
                     {flash}
+                </p>
+            )}
+
+            {/* HU-16 AC-06 */}
+            {cancelMessage && (
+                <p
+                    ref={cancelMessageRef}
+                    tabIndex={-1}
+                    role="status"
+                    className="mb-6 flex items-center gap-2 rounded-lg border border-parkea-200 bg-parkea-50 px-4 py-3 text-body font-medium text-parkea-700 focus:outline-none"
+                >
+                    <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {cancelMessage}
                 </p>
             )}
 
@@ -464,7 +507,9 @@ export default function ReservationConfirmation() {
                 reservation can no longer be paid, the secondary actions take the
                 full width so the row still spans both cards. */}
             <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
-                <div className={`flex flex-col gap-3 sm:flex-row ${canPay ? '' : 'lg:col-span-2'}`}>
+                {/* With "Cancelar reserva" there are three buttons, which only fit
+                    side by side from md up. */}
+                <div className={`flex flex-col gap-3 ${canCancel ? 'md:flex-row' : 'sm:flex-row'} ${canPay ? '' : 'lg:col-span-2'}`}>
                     <Link
                         to="/reservations"
                         className={OUTLINE_ACTION}
@@ -479,6 +524,17 @@ export default function ReservationConfirmation() {
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         Hacer otra reserva
                     </Link>
+                    {/* HU-16 AC-01: Pending or Active reservations that have not started. */}
+                    {canCancel && (
+                        <button
+                            type="button"
+                            onClick={() => setCancelOpen(true)}
+                            className={DANGER_ACTION}
+                        >
+                            <X className="h-4 w-4" aria-hidden="true" />
+                            Cancelar reserva
+                        </button>
+                    )}
                 </div>
                 {/* On mobile the primary action goes first, right below the payment summary. */}
                 {canPay && (
@@ -491,6 +547,12 @@ export default function ReservationConfirmation() {
                     </Link>
                 )}
             </div>
+
+            <CancelReservationDialog
+                reservation={cancelOpen ? reservation : null}
+                onClose={handleCancelClose}
+                onCancelled={handleCancelled}
+            />
         </div>
     );
 }

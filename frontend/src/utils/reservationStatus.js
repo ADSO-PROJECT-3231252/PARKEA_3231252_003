@@ -41,3 +41,11 @@ export const FALLBACK_STATUS = {
     badge: 'border-neutral-300 bg-neutral-100 text-neutral-700',
     border: 'border-l-neutral-400',
 };
+
+// HU-16 AC-01/AC-04/AC-05: a reservation can be cancelled while it is Pending
+// or Active (already paid) and its start time has not passed. The backend
+// applies the same rule; this only decides whether the button is shown.
+export const canCancelReservation = (reservation, now) =>
+    ['Pending', 'Active'].includes(reservation.status) &&
+    now !== null &&
+    new Date(reservation.startTime).getTime() > now;

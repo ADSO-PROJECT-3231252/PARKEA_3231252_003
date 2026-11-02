@@ -41,6 +41,11 @@ export default function ForgotPassword() {
                 // never reached the backend, so showing an error reveals nothing
                 // about the account.
                 setServerError(translateError('INTERNAL_ERROR'));
+            } else if (err.response.data?.code === 'TOO_MANY_REQUESTS') {
+                // Card #191: too many requests from this visitor. The limit counts
+                // visitors, not emails, so the message reveals nothing about the
+                // account (AC-04).
+                setServerError(translateError('TOO_MANY_REQUESTS'));
             } else {
                 // The server did respond (e.g. a 500 while sending the email):
                 // show the same generic message as on success, so it never
