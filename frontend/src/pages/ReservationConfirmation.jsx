@@ -583,13 +583,15 @@ export default function ReservationConfirmation() {
                     {isOpenStay && ['Pending', 'Active'].includes(reservation.status) && (
                         <p className="mt-3 text-caption text-neutral-600">
                             {isRunning
-                                ? `Llevas ${hoursLabel(soFar.chargedHours)} empezadas. Ya pagaste la primera; si terminas ahora, quedan ${formatCurrency(soFar.balance)} por pagar.`
+                                ? soFar.balance > 0
+                                    ? `Llevas ${hoursLabel(soFar.chargedHours, 'empezada')}. Ya pagaste la primera; si terminas ahora, quedan ${formatCurrency(soFar.balance)} por pagar.`
+                                    : 'Vas en tu primera hora, que ya pagaste: si terminas ahora, no queda nada por pagar.'
                                 : `Se cobra ${formatCurrency(hourlyRate)} por cada hora empezada, hasta 24 horas. La primera hora se paga al confirmar y el resto al terminar.`}
                         </p>
                     )}
                     {isOpenStay && reservation.status === 'Finished' && (
                         <p className="mt-3 text-caption text-neutral-600">
-                            {hoursLabel(reservation.openStay.chargedHours)} cobradas. Pagado: {formatCurrency(reservation.openStay.paid)}.
+                            {hoursLabel(reservation.openStay.chargedHours, 'cobrada')}. Pagado: {formatCurrency(reservation.openStay.paid)}.
                         </p>
                     )}
                     {pendingBalance > 0 && (

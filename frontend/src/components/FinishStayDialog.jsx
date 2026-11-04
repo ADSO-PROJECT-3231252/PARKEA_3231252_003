@@ -47,7 +47,8 @@ export default function FinishStayDialog({ reservation, hourlyRate, openedAt, on
             .then(({ data }) => {
                 const result = data.charge;
                 onFinished(
-                    `Estadía terminada en ${zoneName}. Usaste ${formatMinutes(result.usedMinutes)}; se cobraron ` +
+                    `Estadía terminada en ${zoneName}. Usaste ${formatMinutes(result.usedMinutes)}; ` +
+                        `se ${result.chargedHours === 1 ? 'cobró' : 'cobraron'} ` +
                         `${hoursLabel(result.chargedHours)} (${formatCurrency(result.total)}). ` +
                         (result.balance > 0
                             ? `Tienes un saldo pendiente de ${formatCurrency(result.balance)}.`

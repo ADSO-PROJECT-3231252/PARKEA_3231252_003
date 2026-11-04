@@ -38,8 +38,13 @@ export const canFinishStay = isRunningStay;
 // What an open stay still owes after it ended (AC-07); 0 when nothing.
 export const pendingBalanceOf = (reservation) => Number(reservation?.openStay?.pendingBalance ?? 0);
 
-// "1 hora" / "3 horas"
-export const hoursLabel = (hours) => `${hours} ${hours === 1 ? 'hora' : 'horas'}`;
+// "1 hora" / "3 horas". With an adjective it agrees too: "1 hora cobrada",
+// "3 horas cobradas".
+export const hoursLabel = (hours, adjective) => {
+    const plural = hours !== 1;
+    const label = `${hours} ${plural ? 'horas' : 'hora'}`;
+    return adjective ? `${label} ${adjective}${plural ? 's' : ''}` : label;
+};
 
 // "1 h 05 min" / "45 min": short form for the time used so far.
 export function formatMinutes(totalMinutes) {
