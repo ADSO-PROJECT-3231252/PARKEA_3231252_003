@@ -495,7 +495,9 @@ export default function ReservationConfirmation() {
                                     ) : (
                                         <>
                                             <p className="text-body font-medium text-neutral-900">Sin hora de salida</p>
-                                            <p className="text-caption text-neutral-600">Máximo 24 horas</p>
+                                            {['Pending', 'Active'].includes(reservation.status) && (
+                                                <p className="text-caption text-neutral-600">Máximo 24 horas</p>
+                                            )}
                                         </>
                                     )}
                                 </div>
