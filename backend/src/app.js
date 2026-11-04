@@ -20,8 +20,19 @@ app.use(cors({
     credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Reads the JSON and form bodies. An error while reading a body is marked, so
+// the error handler can answer it with the project's own codes (#185, #258).
+function readBody(parser) {
+    return (req, res, next) => {
+        parser(req, res, (err) => {
+            if (err) err.isBodyError = true;
+            next(err);
+        });
+    };
+}
+
+app.use(readBody(express.json()));
+app.use(readBody(express.urlencoded({ extended: true })));
 
 // Health check route, useful to confirm the server is running
 app.get('/api/health', (req, res) => {
