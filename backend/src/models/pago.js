@@ -13,11 +13,18 @@ module.exports = (sequelize, DataTypes) => {
             defaultValue: DataTypes.UUIDV4,
             primaryKey: true,
         },
+        // Not unique: a reservation can have a balance (HU-27) or extensions
+        // (HU-28) besides its initial payment. Only the initial payment is
+        // unique, enforced in the database (payments_initial_reservation_unique).
         reservationId: {
             type: DataTypes.UUID,
             allowNull: false,
-            unique: true,
             field: 'reservation_id',
+        },
+        type: {
+            type: DataTypes.ENUM('initial', 'extension', 'balance'),
+            allowNull: false,
+            defaultValue: 'initial',
         },
         amount: {
             type: DataTypes.DECIMAL(10, 2),
