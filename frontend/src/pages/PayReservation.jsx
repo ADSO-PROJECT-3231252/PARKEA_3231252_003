@@ -121,8 +121,9 @@ function CardField({ id, label, Icon, error, className = '', ...inputProps }) {
                     autoComplete="off"
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? `${id}-error` : undefined}
-                    className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${Icon ? 'min-[360px]:pr-10' : ''
-                        } ${error ? 'border-danger' : 'border-neutral-200'}`}
+                    className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
+                        Icon ? 'min-[360px]:pr-10' : ''
+                    } ${error ? 'border-danger' : 'border-neutral-200'}`}
                     {...inputProps}
                 />
                 {Icon && (
@@ -337,8 +338,8 @@ export default function PayReservation() {
             reservation.status === 'Expired'
                 ? 'RESERVATION_EXPIRED'
                 : reservation.openEnded && reservation.status === 'Finished'
-                    ? 'NO_PENDING_BALANCE'
-                    : 'RESERVATION_NOT_PENDING';
+                  ? 'NO_PENDING_BALANCE'
+                  : 'RESERVATION_NOT_PENDING';
         return (
             <div className={PAGE_SHELL}>
                 <h1 className="sr-only">Pago de reserva</h1>
@@ -476,10 +477,11 @@ export default function PayReservation() {
                                     return (
                                         <label
                                             key={value}
-                                            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors focus-within:ring-2 focus-within:ring-parkea-600 ${selected
-                                                ? 'border-parkea-600 bg-parkea-50'
-                                                : 'border-neutral-200 bg-white hover:border-parkea-300'
-                                                }`}
+                                            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors focus-within:ring-2 focus-within:ring-parkea-600 ${
+                                                selected
+                                                    ? 'border-parkea-600 bg-parkea-50'
+                                                    : 'border-neutral-200 bg-white hover:border-parkea-300'
+                                            }`}
                                         >
                                             {/* AC-03: the filled radio marks the choice, not color alone */}
                                             <input
@@ -608,7 +610,6 @@ export default function PayReservation() {
                                 <SummaryItem label="Tarifa por hora" groupStart>
                                     <span className="font-mono">{formatCurrency(paymentSummary.hourlyRate)}</span>
                                 </SummaryItem>
-
                                 {/* HU-27 AC-07: what the stay cost and what was already paid */}
                                 {isBalance && (
                                     <>
@@ -679,8 +680,9 @@ export default function PayReservation() {
                         ref={messageRef}
                         tabIndex={-1}
                         role={message.type === 'error' ? 'alert' : 'status'}
-                        className={`mt-6 flex items-center gap-2 rounded-md px-4 py-3 text-body focus:outline-none ${message.type === 'error' ? 'bg-danger-soft text-danger' : 'bg-parkea-50 font-medium text-parkea-700'
-                            }`}
+                        className={`mt-6 flex items-center gap-2 rounded-md px-4 py-3 text-body focus:outline-none ${
+                            message.type === 'error' ? 'bg-danger-soft text-danger' : 'bg-parkea-50 font-medium text-parkea-700'
+                        }`}
                     >
                         {message.type === 'error' ? (
                             <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />

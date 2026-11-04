@@ -13,7 +13,7 @@ const STALE_CODES = ['RESERVATION_ALREADY_STARTED', 'RESERVATION_NOT_CANCELLABLE
 // stay (HU-27) has no exit time: "desde el 10/06/2026 08:30, sin hora de salida".
 function formatRange(startIso, endIso) {
     const [startDate, startTime] = formatDateTime(startIso).split(' ');
-        if (!endIso) {
+    if (!endIso) {
         return `desde el ${startDate} ${startTime}, sin hora de salida`;
     }
     const [endDate, endTime] = formatDateTime(endIso).split(' ');

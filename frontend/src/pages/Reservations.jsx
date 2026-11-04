@@ -172,7 +172,6 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                     Pagar
                 </button>
             )}
-
             {/* HU-27 AC-05: a running open stay */}
             {canFinish && (
                 <button
@@ -197,7 +196,6 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                     Pagar saldo
                 </button>
             )}
-
             {/* HU-16 AC-01: Pending or Active (already paid) reservations that have not started. */}
             {canCancel && (
                 <button
@@ -417,10 +415,11 @@ text-body text-neutral-900"
                                 type="button"
                                 onClick={() => handleFilterChange(value)}
                                 aria-pressed={selected}
-                                className={`border-b-2 px-4 py-4 text-label transition-colors ${selected
-                                    ? 'border-parkea-600 font-medium text-parkea-600'
-                                    : 'border-transparent text-neutral-600 hover:text-parkea-600'
-                                    }`}
+                                className={`border-b-2 px-4 py-4 text-label transition-colors ${
+                                    selected
+                                        ? 'border-parkea-600 font-medium text-parkea-600'
+                                        : 'border-transparent text-neutral-600 hover:text-parkea-600'
+                                }`}
                             >
                                 {label}
                             </button>
