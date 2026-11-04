@@ -15,10 +15,11 @@ import {
     TriangleAlert,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
-import { payReservation } from '../services/paymentService';
+import { payBalance, payReservation } from '../services/paymentService';
 import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
 import { translateError } from '../utils/errorMessages';
 import { RESERVATION_STATUS } from '../utils/reservationStatus';
+import { hoursLabel, pendingBalanceOf } from '../utils/openStay';
 
 // Values the backend expects in paymentMethod (pago.controller.js).
 const METHOD_CARD = 'card';
@@ -120,9 +121,8 @@ function CardField({ id, label, Icon, error, className = '', ...inputProps }) {
                     autoComplete="off"
                     aria-invalid={Boolean(error)}
                     aria-describedby={error ? `${id}-error` : undefined}
-                    className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${
-                        Icon ? 'min-[360px]:pr-10' : ''
-                    } ${error ? 'border-danger' : 'border-neutral-200'}`}
+                    className={`w-full rounded-md border bg-white px-3 py-2.5 font-mono text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${Icon ? 'min-[360px]:pr-10' : ''
+                        } ${error ? 'border-danger' : 'border-neutral-200'}`}
                     {...inputProps}
                 />
                 {Icon && (
@@ -320,21 +320,32 @@ export default function PayReservation() {
         );
     }
 
+    // HU-27 AC-07: an open stay that ended owing more than its first hour.
+    // The same screen pays that balance.
+    const pendingBalance = pendingBalanceOf(reservation);
+    const isBalance = reservation.status === 'Finished' && pendingBalance > 0;
+
     // AC-13: an already paid reservation goes to its confirmation, which
     // explains why. After a payment made here the redirect is done below.
     if (reservation.status === 'Active' && !approved) {
         return <Navigate to={`/reservations/${reservation.id}`} replace state={{ flash: 'alreadyPaid' }} />;
     }
 
-    // Expired, Cancelled or Finished: nothing left to pay.
-    if (reservation.status !== 'Pending' && !approved) {
+    // Expired, Cancelled or Finished without a balance: nothing left to pay.
+    if (reservation.status !== 'Pending' && !isBalance && !approved) {
+        const reason =
+            reservation.status === 'Expired'
+                ? 'RESERVATION_EXPIRED'
+                : reservation.openEnded && reservation.status === 'Finished'
+                    ? 'NO_PENDING_BALANCE'
+                    : 'RESERVATION_NOT_PENDING';
         return (
             <div className={PAGE_SHELL}>
                 <h1 className="sr-only">Pago de reserva</h1>
                 <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
                     <p className="flex items-center gap-2 text-body text-neutral-900">
                         <Info className="h-4 w-4 shrink-0 text-info" aria-hidden="true" />
-                        {translateError(reservation.status === 'Expired' ? 'RESERVATION_EXPIRED' : 'RESERVATION_NOT_PENDING')}
+                        {translateError(reason)}
                     </p>
                     <div className="flex flex-wrap gap-2">
                         <Link to={`/reservations/${reservation.id}`} className={OUTLINE_BUTTON_SM}>
@@ -353,8 +364,10 @@ export default function PayReservation() {
     }
 
     const { zone, vehicle, paymentSummary } = reservation;
-    const total = paymentSummary.estimatedTotal;
-    const pendingStatus = RESERVATION_STATUS.Pending;
+    const total = isBalance ? pendingBalance : paymentSummary.estimatedTotal;
+    const statusInfo = RESERVATION_STATUS[reservation.status] ?? RESERVATION_STATUS.Pending;
+    // HU-27: an open stay has no exit time until it ends.
+    const hasExit = Boolean(reservation.endTime);
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = expiredByServer || (remainingMs !== null && remainingMs <= 0);
     const payDisabled = processing || approved || isTimeUp;
@@ -381,21 +394,31 @@ export default function PayReservation() {
                 ? { paymentMethod: method, cardLastFour: onlyDigits(card.number).slice(-4) }
                 : { paymentMethod: method };
 
-        const [result] = await Promise.allSettled([payReservation(id, payload), wait(PROCESSING_MIN_MS)]);
+        const pay = isBalance ? payBalance : payReservation;
+        const [result] = await Promise.allSettled([pay(id, payload), wait(PROCESSING_MIN_MS)]);
         setProcessing(false);
 
         if (result.status === 'fulfilled') {
             // AC-10: message, then the confirmation with the new status.
             setApproved(true);
-            setMessage({ type: 'success', text: 'Pago aprobado' });
+            setMessage({ type: 'success', text: isBalance ? 'Saldo pagado' : 'Pago aprobado' });
             redirectTimerRef.current = setTimeout(
-                () => navigate(`/reservations/${id}`, { replace: true, state: { flash: 'paymentApproved' } }),
+                () =>
+                    navigate(`/reservations/${id}`, {
+                        replace: true,
+                        state: { flash: isBalance ? 'balancePaid' : 'paymentApproved' },
+                    }),
                 REDIRECT_DELAY_MS,
             );
             return;
         }
 
         const code = result.reason.response?.data?.code;
+        if (code === 'NO_PENDING_BALANCE') {
+            // HU-27: the balance was paid meanwhile, for example in another tab.
+            navigate(`/reservations/${id}`, { replace: true, state: { flash: 'noBalance' } });
+            return;
+        }
         if (code === 'PAYMENT_ALREADY_EXISTS') {
             // AC-13: paid meanwhile, for example in another tab.
             navigate(`/reservations/${id}`, { replace: true, state: { flash: 'alreadyPaid' } });
@@ -430,8 +453,12 @@ export default function PayReservation() {
                 )}
             </div>
 
-            <h1 className="text-title font-display uppercase text-neutral-900">Pago de reserva</h1>
-            <p className="mt-1 text-body text-neutral-600">Completa el pago para confirmar tu reserva.</p>
+            <h1 className="text-title font-display uppercase text-neutral-900">{isBalance ? 'Pagar saldo' : 'Pago de reserva'}</h1>
+            <p className="mt-1 text-body text-neutral-600">
+                {isBalance
+                    ? 'Paga lo que quedó pendiente de tu estadía.'
+                    : 'Completa el pago para confirmar tu reserva.'}
+            </p>
 
             <form onSubmit={handleSubmit} noValidate className="mt-6">
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
@@ -449,11 +476,10 @@ export default function PayReservation() {
                                     return (
                                         <label
                                             key={value}
-                                            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors focus-within:ring-2 focus-within:ring-parkea-600 ${
-                                                selected
-                                                    ? 'border-parkea-600 bg-parkea-50'
-                                                    : 'border-neutral-200 bg-white hover:border-parkea-300'
-                                            }`}
+                                            className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors focus-within:ring-2 focus-within:ring-parkea-600 ${selected
+                                                ? 'border-parkea-600 bg-parkea-50'
+                                                : 'border-neutral-200 bg-white hover:border-parkea-300'
+                                                }`}
                                         >
                                             {/* AC-03: the filled radio marks the choice, not color alone */}
                                             <input
@@ -570,16 +596,43 @@ export default function PayReservation() {
                                     {formatDate(reservation.startTime)}, {formatTime(reservation.startTime)}
                                 </SummaryItem>
                                 <SummaryItem label="Fecha y hora de salida">
-                                    {formatDate(reservation.endTime)}, {formatTime(reservation.endTime)}
+                                    {hasExit
+                                        ? `${formatDate(reservation.endTime)}, ${formatTime(reservation.endTime)}`
+                                        : 'Sin hora de salida (máximo 24 horas)'}
                                 </SummaryItem>
                                 <SummaryItem label="Duración">
-                                    {formatDuration(reservation.startTime, reservation.endTime)}
+                                    {hasExit
+                                        ? formatDuration(reservation.startTime, reservation.endTime)
+                                        : 'Tiempo indefinido'}
                                 </SummaryItem>
                                 <SummaryItem label="Tarifa por hora" groupStart>
                                     <span className="font-mono">{formatCurrency(paymentSummary.hourlyRate)}</span>
                                 </SummaryItem>
+
+                                {/* HU-27 AC-07: what the stay cost and what was already paid */}
+                                {isBalance && (
+                                    <>
+                                        <SummaryItem label="Total de la estadía">
+                                            <span className="font-mono">{formatCurrency(reservation.openStay.total)}</span>{' '}
+                                            <span className="text-caption text-neutral-600">
+                                                ({hoursLabel(reservation.openStay.chargedHours)})
+                                            </span>
+                                        </SummaryItem>
+                                        <SummaryItem label="Ya pagado">
+                                            <span className="font-mono">{formatCurrency(reservation.openStay.paid)}</span>
+                                        </SummaryItem>
+                                    </>
+                                )}
+                                {/* HU-27 AC-03: an open stay is confirmed by paying its first hour */}
+                                {reservation.openEnded && !isBalance && (
+                                    <SummaryItem label="Cómo se cobra">
+                                        Ahora pagas la primera hora. El resto se cobra al terminar, por cada hora empezada.
+                                    </SummaryItem>
+                                )}
                                 <div className="flex items-center justify-between gap-3 pb-3">
-                                    <dt className="text-body text-neutral-900">Total a pagar</dt>
+                                    <dt className="text-body text-neutral-900">
+                                        {isBalance ? 'Saldo a pagar' : reservation.openEnded ? 'Primera hora a pagar' : 'Total a pagar'}
+                                    </dt>
                                     <dd className="whitespace-nowrap font-mono text-title font-bold text-neutral-900">
                                         {formatCurrency(total)}
                                     </dd>
@@ -587,9 +640,9 @@ export default function PayReservation() {
                                 <div className="flex items-center justify-between gap-3 border-t border-neutral-100 pt-3">
                                     <dt className="text-caption text-neutral-600">Estado</dt>
                                     <dd>
-                                        <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-medium ${pendingStatus.badge}`}>
-                                            <pendingStatus.Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                                            {pendingStatus.label}
+                                        <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-medium ${statusInfo.badge}`}>
+                                            <statusInfo.Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                                            {statusInfo.label}
                                         </span>
                                     </dd>
                                 </div>
@@ -626,9 +679,8 @@ export default function PayReservation() {
                         ref={messageRef}
                         tabIndex={-1}
                         role={message.type === 'error' ? 'alert' : 'status'}
-                        className={`mt-6 flex items-center gap-2 rounded-md px-4 py-3 text-body focus:outline-none ${
-                            message.type === 'error' ? 'bg-danger-soft text-danger' : 'bg-parkea-50 font-medium text-parkea-700'
-                        }`}
+                        className={`mt-6 flex items-center gap-2 rounded-md px-4 py-3 text-body focus:outline-none ${message.type === 'error' ? 'bg-danger-soft text-danger' : 'bg-parkea-50 font-medium text-parkea-700'
+                            }`}
                     >
                         {message.type === 'error' ? (
                             <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
