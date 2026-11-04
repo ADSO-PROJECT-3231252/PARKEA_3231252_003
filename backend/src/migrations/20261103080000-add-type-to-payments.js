@@ -24,7 +24,7 @@ module.exports = {
     await queryInterface.sequelize.query(`
       ALTER TABLE payments
         ADD COLUMN initial_reservation_id CHAR(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin
-          GENERATED ALWAYS AS (IF(type = 'initial', reservation_id, NULL)) STORED,
+          GENERATED ALWAYS AS (IF(type = 'initial', RTRIM(reservation_id), NULL)) STORED,
         ADD UNIQUE KEY payments_initial_reservation_unique (initial_reservation_id);
     `);
   },
