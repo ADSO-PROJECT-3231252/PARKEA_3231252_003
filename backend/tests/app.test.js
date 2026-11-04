@@ -59,6 +59,10 @@ describe('Damaged or unsupported request bodies (#258)', () => {
     // The answer has the project's code and message only, never the parser's
     // (for example "Z_DATA_ERROR" or "unsupported charset").
     const INVALID_JSON = { code: 'INVALID_JSON', message: 'The request body is not valid JSON' };
+    const UNSUPPORTED = {
+        code: 'UNSUPPORTED_MEDIA_TYPE',
+        message: 'The request body uses an unsupported encoding or charset',
+    };
 
     test.each(['gzip', 'deflate', 'br'])('a damaged %s body answers 400 INVALID_JSON', async (encoding) => {
         // Act
@@ -71,6 +75,46 @@ describe('Damaged or unsupported request bodies (#258)', () => {
         // Assert
         expect(res.status).toBe(400);
         expect(res.body).toEqual(INVALID_JSON);
+    });
+
+    test('an unsupported Content-Encoding answers 415 UNSUPPORTED_MEDIA_TYPE', async () => {
+        // Act
+        const res = await request(app)
+            .post('/api/auth/login')
+            .set('Content-Type', 'application/json')
+            .set('Content-Encoding', 'zip')
+            .send('{}');
+
+        // Assert
+        expect(res.status).toBe(415);
+        expect(res.body).toEqual(UNSUPPORTED);
+    });
+
+    test('an unsupported charset answers 415 UNSUPPORTED_MEDIA_TYPE', async () => {
+        // Act
+        const res = await request(app)
+            .post('/api/auth/login')
+            .set('Content-Type', 'application/json; charset=latin9')
+            .send('{}');
+
+        // Assert
+        expect(res.status).toBe(415);
+        expect(res.body).toEqual(UNSUPPORTED);
+    });
+
+    test('a form with more than 1000 fields answers 413 PAYLOAD_TOO_LARGE', async () => {
+        // Arrange
+        const manyFields = Array.from({ length: 1001 }, (_, i) => `field${i}=1`).join('&');
+
+        // Act
+        const res = await request(app)
+            .post('/api/auth/login')
+            .set('Content-Type', 'application/x-www-form-urlencoded')
+            .send(manyFields);
+
+        // Assert
+        expect(res.status).toBe(413);
+        expect(res.body).toEqual({ code: 'PAYLOAD_TOO_LARGE', message: 'The request body is too large' });
     });
 
     test('a valid gzip body is still read', async () => {
