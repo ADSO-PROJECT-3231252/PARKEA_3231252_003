@@ -66,9 +66,10 @@ export default function ReserveSpot() {
         startTime: '',
         endDate: '',
         endTime: '',
+        openEnded: false, // HU-27: no exit time
     });
     const [errors, setErrors] = useState({});
-    const [serverError, setServerError] = useState('');
+    const [serverErrorCode, setServerErrorCode] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
     const fetchZone = useCallback(() => {
@@ -118,8 +119,10 @@ export default function ReserveSpot() {
     };
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
+        const { name, value, type, checked } = e.target;
+        setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+        // HU-27: without an exit time, its error no longer applies.
+        if (name === 'openEnded' && checked) setErrors((prev) => ({ ...prev, end: undefined }));
     };
 
     const startDateTime = combineDateTime(form.startDate, form.startTime);
@@ -140,6 +143,10 @@ export default function ReserveSpot() {
         hoursLabel = Number.isInteger(hoursDecimal) ? String(hoursDecimal) : hoursDecimal.toFixed(1);
     }
 
+    // HU-27 AC-03: an open stay shows its summary as soon as the entry is set;
+    // only the first hour is paid to confirm it.
+    const showSummary = form.openEnded ? Boolean(startDateTime) : hasValidRange;
+
     const validate = () => {
         const newErrors = {};
         const now = new Date();
@@ -156,7 +163,9 @@ export default function ReserveSpot() {
             newErrors.start = translateError('RESERVATION_TOO_FAR_AHEAD');
         }
 
-        if (!endDateTime) {
+        if (form.openEnded) {
+            // HU-27 AC-02: no exit time to check
+        } else if (!endDateTime) {
             newErrors.end = REQUIRED_MESSAGE;
         } else if (startDateTime && endDateTime <= startDateTime) {
             newErrors.end = translateError('END_BEFORE_START');
@@ -173,7 +182,7 @@ export default function ReserveSpot() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setServerError('');
+        setServerErrorCode('');
         if (!validate()) return;
 
         setSubmitting(true);
@@ -182,7 +191,8 @@ export default function ReserveSpot() {
                 zoneId,
                 vehicleId: form.vehicleId,
                 startTime: startDateTime.toISOString(),
-                endTime: endDateTime.toISOString(),
+                // HU-27: an open stay is sent without an exit time
+                ...(form.openEnded ? { openEnded: true } : { endTime: endDateTime.toISOString() }),
             });
             // AC-12: redirect to the confirmation screen (HU-15).
             navigate(`/reservations/${data.reservation.id}`);
@@ -199,8 +209,9 @@ export default function ReserveSpot() {
                 setErrors((prev) => ({ ...prev, vehicle: translateError(code) }));
             } else {
                 // NO_SPOTS_AVAILABLE (AC-14), ZONE_NOT_FOUND, ZONE_INACTIVE,
-                // MISSING_REQUIRED_FIELDS, or anything else generic banner.
-                setServerError(translateError(code));
+                // MISSING_REQUIRED_FIELDS, PENDING_BALANCE (HU-27 AC-11), or
+                // anything else generic banner.
+                setServerErrorCode(code ?? 'INTERNAL_ERROR');
             }
         } finally {
             setSubmitting(false);
@@ -421,58 +432,78 @@ export default function ReserveSpot() {
                         )}
                     </div>
 
-                    {/* AC-02/AC-06/AC-07: end date + time */}
+                    {/* HU-27 AC-01: a stay without an exit time */}
                     <div>
-                        <span className="block text-label text-neutral-700">
-                            Fecha y hora de salida <span className="text-danger">*</span>
-                        </span>
-                        <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div className="relative">
-                                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
-                                <label htmlFor="endDate" className="sr-only">
-                                    Fecha de salida
-                                </label>
-                                <input
-                                    id="endDate"
-                                    name="endDate"
-                                    type="date"
-                                    value={form.endDate}
-                                    onChange={handleChange}
-                                    aria-invalid={Boolean(errors.end)}
-                                    aria-describedby={errors.end ? 'end-error' : undefined}
-                                    className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
-                                        }`}
-                                />
-                            </div>
-                            <div className="relative">
-                                <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
-                                <label htmlFor="endTime" className="sr-only">
-                                    Hora de salida
-                                </label>
-                                <input
-                                    id="endTime"
-                                    name="endTime"
-                                    type="time"
-                                    value={form.endTime}
-                                    onChange={handleChange}
-                                    aria-invalid={Boolean(errors.end)}
-                                    aria-describedby={errors.end ? 'end-error' : undefined}
-                                    className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
-                                        }`}
-                                />
-                            </div>
-                        </div>
-                        {errors.end ? (
-                            <p id="end-error" role="alert" className="mt-1 text-caption text-danger">
-                                {errors.end}
-                            </p>
-                        ) : (
-                            <p className="mt-1 text-caption text-neutral-600">Selecciona cuándo planeas salir del parqueadero.</p>
-                        )}
+                        <label className="flex cursor-pointer items-start gap-2">
+                            <input
+                                type="checkbox"
+                                name="openEnded"
+                                checked={form.openEnded}
+                                onChange={handleChange}
+                                aria-describedby="openEnded-help"
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-parkea-600"
+                            />
+                            <span className="text-label text-neutral-900">Tiempo indefinido</span>
+                        </label>
+                        <p id="openEnded-help" className="mt-1 pl-6 text-caption text-neutral-600">
+                            Pagas la primera hora al confirmar y el resto cuando termines, por cada hora empezada (máximo 24 horas).
+                        </p>
                     </div>
 
+                    {/* AC-02/AC-06/AC-07: end date + time */}
+                    {!form.openEnded && (
+                        <div>
+                            <span className="block text-label text-neutral-700">
+                                Fecha y hora de salida <span className="text-danger">*</span>
+                            </span>
+                            <div className="mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="relative">
+                                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                                    <label htmlFor="endDate" className="sr-only">
+                                        Fecha de salida
+                                    </label>
+                                    <input
+                                        id="endDate"
+                                        name="endDate"
+                                        type="date"
+                                        value={form.endDate}
+                                        onChange={handleChange}
+                                        aria-invalid={Boolean(errors.end)}
+                                        aria-describedby={errors.end ? 'end-error' : undefined}
+                                        className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
+                                            }`}
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <Clock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                                    <label htmlFor="endTime" className="sr-only">
+                                        Hora de salida
+                                    </label>
+                                    <input
+                                        id="endTime"
+                                        name="endTime"
+                                        type="time"
+                                        value={form.endTime}
+                                        onChange={handleChange}
+                                        aria-invalid={Boolean(errors.end)}
+                                        aria-describedby={errors.end ? 'end-error' : undefined}
+                                        className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
+                                            }`}
+                                    />
+                                </div>
+                            </div>
+                            {errors.end ? (
+                                <p id="end-error" role="alert" className="mt-1 text-caption text-danger">
+                                    {errors.end}
+                                </p>
+                            ) : (
+                                <p className="mt-1 text-caption text-neutral-600">Selecciona cuándo planeas salir del parqueadero.</p>
+                            )}
+                        </div>
+                    )}
+
                     {/* AC-09/AC-10: real-time duration + cost, hidden until the range is valid */}
-                    {hasValidRange && (
+                    {showSummary && (
                         <div className="rounded-lg bg-parkea-50 p-5">
                             <h4 className="text-label font-medium uppercase text-parkea-700">Resumen de la reserva</h4>
                             <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -482,7 +513,9 @@ export default function ReserveSpot() {
                                     </span>
                                     <div className="min-w-0">
                                         <p className="text-caption text-neutral-600">Duración</p>
-                                        <p className="break-words text-body font-medium text-neutral-900">{durationLabel}</p>
+                                        <p className="break-words text-body font-medium text-neutral-900">
+                                            {form.openEnded ? 'Tiempo indefinido' : durationLabel}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex min-w-0 items-center gap-3">
@@ -490,11 +523,23 @@ export default function ReserveSpot() {
                                         <Banknote className="h-4 w-4" aria-hidden="true" />
                                     </span>
                                     <div className="min-w-0">
-                                        <p className="text-caption text-neutral-600">Costo total estimado</p>
-                                        <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(estimatedCost)}</p>
-                                        <p className="text-caption text-neutral-600">
-                                            (Tarifa: {formatCurrency(zone.hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
-                                        </p>
+                                        {form.openEnded ? (
+                                            <>
+                                                <p className="text-caption text-neutral-600">A pagar al confirmar</p>
+                                                <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(zone.hourlyRate)}</p>
+                                                <p className="text-caption text-neutral-600">
+                                                    (Primera hora. Luego {formatCurrency(zone.hourlyRate)} por cada hora empezada)
+                                                </p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-caption text-neutral-600">Costo total estimado</p>
+                                                <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(estimatedCost)}</p>
+                                                <p className="text-caption text-neutral-600">
+                                                    (Tarifa: {formatCurrency(zone.hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
+                                                </p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -506,10 +551,19 @@ export default function ReserveSpot() {
                         El costo final puede variar según el tiempo real de uso.
                     </p>
 
-                    {serverError && (
-                        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-center text-caption text-danger">
-                            {serverError}
-                        </p>
+                    {serverErrorCode && (
+                        <div role="alert" className="flex flex-col items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-center">
+                            <p className="text-caption text-danger">{translateError(serverErrorCode)}</p>
+                            {/* HU-27 AC-11: the balance is paid from the reservation that owes it */}
+                            {serverErrorCode === 'PENDING_BALANCE' && (
+                                <Link
+                                    to="/reservations"
+                                    className="rounded-md border border-danger px-3 py-1 text-caption text-danger transition-colors hover:bg-white"
+                                >
+                                    Ver mis reservas
+                                </Link>
+                            )}
+                        </div>
                     )}
                 </div>
 

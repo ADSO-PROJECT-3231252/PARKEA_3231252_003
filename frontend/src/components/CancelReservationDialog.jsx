@@ -9,9 +9,13 @@ import { formatDateTime, formatReservationCode } from '../utils/format';
 const STALE_CODES = ['RESERVATION_ALREADY_STARTED', 'RESERVATION_NOT_CANCELLABLE', 'RESERVATION_NOT_FOUND'];
 
 // Same date format as the booking history (HU-18): "10/06/2026, de 08:30 a 09:30"
-// or, across two days, "del 10/06/2026 23:00 al 11/06/2026 01:00".
+// or, across two days, "del 10/06/2026 23:00 al 11/06/2026 01:00". An open
+// stay (HU-27) has no exit time: "desde el 10/06/2026 08:30, sin hora de salida".
 function formatRange(startIso, endIso) {
     const [startDate, startTime] = formatDateTime(startIso).split(' ');
+    if (!endIso) {
+        return `desde el ${startDate} ${startTime}, sin hora de salida`;
+    }
     const [endDate, endTime] = formatDateTime(endIso).split(' ');
     if (startDate === endDate) {
         return `${startDate}, de ${startTime} a ${endTime}`;

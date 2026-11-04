@@ -55,6 +55,11 @@ const errorMessages = {
     RESERVATION_ALREADY_STARTED: 'Esta reserva ya inició y no se puede cancelar',
     RESERVATION_NOT_CANCELLABLE: 'Esta reserva no se puede cancelar en su estado actual',
     RESERVATION_EXPIRED: 'Esta reserva expiró porque no se pagó a tiempo. Realiza una nueva reserva',
+    PENDING_BALANCE: 'Tienes un saldo pendiente de una estadía anterior. Págalo antes de hacer una nueva reserva',
+    NOT_AN_OPEN_STAY: 'Esta reserva tiene hora de salida, así que no se puede terminar antes',
+    STAY_NOT_STARTED: 'Tu estadía todavía no ha comenzado',
+    STAY_NOT_ACTIVE: 'Esta estadía ya no está activa',
+    STAY_AMOUNT_CHANGED: 'Empezó otra hora mientras confirmabas. Revisa el nuevo valor y confirma de nuevo',
 
     // Payments
     INVALID_PAYMENT_METHOD: 'Método de pago inválido',
@@ -63,6 +68,7 @@ const errorMessages = {
     RESERVATION_NOT_PENDING: 'Esta reserva no está pendiente de pago',
     PAYMENT_ALREADY_EXISTS: 'Esta reserva ya tiene un pago registrado',
     PAYMENT_DECLINED: 'Pago rechazado. Intenta con otro método de pago',
+    NO_PENDING_BALANCE: 'Esta reserva no tiene saldo pendiente',
 
     // Generic
     VALIDATION_ERROR: 'Revisa los campos marcados',
