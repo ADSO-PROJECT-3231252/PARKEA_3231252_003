@@ -11,11 +11,15 @@ import {
     RefreshCw,
     AlertCircle,
     CheckCircle2,
+    Flag,
+    Wallet,
 } from 'lucide-react';
 import { getReservations } from '../services/reservationService';
 import CancelReservationDialog from '../components/CancelReservationDialog';
+import FinishStayDialog from '../components/FinishStayDialog';
 import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
+import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
 // done by the backend: GET /reservations?status=&page=&limit=
@@ -64,7 +68,17 @@ function VehicleInfo({ vehicle }) {
         </div>
     );
 }
-function DateInfo({ startTime, endTime }) {
+function DateInfo({ reservation, now }) {
+    const { startTime, endTime } = reservation;
+    // HU-27: an open stay has no exit time until it ends.
+    let duration = '—';
+    if (endTime) {
+        duration = formatDuration(startTime, endTime);
+    } else if (isRunningStay(reservation, now)) {
+        duration = `${formatDuration(startTime, stayEndSoFar(startTime, now))} hasta ahora`;
+    } else if (['Pending', 'Active'].includes(reservation.status)) {
+        duration = 'Tiempo indefinido';
+    }
     return (
         <div className="flex items-start gap-2">
             <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
@@ -73,22 +87,39 @@ function DateInfo({ startTime, endTime }) {
                     <span className="sr-only">Inicio: </span>
                     {formatDateTime(startTime)}
                 </p>
-                <p className="font-mono text-caption text-neutral-900">
-                    <span className="sr-only">Fin: </span>
-                    {formatDateTime(endTime)}
-                </p>
-                <p className="mt-0.5 text-caption text-neutral-600">{formatDuration(startTime, endTime)}</p>
+                {endTime ? (
+                    <p className="font-mono text-caption text-neutral-900">
+                        <span className="sr-only">Fin: </span>
+                        {formatDateTime(endTime)}
+                    </p>
+                ) : (
+                    <p className="text-caption text-neutral-900">Sin hora de salida</p>
+                )}
+                <p className="mt-0.5 text-caption text-neutral-600">{duration}</p>
             </div>
         </div>
     );
 }
+// AC-03: unpaid → estimated total; paid → amount paid. HU-27: a running open
+// stay shows the amount so far, and one that ended with a balance, its total.
+function amountLabel(reservation, pendingBalance) {
+    if (reservation.amountType === 'so_far') return 'Hasta ahora';
+    if (pendingBalance > 0) return 'Total';
+    if (reservation.openEnded && reservation.status === 'Pending') return 'Primera hora';
+    return reservation.amountType === 'paid' ? 'Pagado' : 'Estimado';
+}
 function AmountInfo({ reservation }) {
-    const { amount, amountType, appliedHourlyRate } = reservation;
+    const { amount, appliedHourlyRate } = reservation;
+    const pendingBalance = pendingBalanceOf(reservation);
     return (
         <div>
-            {/* AC-03: unpaid → estimated total; paid → amount paid. */}
-            <p className="text-caption text-neutral-600">{amountType === 'paid' ? 'Pagado' : 'Estimado'}</p>
+            <p className="text-caption text-neutral-600">{amountLabel(reservation, pendingBalance)}</p>
             <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(amount)}</p>
+            {pendingBalance > 0 && (
+                <p className="text-caption font-medium text-warning">
+                    Saldo pendiente: <span className="whitespace-nowrap font-mono">{formatCurrency(pendingBalance)}</span>
+                </p>
+            )}
             {appliedHourlyRate != null && (
                 <p
                     className="font-mono text-caption
@@ -101,7 +132,10 @@ text-neutral-600"
     );
 }
 function StatusInfo({ reservation }) {
-    const paymentLabel = PAYMENT_STATUS_LABELS[reservation.paymentStatus] ?? reservation.paymentStatus;
+    const paymentLabel =
+        pendingBalanceOf(reservation) > 0
+            ? 'Saldo pendiente'
+            : (PAYMENT_STATUS_LABELS[reservation.paymentStatus] ?? reservation.paymentStatus);
     return (
         <div className="flex flex-col items-start gap-1 lg:items-center">
             <StatusBadge status={reservation.status} />
@@ -109,9 +143,11 @@ function StatusInfo({ reservation }) {
         </div>
     );
 }
-function Actions({ reservation, now, onViewDetails, onPay, onCancel, inline = false }) {
+function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, inline = false }) {
     const isPending = reservation.status === 'Pending';
     const canCancel = canCancelReservation(reservation, now);
+    const canFinish = canFinishStay(reservation, now);
+    const hasBalance = pendingBalanceOf(reservation) > 0;
     // Used in aria-labels so a screen reader announces which reservation each
     // repeated action belongs to (AC-13, WCAG 2.1 AA).
     const which = `reserva ${shortCode(reservation.id)} en ${reservation.zone?.name ?? 'la zona'}`;
@@ -136,6 +172,32 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                     Pagar
                 </button>
             )}
+
+            {/* HU-27 AC-05: a running open stay */}
+            {canFinish && (
+                <button
+                    type="button"
+                    onClick={() => onFinish(reservation)}
+                    aria-label={`Terminar la estadía de la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+                    Terminar estadía
+                </button>
+            )}
+            {/* HU-27 AC-07: what an open stay still owes after it ended */}
+            {hasBalance && (
+                <button
+                    type="button"
+                    onClick={() => onPay(reservation.id)}
+                    aria-label={`Pagar el saldo de la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <Wallet className="h-3.5 w-3.5" aria-hidden="true" />
+                    Pagar saldo
+                </button>
+            )}
+
             {/* HU-16 AC-01: Pending or Active (already paid) reservations that have not started. */}
             {canCancel && (
                 <button
@@ -217,11 +279,13 @@ export default function Reservations() {
     // Time of the last load, used to decide which reservations already started.
     // Set from the fetch callback, never during render.
     const [now, setNow] = useState(null);
-    // HU-16: the reservation in the cancel dialog (null = closed) and the
-    // AC-06 message shown after cancelling.
+    // HU-16: the reservation in the cancel dialog (null = closed). HU-27: the
+    // stay in the finish dialog and when it was opened. The message shown
+    // after either action (HU-16 AC-06, HU-27 AC-09).
     const [cancelTarget, setCancelTarget] = useState(null);
-    const [cancelMessage, setCancelMessage] = useState('');
-    const cancelMessageRef = useRef(null);
+    const [finishTarget, setFinishTarget] = useState(null);
+    const [resultMessage, setResultMessage] = useState('');
+    const resultMessageRef = useRef(null);
     useEffect(() => {
         // Guards against out-of-order responses: if the user switches filter or
         // page while a request is still in flight, the older response must not
@@ -259,13 +323,13 @@ export default function Reservations() {
     };
     const handleFilterChange = (value) => {
         if (value === statusFilter) return;
-        setCancelMessage('');
+        setResultMessage('');
         startLoading();
         setStatusFilter(value);
         setPage(1);
     };
     const goToPage = (target) => {
-        setCancelMessage('');
+        setResultMessage('');
         startLoading();
         setPage(target);
     };
@@ -285,16 +349,29 @@ export default function Reservations() {
     };
     const handleCancelled = (message) => {
         setCancelTarget(null);
-        setCancelMessage(message);
+        setResultMessage(message);
         // AC-07: reloaded without the loading state, so the list stays on screen
         // and the reservation shows up as "Cancelada".
         setReloadKey((k) => k + 1);
     };
-    // The "Cancelar" button disappears once the reservation is cancelled, so
-    // the focus goes to the message, which also makes sure it is read aloud.
+    // HU-27: same as cancelling, the list is loaded again and the stay shows
+    // up as "Finalizada".
+    const handleFinish = (reservation) => setFinishTarget({ reservation, openedAt: Date.now() });
+    const handleFinishClose = ({ stale }) => {
+        setFinishTarget(null);
+        if (stale) setReloadKey((k) => k + 1);
+    };
+    const handleFinished = (message) => {
+        setFinishTarget(null);
+        setResultMessage(message);
+        setReloadKey((k) => k + 1);
+    };
+    // The "Cancelar" or "Terminar estadía" button disappears after the
+    // action, so the focus goes to the message, which also makes sure it is
+    // read aloud.
     useEffect(() => {
-        if (cancelMessage) cancelMessageRef.current?.focus();
-    }, [cancelMessage]);
+        if (resultMessage) resultMessageRef.current?.focus();
+    }, [resultMessage]);
     const isFiltered = statusFilter !== 'All';
     const isEmpty = !loading && !error && reservations.length === 0;
     const showList = !loading && !error && reservations.length > 0;
@@ -340,11 +417,10 @@ text-body text-neutral-900"
                                 type="button"
                                 onClick={() => handleFilterChange(value)}
                                 aria-pressed={selected}
-                                className={`border-b-2 px-4 py-4 text-label transition-colors ${
-                                    selected
-                                        ? 'border-parkea-600 font-medium text-parkea-600'
-                                        : 'border-transparent text-neutral-600 hover:text-parkea-600'
-                                }`}
+                                className={`border-b-2 px-4 py-4 text-label transition-colors ${selected
+                                    ? 'border-parkea-600 font-medium text-parkea-600'
+                                    : 'border-transparent text-neutral-600 hover:text-parkea-600'
+                                    }`}
                             >
                                 {label}
                             </button>
@@ -353,16 +429,16 @@ text-body text-neutral-900"
                 </div>
             </div>
             {/* HU-16 AC-06 */}
-            {cancelMessage && (
+            {resultMessage && (
                 <p
-                    ref={cancelMessageRef}
+                    ref={resultMessageRef}
                     tabIndex={-1}
                     role="status"
                     className="mt-4 flex items-start gap-2 rounded-md bg-parkea-50 px-3 py-2 text-caption
 text-parkea-700 focus:outline-none"
                 >
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    {cancelMessage}
+                    {resultMessage}
                 </p>
             )}
             <div className="mt-4">
@@ -488,7 +564,7 @@ text-neutral-900"
                                                 <VehicleInfo vehicle={r.vehicle} />
                                             </td>
                                             <td className="px-4 py-4">
-                                                <DateInfo startTime={r.startTime} endTime={r.endTime} />
+                                                <DateInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
                                                 <AmountInfo reservation={r} />
@@ -503,6 +579,7 @@ text-neutral-900"
                                                     onViewDetails={handleViewDetails}
                                                     onPay={handlePay}
                                                     onCancel={handleCancel}
+                                                    onFinish={handleFinish}
                                                 />
                                             </td>
                                         </tr>
@@ -527,7 +604,7 @@ p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-4">
                                         <ZoneInfo reservation={r} />
-                                        <DateInfo startTime={r.startTime} endTime={r.endTime} />
+                                        <DateInfo reservation={r} now={now} />
                                         <VehicleInfo vehicle={r.vehicle} />
                                         <AmountInfo reservation={r} />
                                     </div>
@@ -538,6 +615,7 @@ p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
                                             onViewDetails={handleViewDetails}
                                             onPay={handlePay}
                                             onCancel={handleCancel}
+                                            onFinish={handleFinish}
                                             inline
                                         />
                                     </div>
@@ -608,6 +686,15 @@ text-center text-caption font-medium text-white"
                 onClose={handleCancelClose}
                 onCancelled={handleCancelled}
             />
+            {finishTarget && (
+                <FinishStayDialog
+                    reservation={finishTarget.reservation}
+                    hourlyRate={finishTarget.reservation.appliedHourlyRate}
+                    openedAt={finishTarget.openedAt}
+                    onClose={handleFinishClose}
+                    onFinished={handleFinished}
+                />
+            )}
         </div>
     );
 }
