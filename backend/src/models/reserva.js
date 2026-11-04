@@ -68,6 +68,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'parking_spot_id',
     },
+    // HU-27: no exit time chosen; endTime holds entry + 24 h until the stay ends
+    openEnded: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'open_ended',
+    },
   }, {
     sequelize,
     modelName: 'Reserva',
