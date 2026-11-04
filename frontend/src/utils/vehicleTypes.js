@@ -10,4 +10,4 @@ export const VEHICLE_TYPE_OPTIONS = [
 // Same data as a lookup table: { car: 'Automóvil', ... }
 export const VEHICLE_TYPE_LABELS = Object.fromEntries(
     VEHICLE_TYPE_OPTIONS.map(({ value, label }) => [value, label]),
-); 
+);
