@@ -20,8 +20,19 @@ app.use(cors({
     credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Reads the JSON and form bodies. An error while reading a body is marked, so
+// the error handler can answer it with the project's own codes (#185, #258).
+function readBody(parser) {
+    return (req, res, next) => {
+        parser(req, res, (err) => {
+            if (err) err.isBodyError = true;
+            next(err);
+        });
+    };
+}
+
+app.use(readBody(express.json()));
+app.use(readBody(express.urlencoded({ extended: true })));
 
 // Health check route, useful to confirm the server is running
 app.get('/api/health', (req, res) => {
@@ -36,16 +47,34 @@ app.use((req, res) => {
     res.status(404).json({ code: ErrorCodes.ROUTE_NOT_FOUND, message: 'Route not found' });
 });
 
+// Errors while reading the request body. They are the client's fault, so they
+// are not logged, and the parser's own code and message are never sent: they
+// describe its internals (for example "Z_DATA_ERROR"), not what to fix.
+// Returns [status, body], or null when it is not a body error caused by the client.
+function bodyErrorAnswer(err) {
+    if (!err.isBodyError || err.status >= 500) return null;
+
+    switch (err.type) {
+        // Larger than 100 kB, or a form with more than 1000 fields
+        case 'entity.too.large':
+        case 'parameters.too.many':
+            return [413, { code: ErrorCodes.PAYLOAD_TOO_LARGE, message: 'The request body is too large' }];
+        // A Content-Encoding other than gzip, deflate or br, or an unknown charset
+        case 'encoding.unsupported':
+        case 'charset.unsupported':
+            return [415, { code: ErrorCodes.UNSUPPORTED_MEDIA_TYPE, message: 'The request body uses an unsupported encoding or charset' }];
+        // Not valid JSON, or a gzip, deflate or br body that is damaged
+        default:
+            return [400, { code: ErrorCodes.INVALID_JSON, message: 'The request body is not valid JSON' }];
+    }
+}
+
 // Centralized error handler
 app.use((err, req, res, next) => {
-    // Errors from express.json(): a body that is not valid JSON, or one larger
-    // than its limit (100 kB). They are the client's fault, so they are not
-    // logged, and the parser's own message is not sent.
-    if (err.type === 'entity.parse.failed') {
-        return res.status(400).json({ code: ErrorCodes.INVALID_JSON, message: 'The request body is not valid JSON' });
-    }
-    if (err.type === 'entity.too.large') {
-        return res.status(413).json({ code: ErrorCodes.PAYLOAD_TOO_LARGE, message: 'The request body is too large' });
+    const bodyError = bodyErrorAnswer(err);
+    if (bodyError) {
+        const [status, body] = bodyError;
+        return res.status(status).json(body);
     }
 
     const status = err.status || 500;

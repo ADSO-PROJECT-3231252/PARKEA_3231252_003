@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
-const { sequelize, Reserva, Zona, ParkingSpot } = require('../models');
+const { sequelize, Reserva, Zona, ParkingSpot, Pago } = require('../models');
+const { openStayCharge } = require('../utils/stayPricing');
 
 const INTERVALO_MS = 60 * 1000; // runs every minute, just like the expiration job
 
@@ -42,6 +43,21 @@ async function finalizarReservasVencidas() {
             }
 
             await reservaActual.update({ status: 'Finished' }, { transaction: t });
+
+            // HU-27 AC-10: an open stay not finished within 24 hours closes here.
+            // Its exit time is already entry + 24 h; 24 hours are charged and the
+            // part beyond the first hour stays as a pending balance.
+            if (reservaActual.openEnded) {
+                const cobro = openStayCharge(reservaActual, reservaActual.endTime);
+                if (cobro.balance > 0) {
+                    await Pago.create({
+                        reservationId: reservaActual.id,
+                        amount: cobro.balance,
+                        paymentStatus: 'Pending',
+                        type: 'balance',
+                    }, { transaction: t });
+                }
+            }
 
             const zona = await Zona.findByPk(reservaActual.zoneId, {
                 transaction: t,
