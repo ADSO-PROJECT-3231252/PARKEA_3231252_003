@@ -274,6 +274,7 @@ export default function PayReservation() {
     if (loading) {
         return (
             <div className={PAGE_SHELL}>
+                <title>Pago de reserva | PARKEA</title>
                 <h1 className="sr-only">Pago de reserva</h1>
                 <p role="status" aria-live="polite" className="text-body text-neutral-600">
                     Cargando…
@@ -285,6 +286,7 @@ export default function PayReservation() {
     if (notFound) {
         return (
             <div className={PAGE_SHELL}>
+                <title>Pago de reserva | PARKEA</title>
                 <h1 className="sr-only">Pago de reserva</h1>
                 <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
                     <p className="flex items-center gap-2 text-body text-neutral-600">
@@ -302,6 +304,7 @@ export default function PayReservation() {
     if (loadError || !reservation) {
         return (
             <div className={PAGE_SHELL}>
+                <title>Pago de reserva | PARKEA</title>
                 <h1 className="sr-only">Pago de reserva</h1>
                 <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-danger-soft bg-danger-soft p-5">
                     <p className="flex items-center gap-2 text-body text-danger">
@@ -342,6 +345,7 @@ export default function PayReservation() {
                   : 'RESERVATION_NOT_PENDING';
         return (
             <div className={PAGE_SHELL}>
+                <title>Pago de reserva | PARKEA</title>
                 <h1 className="sr-only">Pago de reserva</h1>
                 <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
                     <p className="flex items-center gap-2 text-body text-neutral-900">
@@ -437,6 +441,7 @@ export default function PayReservation() {
 
     return (
         <div className={PAGE_SHELL}>
+            <title>Pago de reserva | PARKEA</title>
             {/* AC-02: simulated environment notice, with the time left (AC-08) */}
             <div className="mb-6 flex flex-col gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">

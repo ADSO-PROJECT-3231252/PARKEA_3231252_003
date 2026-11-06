@@ -377,6 +377,7 @@ export default function Reservations() {
     const lastShown = firstShown + reservations.length - 1;
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Mis reservas | PARKEA</title>
             <h1 className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Consulta el historial de tus reservas y su estado.
