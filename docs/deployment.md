@@ -266,4 +266,5 @@ To stop or start an app: web app, **Overview**, **Stop** or **Start**.
 | `az: command not found` | VS Code was open while Azure CLI was installed. Close VS Code completely, or restart the computer. |
 | Migrations fail with `ETIMEDOUT` | Your IP is not in the database firewall. See Database changes. |
 | Creating a resource fails with "policy violation" | The region is not allowed. Use one of the allowed regions listed above. |
+| The recovery email does not arrive | Check the spam folder, then Resend > Emails. If it is not there, read the API log (row below) and look for `Could not send the recovery email`. If Resend is down or the domain expired, switch back to Mailtrap (see Email (Resend)). |
 | The API does not start | Read the live log: `az webapp log tail --resource-group parkea-rg --name parkea-api-sena` (stop with Ctrl + C). |
