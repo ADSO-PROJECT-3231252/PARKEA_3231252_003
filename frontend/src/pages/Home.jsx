@@ -78,7 +78,7 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
     return (
         <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
             <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-title font-display uppercase text-neutral-900">{title}</h3>
+                <h2 className="text-title font-display uppercase text-neutral-900">{title}</h2>
                 <Icon className="h-6 w-6 text-parkea-600" aria-hidden="true" />
             </div>
             <div className="flex-1">{children}</div>
@@ -96,6 +96,7 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
 function VisitorHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Inicio | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
                     <h1 className="text-hero-sm font-display uppercase text-parkea-700 sm:text-hero lg:text-hero-sm xl:text-hero">
@@ -218,6 +219,7 @@ function AuthenticatedHome({ user }) {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Inicio | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
                     <h1 className="break-words text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
@@ -375,6 +377,7 @@ function AuthenticatedHome({ user }) {
 function AdminHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Inicio de administrador | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 {/* HU-04 AC-08: on phones the shield goes above the headline so the
                     text and the button get the full width of the card. */}

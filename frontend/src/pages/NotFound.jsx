@@ -32,6 +32,7 @@ export default function NotFound() {
             className="relative flex min-h-screen flex-col items-center bg-illustration px-4 pt-[58vw] text-center landscape:min-h-[calc(var(--text-top)+11rem)] landscape:pt-0"
             style={{ '--text-top': TEXT_TOP }}
         >
+            <title>Página no encontrada | PARKEA</title>
             <img
                 src={notFoundImage}
                 alt="Un carro verde detrás de un enorme 404 en un parqueadero"

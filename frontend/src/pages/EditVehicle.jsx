@@ -120,6 +120,7 @@ export default function EditVehicle() {
     if (loading) {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <title>Editar vehículo | PARKEA</title>
                 <p role="status" aria-live="polite" className="text-body text-neutral-600">
                     Cargando datos del vehículo…
                 </p>
@@ -129,6 +130,7 @@ export default function EditVehicle() {
     if (fetchError) {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <title>Editar vehículo | PARKEA</title>
                 <div
                     role="alert"
                     className={`flex flex-col items-start gap-3 rounded-lg border
@@ -168,6 +170,7 @@ transition-colors hover:bg-white`}
     }
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Editar vehículo | PARKEA</title>
             <h1 className="text-title font-display uppercase text-neutral-900">Editar vehículo</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Actualiza la información de tu vehículo registrado.

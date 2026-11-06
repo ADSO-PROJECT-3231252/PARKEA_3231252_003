@@ -154,7 +154,8 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-3">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-3">
+            <title>Crear cuenta | PARKEA</title>
             <div className="w-full max-w-5xl bg-white rounded-lg shadow-sm border border-neutral-200 flex flex-col md:flex-row overflow-hidden">
                 {/* Columna del formulario */}
                 <div className="flex-1 px-5 py-4">
@@ -405,6 +406,6 @@ export default function Register() {
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

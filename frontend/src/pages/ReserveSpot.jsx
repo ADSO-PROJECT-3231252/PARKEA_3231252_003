@@ -223,6 +223,7 @@ export default function ReserveSpot() {
     if (zoneLoading || vehiclesLoading) {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <title>Reservar cupo | PARKEA</title>
                 <p role="status" aria-live="polite" className="text-body text-neutral-600">
                     Cargando…
                 </p>
@@ -233,6 +234,7 @@ export default function ReserveSpot() {
     if (zoneError || !zone) {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <title>Reservar cupo | PARKEA</title>
                 <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-danger-soft bg-danger-soft p-5">
                     <p className="flex items-center gap-2 text-body text-danger">
                         <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -265,6 +267,7 @@ export default function ReserveSpot() {
     if (!vehiclesError && vehicles.length === 0) {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <title>Reservar cupo | PARKEA</title>
                 <h1 className="text-title font-display uppercase text-neutral-900">Reservar cupo</h1>
                 <div className="mt-6 flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
                     <p className="text-body text-neutral-600">
@@ -286,6 +289,7 @@ export default function ReserveSpot() {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Reservar cupo | PARKEA</title>
             <h1 className="text-title font-display uppercase text-neutral-900">Reservar cupo</h1>
             <p className="mt-1 text-body text-neutral-600">Completa la información para asegurar tu cupo de parqueo.</p>
 

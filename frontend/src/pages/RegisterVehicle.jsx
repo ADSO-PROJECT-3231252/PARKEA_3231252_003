@@ -128,6 +128,7 @@ export default function RegisterVehicle() {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Agregar vehículo | PARKEA</title>
             <h1 className="text-title font-display uppercase text-neutral-900">Agregar vehículo</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Registra un nuevo vehículo para usarlo en tus reservas.
