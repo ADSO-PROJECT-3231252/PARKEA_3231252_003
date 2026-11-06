@@ -180,6 +180,7 @@ export default function Profile() {
     if (loadingProfile) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+                <title>Mi perfil | PARKEA</title>
                 <p className="text-body text-neutral-600">Cargando perfil...</p>
             </div>
         );
@@ -191,6 +192,7 @@ export default function Profile() {
 
     return (
         <div className="min-h-screen bg-neutral-50 px-4 py-8">
+            <title>Mi perfil | PARKEA</title>
             <div className="max-w-4xl mx-auto">
 
                 <h1 className="font-display text-title text-neutral-900 uppercase">Mi perfil</h1>
