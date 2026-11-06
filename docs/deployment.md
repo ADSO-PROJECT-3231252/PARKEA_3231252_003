@@ -72,7 +72,11 @@ After adding or editing a variable, click **Apply** in the small panel and then 
 | `JWT_SECRET` | A long random value, different from any local one |
 | `JWT_EXPIRES_IN` | `1h` |
 | `FRONTEND_URL` | The web app URL, with `https://` and without a trailing `/` |
-| `MAILTRAP_HOST`, `MAILTRAP_PORT`, `MAILTRAP_USER`, `MAILTRAP_PASS` | The Mailtrap sandbox values |
+| `MAILTRAP_HOST` | `smtp.resend.com` (see [Email (Resend)](#email-resend)) |
+| `MAILTRAP_PORT` | `587` |
+| `MAILTRAP_USER` | `resend` |
+| `MAILTRAP_PASS` | The Resend API key. It exists only here. |
+| `MAIL_FROM` | `no-reply@parkeaweb.me` |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | `true` (Azure runs `npm install` on Linux; required by `bcrypt`) |
 
 Do not set `PORT`; Azure provides it.
