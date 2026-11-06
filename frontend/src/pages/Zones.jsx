@@ -36,10 +36,10 @@ function ZoneCard({ zone, onReserve }) {
     return (
         <div className="@container flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
             <div className="flex items-start justify-between gap-3">
-                <h3 className="flex items-center gap-1.5 text-subtitle-sm font-display uppercase text-neutral-900">
+                <h2 className="flex items-center gap-1.5 text-subtitle-sm font-display uppercase text-neutral-900">
                     <MapPin className="h-4 w-4 shrink-0 text-parkea-600" aria-hidden="true" />
                     {zone.name}
-                </h3>
+                </h2>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-label font-medium ${BADGE_CLASSES[availability.state]}`}>
                     {availability.text}
                 </span>
@@ -164,6 +164,7 @@ export default function Zones() {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Zonas de parqueo | PARKEA</title>
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h1 className="text-title font-display uppercase text-neutral-900">Zonas de parqueo</h1>
