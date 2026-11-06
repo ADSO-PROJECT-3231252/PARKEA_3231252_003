@@ -86,7 +86,8 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <title>Iniciar sesión | PARKEA</title>
             <div className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200 p-8">
 
                 {/* Logo */}
@@ -225,6 +226,6 @@ export default function Login() {
                     </p>
                 </form>
             </div>
-        </div>
+        </main>
     );
 }

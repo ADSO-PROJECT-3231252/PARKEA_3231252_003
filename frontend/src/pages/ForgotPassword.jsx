@@ -57,7 +57,8 @@ export default function ForgotPassword() {
         }
     };
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <title>Recuperar contraseña | PARKEA</title>
             <div className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200 p-8">
                 <div className="flex flex-col items-center mb-6">
                     <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
@@ -157,6 +158,6 @@ hover:text-parkea-700"
                     </Link>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

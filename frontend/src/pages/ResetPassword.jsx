@@ -69,7 +69,8 @@ export default function ResetPassword() {
     // the message with the link back to phase 1.
     if (!token || tokenInvalid) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+                <title>Enlace no válido | PARKEA</title>
                 <div
                     className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200
 p-8 text-center"
@@ -87,11 +88,12 @@ p-8 text-center"
                         Solicitar nuevo enlace
                     </Link>
                 </div>
-            </div>
+            </main>
         );
     }
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <title>Crear nueva contraseña | PARKEA</title>
             <div className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200 p-8">
                 <div className="flex flex-col items-center mb-6">
                     <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
@@ -235,6 +237,6 @@ focus:ring-parkea-600 transition disabled:opacity-60"
                     <div className="h-px flex-1 bg-neutral-200" />
                 </div>
             </div>
-        </div>
+        </main>
     );
 }
