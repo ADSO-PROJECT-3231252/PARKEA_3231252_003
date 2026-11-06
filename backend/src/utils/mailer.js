@@ -22,6 +22,18 @@ async function enviarCorreoRecuperacion(destinatario, resetUrl) {
         from: remitente,
         to: destinatario,
         subject: 'Recupera tu contraseña de PARKEA',
+        // Plain-text copy for email apps that do not show HTML. Spam filters
+        // also distrust emails that only come in HTML.
+        text: [
+            'Recupera tu contraseña',
+            '',
+            'Recibimos una solicitud para restablecer tu contraseña de PARKEA.',
+            'Abre el siguiente enlace para crear una nueva contraseña. Este enlace es válido por 1 hora y solo se puede usar una vez.',
+            '',
+            resetUrl,
+            '',
+            'Si no solicitaste esto, puedes ignorar este correo con tranquilidad.',
+        ].join('\n'),
         html: `
     <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
         <h2 style="color: #1F6B4D;">Recupera tu contraseña</h2>
