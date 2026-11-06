@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
-
+// On our machines these settings point to Mailtrap; on the published site
+// they point to Resend (docs/deployment.md).
 const transporter = nodemailer.createTransport({
     host: process.env.MAILTRAP_HOST,
     port: Number(process.env.MAILTRAP_PORT),
@@ -9,9 +10,16 @@ const transporter = nodemailer.createTransport({
     },
 });
 
+// Resend only sends from the domain verified in its account, so the
+// published site sets MAIL_FROM. Mailtrap accepts any address.
+const remitente = {
+    name: 'PARKEA',
+    address: process.env.MAIL_FROM || 'no-reply@parkea.com',
+};
+
 async function enviarCorreoRecuperacion(destinatario, resetUrl) {
     await transporter.sendMail({
-        from: '"PARKEA" <no-reply@parkea.com>',
+        from: remitente,
         to: destinatario,
         subject: 'Recupera tu contraseña de PARKEA',
         html: `
