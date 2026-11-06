@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+
 // On our machines these settings point to Mailtrap; on the published site
 // they point to Resend (docs/deployment.md).
 const transporter = nodemailer.createTransport({
