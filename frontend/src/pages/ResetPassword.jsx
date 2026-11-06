@@ -75,6 +75,7 @@ export default function ResetPassword() {
                     className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200
 p-8 text-center"
                 >
+                    <h1 className="sr-only">Enlace no válido</h1>
                     <p
                         role="alert"
                         className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 mb-4"
