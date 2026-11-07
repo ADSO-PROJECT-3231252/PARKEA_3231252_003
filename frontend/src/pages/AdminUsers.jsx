@@ -41,6 +41,70 @@ const STICKY_ACTIONS = 'sm:sticky sm:right-0 sm:z-10 sm:shadow-[inset_8px_0_8px_
 
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
 
+// AC-17: role and status are always written out, not color alone.
+function RoleBadge({ role }) {
+    return role === 'admin' ? (
+        <span className="inline-block rounded-md bg-parkea-50 px-2.5 py-0.5 text-caption font-medium text-parkea-700">
+            Administrador
+        </span>
+    ) : (
+        <span className="inline-block rounded-md bg-neutral-100 px-2.5 py-0.5 text-caption font-medium text-neutral-700">
+            Usuario
+        </span>
+    );
+}
+
+function StatusBadge({ isActive }) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-caption font-medium ${isActive ? 'bg-parkea-50 text-parkea-700' : 'bg-danger-soft text-danger'}`}
+        >
+            <span
+                className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-parkea-600' : 'bg-danger'}`}
+                aria-hidden="true"
+            />
+            {isActive ? 'Activo' : 'Inactivo'}
+        </span>
+    );
+}
+
+// "Cambiar rol" button, status switch and, when the account can't be changed,
+// the reason why. `reason` is empty when the account can be changed.
+function UserActions({ user, reason, onAction }) {
+    const locked = Boolean(reason);
+    return (
+        <>
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => onAction('role', user)}
+                    disabled={locked}
+                    aria-label={`Cambiar rol de ${user.fullName}`}
+                    className="flex items-center gap-1 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-600 disabled:hover:bg-transparent"
+                >
+                    <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
+                    Cambiar rol
+                </button>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={user.isActive}
+                    aria-label={`Cuenta activa de ${user.fullName}`}
+                    onClick={() => onAction('status', user)}
+                    disabled={locked}
+                    className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${user.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-300 bg-neutral-300'}`}
+                >
+                    <span
+                        className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${user.isActive ? 'translate-x-4' : 'translate-x-0'}`}
+                        aria-hidden="true"
+                    />
+                </button>
+            </div>
+            {locked && <p className="mt-1 max-w-[190px] text-caption text-neutral-600">{reason}</p>}
+        </>
+    );
+}
+
 export default function AdminUsers() {
     const { user: currentUser } = useAuth();
 
@@ -495,63 +559,18 @@ export default function AdminUsers() {
                                                     {u.email.split('@')[0]}@<wbr />{u.email.split('@')[1]}
                                                 </td>
                                                 <td className="px-4 py-3 font-mono text-body text-neutral-600">{u.documentNumber}</td>
-                                                {/* AC-17: role and status are always written out, not color alone. */}
                                                 <td className="px-4 py-3">
-                                                    {u.role === 'admin' ? (
-                                                        <span className="inline-block rounded-md bg-parkea-50 px-2.5 py-0.5 text-caption font-medium text-parkea-700">
-                                                            Administrador
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-block rounded-md bg-neutral-100 px-2.5 py-0.5 text-caption font-medium text-neutral-700">
-                                                            Usuario
-                                                        </span>
-                                                    )}
+                                                    <RoleBadge role={u.role} />
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span
-                                                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-caption font-medium ${u.isActive ? 'bg-parkea-50 text-parkea-700' : 'bg-danger-soft text-danger'}`}
-                                                    >
-                                                        <span
-                                                            className={`h-1.5 w-1.5 rounded-full ${u.isActive ? 'bg-parkea-600' : 'bg-danger'}`}
-                                                            aria-hidden="true"
-                                                        />
-                                                        {u.isActive ? 'Activo' : 'Inactivo'}
-                                                    </span>
+                                                    <StatusBadge isActive={u.isActive} />
                                                 </td>
                                                 <td className="whitespace-nowrap px-4 py-3 font-mono text-body text-neutral-600">{formatDate(u.createdAt)}</td>
                                                 <td className="px-4 py-3 font-mono text-body tabular-nums text-neutral-900">{u.reservationCount}</td>
                                                 <td
                                                     className={`px-4 py-3 ${tableScrolls ? `${STICKY_ACTIONS} ${locked ? 'sm:bg-neutral-50' : 'sm:bg-white'}` : ''}`}
                                                 >
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openAction('role', u)}
-                                                            disabled={locked}
-                                                            aria-label={`Cambiar rol de ${u.fullName}`}
-                                                            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-600 disabled:hover:bg-transparent"
-                                                        >
-                                                            <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
-                                                            Cambiar rol
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            role="switch"
-                                                            aria-checked={u.isActive}
-                                                            aria-label={`Cuenta activa de ${u.fullName}`}
-                                                            onClick={() => openAction('status', u)}
-                                                            disabled={locked}
-                                                            className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${u.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-300 bg-neutral-300'}`}
-                                                        >
-                                                            <span
-                                                                className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${u.isActive ? 'translate-x-4' : 'translate-x-0'}`}
-                                                                aria-hidden="true"
-                                                            />
-                                                        </button>
-                                                    </div>
-                                                    {locked && (
-                                                        <p className="mt-1 max-w-[190px] text-caption text-neutral-600">{reason}</p>
-                                                    )}
+                                                    <UserActions user={u} reason={reason} onAction={openAction} />
                                                 </td>
                                             </tr>
                                         );
