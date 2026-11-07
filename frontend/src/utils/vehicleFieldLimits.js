@@ -6,4 +6,4 @@ export const MAX_LENGTH = {
     model: 50,
     color: 30,
     visualDescription: 255,
-}; 
+};
