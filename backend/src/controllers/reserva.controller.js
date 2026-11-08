@@ -2,7 +2,8 @@ const { Op } = require('sequelize');
 const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
-const { provisionalEndTime, openStayCharge } = require('../utils/stayPricing');
+const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
+const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -53,6 +54,22 @@ async function crear(req, res, next) {
             return res.status(400).json({ code: ErrorCodes.INVALID_DURATION, message: 'The reservation must last between 30 minutes and 24 hours' });
         }
 
+        // Locked until the transaction ends: if the same vehicle is booked twice
+        // at the same moment (double click, two tabs), the second request waits
+        // here and the overlap check below then sees the first reservation.
+        // It must be the first read of the transaction: in MySQL the first
+        // plain read fixes what the transaction sees, so a read before this
+        // lock would hide the reservation the other request just created.
+        const vehiculo = await Vehiculo.findOne({
+            where: { id: vehicleId, userId },
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        if (!vehiculo) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
         // HU-27 AC-12: an unpaid balance from an open stay blocks new reservations
         const saldoPendiente = await Pago.findOne({
             where: { type: 'balance', paymentStatus: 'Pending' },
@@ -62,19 +79,6 @@ async function crear(req, res, next) {
         if (saldoPendiente) {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.PENDING_BALANCE, message: 'You have a pending balance. Please pay it before making a new reservation' });
-        }
-
-        // Locked until the transaction ends: if the same vehicle is booked twice
-        // at the same moment (double click, two tabs), the second request waits
-        // here and the overlap check below then sees the first reservation
-        const vehiculo = await Vehiculo.findOne({
-            where: { id: vehicleId, userId },
-            transaction: t,
-            lock: t.LOCK.UPDATE,
-        });
-        if (!vehiculo) {
-            await t.rollback();
-            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
         // Reject if this vehicle already has a Pending/Active reservation
@@ -157,6 +161,8 @@ async function crear(req, res, next) {
 // entry it costs the first hour; while it runs, the started hours so far
 // (AC-13, never the price of 24 hours); once finished, the final charge.
 // `paid` adds the approved payments and `pendingBalance` is what is still owed.
+// HU-28: a reservation switched to an open stay may have paid more than the
+// first hour, so the charge counts what it really paid before the balance.
 function resumenEstadiaAbierta(reserva, pagos, ahora = new Date()) {
     const lista = pagos || [];
     const pagado = lista
@@ -164,14 +170,15 @@ function resumenEstadiaAbierta(reserva, pagos, ahora = new Date()) {
         .reduce((suma, p) => suma + Number(p.amount), 0);
     const saldo = lista.find((p) => p.type === 'balance' && p.paymentStatus === 'Pending');
     const empezo = new Date(reserva.startTime) <= ahora;
+    const pagadoAntes = paidBeforeBalance(reserva, lista);
 
     let cobro;
     if (reserva.status === 'Finished') {
-        cobro = openStayCharge(reserva, reserva.endTime);
+        cobro = openStayCharge(reserva, reserva.endTime, pagadoAntes);
     } else if (reserva.status === 'Active' && empezo) {
-        cobro = openStayCharge(reserva, ahora);
+        cobro = openStayCharge(reserva, ahora, pagadoAntes);
     } else {
-        cobro = openStayCharge(reserva, reserva.startTime);
+        cobro = openStayCharge(reserva, reserva.startTime, pagadoAntes);
     }
 
     return {
@@ -181,6 +188,19 @@ function resumenEstadiaAbierta(reserva, pagos, ahora = new Date()) {
         total: cobro.total,
         paid: Number(pagado.toFixed(2)),
         pendingBalance: saldo ? Number(saldo.amount) : 0,
+    };
+}
+
+// HU-28 AC-09: what a reservation was charged before its balance: the initial
+// payment and its extensions, also when they were refunded by a cancellation
+// (the history keeps showing what was paid). `extensions` counts the approved
+// extensions.
+function resumenPagos(pagos = []) {
+    const cobrados = pagos.filter((p) => p.type !== 'balance' && ['Paid', 'Refunded'].includes(p.paymentStatus));
+    const total = cobrados.reduce((suma, p) => suma + Number(p.amount), 0);
+    return {
+        paidTotal: Number(total.toFixed(2)),
+        extensions: cobrados.filter((p) => p.type === 'extension').length,
     };
 }
 
@@ -214,6 +234,7 @@ async function obtenerConfirmacion(req, res, next) {
             ? Number(Number(reserva.appliedHourlyRate).toFixed(2))
             : Number((durationHours * Number(reserva.appliedHourlyRate)).toFixed(2));
         const duracionMostrada = sinSalidaAun ? null : Number(durationHours.toFixed(2));
+        const pagos = resumenPagos(reserva.payments);
 
         return res.status(200).json({
             reservation: {
@@ -247,6 +268,9 @@ async function obtenerConfirmacion(req, res, next) {
                     hourlyRate: Number(reserva.appliedHourlyRate),
                     durationHours: reserva.openEnded ? 1 : duracionMostrada,
                     estimatedTotal,
+                    // HU-28 AC-09: what was paid, extensions included
+                    paidTotal: pagos.paidTotal,
+                    extensions: pagos.extensions,
                 },
             },
         });
@@ -296,11 +320,12 @@ async function cancelar(req, res, next) {
         const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ status: 'Cancelled' }, { transaction: t });
-        // Only the initial payment is refunded: before the entry an open stay
-        // has paid just its first hour (HU-27 AC-14)
-        const pagoInicial = reserva.payments.find((p) => p.type === 'initial');
-        if (pagoInicial && pagoInicial.paymentStatus === 'Paid') {
-            await pagoInicial.update({ paymentStatus: 'Refunded' }, { transaction: t });
+        // Before the entry, what was paid is refunded: the initial payment and
+        // any extension paid in advance (HU-27 AC-14, HU-28). A balance only
+        // exists after the stay ends, so there is none here.
+        const reembolsables = reserva.payments.filter((p) => ['initial', 'extension'].includes(p.type) && p.paymentStatus === 'Paid');
+        for (const pago of reembolsables) {
+            await pago.update({ paymentStatus: 'Refunded' }, { transaction: t });
         }
         await t.commit();
         return res.status(200).json({ message: 'Reservation cancelled successfully' });
@@ -343,7 +368,10 @@ async function terminar(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.STAY_NOT_STARTED, message: 'This stay has not started yet' });
         }
 
-        const cobro = openStayCharge(reserva, ahora);
+        // HU-28: what was paid before (the first hour, or more for a
+        // reservation switched to an open stay) is subtracted from the charge
+        const pagos = await Pago.findAll({ where: { reservationId: reserva.id }, transaction: t });
+        const cobro = openStayCharge(reserva, ahora, paidBeforeBalance(reserva, pagos));
         // AC-06: the user confirmed the amount shown in the dialog. If another
         // hour started in the meantime, nothing is charged and the new amount
         // is sent back so it can be confirmed again.
@@ -352,7 +380,7 @@ async function terminar(req, res, next) {
             return res.status(409).json({
                 code: ErrorCodes.STAY_AMOUNT_CHANGED,
                 message: 'Another hour started while confirming. Please check the new amount',
-                charge: { usedMinutes: cobro.usedMinutes, chargedHours: cobro.chargedHours, total: cobro.total, balance: cobro.balance },
+                charge: { usedMinutes: cobro.usedMinutes, chargedHours: cobro.chargedHours, total: cobro.total, paid: cobro.paid, balance: cobro.balance },
             });
         }
 
@@ -367,7 +395,7 @@ async function terminar(req, res, next) {
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ endTime: cobro.endTime, status: 'Finished' }, { transaction: t });
 
-        // AC-07/AC-08: the first hour is already paid; under one hour nothing is owed
+        // AC-07/AC-08: what was paid is subtracted; under one hour nothing is owed
         if (cobro.balance > 0) {
             await Pago.create({
                 reservationId: reserva.id,
@@ -385,9 +413,137 @@ async function terminar(req, res, next) {
                 usedMinutes: cobro.usedMinutes,
                 chargedHours: cobro.chargedHours,
                 total: cobro.total,
-                paid: cobro.firstHour,
+                paid: cobro.paid,
                 balance: cobro.balance,
             },
+        });
+    } catch (error) {
+        await t.rollback();
+        next(error);
+    }
+}
+
+// HU-28: Extend a stay. Either a later exit time, paid at that moment
+// (AC-06), or a switch to an open stay, paid when it ends (AC-07).
+// PATCH /api/reservations/:id/extend
+// { fromEndTime, newEndTime, paymentMethod, cardLastFour } or { fromEndTime, openEnded: true }
+async function ampliar(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+        const { fromEndTime, newEndTime, openEnded } = req.body;
+        const aTiempoIndefinido = openEnded === true;
+
+        // Locked: two extensions at the same time (double click, two tabs)
+        // would otherwise both start from the same exit time and both be paid
+        const reserva = await Reserva.findOne({
+            where: { id, userId },
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        if (!reserva) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
+        }
+        // AC-01: only a paid reservation that has not ended
+        if (reserva.status !== 'Active') {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.STAY_NOT_ACTIVE, message: `A reservation with status "${reserva.status}" cannot be extended` });
+        }
+        if (reserva.openEnded) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.ALREADY_OPEN_STAY, message: 'This reservation has no exit time; finish it when you leave' });
+        }
+        const ahora = new Date();
+        const salidaActual = new Date(reserva.endTime);
+        if (salidaActual <= ahora) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.EXIT_TIME_PASSED, message: 'The exit time of this reservation has already passed' });
+        }
+        // The exit time the user saw. If it changed in the meantime (another
+        // tab extended it), nothing is charged and the current one is sent back.
+        if (new Date(fromEndTime).getTime() !== salidaActual.getTime()) {
+            await t.rollback();
+            return res.status(409).json({
+                code: ErrorCodes.RESERVATION_CHANGED,
+                message: 'This reservation changed while you were extending it. Please check it again',
+                reservation: { endTime: reserva.endTime, openEnded: reserva.openEnded },
+            });
+        }
+
+        const inicio = new Date(reserva.startTime);
+        // AC-07: an open stay keeps entry + 24 h as its provisional exit time
+        const salidaNueva = aTiempoIndefinido ? provisionalEndTime(inicio) : new Date(newEndTime);
+        if (!aTiempoIndefinido && salidaNueva <= salidaActual) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.EXTENSION_NOT_LATER, message: 'The new exit time must be later than the current one' });
+        }
+        // AC-03: never more than 24 hours from the entry
+        if (salidaNueva - inicio > DURACION_MAX_MS) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.EXTENSION_TOO_LONG, message: 'The stay cannot last more than 24 hours from the entry' });
+        }
+
+        let cobro = null;
+        if (!aTiempoIndefinido) {
+            const errorMetodo = validarMetodoPago(req.body);
+            if (errorMetodo) {
+                await t.rollback();
+                return res.status(errorMetodo.status).json(errorMetodo.body);
+            }
+        }
+
+        // AC-04: the same vehicle cannot have another reservation in the
+        // added time. The vehicle row is locked like when a reservation is
+        // created, so a new reservation for it waits until this one ends.
+        await Vehiculo.findOne({
+            where: { id: reserva.vehicleId },
+            paranoid: false,
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        const solapada = await Reserva.findOne({
+            where: {
+                id: { [Op.ne]: reserva.id },
+                vehicleId: reserva.vehicleId,
+                status: ['Pending', 'Active'],
+                startTime: { [Op.lt]: salidaNueva },
+                endTime: { [Op.gt]: salidaActual },
+            },
+            transaction: t,
+        });
+        if (solapada) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
+        }
+
+        if (!aTiempoIndefinido) {
+            // AC-06: the new exit time is saved only if the payment is approved
+            if (esRechazado(req.body)) {
+                await t.rollback();
+                return res.status(402).json(RECHAZADO);
+            }
+            cobro = extensionCharge(reserva, salidaActual, salidaNueva);
+            await Pago.create({
+                reservationId: reserva.id,
+                amount: cobro.amount,
+                paymentStatus: 'Paid',
+                paymentMethod: req.body.paymentMethod,
+                cardLastFour: req.body.paymentMethod === 'card' ? req.body.cardLastFour : null,
+                paidAt: new Date(),
+                type: 'extension',
+            }, { transaction: t });
+        }
+
+        // AC-05: the same spot; it stays Occupied until the stay ends
+        await reserva.update({ endTime: salidaNueva, openEnded: aTiempoIndefinido }, { transaction: t });
+        await t.commit();
+
+        return res.status(200).json({
+            message: aTiempoIndefinido ? 'The reservation is now an open stay' : 'Stay extended successfully',
+            reservation: { id: reserva.id, endTime: aTiempoIndefinido ? null : salidaNueva, openEnded: aTiempoIndefinido },
+            charge: cobro,
         });
     } catch (error) {
         await t.rollback();
@@ -429,6 +585,8 @@ async function misReservas(req, res, next) {
         const reservations = rows.map((r) => {
             const pagoInicial = r.payments.find((p) => p.type === 'initial');
             const yaTienePago = pagoInicial && ['Paid', 'Refunded'].includes(pagoInicial.paymentStatus);
+            // HU-28 AC-09: the initial payment plus its extensions
+            const pagos = resumenPagos(r.payments);
 
             let amount;
             let amountType;
@@ -439,11 +597,16 @@ async function misReservas(req, res, next) {
                 amount = openStay.total;
                 if (r.status === 'Active' && openStay.started) {
                     amountType = 'so_far';
+                } else if (yaTienePago) {
+                    amountType = 'paid';
+                    // Before the entry (or cancelled), what it paid: the first
+                    // hour, or more if it was switched to an open stay (HU-28)
+                    if (r.status !== 'Finished') amount = Math.max(pagos.paidTotal, openStay.total);
                 } else {
-                    amountType = yaTienePago ? 'paid' : 'estimated';
+                    amountType = 'estimated';
                 }
             } else if (yaTienePago) {
-                amount = Number(pagoInicial.amount);
+                amount = pagos.paidTotal;
                 amountType = 'paid';
             } else {
                 const horas = (new Date(r.endTime) - new Date(r.startTime)) / (1000 * 60 * 60);
@@ -464,6 +627,7 @@ async function misReservas(req, res, next) {
                 vehicle: r.vehicle,
                 amount,
                 amountType,
+                extensions: pagos.extensions,
                 appliedHourlyRate: Number(r.appliedHourlyRate),
                 paymentStatus: pagoInicial ? pagoInicial.paymentStatus : 'Pending',
             };
@@ -483,4 +647,4 @@ async function misReservas(req, res, next) {
     }
 }
 
-module.exports = { crear, obtenerConfirmacion, cancelar, terminar, misReservas };
+module.exports = { crear, obtenerConfirmacion, cancelar, terminar, ampliar, misReservas };

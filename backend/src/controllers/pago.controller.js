@@ -1,32 +1,7 @@
 const { Pago, Reserva } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
-
-const DECLINED_TEST_CARD = '0002'; // simulated decline test card
-
-// Checks the payment method and, for a card, its last 4 digits. Returns the
-// error to answer, or null when they are valid (HU-17, also used to pay the
-// balance of an open stay, HU-27).
-function validarMetodoPago({ paymentMethod, cardLastFour }) {
-  if (!paymentMethod || !['card', 'pse'].includes(paymentMethod)) {
-    return { status: 400, body: { code: ErrorCodes.INVALID_PAYMENT_METHOD, message: 'Invalid payment method' } };
-  }
-  if (paymentMethod === 'card') {
-    // Only text: a list or a number would pass the regular expression below
-    if (typeof cardLastFour !== 'string' || !/^\d{4}$/.test(cardLastFour)) {
-      return { status: 400, body: { code: ErrorCodes.CARD_DIGITS_REQUIRED, message: 'The last 4 digits of the card are required' } };
-    }
-  }
-  return null;
-}
-
-// Simulated decline: a reserved test card number always fails (HU-17, AC-11)
-const esRechazado = ({ paymentMethod, cardLastFour }) => paymentMethod === 'card' && cardLastFour === DECLINED_TEST_CARD;
-
-const RECHAZADO = {
-  code: ErrorCodes.PAYMENT_DECLINED,
-  message: 'Payment declined. Please try another payment method.',
-};
+const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 
 // POST /api/payments/:reservationId
 const crearPago = async (req, res) => {
