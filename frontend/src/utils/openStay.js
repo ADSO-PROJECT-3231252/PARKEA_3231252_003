@@ -6,20 +6,37 @@
 const HOUR_MS = 60 * 60 * 1000;
 export const MAX_OPEN_STAY_MS = 24 * HOUR_MS;
 
-// What the stay costs if it ends at `nowMs`.
-export function openStayCharge(startIso, hourlyRate, nowMs) {
+const money = (value) => Math.round(value * 100) / 100;
+
+// What the stay costs if it ends at `nowMs`. `paid` is what it paid before
+// it ends: the first hour for a stay booked without an exit time, or more (or
+// less) for a reservation switched to an open stay (HU-28). What was paid is
+// never refunded, so the total is at least `paid`.
+export function openStayCharge(startIso, hourlyRate, nowMs, paid = Number(hourlyRate)) {
     const startMs = new Date(startIso).getTime();
     const usedMs = Math.min(Math.max(0, nowMs - startMs), MAX_OPEN_STAY_MS);
     const chargedHours = Math.max(1, Math.ceil(usedMs / HOUR_MS));
-    const rate = Number(hourlyRate);
-    const total = Math.round(chargedHours * rate * 100) / 100;
+    const total = Math.max(money(chargedHours * Number(hourlyRate)), money(paid));
     return {
         usedMinutes: Math.floor(usedMs / 60000),
         chargedHours,
         total,
-        balance: Math.round((total - rate) * 100) / 100,
+        paid: money(paid),
+        balance: money(total - paid),
     };
 }
+
+// HU-28: what an open stay paid before it ends, the same rule as the
+// backend's paidBeforeBalance: the payments approved so far, or the first
+// hour when there are none.
+export const paidBeforeEnd = (reservation, hourlyRate) => {
+    const paid = Number(reservation?.openStay?.paid ?? 0);
+    return paid > 0 ? paid : Number(hourlyRate);
+};
+
+// True when what was paid is just the first hour (a stay booked without an
+// exit time), so the screens can keep saying "la primera hora".
+export const paidOnlyFirstHour = (paid, hourlyRate) => Math.abs(paid - Number(hourlyRate)) < 0.005;
 
 // The time used so far never goes past 24 hours: right after that, the
 // backend job ends the stay by itself (AC-10).

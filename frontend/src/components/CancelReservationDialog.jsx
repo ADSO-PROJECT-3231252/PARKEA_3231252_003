@@ -40,6 +40,9 @@ export default function CancelReservationDialog({ reservation, onClose, onCancel
     const range = reservation ? formatRange(reservation.startTime, reservation.endTime) : '';
     // An Active reservation is always a paid one (HU-17 sets it).
     const isPaid = reservation?.status === 'Active';
+    // HU-28: the extensions paid are refunded too. The booking history and
+    // the confirmation send the count in different places.
+    const hasExtensions = (reservation?.extensions ?? reservation?.paymentSummary?.extensions ?? 0) > 0;
 
     const handleClose = () => {
         if (cancelling) return;
@@ -59,7 +62,8 @@ export default function CancelReservationDialog({ reservation, onClose, onCancel
                 // AC-06: reservation ID, zone and the freed time range.
                 onCancelled(
                     `Reserva ${code} cancelada. Se liberó tu cupo en ${zoneName} (${range}).` +
-                        (isPaid ? ' El pago se reembolsó (simulado).' : '')
+                        (isPaid && hasExtensions ? ' El pago y sus ampliaciones se reembolsaron (simulado).' : '') +
+                        (isPaid && !hasExtensions ? ' El pago se reembolsó (simulado).' : '')
                 );
             })
             .catch((err) => {
@@ -82,7 +86,8 @@ export default function CancelReservationDialog({ reservation, onClose, onCancel
                 reservation
                     ? `¿Estás seguro de que deseas cancelar esta reserva? Reserva ${code} en ` +
                       `${zoneName} (${range}). El cupo quedará libre para otros usuarios.` +
-                      (isPaid ? ' El pago se reembolsará (simulado).' : '')
+                      (isPaid && hasExtensions ? ' El pago y sus ampliaciones se reembolsarán (simulado).' : '') +
+                      (isPaid && !hasExtensions ? ' El pago se reembolsará (simulado).' : '')
                     : ''
             }
             confirmLabel="Cancelar reserva"

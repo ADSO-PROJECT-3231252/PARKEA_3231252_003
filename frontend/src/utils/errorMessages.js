@@ -60,6 +60,11 @@ const errorMessages = {
     STAY_NOT_STARTED: 'Tu estadía todavía no ha comenzado',
     STAY_NOT_ACTIVE: 'Esta estadía ya no está activa',
     STAY_AMOUNT_CHANGED: 'Empezó otra hora mientras confirmabas. Revisa el nuevo valor y confirma de nuevo',
+    ALREADY_OPEN_STAY: 'Esta reserva ya está en tiempo indefinido. Termínala cuando salgas',
+    EXIT_TIME_PASSED: 'La hora de salida de esta reserva ya pasó, así que no se puede ampliar',
+    EXTENSION_NOT_LATER: 'La nueva hora de salida debe ser posterior a la actual',
+    EXTENSION_TOO_LONG: 'La estadía no puede durar más de 24 horas desde la entrada',
+    RESERVATION_CHANGED: 'Esta reserva cambió mientras la ampliabas, por ejemplo desde otra pestaña. No se cobró nada en este intento. Revisa la reserva e intenta de nuevo',
 
     // Payments
     INVALID_PAYMENT_METHOD: 'Método de pago inválido',

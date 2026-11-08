@@ -61,3 +61,7 @@ export function formatDateTime(isoString) {
     const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     return `${fecha} ${hora}`;
 }
+
+// A time or an amount inside a sentence ("03:00 p. m.", "$ 2.500"), with its
+// spaces made non-breaking so a line never splits it (HU-28 dialogs).
+export const keepTogether = (text) => String(text).replace(/ /g, '\u00a0');
