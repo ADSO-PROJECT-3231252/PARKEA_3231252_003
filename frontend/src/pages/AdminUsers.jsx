@@ -532,7 +532,7 @@ export default function AdminUsers() {
 
                 {!loading && !error && users.length > 0 && (
                     <>
-                        {/* AC-01: table on computers */}
+                        {/* AC-03: table on computers */}
                         <div ref={watchTableWidth} className="hidden overflow-x-auto lg:block">
                             <table className="w-full min-w-[900px] border-collapse text-left">
                                 <thead>
@@ -586,7 +586,7 @@ export default function AdminUsers() {
                             </table>
                         </div>
 
-                        {/* AC-15: one card per user on phones and tablets */}
+                        {/* AC-18: one card per user on phones and tablets */}
                         <ul className="divide-y divide-neutral-100 lg:hidden">
                             {users.map((u) => (
                                 <li key={u.id} className="flex flex-col gap-3 p-4">
