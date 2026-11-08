@@ -24,6 +24,18 @@ function coordenadasValidas(lat, lng) {
   );
 }
 
+// Rectangle that covers Colombia, San Andrés and Leticia included (audit of
+// Oct 20, 2026). It also takes in small border areas of the neighboring
+// countries, which is accepted. A point on an edge counts as inside.
+const COLOMBIA_BOUNDS = { minLat: -4.3, maxLat: 13.5, minLng: -82, maxLng: -66.8 };
+
+function dentroDeColombia(lat, lng) {
+  return (
+    lat >= COLOMBIA_BOUNDS.minLat && lat <= COLOMBIA_BOUNDS.maxLat &&
+    lng >= COLOMBIA_BOUNDS.minLng && lng <= COLOMBIA_BOUNDS.maxLng
+  );
+}
+
 // Upper limit so a typo (e.g. 50000 instead of 50) can't create thousands of
 // parking spots in a single request
 const MAX_TOTAL_SLOTS = 500;
@@ -64,6 +76,9 @@ function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRat
   }
   if (!coordenadasValidas(latitude, longitude)) {
     return { status: 400, body: { code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' } };
+  }
+  if (!dentroDeColombia(latitude, longitude)) {
+    return { status: 400, body: { code: ErrorCodes.COORDINATES_OUTSIDE_COLOMBIA, message: `latitude must be between ${COLOMBIA_BOUNDS.minLat} and ${COLOMBIA_BOUNDS.maxLat}, and longitude between ${COLOMBIA_BOUNDS.minLng} and ${COLOMBIA_BOUNDS.maxLng} (Colombia)` } };
   }
   return null;
 }
