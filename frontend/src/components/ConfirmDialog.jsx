@@ -17,10 +17,21 @@ export default function ConfirmDialog({
     confirming = false,
     variant = 'default', // 'default' | 'danger'
     error = '',
+    confirmDisabled = false,
+    // HU-28: optional content under the message, such as a field to choose from
+    children = null,
 }) {
     const dialogRef = useRef(null);
     const cancelButtonRef = useRef(null);
     const previouslyFocusedRef = useRef(null);
+    // The latest onCancel. The parent creates a new function on every render,
+    // and the effect below must not run again because of it: that would move
+    // the focus back to the cancel button while the user is choosing an option.
+    const onCancelRef = useRef(onCancel);
+
+    useEffect(() => {
+        onCancelRef.current = onCancel;
+    });
 
     useEffect(() => {
         if (!open) return;
@@ -34,7 +45,7 @@ export default function ConfirmDialog({
 
         function handleKeyDown(event) {
             if (event.key === 'Escape') {
-                if (!confirming) onCancel();
+                if (!confirming) onCancelRef.current();
                 return;
             }
             if (event.key !== 'Tab') return;
@@ -61,7 +72,7 @@ export default function ConfirmDialog({
             document.removeEventListener('keydown', handleKeyDown);
             previouslyFocusedRef.current?.focus();
         };
-    }, [open, confirming, onCancel]);
+    }, [open, confirming]);
 
     if (!open) return null;
 
@@ -80,7 +91,9 @@ export default function ConfirmDialog({
                 aria-modal="true"
                 aria-labelledby="confirm-dialog-title"
                 aria-describedby="confirm-dialog-message"
-                className="relative w-full max-w-sm rounded-lg bg-white p-6 shadow-lg"
+                // Never taller than the screen (a phone held sideways): the
+                // content scrolls inside, so the title and buttons stay reachable.
+                className="relative max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto overscroll-contain rounded-lg bg-white p-6 shadow-lg"
             >
                 <div className="flex items-start gap-3">
                     {variant === 'danger' && (
@@ -106,6 +119,8 @@ export default function ConfirmDialog({
                         </p>
                     </div>
                 </div>
+
+                {children && <div className="mt-4">{children}</div>}
 
                 {error && (
                     <p
@@ -135,7 +150,7 @@ export default function ConfirmDialog({
                     <button
                         type="button"
                         onClick={onConfirm}
-                        disabled={confirming}
+                        disabled={confirming || confirmDisabled}
                         className={`whitespace-nowrap rounded-md border border-transparent px-4 py-2 text-label font-medium text-white
                             transition-colors disabled:cursor-not-allowed
                             disabled:opacity-60 ${
