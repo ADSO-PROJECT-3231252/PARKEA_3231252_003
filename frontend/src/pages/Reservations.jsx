@@ -13,13 +13,16 @@ import {
     CheckCircle2,
     Flag,
     Wallet,
+    ClockPlus,
 } from 'lucide-react';
 import { getReservations } from '../services/reservationService';
 import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
+import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
 import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
+import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
 // done by the backend: GET /reservations?status=&page=&limit=
@@ -109,12 +112,18 @@ function amountLabel(reservation, pendingBalance) {
     return reservation.amountType === 'paid' ? 'Pagado' : 'Estimado';
 }
 function AmountInfo({ reservation }) {
-    const { amount, appliedHourlyRate } = reservation;
+    const { amount, appliedHourlyRate, extensions = 0 } = reservation;
     const pendingBalance = pendingBalanceOf(reservation);
     return (
         <div>
             <p className="text-caption text-neutral-600">{amountLabel(reservation, pendingBalance)}</p>
             <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(amount)}</p>
+            {/* HU-28 AC-09: the amount paid includes the extensions */}
+            {extensions > 0 && (
+                <p className="text-caption text-neutral-600">
+                    Incluye {extensions === 1 ? '1 ampliación' : `${extensions} ampliaciones`}
+                </p>
+            )}
             {pendingBalance > 0 && (
                 <p className="text-caption font-medium text-warning">
                     Saldo pendiente: <span className="whitespace-nowrap font-mono">{formatCurrency(pendingBalance)}</span>
@@ -143,10 +152,11 @@ function StatusInfo({ reservation }) {
         </div>
     );
 }
-function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, inline = false }) {
+function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, onExtend, inline = false }) {
     const isPending = reservation.status === 'Pending';
     const canCancel = canCancelReservation(reservation, now);
     const canFinish = canFinishStay(reservation, now);
+    const canExtend = canExtendStay(reservation, now);
     const hasBalance = pendingBalanceOf(reservation) > 0;
     // Used in aria-labels so a screen reader announces which reservation each
     // repeated action belongs to (AC-13, WCAG 2.1 AA).
@@ -194,6 +204,18 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                 >
                     <Wallet className="h-3.5 w-3.5" aria-hidden="true" />
                     Pagar saldo
+                </button>
+            )}
+            {/* HU-28 AC-01: paid, with an exit time that has not been reached */}
+            {canExtend && (
+                <button
+                    type="button"
+                    onClick={() => onExtend(reservation)}
+                    aria-label={`Ampliar la estadía de la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <ClockPlus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Ampliar estadía
                 </button>
             )}
             {/* HU-16 AC-01: Pending or Active (already paid) reservations that have not started. */}
@@ -282,6 +304,8 @@ export default function Reservations() {
     // after either action (HU-16 AC-06, HU-27 AC-09).
     const [cancelTarget, setCancelTarget] = useState(null);
     const [finishTarget, setFinishTarget] = useState(null);
+    // HU-28: the stay in the extend dialog and when it was opened.
+    const [extendTarget, setExtendTarget] = useState(null);
     const [resultMessage, setResultMessage] = useState('');
     const resultMessageRef = useRef(null);
     useEffect(() => {
@@ -313,6 +337,21 @@ export default function Reservations() {
             active = false;
         };
     }, [statusFilter, page, reloadKey]);
+    // HU-28 AC-01: "Ampliar estadía" is offered until the exit time, so the
+    // list updates itself when the next exit time on screen is reached. A
+    // timer cannot wait more than about 24 days, so a longer wait is done in
+    // steps (each step updates `now`, which schedules the next one).
+    const nextExitMs = reservations
+        .filter((r) => r.status === 'Active' && !r.openEnded && r.endTime)
+        .map((r) => new Date(r.endTime).getTime())
+        .filter((ms) => now !== null && ms > now)
+        .reduce((min, ms) => Math.min(min, ms), Infinity);
+    useEffect(() => {
+        if (nextExitMs === Infinity) return;
+        const delay = Math.max(0, nextExitMs - Date.now());
+        const timer = setTimeout(() => setNow(Date.now()), Math.min(delay + 100, MAX_TIMER_MS));
+        return () => clearTimeout(timer);
+    }, [nextExitMs, now]);
     // Every change that triggers a new fetch shows the loading state first; it's
     // set here, in the event, rather than inside the effect.
     const startLoading = () => {
@@ -361,6 +400,18 @@ export default function Reservations() {
     };
     const handleFinished = (message) => {
         setFinishTarget(null);
+        setResultMessage(message);
+        setReloadKey((k) => k + 1);
+    };
+    // HU-28: a later exit time goes to the payment screen; switching to an
+    // open stay reloads the list, where the stay shows without an exit time.
+    const handleExtend = (reservation) => setExtendTarget({ reservation, openedAt: Date.now() });
+    const handleExtendClose = ({ stale }) => {
+        setExtendTarget(null);
+        if (stale) setReloadKey((k) => k + 1);
+    };
+    const handleExtended = (message) => {
+        setExtendTarget(null);
         setResultMessage(message);
         setReloadKey((k) => k + 1);
     };
@@ -580,6 +631,7 @@ text-neutral-900"
                                                     onPay={handlePay}
                                                     onCancel={handleCancel}
                                                     onFinish={handleFinish}
+                                                    onExtend={handleExtend}
                                                 />
                                             </td>
                                         </tr>
@@ -616,6 +668,7 @@ p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
                                             onPay={handlePay}
                                             onCancel={handleCancel}
                                             onFinish={handleFinish}
+                                            onExtend={handleExtend}
                                             inline
                                         />
                                     </div>
@@ -693,6 +746,16 @@ text-center text-caption font-medium text-white"
                     openedAt={finishTarget.openedAt}
                     onClose={handleFinishClose}
                     onFinished={handleFinished}
+                />
+            )}
+            {extendTarget && (
+                <ExtendStayDialog
+                    reservation={extendTarget.reservation}
+                    hourlyRate={extendTarget.reservation.appliedHourlyRate}
+                    paid={extendTarget.reservation.amount}
+                    openedAt={extendTarget.openedAt}
+                    onClose={handleExtendClose}
+                    onExtended={handleExtended}
                 />
             )}
         </div>
