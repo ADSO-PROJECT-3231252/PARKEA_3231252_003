@@ -610,6 +610,14 @@ export default function AdminUsers() {
                                                 <RoleBadge role={u.role} />
                                             </dd>
                                         </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Fecha de registro</dt>
+                                            <dd className="font-mono text-body text-neutral-900">{formatDate(u.createdAt)}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">N.º de reservas</dt>
+                                            <dd className="font-mono text-body tabular-nums text-neutral-900">{u.reservationCount}</dd>
+                                        </div>
                                     </dl>
                                     <UserActions
                                         user={u}
