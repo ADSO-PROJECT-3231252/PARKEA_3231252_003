@@ -640,7 +640,7 @@ export default function AdminUsers() {
                                     onClick={() => goToPage(1)}
                                     disabled={page === 1}
                                     aria-label="Primera página"
-                                    className={pageButton}
+                                    className={`${pageButton} max-sm:hidden`}
                                 >
                                     <ChevronsLeft className="h-4 w-4" aria-hidden="true" />
                                 </button>
@@ -685,7 +685,7 @@ export default function AdminUsers() {
                                     onClick={() => goToPage(pagination.totalPages)}
                                     disabled={page === pagination.totalPages}
                                     aria-label="Última página"
-                                    className={pageButton}
+                                    className={`${pageButton} max-sm:hidden`}
                                 >
                                     <ChevronsRight className="h-4 w-4" aria-hidden="true" />
                                 </button>
