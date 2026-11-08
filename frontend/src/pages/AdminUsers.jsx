@@ -77,7 +77,7 @@ function UserName({ user }) {
             >
                 {getInitials(user.fullName)}
             </span>
-            <span className="break-words text-body font-medium text-neutral-900">{user.fullName}</span>
+            <span className="min-w-0 break-words text-body font-medium text-neutral-900">{user.fullName}</span>
         </div>
     );
 }
@@ -626,7 +626,7 @@ export default function AdminUsers() {
                             <p className="text-caption text-neutral-600">
                                 Mostrando {rangeStart} a {rangeEnd} de {pagination.total} usuarios
                             </p>
-                            <nav aria-label="Paginación de usuarios" className="flex items-center gap-1">
+                            <nav aria-label="Paginación de usuarios" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
                                     onClick={() => goToPage(1)}
@@ -653,12 +653,12 @@ export default function AdminUsers() {
                                             onClick={() => goToPage(item)}
                                             aria-label={`Página ${item}`}
                                             aria-current={item === page ? 'page' : undefined}
-                                            className={`flex h-7 w-7 items-center justify-center rounded-md text-label transition-colors ${item === page ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
+                                            className={`flex h-7 w-6 items-center justify-center rounded-md text-label transition-colors sm:w-7 ${item === page ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
                                         >
                                             {item}
                                         </button>
                                     ) : (
-                                        <span key={item} className="px-1 text-neutral-600" aria-hidden="true">
+                                        <span key={item} className="px-0.5 text-neutral-600 sm:px-1" aria-hidden="true">
                                             …
                                         </span>
                                     ),
