@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Navigate, useNavigate, useParams, Link } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useSearchParams, Link } from 'react-router-dom';
 import {
     AlertCircle,
     ArrowLeft,
@@ -14,12 +14,13 @@ import {
     RefreshCw,
     TriangleAlert,
 } from 'lucide-react';
-import { getReservation } from '../services/reservationService';
+import { extendStay, getReservation } from '../services/reservationService';
 import { payBalance, payReservation } from '../services/paymentService';
 import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
 import { translateError } from '../utils/errorMessages';
 import { RESERVATION_STATUS } from '../utils/reservationStatus';
 import { hoursLabel, pendingBalanceOf } from '../utils/openStay';
+import { EXTEND_FINAL_CODES, extendErrorMessage, extensionCharge, extensionProblem } from '../utils/extendStay';
 
 // Values the backend expects in paymentMethod (pago.controller.js).
 const METHOD_CARD = 'card';
@@ -182,9 +183,43 @@ function ProcessingOverlay({ amount }) {
     );
 }
 
+// Shown instead of the form when there is nothing to pay on this screen (the
+// reason in `text`), with a way back to the reservation.
+function NothingToPay({ reservation, text }) {
+    return (
+        <div className={PAGE_SHELL}>
+            <title>Pago de reserva | PARKEA</title>
+            <h1 className="sr-only">Pago de reserva</h1>
+            <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
+                <p className="flex items-center gap-2 text-body text-neutral-900">
+                    <Info className="h-4 w-4 shrink-0 text-info" aria-hidden="true" />
+                    {text}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                    <Link to={`/reservations/${reservation.id}`} className={OUTLINE_BUTTON_SM}>
+                        Ver la reserva
+                    </Link>
+                    {/* HU-26 AC-06: an expired reservation can only be booked again */}
+                    {reservation.status === 'Expired' && (
+                        <Link to="/zones" className={OUTLINE_BUTTON_SM}>
+                            Ver zonas disponibles
+                        </Link>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function PayReservation() {
     const { id } = useParams();
     const navigate = useNavigate();
+    // HU-28: "Ampliar estadía" opens this screen with the new exit time and
+    // the exit time the user saw (?extendTo=&from=).
+    const [searchParams] = useSearchParams();
+    const extendTo = searchParams.get('extendTo');
+    const extendFrom = searchParams.get('from');
+    const isExtension = extendTo !== null;
 
     const [reservation, setReservation] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -202,6 +237,8 @@ export default function PayReservation() {
     const [processing, setProcessing] = useState(false);
     const [approved, setApproved] = useState(false);
     const [expiredByServer, setExpiredByServer] = useState(false);
+    // HU-28: the extension can no longer go on (see EXTEND_FINAL_CODES).
+    const [extendBlocked, setExtendBlocked] = useState(false);
     const [message, setMessage] = useState(null); // { type: 'error' | 'success', text }
     const messageRef = useRef(null);
     const expiredRef = useRef(null);
@@ -327,55 +364,47 @@ export default function PayReservation() {
     // HU-27 AC-07: an open stay that ended owing more than its first hour.
     // The same screen pays that balance.
     const pendingBalance = pendingBalanceOf(reservation);
-    const isBalance = reservation.status === 'Finished' && pendingBalance > 0;
+    const isBalance = !isExtension && reservation.status === 'Finished' && pendingBalance > 0;
+
+    // HU-28: the stay must still be extendable to the chosen time, from the
+    // exit time the user saw. The backend checks it again when paying.
+    const extendProblem = isExtension && !approved ? extensionProblem(reservation, extendFrom, extendTo, now) : null;
+    if (extendProblem) {
+        return <NothingToPay reservation={reservation} text={extendErrorMessage(extendProblem)} />;
+    }
 
     // AC-13: an already paid reservation goes to its confirmation, which
     // explains why. After a payment made here the redirect is done below.
-    if (reservation.status === 'Active' && !approved) {
+    if (reservation.status === 'Active' && !approved && !isExtension) {
         return <Navigate to={`/reservations/${reservation.id}`} replace state={{ flash: 'alreadyPaid' }} />;
     }
 
     // Expired, Cancelled or Finished without a balance: nothing left to pay.
-    if (reservation.status !== 'Pending' && !isBalance && !approved) {
+    if (reservation.status !== 'Pending' && !isBalance && !isExtension && !approved) {
         const reason =
             reservation.status === 'Expired'
                 ? 'RESERVATION_EXPIRED'
                 : reservation.openEnded && reservation.status === 'Finished'
                   ? 'NO_PENDING_BALANCE'
                   : 'RESERVATION_NOT_PENDING';
-        return (
-            <div className={PAGE_SHELL}>
-                <title>Pago de reserva | PARKEA</title>
-                <h1 className="sr-only">Pago de reserva</h1>
-                <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
-                    <p className="flex items-center gap-2 text-body text-neutral-900">
-                        <Info className="h-4 w-4 shrink-0 text-info" aria-hidden="true" />
-                        {translateError(reason)}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        <Link to={`/reservations/${reservation.id}`} className={OUTLINE_BUTTON_SM}>
-                            Ver la reserva
-                        </Link>
-                        {/* HU-26 AC-06: an expired reservation can only be booked again */}
-                        {reservation.status === 'Expired' && (
-                            <Link to="/zones" className={OUTLINE_BUTTON_SM}>
-                                Ver zonas disponibles
-                            </Link>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
+        return <NothingToPay reservation={reservation} text={translateError(reason)} />;
     }
 
     const { zone, vehicle, paymentSummary } = reservation;
-    const total = isBalance ? pendingBalance : paymentSummary.estimatedTotal;
+    // HU-28 AC-06: every started hour of the extra time.
+    const extension = isExtension ? extensionCharge(extendFrom, extendTo, paymentSummary.hourlyRate) : null;
+    let total = paymentSummary.estimatedTotal;
+    if (isExtension) total = extension.amount;
+    else if (isBalance) total = pendingBalance;
+    let pageTitle = 'Pago de reserva';
+    if (isExtension) pageTitle = 'Ampliar estadía';
+    else if (isBalance) pageTitle = 'Pagar saldo';
     const statusInfo = RESERVATION_STATUS[reservation.status] ?? RESERVATION_STATUS.Pending;
     // HU-27: an open stay has no exit time until it ends.
     const hasExit = Boolean(reservation.endTime);
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = expiredByServer || (remainingMs !== null && remainingMs <= 0);
-    const payDisabled = processing || approved || isTimeUp;
+    const payDisabled = processing || approved || isTimeUp || extendBlocked;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -399,26 +428,43 @@ export default function PayReservation() {
                 ? { paymentMethod: method, cardLastFour: onlyDigits(card.number).slice(-4) }
                 : { paymentMethod: method };
 
-        const pay = isBalance ? payBalance : payReservation;
-        const [result] = await Promise.allSettled([pay(id, payload), wait(PROCESSING_MIN_MS)]);
+        let request;
+        let successText = 'Pago aprobado';
+        let flash = 'paymentApproved';
+        if (isExtension) {
+            // HU-28 AC-06: the new exit time is saved only if this payment is approved.
+            request = extendStay(id, { fromEndTime: extendFrom, newEndTime: extendTo, ...payload });
+            successText = 'Pago aprobado. Estadía ampliada';
+            flash = 'stayExtended';
+        } else if (isBalance) {
+            request = payBalance(id, payload);
+            successText = 'Saldo pagado';
+            flash = 'balancePaid';
+        } else {
+            request = payReservation(id, payload);
+        }
+        const [result] = await Promise.allSettled([request, wait(PROCESSING_MIN_MS)]);
         setProcessing(false);
 
         if (result.status === 'fulfilled') {
             // AC-10: message, then the confirmation with the new status.
             setApproved(true);
-            setMessage({ type: 'success', text: isBalance ? 'Saldo pagado' : 'Pago aprobado' });
+            setMessage({ type: 'success', text: successText });
             redirectTimerRef.current = setTimeout(
-                () =>
-                    navigate(`/reservations/${id}`, {
-                        replace: true,
-                        state: { flash: isBalance ? 'balancePaid' : 'paymentApproved' },
-                    }),
+                () => navigate(`/reservations/${id}`, { replace: true, state: { flash } }),
                 REDIRECT_DELAY_MS,
             );
             return;
         }
 
         const code = result.reason.response?.data?.code;
+        if (isExtension) {
+            // HU-28: nothing was charged. A declined payment can be tried
+            // again; after the other codes the extension cannot go on.
+            if (EXTEND_FINAL_CODES.includes(code)) setExtendBlocked(true);
+            setMessage({ type: 'error', text: extendErrorMessage(code) });
+            return;
+        }
         if (code === 'NO_PENDING_BALANCE') {
             // HU-27: the balance was paid meanwhile, for example in another tab.
             navigate(`/reservations/${id}`, { replace: true, state: { flash: 'noBalance' } });
@@ -441,7 +487,7 @@ export default function PayReservation() {
 
     return (
         <div className={PAGE_SHELL}>
-            <title>Pago de reserva | PARKEA</title>
+            <title>{`${pageTitle} | PARKEA`}</title>
             {/* AC-02: simulated environment notice, with the time left (AC-08) */}
             <div className="mb-6 flex flex-col gap-3 rounded-lg border border-warning/30 bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
@@ -459,11 +505,11 @@ export default function PayReservation() {
                 )}
             </div>
 
-            <h1 className="text-title font-display uppercase text-neutral-900">{isBalance ? 'Pagar saldo' : 'Pago de reserva'}</h1>
+            <h1 className="text-title font-display uppercase text-neutral-900">{pageTitle}</h1>
             <p className="mt-1 text-body text-neutral-600">
-                {isBalance
-                    ? 'Paga lo que quedó pendiente de tu estadía.'
-                    : 'Completa el pago para confirmar tu reserva.'}
+                {isExtension && 'Paga el tiempo extra. Tu nueva hora de salida se guarda cuando el pago sea aprobado.'}
+                {isBalance && 'Paga lo que quedó pendiente de tu estadía.'}
+                {!isExtension && !isBalance && 'Completa el pago para confirmar tu reserva.'}
             </p>
 
             <form onSubmit={handleSubmit} noValidate className="mt-6">
@@ -580,7 +626,7 @@ export default function PayReservation() {
                     <div className="flex flex-col gap-6">
                         <section aria-labelledby="summary-title" className={CARD}>
                             <h2 id="summary-title" className="text-subtitle-sm text-parkea-700">
-                                Resumen de la reserva
+                                {isExtension ? 'Resumen de la ampliación' : 'Resumen de la reserva'}
                             </h2>
 
                             <dl className="mt-2">
@@ -602,19 +648,48 @@ export default function PayReservation() {
                                 <SummaryItem label="Fecha y hora de entrada">
                                     {formatDate(reservation.startTime)}, {formatTime(reservation.startTime)}
                                 </SummaryItem>
-                                <SummaryItem label="Fecha y hora de salida">
-                                    {hasExit
-                                        ? `${formatDate(reservation.endTime)}, ${formatTime(reservation.endTime)}`
-                                        : 'Sin hora de salida (máximo 24 horas)'}
-                                </SummaryItem>
-                                <SummaryItem label="Duración">
-                                    {hasExit
-                                        ? formatDuration(reservation.startTime, reservation.endTime)
-                                        : 'Tiempo indefinido'}
-                                </SummaryItem>
+                                {isExtension ? (
+                                    <>
+                                        {/* HU-28: the current and the new exit time, and the time added */}
+                                        <SummaryItem label="Salida actual">
+                                            {formatDate(extendFrom)}, {formatTime(extendFrom)}
+                                        </SummaryItem>
+                                        <SummaryItem label="Nueva salida">
+                                            <span className="font-medium">
+                                                {formatDate(extendTo)}, {formatTime(extendTo)}
+                                            </span>
+                                        </SummaryItem>
+                                        <SummaryItem label="Tiempo agregado">{formatDuration(extendFrom, extendTo)}</SummaryItem>
+                                        <SummaryItem label="Duración total">
+                                            {formatDuration(reservation.startTime, extendTo)}
+                                        </SummaryItem>
+                                    </>
+                                ) : (
+                                    <>
+                                        <SummaryItem label="Fecha y hora de salida">
+                                            {hasExit
+                                                ? `${formatDate(reservation.endTime)}, ${formatTime(reservation.endTime)}`
+                                                : 'Sin hora de salida (máximo 24 horas)'}
+                                        </SummaryItem>
+                                        <SummaryItem label="Duración">
+                                            {hasExit
+                                                ? formatDuration(reservation.startTime, reservation.endTime)
+                                                : 'Tiempo indefinido'}
+                                        </SummaryItem>
+                                    </>
+                                )}
                                 <SummaryItem label="Tarifa por hora" groupStart>
                                     <span className="font-mono">{formatCurrency(paymentSummary.hourlyRate)}</span>
                                 </SummaryItem>
+                                {/* HU-28 AC-06: every started hour of the extra time */}
+                                {isExtension && (
+                                    <SummaryItem label="Horas a pagar">
+                                        {hoursLabel(extension.hours)}
+                                        <span className="block text-caption text-neutral-600">
+                                            Cada hora empezada se cobra completa.
+                                        </span>
+                                    </SummaryItem>
+                                )}
                                 {/* HU-27 AC-07: what the stay cost and what was already paid */}
                                 {isBalance && (
                                     <>
@@ -724,7 +799,8 @@ export default function PayReservation() {
                         className="order-last flex items-center justify-center gap-1.5 rounded-md border border-parkea-600 bg-white px-5 py-2.5 text-label text-parkea-700 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:opacity-60 lg:order-none"
                     >
                         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                        Cancelar pago
+                        {/* HU-28: nothing left to pay here, the way out is the reservation */}
+                        {extendBlocked ? 'Volver a la reserva' : 'Cancelar pago'}
                     </button>
                     <button
                         type="submit"
