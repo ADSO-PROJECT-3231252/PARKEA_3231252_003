@@ -281,7 +281,10 @@ function AuthenticatedHome({ user }) {
 
                             <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pl-[18px]">
                                 <p className="text-body text-neutral-600">
-                                    {formatTime(latestReservation.startTime)} – {formatTime(latestReservation.endTime)}
+                                    {/* An open stay (HU-27, or switched to it in HU-28) has no exit time yet */}
+                                    {latestReservation.endTime
+                                        ? `${formatTime(latestReservation.startTime)} – ${formatTime(latestReservation.endTime)}`
+                                        : `${formatTime(latestReservation.startTime)} · Sin hora de salida`}
                                 </p>
                                 <p className="shrink-0 font-mono text-label text-neutral-600">
                                     Cupo N.º {latestReservation.spotNumber}
