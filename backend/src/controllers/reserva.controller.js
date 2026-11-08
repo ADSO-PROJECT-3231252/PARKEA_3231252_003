@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
-const { provisionalEndTime, openStayCharge } = require('../utils/stayPricing');
+const { provisionalEndTime, openStayCharge, paidBeforeBalance } = require('../utils/stayPricing');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -157,6 +157,8 @@ async function crear(req, res, next) {
 // entry it costs the first hour; while it runs, the started hours so far
 // (AC-13, never the price of 24 hours); once finished, the final charge.
 // `paid` adds the approved payments and `pendingBalance` is what is still owed.
+// HU-28: a reservation switched to an open stay may have paid more than the
+// first hour, so the charge counts what it really paid before the balance.
 function resumenEstadiaAbierta(reserva, pagos, ahora = new Date()) {
     const lista = pagos || [];
     const pagado = lista
@@ -164,14 +166,15 @@ function resumenEstadiaAbierta(reserva, pagos, ahora = new Date()) {
         .reduce((suma, p) => suma + Number(p.amount), 0);
     const saldo = lista.find((p) => p.type === 'balance' && p.paymentStatus === 'Pending');
     const empezo = new Date(reserva.startTime) <= ahora;
+    const pagadoAntes = paidBeforeBalance(reserva, lista);
 
     let cobro;
     if (reserva.status === 'Finished') {
-        cobro = openStayCharge(reserva, reserva.endTime);
+        cobro = openStayCharge(reserva, reserva.endTime, pagadoAntes);
     } else if (reserva.status === 'Active' && empezo) {
-        cobro = openStayCharge(reserva, ahora);
+        cobro = openStayCharge(reserva, ahora, pagadoAntes);
     } else {
-        cobro = openStayCharge(reserva, reserva.startTime);
+        cobro = openStayCharge(reserva, reserva.startTime, pagadoAntes);
     }
 
     return {
@@ -343,7 +346,10 @@ async function terminar(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.STAY_NOT_STARTED, message: 'This stay has not started yet' });
         }
 
-        const cobro = openStayCharge(reserva, ahora);
+        // HU-28: what was paid before (the first hour, or more for a
+        // reservation switched to an open stay) is subtracted from the charge
+        const pagos = await Pago.findAll({ where: { reservationId: reserva.id }, transaction: t });
+        const cobro = openStayCharge(reserva, ahora, paidBeforeBalance(reserva, pagos));
         // AC-06: the user confirmed the amount shown in the dialog. If another
         // hour started in the meantime, nothing is charged and the new amount
         // is sent back so it can be confirmed again.
@@ -352,7 +358,7 @@ async function terminar(req, res, next) {
             return res.status(409).json({
                 code: ErrorCodes.STAY_AMOUNT_CHANGED,
                 message: 'Another hour started while confirming. Please check the new amount',
-                charge: { usedMinutes: cobro.usedMinutes, chargedHours: cobro.chargedHours, total: cobro.total, balance: cobro.balance },
+                charge: { usedMinutes: cobro.usedMinutes, chargedHours: cobro.chargedHours, total: cobro.total, paid: cobro.paid, balance: cobro.balance },
             });
         }
 
@@ -367,7 +373,7 @@ async function terminar(req, res, next) {
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ endTime: cobro.endTime, status: 'Finished' }, { transaction: t });
 
-        // AC-07/AC-08: the first hour is already paid; under one hour nothing is owed
+        // AC-07/AC-08: what was paid is subtracted; under one hour nothing is owed
         if (cobro.balance > 0) {
             await Pago.create({
                 reservationId: reserva.id,
@@ -385,7 +391,7 @@ async function terminar(req, res, next) {
                 usedMinutes: cobro.usedMinutes,
                 chargedHours: cobro.chargedHours,
                 total: cobro.total,
-                paid: cobro.firstHour,
+                paid: cobro.paid,
                 balance: cobro.balance,
             },
         });

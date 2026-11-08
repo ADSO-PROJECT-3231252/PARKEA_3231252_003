@@ -23,23 +23,44 @@ function provisionalEndTime(startTime) {
 }
 
 // What an open stay costs if it ends at `endTime` (never later than 24 hours
-// after the entry). The first hour was already paid to confirm it (AC-03), so
-// the balance is the rest.
-function openStayCharge(reserva, endTime = new Date()) {
+// after the entry). `paid` is what the reservation already paid before the
+// stay ends: the first hour for a stay booked without an exit time (AC-03),
+// or more for a reservation switched to an open stay (HU-28 AC-07). What was
+// paid is never refunded, so the total is at least `paid`, and the balance is
+// the rest.
+function openStayCharge(reserva, endTime = new Date(), paid = Number(reserva.appliedHourlyRate)) {
     const start = new Date(reserva.startTime);
     const cappedEnd = new Date(Math.min(new Date(endTime).getTime(), start.getTime() + MAX_OPEN_STAY_MS));
     const rate = Number(reserva.appliedHourlyRate);
     const hours = chargedHours(start, cappedEnd);
-    const total = money(hours * rate);
-    const firstHour = money(rate);
+    const alreadyPaid = money(Number(paid));
+    const total = Math.max(money(hours * rate), alreadyPaid);
     return {
         endTime: cappedEnd,
         usedMinutes: Math.max(0, Math.floor((cappedEnd - start) / 60000)),
         chargedHours: hours,
         total,
-        firstHour,
-        balance: money(total - firstHour),
+        paid: alreadyPaid,
+        balance: money(total - alreadyPaid),
     };
 }
 
-module.exports = { chargedHours, provisionalEndTime, openStayCharge, MAX_OPEN_STAY_MS };
+// What an open stay paid before it ends: the initial payment and the
+// extensions that were approved (HU-28). A balance is what is still owed, so
+// it is not part of it. A reservation of 30 minutes switched to an open stay
+// paid less than one hour, so the real amount is used. Without any payment
+// it counts the first hour, as HU-27 always did (AC-03).
+function paidBeforeBalance(reserva, payments = []) {
+    const approved = payments.filter((p) => p.paymentStatus === 'Paid' && p.type !== 'balance');
+    if (approved.length === 0) return money(Number(reserva.appliedHourlyRate));
+    return money(approved.reduce((sum, p) => sum + Number(p.amount), 0));
+}
+
+// HU-28 AC-06: extending the exit time charges every started hour of the
+// extra time at the reservation's stored rate. 20 minutes are 1 hour.
+function extensionCharge(reserva, fromEndTime, toEndTime) {
+    const hours = chargedHours(fromEndTime, toEndTime);
+    return { hours, amount: money(hours * Number(reserva.appliedHourlyRate)) };
+}
+
+module.exports = { chargedHours, provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge, MAX_OPEN_STAY_MS };
