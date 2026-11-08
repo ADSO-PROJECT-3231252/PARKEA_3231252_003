@@ -21,21 +21,27 @@ import {
     Ban,
     X,
     Flag,
+    ClockPlus,
 } from 'lucide-react';
 import { getReservation } from '../services/reservationService';
 import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
-import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime } from '../utils/format';
+import ExtendStayDialog from '../components/ExtendStayDialog';
+import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime, keepTogether } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
 import {
     MAX_OPEN_STAY_MS,
     canFinishStay,
+    formatMinutes,
     hoursLabel,
     isRunningStay,
     openStayCharge,
+    paidBeforeEnd,
+    paidOnlyFirstHour,
     pendingBalanceOf,
     stayEndSoFar,
 } from '../utils/openStay';
+import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
 
 // Once the 15-minute hold runs out, the backend job (every 60 s) is what
 // actually marks the reservation as Expired, so the screen asks again every
@@ -48,12 +54,14 @@ const COPY_FEEDBACK_MS = 2000;
 
 // HU-17: messages sent by the payment screen through location.state.flash
 // (AC-10 after a successful payment, AC-13 when it was already paid; HU-27
-// after paying the balance of an open stay, or when it was already paid).
+// after paying the balance of an open stay, or when it was already paid;
+// HU-28 after paying an extension).
 const FLASH_MESSAGES = {
     paymentApproved: 'Pago aprobado. Tu reserva quedó activa.',
     alreadyPaid: 'Esta reserva ya fue pagada.',
     balancePaid: 'Saldo pagado. Tu estadía quedó al día.',
     noBalance: 'Esta estadía ya no tiene saldo pendiente.',
+    stayExtended: 'Pago aprobado. Tu estadía quedó ampliada con la nueva hora de salida.',
 };
 
 // Shared class strings, so the same look is written once.
@@ -67,9 +75,44 @@ const OUTLINE_ACTION =
 const DANGER_ACTION =
     'flex items-center justify-center gap-1.5 rounded-md border border-danger px-5 py-2 text-label text-danger transition-colors hover:bg-danger-soft sm:flex-1';
 // The main action of the screen ("Ir al pago", "Terminar estadía", "Pagar
-// saldo"), under the payment summary; on mobile it goes first.
+// saldo", "Ampliar estadía"), under the payment summary; on mobile it goes
+// first. The breakpoint where it moves beside the others is added in the page.
 const PRIMARY_ACTION =
-    'order-first flex items-center justify-center gap-1.5 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 lg:order-none';
+    'order-first flex items-center justify-center gap-1.5 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700';
+
+// An amount inside a sentence: "$" and the number stay on the same line.
+const money = (amount) => keepTogether(formatCurrency(amount));
+
+// HU-27 AC-03/AC-07: how an open stay is charged, and what is left to pay.
+// HU-28: a reservation switched to an open stay paid another amount than the
+// first hour, so the text names it.
+function openStayNote(isRunning, soFar, paid, hourlyRate) {
+    const firstHourOnly = paidOnlyFirstHour(paid, hourlyRate);
+    const rate = money(hourlyRate);
+    if (!isRunning) {
+        return firstHourOnly
+            ? `Se cobra ${rate} por cada hora empezada, hasta 24 horas. La primera hora se paga al confirmar y el resto al terminar.`
+            : `Se cobra ${rate} por cada hora empezada desde la entrada, hasta 24 horas. Ya pagaste ${money(paid)} y el resto se paga al terminar.`;
+    }
+    const started = hoursLabel(soFar.chargedHours, 'empezada');
+    if (soFar.balance > 0) {
+        return `Llevas ${started}. Ya pagaste ${firstHourOnly ? 'la primera' : money(paid)}; si terminas ahora, quedan ${money(soFar.balance)} por pagar.`;
+    }
+    return firstHourOnly
+        ? 'Vas en tu primera hora, que ya pagaste: si terminas ahora, no queda nada por pagar.'
+        : `Llevas ${started} y ya pagaste ${money(paid)}: si terminas ahora, no queda nada por pagar.`;
+}
+
+// HU-27: what a finished open stay was charged. HU-28: when what was already
+// paid covered more than the hours used, it says so instead.
+function finishedStayNote(openStay, hourlyRate) {
+    const byHours = Math.round(openStay.chargedHours * Number(hourlyRate) * 100) / 100;
+    const paid = `Pagado: ${money(openStay.paid)}.`;
+    if (openStay.total - byHours > 0.005) {
+        return `Usaste ${formatMinutes(openStay.usedMinutes)}, que ya estaban cubiertos por lo que habías pagado. ${paid}`;
+    }
+    return `${hoursLabel(openStay.chargedHours, 'cobrada')}. ${paid}`;
+}
 
 export default function ReservationConfirmation() {
     const { id } = useParams();
@@ -99,6 +142,8 @@ export default function ReservationConfirmation() {
     // moment it was clicked (null = closed). The message after either action.
     const [cancelOpen, setCancelOpen] = useState(false);
     const [finishOpenedAt, setFinishOpenedAt] = useState(null);
+    // HU-28: the extend dialog, open since the moment it was clicked.
+    const [extendOpenedAt, setExtendOpenedAt] = useState(null);
     const [resultMessage, setResultMessage] = useState('');
     const resultMessageRef = useRef(null);
 
@@ -178,6 +223,19 @@ export default function ReservationConfirmation() {
         return () => clearInterval(interval);
     }, [openStaySince, fetchReservation]);
 
+    // HU-28 AC-01: "Ampliar estadía" is offered until the exit time, so the
+    // screen updates itself at that moment. A timer cannot wait more than
+    // about 24 days, so a longer wait is done in steps.
+    const extendableUntil = reservation?.status === 'Active' && !reservation.openEnded ? reservation.endTime : null;
+
+    useEffect(() => {
+        if (!extendableUntil) return;
+        const delay = new Date(extendableUntil).getTime() - Date.now();
+        if (delay <= 0) return;
+        const timer = setTimeout(() => setNow(Date.now()), Math.min(delay + 100, MAX_TIMER_MS));
+        return () => clearTimeout(timer);
+    }, [extendableUntil, now]);
+
     useEffect(() => {
         return () => clearTimeout(copyTimerRef.current);
     }, []);
@@ -212,6 +270,17 @@ export default function ReservationConfirmation() {
     };
     const handleFinishClose = ({ stale }) => {
         setFinishOpenedAt(null);
+        if (stale) fetchReservation(true);
+    };
+
+    // HU-28: after switching to an open stay, loaded again without an exit time.
+    const handleExtended = (message) => {
+        setExtendOpenedAt(null);
+        setResultMessage(message);
+        fetchReservation(true);
+    };
+    const handleExtendClose = ({ stale }) => {
+        setExtendOpenedAt(null);
         if (stale) fetchReservation(true);
     };
 
@@ -303,9 +372,15 @@ export default function ReservationConfirmation() {
     const hasExit = Boolean(reservation.endTime);
     const isRunning = isRunningStay(reservation, now);
     const canFinish = canFinishStay(reservation, now);
+    const canExtend = canExtendStay(reservation, now);
     const pendingBalance = pendingBalanceOf(reservation);
     const hourlyRate = reservation.paymentSummary.hourlyRate;
-    const soFar = isRunning ? openStayCharge(reservation.startTime, hourlyRate, now) : null;
+    // HU-28: what was paid, extensions included, and how many there were.
+    const { paidTotal = 0, extensions = 0 } = reservation.paymentSummary;
+    // What an open stay paid before it ends: the first hour, or another amount
+    // if it was switched from a reservation with an exit time (HU-28).
+    const paidBefore = isOpenStay ? paidBeforeEnd(reservation, hourlyRate) : 0;
+    const soFar = isRunning ? openStayCharge(reservation.startTime, hourlyRate, now, paidBefore) : null;
     let durationLabel = '—';
     if (hasExit) {
         durationLabel = formatDuration(reservation.startTime, reservation.endTime);
@@ -327,10 +402,27 @@ export default function ReservationConfirmation() {
         } else if (isPending) {
             totalLabel = 'Primera hora a pagar';
         } else if (reservation.status === 'Active') {
-            totalLabel = 'Primera hora pagada';
+            totalLabel = paidOnlyFirstHour(paidBefore, hourlyRate) ? 'Primera hora pagada' : 'Ya pagado';
+            totalAmount = paidBefore;
         }
     }
-    const hasPrimaryAction = canPay || canFinish || pendingBalance > 0;
+    // HU-28 AC-09: the total paid, extensions included. A cancelled
+    // reservation shows what it cost before the refund.
+    if (reservation.status === 'Cancelled' && paidTotal > 0) {
+        totalAmount = paidTotal;
+    } else if (!isOpenStay && extensions > 0) {
+        totalLabel = 'Total pagado';
+        totalAmount = paidTotal;
+    }
+    const hasPrimaryAction = canPay || canFinish || pendingBalance > 0 || canExtend;
+    // HU-28: "Cancelar reserva" plus a main action ("Ir al pago" or "Ampliar
+    // estadía") are four buttons. The three secondary ones only fit beside the
+    // main one from xl up; below that the main action keeps its own row, first.
+    const fourActions = canCancel && hasPrimaryAction;
+    const actionsGrid = fourActions
+        ? 'xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-6'
+        : 'lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6';
+    const primaryAction = `${PRIMARY_ACTION} ${fourActions ? 'xl:order-none' : 'lg:order-none'}`;
     const { latitude, longitude } = reservation.zone;
     const hasCoordinates = latitude != null && longitude != null;
     const mapUrl = hasCoordinates ? `https://www.google.com/maps?q=${latitude},${longitude}` : null;
@@ -588,16 +680,18 @@ export default function ReservationConfirmation() {
                     {/* HU-27 AC-03/AC-07: how an open stay is charged, and what is left to pay */}
                     {isOpenStay && ['Pending', 'Active'].includes(reservation.status) && (
                         <p className="mt-3 text-caption text-neutral-600">
-                            {isRunning
-                                ? soFar.balance > 0
-                                    ? `Llevas ${hoursLabel(soFar.chargedHours, 'empezada')}. Ya pagaste la primera; si terminas ahora, quedan ${formatCurrency(soFar.balance)} por pagar.`
-                                    : 'Vas en tu primera hora, que ya pagaste: si terminas ahora, no queda nada por pagar.'
-                                : `Se cobra ${formatCurrency(hourlyRate)} por cada hora empezada, hasta 24 horas. La primera hora se paga al confirmar y el resto al terminar.`}
+                            {openStayNote(isRunning, soFar, paidBefore, hourlyRate)}
                         </p>
                     )}
                     {isOpenStay && reservation.status === 'Finished' && (
                         <p className="mt-3 text-caption text-neutral-600">
-                            {hoursLabel(reservation.openStay.chargedHours, 'cobrada')}. Pagado: {formatCurrency(reservation.openStay.paid)}.
+                            {finishedStayNote(reservation.openStay, hourlyRate)}
+                        </p>
+                    )}
+                    {/* HU-28 AC-09 */}
+                    {!isOpenStay && extensions > 0 && (
+                        <p className="mt-3 text-caption text-neutral-600">
+                            Incluye {extensions === 1 ? '1 ampliación' : `${extensions} ampliaciones`} de la estadía.
                         </p>
                     )}
                     {pendingBalance > 0 && (
@@ -638,7 +732,7 @@ export default function ReservationConfirmation() {
                 details card and "Ir al pago" under the payment summary. When the
                 reservation can no longer be paid, the secondary actions take the
                 full width so the row still spans both cards. */}
-            <div className="mt-6 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6">
+            <div className={`mt-6 grid grid-cols-1 gap-3 ${actionsGrid}`}>
                 {/* With "Cancelar reserva" there are three buttons, which only fit
                     side by side from md up. */}
                 <div className={`flex flex-col gap-3 ${canCancel ? 'md:flex-row' : 'sm:flex-row'} ${hasPrimaryAction ? '' : 'lg:col-span-2'}`}>
@@ -670,25 +764,32 @@ export default function ReservationConfirmation() {
                 </div>
                 {/* On mobile the primary action goes first, right below the payment summary. */}
                 {canPay && (
-                    <Link to={`/reservations/${reservation.id}/payment`} className={PRIMARY_ACTION}>
+                    <Link to={`/reservations/${reservation.id}/payment`} className={primaryAction}>
                         <Wallet className="h-4 w-4" aria-hidden="true" />
                         Ir al pago
                     </Link>
                 )}
                 {/* HU-27 AC-05 */}
                 {canFinish && (
-                    <button type="button" onClick={() => setFinishOpenedAt(Date.now())} className={PRIMARY_ACTION}>
+                    <button type="button" onClick={() => setFinishOpenedAt(Date.now())} className={primaryAction}>
                         <Flag className="h-4 w-4" aria-hidden="true" />
                         Terminar estadía
                     </button>
                 )}
                 {/* HU-27 AC-07: the balance is paid on the same payment screen */}
                 {pendingBalance > 0 && (
-                    <Link to={`/reservations/${reservation.id}/payment`} className={PRIMARY_ACTION}>
+                    <Link to={`/reservations/${reservation.id}/payment`} className={primaryAction}>
                         <Wallet className="h-4 w-4" aria-hidden="true" />
                         Pagar saldo
                         <span className="font-mono">{formatCurrency(pendingBalance)}</span>
                     </Link>
+                )}
+                {/* HU-28 AC-01: paid, with an exit time that has not been reached */}
+                {canExtend && (
+                    <button type="button" onClick={() => setExtendOpenedAt(Date.now())} className={primaryAction}>
+                        <ClockPlus className="h-4 w-4" aria-hidden="true" />
+                        Ampliar estadía
+                    </button>
                 )}
             </div>
 
@@ -704,6 +805,16 @@ export default function ReservationConfirmation() {
                     openedAt={finishOpenedAt}
                     onClose={handleFinishClose}
                     onFinished={handleFinished}
+                />
+            )}
+            {extendOpenedAt !== null && (
+                <ExtendStayDialog
+                    reservation={reservation}
+                    hourlyRate={hourlyRate}
+                    paid={paidTotal}
+                    openedAt={extendOpenedAt}
+                    onClose={handleExtendClose}
+                    onExtended={handleExtended}
                 />
             )}
         </div>
