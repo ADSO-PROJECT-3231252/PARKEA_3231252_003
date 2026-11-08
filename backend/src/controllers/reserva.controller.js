@@ -187,6 +187,19 @@ function resumenEstadiaAbierta(reserva, pagos, ahora = new Date()) {
     };
 }
 
+// HU-28 AC-09: what a reservation was charged before its balance: the initial
+// payment and its extensions, also when they were refunded by a cancellation
+// (the history keeps showing what was paid). `extensions` counts the approved
+// extensions.
+function resumenPagos(pagos = []) {
+    const cobrados = pagos.filter((p) => p.type !== 'balance' && ['Paid', 'Refunded'].includes(p.paymentStatus));
+    const total = cobrados.reduce((suma, p) => suma + Number(p.amount), 0);
+    return {
+        paidTotal: Number(total.toFixed(2)),
+        extensions: cobrados.filter((p) => p.type === 'extension').length,
+    };
+}
+
 // HU-15: View Reservation Confirmation
 async function obtenerConfirmacion(req, res, next) {
     try {
@@ -217,6 +230,7 @@ async function obtenerConfirmacion(req, res, next) {
             ? Number(Number(reserva.appliedHourlyRate).toFixed(2))
             : Number((durationHours * Number(reserva.appliedHourlyRate)).toFixed(2));
         const duracionMostrada = sinSalidaAun ? null : Number(durationHours.toFixed(2));
+        const pagos = resumenPagos(reserva.payments);
 
         return res.status(200).json({
             reservation: {
@@ -250,6 +264,9 @@ async function obtenerConfirmacion(req, res, next) {
                     hourlyRate: Number(reserva.appliedHourlyRate),
                     durationHours: reserva.openEnded ? 1 : duracionMostrada,
                     estimatedTotal,
+                    // HU-28 AC-09: what was paid, extensions included
+                    paidTotal: pagos.paidTotal,
+                    extensions: pagos.extensions,
                 },
             },
         });
@@ -299,11 +316,12 @@ async function cancelar(req, res, next) {
         const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ status: 'Cancelled' }, { transaction: t });
-        // Only the initial payment is refunded: before the entry an open stay
-        // has paid just its first hour (HU-27 AC-14)
-        const pagoInicial = reserva.payments.find((p) => p.type === 'initial');
-        if (pagoInicial && pagoInicial.paymentStatus === 'Paid') {
-            await pagoInicial.update({ paymentStatus: 'Refunded' }, { transaction: t });
+        // Before the entry, what was paid is refunded: the initial payment and
+        // any extension paid in advance (HU-27 AC-14, HU-28). A balance only
+        // exists after the stay ends, so there is none here.
+        const reembolsables = reserva.payments.filter((p) => ['initial', 'extension'].includes(p.type) && p.paymentStatus === 'Paid');
+        for (const pago of reembolsables) {
+            await pago.update({ paymentStatus: 'Refunded' }, { transaction: t });
         }
         await t.commit();
         return res.status(200).json({ message: 'Reservation cancelled successfully' });
@@ -435,6 +453,8 @@ async function misReservas(req, res, next) {
         const reservations = rows.map((r) => {
             const pagoInicial = r.payments.find((p) => p.type === 'initial');
             const yaTienePago = pagoInicial && ['Paid', 'Refunded'].includes(pagoInicial.paymentStatus);
+            // HU-28 AC-09: the initial payment plus its extensions
+            const pagos = resumenPagos(r.payments);
 
             let amount;
             let amountType;
@@ -445,11 +465,16 @@ async function misReservas(req, res, next) {
                 amount = openStay.total;
                 if (r.status === 'Active' && openStay.started) {
                     amountType = 'so_far';
+                } else if (yaTienePago) {
+                    amountType = 'paid';
+                    // Before the entry (or cancelled), what it paid: the first
+                    // hour, or more if it was switched to an open stay (HU-28)
+                    if (r.status !== 'Finished') amount = Math.max(pagos.paidTotal, openStay.total);
                 } else {
-                    amountType = yaTienePago ? 'paid' : 'estimated';
+                    amountType = 'estimated';
                 }
             } else if (yaTienePago) {
-                amount = Number(pagoInicial.amount);
+                amount = pagos.paidTotal;
                 amountType = 'paid';
             } else {
                 const horas = (new Date(r.endTime) - new Date(r.startTime)) / (1000 * 60 * 60);
@@ -470,6 +495,7 @@ async function misReservas(req, res, next) {
                 vehicle: r.vehicle,
                 amount,
                 amountType,
+                extensions: pagos.extensions,
                 appliedHourlyRate: Number(r.appliedHourlyRate),
                 paymentStatus: pagoInicial ? pagoInicial.paymentStatus : 'Pending',
             };
