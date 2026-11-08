@@ -2,7 +2,8 @@ const { Op } = require('sequelize');
 const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
-const { provisionalEndTime, openStayCharge, paidBeforeBalance } = require('../utils/stayPricing');
+const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
+const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -419,6 +420,134 @@ async function terminar(req, res, next) {
     }
 }
 
+// HU-28: Extend a stay. Either a later exit time, paid at that moment
+// (AC-06), or a switch to an open stay, paid when it ends (AC-07).
+// PATCH /api/reservations/:id/extend
+// { fromEndTime, newEndTime, paymentMethod, cardLastFour } or { fromEndTime, openEnded: true }
+async function ampliar(req, res, next) {
+    const t = await sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const userId = req.usuario.id;
+        const { fromEndTime, newEndTime, openEnded } = req.body;
+        const aTiempoIndefinido = openEnded === true;
+
+        // Locked: two extensions at the same time (double click, two tabs)
+        // would otherwise both start from the same exit time and both be paid
+        const reserva = await Reserva.findOne({
+            where: { id, userId },
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        if (!reserva) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
+        }
+        // AC-01: only a paid reservation that has not ended
+        if (reserva.status !== 'Active') {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.STAY_NOT_ACTIVE, message: `A reservation with status "${reserva.status}" cannot be extended` });
+        }
+        if (reserva.openEnded) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.ALREADY_OPEN_STAY, message: 'This reservation has no exit time; finish it when you leave' });
+        }
+        const ahora = new Date();
+        const salidaActual = new Date(reserva.endTime);
+        if (salidaActual <= ahora) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.EXIT_TIME_PASSED, message: 'The exit time of this reservation has already passed' });
+        }
+        // The exit time the user saw. If it changed in the meantime (another
+        // tab extended it), nothing is charged and the current one is sent back.
+        if (new Date(fromEndTime).getTime() !== salidaActual.getTime()) {
+            await t.rollback();
+            return res.status(409).json({
+                code: ErrorCodes.RESERVATION_CHANGED,
+                message: 'This reservation changed while you were extending it. Please check it again',
+                reservation: { endTime: reserva.endTime, openEnded: reserva.openEnded },
+            });
+        }
+
+        const inicio = new Date(reserva.startTime);
+        // AC-07: an open stay keeps entry + 24 h as its provisional exit time
+        const salidaNueva = aTiempoIndefinido ? provisionalEndTime(inicio) : new Date(newEndTime);
+        if (!aTiempoIndefinido && salidaNueva <= salidaActual) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.EXTENSION_NOT_LATER, message: 'The new exit time must be later than the current one' });
+        }
+        // AC-03: never more than 24 hours from the entry
+        if (salidaNueva - inicio > DURACION_MAX_MS) {
+            await t.rollback();
+            return res.status(400).json({ code: ErrorCodes.EXTENSION_TOO_LONG, message: 'The stay cannot last more than 24 hours from the entry' });
+        }
+
+        let cobro = null;
+        if (!aTiempoIndefinido) {
+            const errorMetodo = validarMetodoPago(req.body);
+            if (errorMetodo) {
+                await t.rollback();
+                return res.status(errorMetodo.status).json(errorMetodo.body);
+            }
+        }
+
+        // AC-04: the same vehicle cannot have another reservation in the
+        // added time. The vehicle row is locked like when a reservation is
+        // created, so a new reservation for it waits until this one ends.
+        await Vehiculo.findOne({
+            where: { id: reserva.vehicleId },
+            paranoid: false,
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        const solapada = await Reserva.findOne({
+            where: {
+                id: { [Op.ne]: reserva.id },
+                vehicleId: reserva.vehicleId,
+                status: ['Pending', 'Active'],
+                startTime: { [Op.lt]: salidaNueva },
+                endTime: { [Op.gt]: salidaActual },
+            },
+            transaction: t,
+        });
+        if (solapada) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
+        }
+
+        if (!aTiempoIndefinido) {
+            // AC-06: the new exit time is saved only if the payment is approved
+            if (esRechazado(req.body)) {
+                await t.rollback();
+                return res.status(402).json(RECHAZADO);
+            }
+            cobro = extensionCharge(reserva, salidaActual, salidaNueva);
+            await Pago.create({
+                reservationId: reserva.id,
+                amount: cobro.amount,
+                paymentStatus: 'Paid',
+                paymentMethod: req.body.paymentMethod,
+                cardLastFour: req.body.paymentMethod === 'card' ? req.body.cardLastFour : null,
+                paidAt: new Date(),
+                type: 'extension',
+            }, { transaction: t });
+        }
+
+        // AC-05: the same spot; it stays Occupied until the stay ends
+        await reserva.update({ endTime: salidaNueva, openEnded: aTiempoIndefinido }, { transaction: t });
+        await t.commit();
+
+        return res.status(200).json({
+            message: aTiempoIndefinido ? 'The reservation is now an open stay' : 'Stay extended successfully',
+            reservation: { id: reserva.id, endTime: aTiempoIndefinido ? null : salidaNueva, openEnded: aTiempoIndefinido },
+            charge: cobro,
+        });
+    } catch (error) {
+        await t.rollback();
+        next(error);
+    }
+}
+
 // HU-18: View Booking History
 async function misReservas(req, res, next) {
     try {
@@ -515,4 +644,4 @@ async function misReservas(req, res, next) {
     }
 }
 
-module.exports = { crear, obtenerConfirmacion, cancelar, terminar, misReservas };
+module.exports = { crear, obtenerConfirmacion, cancelar, terminar, ampliar, misReservas };

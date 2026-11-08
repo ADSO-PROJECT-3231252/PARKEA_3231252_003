@@ -30,6 +30,28 @@ const validarTerminar = [
     responderErrores,
 ];
 
+// HU-28: the exit time the user saw, plus either a later exit time (paid
+// now) or a switch to an open stay. The payment fields are checked by the
+// controller, as in the payments route.
+const validarAmpliar = [
+    body(['fromEndTime', 'newEndTime'])
+        .custom(isTextOrMissing).withMessage((value, { path }) => `${path} must be text`),
+    body('fromEndTime')
+        .notEmpty().withMessage('fromEndTime is required').bail()
+        .isISO8601({ strict: true }).withMessage('fromEndTime must be a date'),
+    body('openEnded').optional().custom((value) => value === true).withMessage('openEnded can only be true'),
+    body('newEndTime').custom((value, { req }) => {
+        if (req.body.openEnded === true) {
+            if (value !== undefined) throw new Error('Send newEndTime or openEnded, not both');
+            return true;
+        }
+        if (value === undefined || value === null || value === '') throw new Error('newEndTime is required');
+        if (Number.isNaN(Date.parse(value)) || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) throw new Error('newEndTime must be a date and time');
+        return true;
+    }),
+    responderErrores,
+];
+
 // POST /api/reservations — create a reservation (HU-14)
 router.post('/', verificarToken, validarCamposReserva, reservaController.crear);
 
@@ -44,5 +66,8 @@ router.patch('/:id/cancel', verificarToken, reservaController.cancelar);
 
 // PATCH /api/reservations/:id/finish — finish an open stay (HU-27)
 router.patch('/:id/finish', verificarToken, validarTerminar, reservaController.terminar);
+
+// PATCH /api/reservations/:id/extend — extend a stay or leave it open (HU-28)
+router.patch('/:id/extend', verificarToken, validarAmpliar, reservaController.ampliar);
 
 module.exports = router;
