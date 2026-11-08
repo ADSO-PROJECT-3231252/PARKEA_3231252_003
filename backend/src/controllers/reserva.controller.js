@@ -54,6 +54,22 @@ async function crear(req, res, next) {
             return res.status(400).json({ code: ErrorCodes.INVALID_DURATION, message: 'The reservation must last between 30 minutes and 24 hours' });
         }
 
+        // Locked until the transaction ends: if the same vehicle is booked twice
+        // at the same moment (double click, two tabs), the second request waits
+        // here and the overlap check below then sees the first reservation.
+        // It must be the first read of the transaction: in MySQL the first
+        // plain read fixes what the transaction sees, so a read before this
+        // lock would hide the reservation the other request just created.
+        const vehiculo = await Vehiculo.findOne({
+            where: { id: vehicleId, userId },
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        if (!vehiculo) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
         // HU-27 AC-12: an unpaid balance from an open stay blocks new reservations
         const saldoPendiente = await Pago.findOne({
             where: { type: 'balance', paymentStatus: 'Pending' },
@@ -63,19 +79,6 @@ async function crear(req, res, next) {
         if (saldoPendiente) {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.PENDING_BALANCE, message: 'You have a pending balance. Please pay it before making a new reservation' });
-        }
-
-        // Locked until the transaction ends: if the same vehicle is booked twice
-        // at the same moment (double click, two tabs), the second request waits
-        // here and the overlap check below then sees the first reservation
-        const vehiculo = await Vehiculo.findOne({
-            where: { id: vehicleId, userId },
-            transaction: t,
-            lock: t.LOCK.UPDATE,
-        });
-        if (!vehiculo) {
-            await t.rollback();
-            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
         // Reject if this vehicle already has a Pending/Active reservation
