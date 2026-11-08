@@ -32,11 +32,11 @@ const SEARCH_DEBOUNCE_MS = 400;
 const SUCCESS_MESSAGE_MS = 3000;
 const VISIBLE_LOGS = 3;
 
-// #230: when the table is wider than its card (laptops from 640 to about
+// #230: when the table is wider than its card (laptops from 1024 to about
 // 1440 px), the Actions column stays fixed on the right, so "Cambiar rol",
 // the status switch and the locked reason are always in sight. The shadow
-// shows that the other columns continue underneath. Phones (below 640 px)
-// keep the table as it is; #195 turns it into cards.
+// shows that the other columns continue underneath. Below 1024 px the table
+// is hidden and each user is a card instead (#195).
 const STICKY_ACTIONS = 'sm:sticky sm:right-0 sm:z-10 sm:shadow-[inset_8px_0_8px_-8px_rgb(0_0_0/0.12)]';
 
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
@@ -68,9 +68,23 @@ function StatusBadge({ isActive }) {
     );
 }
 
+function UserName({ user }) {
+    return (
+        <div className="flex items-center gap-2.5">
+            <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-caption font-semibold text-parkea-700"
+                aria-hidden="true"
+            >
+                {getInitials(user.fullName)}
+            </span>
+            <span className="break-words text-body font-medium text-neutral-900">{user.fullName}</span>
+        </div>
+    );
+}
+
 // "Cambiar rol" button, status switch and, when the account can't be changed,
 // the reason why. `reason` is empty when the account can be changed.
-function UserActions({ user, reason, onAction }) {
+function UserActions({ user, reason, onAction, reasonClassName = 'max-w-[190px]' }) {
     const locked = Boolean(reason);
     return (
         <>
@@ -100,7 +114,7 @@ function UserActions({ user, reason, onAction }) {
                     />
                 </button>
             </div>
-            {locked && <p className="mt-1 max-w-[190px] text-caption text-neutral-600">{reason}</p>}
+            {locked && <p className={`mt-1 text-caption text-neutral-600 ${reasonClassName}`}>{reason}</p>}
         </>
     );
 }
@@ -518,7 +532,8 @@ export default function AdminUsers() {
 
                 {!loading && !error && users.length > 0 && (
                     <>
-                        <div ref={watchTableWidth} className="overflow-x-auto">
+                        {/* AC-01: table on computers */}
+                        <div ref={watchTableWidth} className="hidden overflow-x-auto lg:block">
                             <table className="w-full min-w-[900px] border-collapse text-left">
                                 <thead>
                                     <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900">
@@ -544,15 +559,7 @@ export default function AdminUsers() {
                                                 className={`border-b border-neutral-100 align-top last:border-0 ${locked ? 'bg-neutral-50' : ''}`}
                                             >
                                                 <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <span
-                                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-caption font-semibold text-parkea-700"
-                                                            aria-hidden="true"
-                                                        >
-                                                            {getInitials(u.fullName)}
-                                                        </span>
-                                                        <span className="text-body font-medium text-neutral-900">{u.fullName}</span>
-                                                    </div>
+                                                    <UserName user={u} />
                                                 </td>
                                                 <td className="px-4 py-3 text-body text-neutral-600">
                                                     {/* <wbr> lets a long email break after the @ instead of widening the table */}
@@ -578,6 +585,41 @@ export default function AdminUsers() {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* AC-15: one card per user on phones and tablets */}
+                        <ul className="divide-y divide-neutral-100 lg:hidden">
+                            {users.map((u) => (
+                                <li key={u.id} className="flex flex-col gap-3 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <UserName user={u} />
+                                        </div>
+                                        <StatusBadge isActive={u.isActive} />
+                                    </div>
+                                    <p className="break-words text-body text-neutral-600">
+                                        {u.email.split('@')[0]}@<wbr />{u.email.split('@')[1]}
+                                    </p>
+                                    <dl className="grid grid-cols-2 gap-2 rounded-md bg-neutral-50 p-3">
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Documento</dt>
+                                            <dd className="break-words font-mono text-body text-neutral-900">{u.documentNumber}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Rol</dt>
+                                            <dd>
+                                                <RoleBadge role={u.role} />
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                    <UserActions
+                                        user={u}
+                                        reason={lockedReason(u)}
+                                        reasonClassName=""
+                                        onAction={openAction}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
 
                         {/* AC-15: pagination */}
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
