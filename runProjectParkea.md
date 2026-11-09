@@ -98,3 +98,12 @@ npm test
 ```
 
 Every test is listed with ✓ when it passes. They are in `backend/tests/`.
+
+The frontend tests use Jest and React Testing Library. They don't need the backend running.
+
+```bash
+cd frontend
+npm test
+```
+
+They are in `frontend/tests/`. The screen tests (like `Login.test.js`) replace the calls to the API with fake answers.
