@@ -1,5 +1,5 @@
 const { validationResult } = require('express-validator');
-const { UniqueConstraintError } = require('sequelize');
+const { Op, UniqueConstraintError } = require('sequelize');
 const { Vehiculo, Reserva, Usuario, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
@@ -183,9 +183,13 @@ async function marcarPredeterminado(req, res, next) {
                 return null;
             }
 
+            // Clear every other default. This vehicle is left out: if it is
+            // already the default (another tab, a second click), clearing it
+            // too would leave the user without one, because update() below
+            // sends nothing when the value it holds is already true.
             await Vehiculo.update(
                 { isDefault: false },
-                { where: { userId, isDefault: true }, transaction: t }
+                { where: { userId, isDefault: true, id: { [Op.ne]: id } }, transaction: t }
             );
             await actual.update({ isDefault: true }, { transaction: t });
             return actual;
