@@ -64,8 +64,17 @@ describe('validateZoneForm', () => {
         expect(errors[field]).toBe(message);
     });
 
-    test.each([['90', '180'], ['-90', '-180']])('coordinates %s, %s are accepted (limits)', (latitude, longitude) => {
+    // #232: the zone has to be inside the Colombia rectangle (San Andrés and Leticia included)
+    test.each([['13.5', '-66.8'], ['-4.3', '-82']])('coordinates %s, %s on the edges of Colombia are accepted', (latitude, longitude) => {
         expect(validateZoneForm({ ...validForm(), latitude, longitude })).toEqual({});
+    });
+
+    test.each([['90', '180'], ['40.4168', '-3.7038'], ['13.51', '-75'], ['4.8', '-66.79']])('coordinates %s, %s outside Colombia show the Colombia message on both fields', (latitude, longitude) => {
+        const errors = validateZoneForm({ ...validForm(), latitude, longitude });
+        expect(errors).toEqual({
+            latitude: 'La ubicación de la zona debe estar dentro de Colombia',
+            longitude: 'La ubicación de la zona debe estar dentro de Colombia',
+        });
     });
 });
 
