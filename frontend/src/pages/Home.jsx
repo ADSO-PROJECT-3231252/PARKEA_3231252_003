@@ -450,9 +450,9 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de zonas</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Crea, edita y administra las zonas de parqueo, tarifas,{' '}
+                            Crea, edita y administra las zonas de parqueo, tarifas{' '}
                             <br className="hidden 2xl:block" />
-                            cupos disponibles y horarios de operación.
+                            y cupos disponibles.
                         </p>
                         <Link
                             to="/admin/zones"
