@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, ZoomControl, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './LocationPicker.css';
@@ -16,6 +16,10 @@ const DEFAULT_CENTER = [4.83, -75.67];
 const DEFAULT_ZOOM = 13;
 // Close enough to tell one block from the next.
 const PLACE_ZOOM = 17;
+
+// #232: a zone can only be inside Colombia. Same rectangle as the backend
+// (COORDINATES_OUTSIDE_COLOMBIA), San Andrés and Leticia included.
+const COLOMBIA_BOUNDS = L.latLngBounds([-4.3, -82], [13.5, -66.8]);
 
 // If this many tiles fail before any loads, the map is unusable.
 const MAX_TILE_ERRORS = 3;
@@ -34,8 +38,25 @@ const PIN_ICON = L.divIcon({
 // longitude between -180 and 180 if the map was panned past the date line.
 function ClickToPlace({ onPick }) {
     useMapEvents({
-        click: (e) => onPick(e.latlng.wrap()),
+        click: (e) => {
+            const latlng = e.latlng.wrap();
+            if (COLOMBIA_BOUNDS.contains(latlng)) onPick(latlng);
+        },
     });
+    return null;
+}
+
+// The map can't zoom out so far that the view goes past the rectangle. That
+// minimum zoom depends on the size of the map, so it is set again when the
+// map changes size.
+function LimitToColombia() {
+    const map = useMap();
+    useEffect(() => {
+        const fit = () => map.setMinZoom(map.getBoundsZoom(COLOMBIA_BOUNDS, true));
+        fit();
+        map.on('resize', fit);
+        return () => map.off('resize', fit);
+    }, [map]);
     return null;
 }
 
@@ -88,11 +109,16 @@ export default function LocationPicker({ position, onPick, focusKey }) {
 
     const tileHandlers = useTileFailure(() => setFailed(true));
 
+    // A pin dropped outside Colombia goes back to where it was.
     const markerHandlers = useMemo(
         () => ({
-            dragend: (e) => onPick(e.target.getLatLng().wrap()),
+            dragend: (e) => {
+                const latlng = e.target.getLatLng().wrap();
+                if (COLOMBIA_BOUNDS.contains(latlng)) onPick(latlng);
+                else e.target.setLatLng(position);
+            },
         }),
-        [onPick],
+        [onPick, position],
     );
 
     const centerOnPin = () => {
@@ -108,11 +134,14 @@ export default function LocationPicker({ position, onPick, focusKey }) {
                 center={position ?? DEFAULT_CENTER}
                 zoom={position ? PLACE_ZOOM : DEFAULT_ZOOM}
                 zoomControl={false}
+                maxBounds={COLOMBIA_BOUNDS}
+                maxBoundsViscosity={1}
                 className="location-picker-map h-full w-full"
             >
                 <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} maxZoom={19} eventHandlers={tileHandlers} />
                 <ZoomControl position="topright" zoomInTitle="Acercar" zoomOutTitle="Alejar" />
                 <ClickToPlace onPick={onPick} />
+                <LimitToColombia />
                 {position && (
                     <Marker
                         position={position}
