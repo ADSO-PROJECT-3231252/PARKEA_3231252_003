@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Reserva, Zona, Vehiculo, Pago, ParkingSpot } = require('../models');
+const { Reserva, Zona, Vehiculo, Pago, ParkingSpot, Usuario } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
@@ -54,12 +54,26 @@ async function crear(req, res, next) {
             return res.status(400).json({ code: ErrorCodes.INVALID_DURATION, message: 'The reservation must last between 30 minutes and 24 hours' });
         }
 
-        // Locked until the transaction ends: if the same vehicle is booked twice
-        // at the same moment (double click, two tabs), the second request waits
-        // here and the overlap check below then sees the first reservation.
-        // It must be the first read of the transaction: in MySQL the first
-        // plain read fixes what the transaction sees, so a read before this
-        // lock would hide the reservation the other request just created.
+        // Locked until the transaction ends, first the user and then the
+        // vehicle: if the same vehicle is booked twice at the same moment
+        // (double click, two tabs), the second request waits here and the
+        // overlap check below then sees the first reservation. The user goes
+        // first because registrar, marcarPredeterminado and eliminar (vehicles)
+        // also lock the user first; with the same order, deleting a vehicle
+        // while it is being booked waits instead of a deadlock (#288).
+        // These two locks must be the first reads of the transaction: in MySQL
+        // the first plain read fixes what the transaction sees, so a plain read
+        // before them would hide the reservation the other request just created.
+        const usuario = await Usuario.findByPk(userId, {
+            attributes: ['id'],
+            transaction: t,
+            lock: t.LOCK.UPDATE,
+        });
+        if (!usuario) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+
         const vehiculo = await Vehiculo.findOne({
             where: { id: vehicleId, userId },
             transaction: t,

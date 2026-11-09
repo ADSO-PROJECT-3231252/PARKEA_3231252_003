@@ -1,5 +1,5 @@
 const { validationResult } = require('express-validator');
-const { UniqueConstraintError } = require('sequelize');
+const { Op, UniqueConstraintError } = require('sequelize');
 const { Vehiculo, Reserva, Usuario, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
@@ -162,19 +162,44 @@ async function marcarPredeterminado(req, res, next) {
         }
 
         // Only one default per user: clear the previous one first (HU-11, AC-06).
-        // Wrapped in a transaction so the two updates are applied atomically,
-        // without this, two concurrent requests could each read/clear the
-        // previous default before either one applies its own "set new default",
-        // leaving more than one vehicle marked as default at once.
-        await sequelize.transaction(async (t) => {
+        // The two updates happen in one transaction that first locks the user's
+        // row, the same lock registrar and eliminar use (#267, #268, #288).
+        // Without it, setting a default while the default is deleted can leave
+        // two defaults, or none. The transaction returns the vehicle, or null
+        // when another request deleted it while this one was waiting.
+        const actualizado = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, {
+                attributes: ['id'],
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+            if (!usuario) {
+                return null;
+            }
+
+            // Read the vehicle again now that the lock is held
+            const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
+            if (!actual) {
+                return null;
+            }
+
+            // Clear every other default. This vehicle is left out: if it is
+            // already the default (another tab, a second click), clearing it
+            // too would leave the user without one, because update() below
+            // sends nothing when the value it holds is already true.
             await Vehiculo.update(
                 { isDefault: false },
-                { where: { userId, isDefault: true }, transaction: t }
+                { where: { userId, isDefault: true, id: { [Op.ne]: id } }, transaction: t }
             );
-            await vehiculo.update({ isDefault: true }, { transaction: t });
+            await actual.update({ isDefault: true }, { transaction: t });
+            return actual;
         });
 
-        return res.status(200).json({ message: 'Default vehicle updated successfully', vehicle: vehiculo });
+        if (!actualizado) {
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
+        return res.status(200).json({ message: 'Default vehicle updated successfully', vehicle: actualizado });
     } catch (error) {
         next(error);
     }
@@ -191,19 +216,9 @@ async function eliminar(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
-        // Block deletion if the vehicle has an active or pending reservation (HU-13, AC-02)
-        const reservaActiva = await Reserva.findOne({
-            where: { vehicleId: id, status: ['Pending', 'Active'] },
-        });
-        if (reservaActiva) {
-            return res.status(409).json({
-                code: ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION,
-                message: 'This vehicle has an active reservation. Please cancel the reservation before removing the vehicle.',
-            });
-        }
-
         // The deletion and the default reassignment happen in one transaction
-        // that holds the user's row locked, the same lock registrar uses (#267).
+        // that holds the user's row locked, the same lock registrar, marcarPredeterminado
+        // and crear (reservations) take first (#267, #288).
         // Without it, a deletion running at the same time as a registration or
         // another deletion can leave the user without exactly one default
         // vehicle (HU-13 AC-04, HU-10 AC-09). The transaction returns null when
@@ -224,6 +239,18 @@ async function eliminar(req, res, next) {
             const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
             if (!actual) {
                 return ErrorCodes.VEHICLE_NOT_FOUND;
+            }
+
+            // Block deletion if the vehicle has an active or pending reservation
+            // (HU-13, AC-02). Checked here, with the lock held: crear takes the
+            // same lock first (#288), so a reservation created at the same time
+            // is either seen here or waits until the vehicle is gone.
+            const reservaActiva = await Reserva.findOne({
+                where: { vehicleId: id, status: ['Pending', 'Active'] },
+                transaction: t,
+            });
+            if (reservaActiva) {
+                return ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION;
             }
 
             const eraDefault = actual.isDefault;
@@ -249,6 +276,12 @@ async function eliminar(req, res, next) {
         }
         if (fallo === ErrorCodes.VEHICLE_NOT_FOUND) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+        if (fallo === ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION) {
+            return res.status(409).json({
+                code: ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION,
+                message: 'This vehicle has an active reservation. Please cancel the reservation before removing the vehicle.',
+            });
         }
 
         return res.status(200).json({ message: 'Vehicle deleted successfully' });
