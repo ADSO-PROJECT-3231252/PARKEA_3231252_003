@@ -1,6 +1,6 @@
 -- PARKEA (SIGMUI) — Official database schema
--- Mirrors the Sequelize migrations in backend/src/migrations (19 migrations,
--- up to 20260925022623-allow-plate-reuse-after-delete). The application's
+-- Mirrors the Sequelize migrations in backend/src/migrations (21 migrations,
+-- up to 20261103080100-add-open-ended-to-reservations). The application's
 -- database is created with those migrations and seeders (see README); this
 -- file is the readable reference of the same design. The CHECK constraints
 -- below document rules that the backend also validates.
@@ -95,6 +95,9 @@ CREATE TABLE parking_spots (
 -- applied_hourly_rate freezes the zone rate at booking time, so later rate
 -- changes never alter the price of an existing reservation
 -- hold_expires_at: an unpaid reservation expires and releases its spot (HU-26)
+-- open_ended: a stay without a chosen exit time (HU-27). Its end_time keeps a
+-- provisional value (entry + 24 h) until the stay ends, so this flag is what
+-- tells it apart from a reservation with an exit time
 -- Foreign keys use RESTRICT so removing a user, zone, vehicle, or spot can
 -- never destroy the booking history
 CREATE TABLE reservations (
@@ -110,6 +113,7 @@ CREATE TABLE reservations (
     applied_hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0,
     status ENUM('Pending', 'Active', 'Finished', 'Cancelled', 'Expired')
         NOT NULL DEFAULT 'Pending',
+    open_ended BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT reservations_user_id_fk FOREIGN KEY (user_id)
         REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT reservations_zone_id_fk FOREIGN KEY (zone_id)
@@ -121,12 +125,19 @@ CREATE TABLE reservations (
 );
 
 -- 7. Table: payments
--- Relation: reservations (1) - (1) payments (enforced with UNIQUE)
+-- Relation: reservations (1) - (N) payments
+-- type: the initial payment pays the whole stay, or the first hour of an open
+-- stay (HU-27); later a reservation can get extension payments (HU-28) and
+-- the balance of an open stay (HU-27)
+-- initial_reservation_id holds the reservation id only for the initial
+-- payment (NULL for the others), so the unique index allows one initial
+-- payment per reservation and any number of extensions and balances, the
+-- same pattern as plate_active on vehicles
 -- The full card number is never stored, only the last four digits
 -- RESTRICT keeps a reservation from being deleted while it has a payment
 CREATE TABLE payments (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    reservation_id VARCHAR(36) NOT NULL UNIQUE,
+    reservation_id VARCHAR(36) NOT NULL,
     amount DECIMAL(10,2) NOT NULL CHECK (amount >= 0),
     payment_status ENUM('Pending', 'Paid', 'Cancelled', 'Refunded')
         NOT NULL DEFAULT 'Pending',
@@ -134,6 +145,10 @@ CREATE TABLE payments (
     card_last_four VARCHAR(4),
     paid_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    type ENUM('initial', 'extension', 'balance') NOT NULL DEFAULT 'initial',
+    initial_reservation_id VARCHAR(36)
+        GENERATED ALWAYS AS (IF(type = 'initial', reservation_id, NULL)) STORED,
+    UNIQUE KEY payments_initial_reservation_unique (initial_reservation_id),
     FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE RESTRICT
 );
 
