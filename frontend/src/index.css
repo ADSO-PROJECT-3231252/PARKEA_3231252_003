@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The Jest tests are not part of the app: their words must not become classes */
+@source not "../tests";
 
 @theme {
     /* Verde primario — el 600 es el tono por defecto para botones/links/texto */

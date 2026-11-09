@@ -18,4 +18,19 @@ export default defineConfig([
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
   },
+  // Jest tests: describe, test, expect and jest are globals there
+  {
+    files: ['tests/**/*.js'],
+    languageOptions: {
+      globals: { ...globals.browser, ...globals.jest },
+    },
+  },
+  // babel.config.cjs and the test mocks use CommonJS (module.exports)
+  {
+    files: ['**/*.cjs', 'tests/mocks/*.js'],
+    languageOptions: {
+      globals: globals.node,
+      sourceType: 'commonjs',
+    },
+  },
 ])
