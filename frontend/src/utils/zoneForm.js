@@ -131,6 +131,7 @@ const FIELD_BY_CODE = {
     INVALID_CAPACITY: ['totalSlots'],
     NEGATIVE_VALUE: ['hourlyRate'],
     INVALID_COORDINATES: ['latitude', 'longitude'],
+    COORDINATES_OUTSIDE_COLOMBIA: ['latitude', 'longitude'],
     CAPACITY_BELOW_IN_USE: ['totalSlots'],
     INSUFFICIENT_AVAILABLE_SPOTS: ['totalSlots'],
 };
