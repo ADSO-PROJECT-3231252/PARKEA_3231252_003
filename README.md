@@ -46,6 +46,8 @@
 
 The system is designed under a **MERN-like** architecture (React + Node.js + MySQL) with clear separation between frontend, backend, and persistence layer.
 
+**Published site:** [https://parkea-web-sena-gcf8d5ggfcdncyam.chilecentral-01.azurewebsites.net](https://parkea-web-sena-gcf8d5ggfcdncyam.chilecentral-01.azurewebsites.net), hosted on Azure (see [docs/deployment.md](docs/deployment.md)). It runs on a free plan: after 20 minutes without visits the first page takes 30 to 60 seconds to load.
+
 ### Documented Scope (SRS)
 
 > The system operates under a **mandatory reservation model**: a vehicle must have an active reservation to occupy a spot. Drive-in parking without a prior reservation is not supported. This is a documented limitation, not an omission.
@@ -58,9 +60,9 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 |------|------------|--------|----------|
 | **Michael Isaza** | Product Owner · Developer | [@MichaelIsaza](https://github.com/MichaelIsaza) | `isaza_backend`, `isaza_frontend` |
 | **Jhoan Marín** | Scrum Master (Sprint 1) · Developer | [@jhoanmarin227](https://github.com/jhoanmarin227) | `marin_backend`, `marin_frontend` |
-| **Stiven Sánchez** | Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend`, `stiven_frontend` |
-| **David León** | Developer | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_frontend`, `leon_sql` |
-| **Jhoan Almario** | Developer | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
+| **Stiven Sánchez** | Scrum Master (Sprint 4) · Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend`, `stiven_frontend` |
+| **David León** | Scrum Master (Sprint 2) · Developer | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_frontend`, `leon_sql` |
+| **Jhoan Almario** | Scrum Master (Sprint 3) · Developer | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
 
 > The Product Owner is the same for the whole project. The Scrum Master rotates every sprint.
 
@@ -82,6 +84,7 @@ Versions are the ranges declared in each `package.json`.
 | Recharts | ^3.10.1 | Charts in the admin dashboard |
 | Leaflet | ^1.9.4 | Interactive map (OpenStreetMap tiles) |
 | React Leaflet | ^5.0.0 | React components for the zones map |
+| Jest + React Testing Library | ^30.5.2 / ^16.3.3 | Frontend tests (dev dependencies) |
 
 ### Backend
 | Technology | Version | Purpose |
@@ -97,20 +100,24 @@ Versions are the ranges declared in each `package.json`.
 | Helmet | ^8.3.0 | HTTP security headers |
 | CORS | ^2.8.6 | Cross-origin policy |
 | dotenv | ^17.4.2 | Loads the `.env` file |
-| Nodemailer | ^9.0.5 | Password recovery emails (Mailtrap) |
+| express-rate-limit | ^8.7.1 | Attempt limits on sign-in, sign-up and password recovery |
+| Nodemailer | ^10.1.7 | Password recovery emails (Mailtrap on your computer, Resend on the published site) |
 | UUID | ^14.0.1 | Unique identifiers |
 | nodemon | ^3.1.14 | Auto-reload in development (dev dependency) |
+| Jest + Supertest | ^30.5.2 / ^7.3.1 | Backend tests (dev dependencies) |
 
 ### Database
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| MySQL | 8.0 | Relational database engine |
+| MySQL | 8.0 or later (8.4 on Azure) | Relational database engine |
 
 ### Development Tools
 | Tool | Use |
 |------|-----|
 | Git + GitHub | Version control, pull requests and the GitHub Projects board |
 | Postman | Manual API testing |
+| Azure (App Service + Azure Database for MySQL) | Hosting of the published site |
+| Resend | Sending the emails of the published site |
 | VS Code | Primary IDE |
 | ESLint | JavaScript linter (frontend, ^10.6.0) |
 
@@ -129,14 +136,16 @@ PARKEA_3231252_003/
 │   │   ├── 📁 constants/     # Centralized error codes (errorCodes.js)
 │   │   ├── 📁 controllers/   # Business logic (one per module)
 │   │   ├── 📁 jobs/          # Background jobs (reservation expiration and finalization)
-│   │   ├── 📁 middlewares/   # Auth and express-validator rules (*.validator.js)
-│   │   ├── 📁 migrations/    # 19 Sequelize migrations: they create the database
+│   │   ├── 📁 middlewares/   # Auth, attempt limits (rateLimit.js) and express-validator rules (*.validator.js)
+│   │   ├── 📁 migrations/    # 21 Sequelize migrations: they create the database
 │   │   ├── 📁 models/        # Sequelize models (9 tables)
 │   │   ├── 📁 routes/        # API route definitions
 │   │   ├── 📁 seeders/       # Demo data: roles, zones and the primary administrator
-│   │   └── 📁 utils/         # Helpers (mailer)
+│   │   └── 📁 utils/         # Helpers (mailer, simulated payment, stay pricing, validation)
+│   ├── 📁 tests/             # Jest + Supertest tests (npm test)
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
+│   ├── API_REFERENCE.md      # Every endpoint with its rules and error codes
 │   └── package.json
 │
 ├── 📁 frontend/
@@ -146,14 +155,17 @@ PARKEA_3231252_003/
 │   │   ├── App.jsx           # Router + AuthProvider
 │   │   ├── index.css         # Tailwind CSS + PARKEA theme (design tokens via @theme)
 │   │   ├── 📁 assets/        # Images, logos, illustrations
-│   │   ├── 📁 components/    # Shared UI (Header, Layout, ConfirmDialog, FieldRow, MetricCard, LogDetailsModal, ZoneMap)
+│   │   ├── 📁 components/    # Shared UI (Header, Footer, Layout, dialogs, FieldRow, MetricCard, ZoneMap, LocationPicker, ZoneFormFields)
 │   │   ├── 📁 context/       # Global state (AuthContext)
-│   │   ├── 📁 hooks/         # Custom React hooks (useAuth)
+│   │   ├── 📁 hooks/         # Custom React hooks (useAuth, useZoneForm)
 │   │   ├── 📁 pages/         # Route-based views
 │   │   ├── 📁 routes/        # Route definitions and ProtectedRoute
 │   │   ├── 📁 services/      # API calls (Axios)
-│   │   └── 📁 utils/         # Helpers: format, validators, error messages, statuses
+│   │   ├── 📁 utils/         # Helpers: format, validators, error messages, statuses, open and extended stays
+│   │   └── config.js         # Address of the API (VITE_API_URL)
+│   ├── 📁 tests/             # Jest + React Testing Library tests (npm test)
 │   ├── .env.example
+│   ├── babel.config.cjs      # Only used by Jest
 │   ├── eslint.config.js
 │   ├── index.html
 │   ├── package.json
@@ -164,8 +176,12 @@ PARKEA_3231252_003/
 │   └── README.md
 │
 ├── 📁 docs/
-│   └── README.md             # Technical manual and accessibility report (to be added)
+│   ├── deployment.md         # How the site is published on Azure, and the emails with Resend
+│   └── README.md             # Index (technical manual and accessibility report to be added)
 │
+├── .editorconfig             # Shared editor settings (UTF-8, LF, final newline)
+├── .mailmap                  # One name per author in the Git history
+├── runProjectParkea.md       # Short step-by-step guide to run the project
 └── README.md                 # ← This document
 ```
 
@@ -226,7 +242,7 @@ npx sequelize-cli db:migrate
 npx sequelize-cli db:seed:all
 ```
 
-> The 19 migrations create the 9 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens and admin_action_logs.
+> The 21 migrations create the 9 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens and admin_action_logs.
 > The seeders add the `admin` and `user` roles, 4 demo zones with their parking spots, and the primary administrator `admin@parkea.com` (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
 
 6. Start the development server:
@@ -283,7 +299,8 @@ JWT_EXPIRES_IN=1h
 # CORS: address of the frontend
 FRONTEND_URL=http://localhost:5173
 
-# Mailtrap (password recovery emails)
+# Emails (password recovery): Mailtrap on your computer
+MAIL_FROM=
 MAILTRAP_HOST=sandbox.smtp.mailtrap.io
 MAILTRAP_PORT=2525
 MAILTRAP_USER=your_mailtrap_user
@@ -297,10 +314,10 @@ MAILTRAP_PASS=your_mailtrap_password
 | `DATABASE_URL` | MySQL connection, used by the server and by sequelize-cli |
 | `JWT_SECRET` / `JWT_EXPIRES_IN` | Signing and lifetime of the session token (default 1h) |
 | `FRONTEND_URL` | Origin allowed by CORS (default `http://localhost:5173`) |
-| `MAILTRAP_*` | SMTP account for the password recovery emails |
+| `MAILTRAP_*` | SMTP account for the password recovery emails. On your computer, the Mailtrap sandbox; the published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
+| `MAIL_FROM` | Sender of the emails. Leave it empty on your computer; the published site uses `no-reply@parkeaweb.me` |
 
 > If the MySQL password has special characters, encode them in `DATABASE_URL` (for example `$` → `%24`, `@` → `%40`).
-> `.env.example` also lists `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` and `DB_PASSWORD`, but the code does not read them.
 
 ### Frontend (`frontend/.env`)
 
@@ -336,6 +353,7 @@ VITE_API_URL=http://localhost:3000/api
 | Build | `npm run build` | Production build |
 | Preview | `npm run preview` | Build preview |
 | Lint | `npm run lint` | ESLint |
+| Tests | `npm test` | Jest + React Testing Library, no backend needed |
 
 ---
 
@@ -357,15 +375,18 @@ Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signe
 | Zones | `GET /zones`, `GET /zones/:id` | Public | HU-09 |
 | Zones | `GET /zones/all`, `GET /zones/:id/spots` | Admin | HU-19 |
 | Zones | `POST /zones`, `PUT /zones/:id`, `PATCH /zones/:id/toggle` | Admin | HU-19, HU-20, HU-21 |
-| Reservations | `POST /reservations` | User | HU-14 |
+| Reservations | `POST /reservations` (with `openEnded: true` for a stay without an exit time) | User | HU-14, HU-27 |
 | Reservations | `GET /reservations` (paginated), `GET /reservations/:id` | User | HU-15, HU-18 |
 | Reservations | `PATCH /reservations/:id/cancel` | User | HU-16 |
+| Reservations | `PATCH /reservations/:id/finish` (finish an open stay) | User | HU-27 |
+| Reservations | `PATCH /reservations/:id/extend` (extend a stay or switch it to an open stay) | User | HU-28 |
 | Payments | `POST /payments/:reservationId` | User | HU-17 |
+| Payments | `POST /payments/:reservationId/balance` (balance of an open stay) | User | HU-27 |
 | Dashboard | `GET /admin/dashboard` and `/admin/dashboard/{occupancy, payments-status, recent-payments, reservations-by-zone, alerts}` | Admin | HU-22 |
 | Users | `GET /admin/users`, `GET /admin/users/logs` | Admin | HU-23 |
 | Users | `PATCH /admin/users/:id/role`, `PATCH /admin/users/:id/status` | Admin | HU-23 |
 
-Business errors come back as `{ "code": "...", "message": "..." }`. Validation errors come back as `{ "code": "VALIDATION_ERROR", "errors": [...] }`, without `message`: each item of `errors` names the field (`path`) and its message (`msg`). A route that does not exist returns 404 with `{ "message": "Route not found" }`, without `code`. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`.
+Business errors come back as `{ "code": "...", "message": "..." }`. Validation errors come back as `{ "code": "VALIDATION_ERROR", "errors": [...] }`, without `message`: each item of `errors` names the field (`path`) and its message (`msg`). A route that does not exist returns 404 `ROUTE_NOT_FOUND`. Sign-in, sign-up and password recovery have attempt limits and answer 429 `TOO_MANY_REQUESTS` when one is reached. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`. Every endpoint, with its rules, its errors and the attempt limits, is described in [backend/API_REFERENCE.md](backend/API_REFERENCE.md).
 
 ---
 
@@ -473,6 +494,8 @@ Each user story is an issue with its acceptance criteria, traceability and Defin
 | HU-24 | Sign Out | @MichaelIsaza | [#159](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/159) |
 | HU-25 | View Zones on Map | @jhoanmarin227 | [#160](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/160) |
 | HU-26 | Reservation Expiration | @MichaelIsaza | [#161](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/161) |
+| HU-27 | Open-Ended Stay | @jhoanmarin227 | [#225](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/225) |
+| HU-28 | Extend Stay | @jhoanmarin227 | [#226](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/226) |
 
 ---
 
@@ -523,23 +546,25 @@ The work is managed with Scrum on the **PARKEA - Sprint Board** (Projects tab of
 
 | Period | Dates | Notes |
 |--------|-------|-------|
-| Sprint 1 | Oct 13 – Oct 26, 2026 | Sprint review on Oct 27 |
-| Sprint 2 | Oct 27 – Nov 9, 2026 | Audit 2 on Nov 10 |
+| Sprint 1 | Oct 13 – Oct 26, 2026 | Sprint review on Oct 27, version `v0.1` |
+| Sprint 2 | Oct 27 – Nov 9, 2026 | Audit 2 on Nov 10, version `v0.2` |
 | Sprint 3 | Nov 10 – Nov 23, 2026 | |
 | Feature freeze | Nov 24, 2026 | From this date only fixes: no new views or features |
 | Final demo | Dec 1, 2026 | Demo and individual presentation |
 
 **Sprint 1 goal:** finish the reservation confirmation, the simulated payment, zone management and creation, user management and the zones map, and close the pending fixes of the stories already delivered.
 
-### Identified Pending Work
+**Sprint 2 goal:** let users cancel a reservation, see their booking history, park without a chosen exit time and extend a stay (HU-16, HU-18, HU-27 and HU-28), and make the system more reliable with stronger validations and error handling, attempt limits, safe handling of simultaneous requests, real recovery emails and the first frontend tests.
 
-| Task | Priority | Notes |
-|------|----------|-------|
-| Integrate `backend` and `frontend` into `develop` | High | Rehearsal on Oct 22–23 and tag `v0.1` before Oct 26; then at the end of every sprint |
-| Automated testing (unit + integration) | High | Planned with Jest; today everything is verified manually and with Postman |
-| Performance measurement | Medium | SRS requires < 3s with 50 concurrent users |
-| API documentation (Swagger/OpenAPI) | Medium | The endpoint table above is the current reference |
-| Server/cloud deployment | Low | Pending for the final phase |
+### Technical Work Status
+
+| Task | Priority | Status |
+|------|----------|--------|
+| Integrate `backend` and `frontend` into `develop` | High | Done at the end of every sprint: `v0.1` (Sprint 1) and `v0.2` (Sprint 2) |
+| Automated testing (unit + integration) | High | In progress: Jest + Supertest in the backend since Sprint 1 and Jest + React Testing Library in the frontend since Sprint 2. At the end of Sprint 2: 105 backend tests and 77 frontend tests |
+| Server/cloud deployment | Low | Done: published on Azure (App Service + Azure Database for MySQL), see [docs/deployment.md](docs/deployment.md). It runs `integration/sprint-2` |
+| Performance measurement | Medium | SRS requires < 3s with 50 concurrent users. Not against the published site: its free plan has 60 CPU minutes a day |
+| API documentation (Swagger/OpenAPI) | Medium | Today the reference is the endpoint table above and [backend/API_REFERENCE.md](backend/API_REFERENCE.md) |
 
 ---
 

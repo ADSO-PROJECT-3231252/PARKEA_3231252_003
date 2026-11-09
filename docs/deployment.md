@@ -29,7 +29,7 @@ Notes:
 
 ## What runs where
 
-- The live site runs the code of the branch that was last deployed. For Sprint 1 that is `integration/sprint-1`.
+- The live site runs the code of the branch that was last deployed. For Sprint 2 that is `integration/sprint-2`.
 - App changes follow the normal flow: personal branch, PR to `frontend` or `backend`, review, merge. To publish them, merge `frontend` and `backend` into the branch you deploy from, then deploy.
 - Changes that only matter for the hosted version (for example the encrypted database connection in `backend/src/config/config.js`) go directly to the branch you deploy from.
 
