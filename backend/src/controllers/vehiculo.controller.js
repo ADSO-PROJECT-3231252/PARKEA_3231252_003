@@ -162,19 +162,40 @@ async function marcarPredeterminado(req, res, next) {
         }
 
         // Only one default per user: clear the previous one first (HU-11, AC-06).
-        // Wrapped in a transaction so the two updates are applied atomically,
-        // without this, two concurrent requests could each read/clear the
-        // previous default before either one applies its own "set new default",
-        // leaving more than one vehicle marked as default at once.
-        await sequelize.transaction(async (t) => {
+        // The two updates happen in one transaction that first locks the user's
+        // row, the same lock registrar and eliminar use (#267, #268, #288).
+        // Without it, setting a default while the default is deleted can leave
+        // two defaults, or none. The transaction returns the vehicle, or null
+        // when another request deleted it while this one was waiting.
+        const actualizado = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, {
+                attributes: ['id'],
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+            if (!usuario) {
+                return null;
+            }
+
+            // Read the vehicle again now that the lock is held
+            const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
+            if (!actual) {
+                return null;
+            }
+
             await Vehiculo.update(
                 { isDefault: false },
                 { where: { userId, isDefault: true }, transaction: t }
             );
-            await vehiculo.update({ isDefault: true }, { transaction: t });
+            await actual.update({ isDefault: true }, { transaction: t });
+            return actual;
         });
 
-        return res.status(200).json({ message: 'Default vehicle updated successfully', vehicle: vehiculo });
+        if (!actualizado) {
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
+        return res.status(200).json({ message: 'Default vehicle updated successfully', vehicle: actualizado });
     } catch (error) {
         next(error);
     }
