@@ -202,18 +202,53 @@ async function eliminar(req, res, next) {
             });
         }
 
-        const eraDefault = vehiculo.isDefault;
-        await vehiculo.destroy(); // soft delete (paranoid: true on the model)
-
-        // Reassign the default to the most recently registered remaining vehicle (HU-13, AC-04)
-        if (eraDefault) {
-            const siguiente = await Vehiculo.findOne({
-                where: { userId },
-                order: [['created_at', 'DESC']],
+        // The deletion and the default reassignment happen in one transaction
+        // that holds the user's row locked, the same lock registrar uses (#267).
+        // Without it, a deletion running at the same time as a registration or
+        // another deletion can leave the user without exactly one default
+        // vehicle (HU-13 AC-04, HU-10 AC-09). The transaction returns null when
+        // everything went well, or the error code to answer with.
+        const fallo = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, {
+                attributes: ['id'],
+                transaction: t,
+                lock: t.LOCK.UPDATE,
             });
-            if (siguiente) {
-                await siguiente.update({ isDefault: true });
+            if (!usuario) {
+                return ErrorCodes.USER_NOT_FOUND;
             }
+
+            // Read the vehicle again now that the lock is held: another request
+            // may have deleted it, or changed which one is the default, while
+            // this one was waiting.
+            const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
+            if (!actual) {
+                return ErrorCodes.VEHICLE_NOT_FOUND;
+            }
+
+            const eraDefault = actual.isDefault;
+            await actual.destroy({ transaction: t }); // soft delete (paranoid: true on the model)
+
+            // Reassign the default to the most recently registered remaining vehicle (HU-13, AC-04)
+            if (eraDefault) {
+                const siguiente = await Vehiculo.findOne({
+                    where: { userId },
+                    order: [['created_at', 'DESC']],
+                    transaction: t,
+                });
+                if (siguiente) {
+                    await siguiente.update({ isDefault: true }, { transaction: t });
+                }
+            }
+
+            return null;
+        });
+
+        if (fallo === ErrorCodes.USER_NOT_FOUND) {
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+        if (fallo === ErrorCodes.VEHICLE_NOT_FOUND) {
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
         return res.status(200).json({ message: 'Vehicle deleted successfully' });
