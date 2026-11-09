@@ -212,19 +212,9 @@ async function eliminar(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
-        // Block deletion if the vehicle has an active or pending reservation (HU-13, AC-02)
-        const reservaActiva = await Reserva.findOne({
-            where: { vehicleId: id, status: ['Pending', 'Active'] },
-        });
-        if (reservaActiva) {
-            return res.status(409).json({
-                code: ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION,
-                message: 'This vehicle has an active reservation. Please cancel the reservation before removing the vehicle.',
-            });
-        }
-
         // The deletion and the default reassignment happen in one transaction
-        // that holds the user's row locked, the same lock registrar uses (#267).
+        // that holds the user's row locked, the same lock registrar, marcarPredeterminado
+        // and crear (reservations) take first (#267, #288).
         // Without it, a deletion running at the same time as a registration or
         // another deletion can leave the user without exactly one default
         // vehicle (HU-13 AC-04, HU-10 AC-09). The transaction returns null when
@@ -245,6 +235,18 @@ async function eliminar(req, res, next) {
             const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
             if (!actual) {
                 return ErrorCodes.VEHICLE_NOT_FOUND;
+            }
+
+            // Block deletion if the vehicle has an active or pending reservation
+            // (HU-13, AC-02). Checked here, with the lock held: crear takes the
+            // same lock first (#288), so a reservation created at the same time
+            // is either seen here or waits until the vehicle is gone.
+            const reservaActiva = await Reserva.findOne({
+                where: { vehicleId: id, status: ['Pending', 'Active'] },
+                transaction: t,
+            });
+            if (reservaActiva) {
+                return ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION;
             }
 
             const eraDefault = actual.isDefault;
@@ -270,6 +272,12 @@ async function eliminar(req, res, next) {
         }
         if (fallo === ErrorCodes.VEHICLE_NOT_FOUND) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+        if (fallo === ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION) {
+            return res.status(409).json({
+                code: ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION,
+                message: 'This vehicle has an active reservation. Please cancel the reservation before removing the vehicle.',
+            });
         }
 
         return res.status(200).json({ message: 'Vehicle deleted successfully' });
