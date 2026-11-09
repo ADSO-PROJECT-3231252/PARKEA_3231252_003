@@ -40,6 +40,7 @@ const errorMessages = {
     NEGATIVE_VALUE: 'Los valores no pueden ser negativos',
     INVALID_CAPACITY: 'La capacidad debe ser un número entero entre 1 y 500',
     INVALID_COORDINATES: 'Las coordenadas ingresadas no son válidas',
+    COORDINATES_OUTSIDE_COLOMBIA: 'La ubicación de la zona debe estar dentro de Colombia',
     CAPACITY_BELOW_IN_USE: 'No puedes reducir la capacidad por debajo de los cupos en uso',
     INSUFFICIENT_AVAILABLE_SPOTS: 'No hay suficientes cupos disponibles para reducir la capacidad',
 
