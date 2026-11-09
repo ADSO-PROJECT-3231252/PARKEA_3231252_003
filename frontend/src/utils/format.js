@@ -25,7 +25,8 @@ export function formatTime(isoString) {
 }
 
 export function formatCurrency(amount) {
-    return `$ ${Math.round(Number(amount)).toLocaleString('es-CO')}`;
+    // Non-breaking space: "$" never ends a line apart from the number (#261)
+    return `$\u00a0${Math.round(Number(amount)).toLocaleString('es-CO')}`;
 }
 
 // "2 horas 30 minutos" / "1 hora 00 minutos" / "30 minutos".
