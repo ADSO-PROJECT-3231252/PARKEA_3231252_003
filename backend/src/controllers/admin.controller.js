@@ -192,7 +192,7 @@ async function getUsuarios(req, res, next) {
   try {
     const { search, role, status } = req.query;
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
-    const limit = Math.max(parseInt(req.query.limit, 10) || 10, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 100);
     const offset = (page - 1) * limit;
 
     const where = {};

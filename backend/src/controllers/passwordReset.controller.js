@@ -44,7 +44,14 @@ async function solicitarRecuperacion(req, res, next) {
         // production, the local Vite server in development.
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const resetUrl = `${frontendUrl}/reset-password?token=${tokenPlano}`;
-        await enviarCorreoRecuperacion(usuario.email, resetUrl);
+
+        // The email goes out in the background, so the answer is the same,
+        // and just as fast, whether the account exists or not. If the email
+        // provider fails, it only goes to the server log: a 500 here would
+        // tell anyone that the account exists.
+        enviarCorreoRecuperacion(usuario.email, resetUrl).catch((error) => {
+            console.error('Could not send the recovery email:', error.message);
+        });
 
         return res.status(200).json(respuestaGenerica);
     } catch (error) {
