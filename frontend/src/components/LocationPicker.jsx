@@ -4,6 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './LocationPicker.css';
 import { LocateFixed, MapPin, AlertCircle } from 'lucide-react';
+import { COLOMBIA_RECTANGLE } from '../utils/zoneForm';
 
 // HU-20 / HU-21: map to choose where a zone is. Same base map as HU-25
 // (OpenStreetMap standard tiles: free, no API key, attribution required).
@@ -17,9 +18,11 @@ const DEFAULT_ZOOM = 13;
 // Close enough to tell one block from the next.
 const PLACE_ZOOM = 17;
 
-// #232: a zone can only be inside Colombia. Same rectangle as the backend
-// (COORDINATES_OUTSIDE_COLOMBIA), San Andrés and Leticia included.
-const COLOMBIA_BOUNDS = L.latLngBounds([-4.3, -82], [13.5, -66.8]);
+// #232: the map can't leave Colombia, the same rectangle the form checks.
+const COLOMBIA_BOUNDS = L.latLngBounds(
+    [COLOMBIA_RECTANGLE.south, COLOMBIA_RECTANGLE.west],
+    [COLOMBIA_RECTANGLE.north, COLOMBIA_RECTANGLE.east],
+);
 
 // If this many tiles fail before any loads, the map is unusable.
 const MAX_TILE_ERRORS = 3;
