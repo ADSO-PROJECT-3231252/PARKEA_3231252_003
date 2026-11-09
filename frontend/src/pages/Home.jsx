@@ -78,7 +78,7 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
     return (
         <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
             <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-title font-display uppercase text-neutral-900">{title}</h3>
+                <h2 className="text-title font-display uppercase text-neutral-900">{title}</h2>
                 <Icon className="h-6 w-6 text-parkea-600" aria-hidden="true" />
             </div>
             <div className="flex-1">{children}</div>
@@ -96,6 +96,7 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
 function VisitorHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Inicio | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
                     <h1 className="text-hero-sm font-display uppercase text-parkea-700 sm:text-hero lg:text-hero-sm xl:text-hero">
@@ -218,6 +219,7 @@ function AuthenticatedHome({ user }) {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Inicio | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
                     <h1 className="break-words text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
@@ -279,7 +281,10 @@ function AuthenticatedHome({ user }) {
 
                             <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pl-[18px]">
                                 <p className="text-body text-neutral-600">
-                                    {formatTime(latestReservation.startTime)} – {formatTime(latestReservation.endTime)}
+                                    {/* An open stay (HU-27, or switched to it in HU-28) has no exit time yet */}
+                                    {latestReservation.endTime
+                                        ? `${formatTime(latestReservation.startTime)} – ${formatTime(latestReservation.endTime)}`
+                                        : `${formatTime(latestReservation.startTime)} · Sin hora de salida`}
                                 </p>
                                 <p className="shrink-0 font-mono text-label text-neutral-600">
                                     Cupo N.º {latestReservation.spotNumber}
@@ -375,6 +380,7 @@ function AuthenticatedHome({ user }) {
 function AdminHome() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Inicio de administrador | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 {/* HU-04 AC-08: on phones the shield goes above the headline so the
                     text and the button get the full width of the card. */}
@@ -444,9 +450,9 @@ function AdminHome() {
                         </span>
                         <h3 className="mt-4 text-body font-medium text-neutral-900">Gestión de zonas</h3>
                         <p className="mt-1 text-body text-neutral-600">
-                            Crea, edita y administra las zonas de parqueo, tarifas,{' '}
+                            Crea, edita y administra las zonas de parqueo, tarifas{' '}
                             <br className="hidden 2xl:block" />
-                            cupos disponibles y horarios de operación.
+                            y cupos disponibles.
                         </p>
                         <Link
                             to="/admin/zones"

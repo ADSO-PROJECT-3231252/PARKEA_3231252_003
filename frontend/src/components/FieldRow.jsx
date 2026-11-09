@@ -9,4 +9,4 @@ export default function FieldRow({ icon: Icon, children }) {
             <div className="flex-1">{children}</div>
         </div>
     );
-} 
+}

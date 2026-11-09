@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The Jest tests are not part of the app: their words must not become classes */
+@source not "../tests";
 
 @theme {
     /* Verde primario — el 600 es el tono por defecto para botones/links/texto */
@@ -40,6 +42,8 @@
     --color-flag-yellow: #FCD116;
     --color-flag-blue: #003893;
     --color-flag-red: #CE1126;
+    /* Light green at the edges of the 404 picture, so the page around it blends in (NotFound) */
+    --color-illustration: #F1F8F1;
 
     /* Familias tipográficas */
     --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;

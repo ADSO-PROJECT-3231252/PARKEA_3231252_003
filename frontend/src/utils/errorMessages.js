@@ -40,6 +40,7 @@ const errorMessages = {
     NEGATIVE_VALUE: 'Los valores no pueden ser negativos',
     INVALID_CAPACITY: 'La capacidad debe ser un número entero entre 1 y 500',
     INVALID_COORDINATES: 'Las coordenadas ingresadas no son válidas',
+    COORDINATES_OUTSIDE_COLOMBIA: 'La ubicación de la zona debe estar dentro de Colombia',
     CAPACITY_BELOW_IN_USE: 'No puedes reducir la capacidad por debajo de los cupos en uso',
     INSUFFICIENT_AVAILABLE_SPOTS: 'No hay suficientes cupos disponibles para reducir la capacidad',
 
@@ -55,6 +56,16 @@ const errorMessages = {
     RESERVATION_ALREADY_STARTED: 'Esta reserva ya inició y no se puede cancelar',
     RESERVATION_NOT_CANCELLABLE: 'Esta reserva no se puede cancelar en su estado actual',
     RESERVATION_EXPIRED: 'Esta reserva expiró porque no se pagó a tiempo. Realiza una nueva reserva',
+    PENDING_BALANCE: 'Tienes un saldo pendiente de una estadía anterior. Págalo antes de hacer una nueva reserva',
+    NOT_AN_OPEN_STAY: 'Esta reserva tiene hora de salida, así que no se puede terminar antes',
+    STAY_NOT_STARTED: 'Tu estadía todavía no ha comenzado',
+    STAY_NOT_ACTIVE: 'Esta estadía ya no está activa',
+    STAY_AMOUNT_CHANGED: 'Empezó otra hora mientras confirmabas. Revisa el nuevo valor y confirma de nuevo',
+    ALREADY_OPEN_STAY: 'Esta reserva ya está en tiempo indefinido. Termínala cuando salgas',
+    EXIT_TIME_PASSED: 'La hora de salida de esta reserva ya pasó, así que no se puede ampliar',
+    EXTENSION_NOT_LATER: 'La nueva hora de salida debe ser posterior a la actual',
+    EXTENSION_TOO_LONG: 'La estadía no puede durar más de 24 horas desde la entrada',
+    RESERVATION_CHANGED: 'Esta reserva cambió mientras la ampliabas, por ejemplo desde otra pestaña. No se cobró nada en este intento. Revisa la reserva e intenta de nuevo',
 
     // Payments
     INVALID_PAYMENT_METHOD: 'Método de pago inválido',
@@ -63,11 +74,14 @@ const errorMessages = {
     RESERVATION_NOT_PENDING: 'Esta reserva no está pendiente de pago',
     PAYMENT_ALREADY_EXISTS: 'Esta reserva ya tiene un pago registrado',
     PAYMENT_DECLINED: 'Pago rechazado. Intenta con otro método de pago',
+    NO_PENDING_BALANCE: 'Esta reserva no tiene saldo pendiente',
 
     // Generic
     VALIDATION_ERROR: 'Revisa los campos marcados',
     INVALID_JSON: 'No pudimos leer los datos enviados. Intenta de nuevo',
     PAYLOAD_TOO_LARGE: 'Los datos enviados son demasiado grandes',
+    UNSUPPORTED_MEDIA_TYPE: 'No pudimos leer los datos enviados porque su formato no es compatible. Intenta de nuevo',
+    TOO_MANY_REQUESTS: 'Hiciste demasiados intentos. Espera unos minutos e intenta de nuevo',
     ROUTE_NOT_FOUND: 'No encontramos lo que buscas',
     INTERNAL_ERROR: 'Ocurrió un error inesperado. Intenta de nuevo',
 };

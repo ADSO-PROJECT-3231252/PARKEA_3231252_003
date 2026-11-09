@@ -128,6 +128,7 @@ export default function RegisterVehicle() {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Agregar vehículo | PARKEA</title>
             <h1 className="text-title font-display uppercase text-neutral-900">Agregar vehículo</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Registra un nuevo vehículo para usarlo en tus reservas.
@@ -175,7 +176,7 @@ export default function RegisterVehicle() {
                                 {errors.vehicleType}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">
+                            <p className="mt-1 text-caption text-neutral-600">
                                 Elige el tipo de vehículo que deseas registrar.
                             </p>
                         )}
@@ -202,7 +203,7 @@ export default function RegisterVehicle() {
                                 {errors.plate}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">Ingresa la placa sin espacios.</p>
+                            <p className="mt-1 text-caption text-neutral-600">Ingresa la placa sin espacios.</p>
                         )}
                     </FieldRow>
 
@@ -256,7 +257,7 @@ export default function RegisterVehicle() {
 
                     <FieldRow icon={Eye}>
                         <label htmlFor="visualDescription" className="block text-label text-neutral-700">
-                            Descripción visual <span className="text-neutral-500">(opcional)</span>
+                            Descripción visual <span className="text-neutral-600">(opcional)</span>
                         </label>
                         <textarea
                             id="visualDescription"
@@ -268,7 +269,7 @@ export default function RegisterVehicle() {
                             placeholder="Ejemplo: Rayón en la puerta delantera derecha, calcomanía en el vidrio trasero."
                             className="mt-1 w-full resize-none rounded-md border border-neutral-200 px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                         />
-                        <p className="mt-1 text-caption text-neutral-500">
+                        <p className="mt-1 text-caption text-neutral-600">
                             Información adicional para identificar tu vehículo fácilmente.
                         </p>
                     </FieldRow>
@@ -295,7 +296,7 @@ export default function RegisterVehicle() {
                                 {errors.color}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-500">
+                            <p className="mt-1 text-caption text-neutral-600">
                                 Los campos rellenados con <span className="text-danger">*</span> son obligatorios
                             </p>
                         )}
@@ -322,4 +323,4 @@ export default function RegisterVehicle() {
             </form>
         </div>
     );
-} 
+}
