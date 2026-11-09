@@ -41,6 +41,11 @@ export default function ForgotPassword() {
                 // never reached the backend, so showing an error reveals nothing
                 // about the account.
                 setServerError(translateError('INTERNAL_ERROR'));
+            } else if (err.response.data?.code === 'TOO_MANY_REQUESTS') {
+                // Card #191: too many requests from this visitor. The limit counts
+                // visitors, not emails, so the message reveals nothing about the
+                // account (AC-04).
+                setServerError(translateError('TOO_MANY_REQUESTS'));
             } else {
                 // The server did respond (e.g. a 500 while sending the email):
                 // show the same generic message as on success, so it never
@@ -52,7 +57,8 @@ export default function ForgotPassword() {
         }
     };
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <title>Recuperar contraseña | PARKEA</title>
             <div className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200 p-8">
                 <div className="flex flex-col items-center mb-6">
                     <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
@@ -152,6 +158,6 @@ hover:text-parkea-700"
                     </Link>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

@@ -70,6 +70,7 @@ export default function EditZone() {
     if (loading) {
         return (
             <div className={PAGE_CLASS}>
+                <title>Editar zona | PARKEA</title>
                 <PageTitle />
                 <p role="status" aria-live="polite" className="mt-6 rounded-lg border border-neutral-200 bg-white p-6 text-body text-neutral-600">
                     Cargando datos de la zona…
@@ -81,6 +82,7 @@ export default function EditZone() {
     if (fetchError) {
         return (
             <div className={PAGE_CLASS}>
+                <title>Editar zona | PARKEA</title>
                 <PageTitle />
                 <div role="alert" className="mt-6 flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-6">
                     <p className="flex items-center gap-2 text-body text-danger">
@@ -222,6 +224,7 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
 
     return (
         <div className={PAGE_CLASS}>
+            <title>Editar zona | PARKEA</title>
             <PageTitle zone={zone} />
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 rounded-lg border border-neutral-200 bg-white">

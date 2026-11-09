@@ -25,7 +25,8 @@ export function formatTime(isoString) {
 }
 
 export function formatCurrency(amount) {
-    return `$ ${Math.round(Number(amount)).toLocaleString('es-CO')}`;
+    // Non-breaking space: "$" never ends a line apart from the number (#261)
+    return `$\u00a0${Math.round(Number(amount)).toLocaleString('es-CO')}`;
 }
 
 // "2 horas 30 minutos" / "1 hora 00 minutos" / "30 minutos".
@@ -45,3 +46,23 @@ export function formatCountdown(ms) {
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
+
+// The backend has no human-readable reservation code, only the UUID. The first
+// 8 characters are shown as a short code (a prefix of the full ID that the
+// confirmation screen displays). Shared by HU-16 and HU-18.
+export const formatReservationCode = (id) => String(id).slice(0, 8).toUpperCase();
+
+const pad = (n) => String(n).padStart(2, '0');
+
+// "10/06/2026 08:30", 24-hour clock, in the user's local time (mockup format of
+// the booking history). Shared by HU-18 and the HU-16 cancel dialog.
+export function formatDateTime(isoString) {
+    const d = new Date(isoString);
+    const fecha = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+    const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${fecha} ${hora}`;
+}
+
+// A time or an amount inside a sentence ("03:00 p. m.", "$ 2.500"), with its
+// spaces made non-breaking so a line never splits it (HU-28 dialogs).
+export const keepTogether = (text) => String(text).replace(/ /g, '\u00a0');

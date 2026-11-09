@@ -69,11 +69,13 @@ export default function ResetPassword() {
     // the message with the link back to phase 1.
     if (!token || tokenInvalid) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+                <title>Enlace no válido | PARKEA</title>
                 <div
                     className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200
 p-8 text-center"
                 >
+                    <h1 className="sr-only">Enlace no válido</h1>
                     <p
                         role="alert"
                         className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 mb-4"
@@ -87,11 +89,12 @@ p-8 text-center"
                         Solicitar nuevo enlace
                     </Link>
                 </div>
-            </div>
+            </main>
         );
     }
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <title>Crear nueva contraseña | PARKEA</title>
             <div className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200 p-8">
                 <div className="flex flex-col items-center mb-6">
                     <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
@@ -151,7 +154,7 @@ ${errors.newPassword ? 'border-danger' : 'border-neutral-200'}`}
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showPassword ? (
@@ -166,7 +169,7 @@ hover:text-neutral-700"
                                 {errors.newPassword}
                             </p>
                         ) : (
-                            <p id="newPassword-hint" className="mt-1 text-caption text-neutral-500">
+                            <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
                                 Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
                             </p>
                         )}
@@ -199,7 +202,7 @@ ${errors.confirmNewPassword ? 'border-danger' : 'border-neutral-200'}`}
                                 type="button"
                                 onClick={() => setShowConfirm((v) => !v)}
                                 aria-label={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showConfirm ? (
@@ -235,6 +238,6 @@ focus:ring-parkea-600 transition disabled:opacity-60"
                     <div className="h-px flex-1 bg-neutral-200" />
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

@@ -45,6 +45,14 @@ export function parseCoordinatePair(text) {
     return match ? { latitude: match[1], longitude: match[2] } : null;
 }
 
+// #232: a zone can only be inside Colombia. Same rectangle as validarZona in
+// the backend (COORDINATES_OUTSIDE_COLOMBIA), San Andrés and Leticia included.
+export const COLOMBIA_RECTANGLE = { south: -4.3, north: 13.5, west: -82, east: -66.8 };
+
+const insideColombia = (lat, lng) =>
+    lat >= COLOMBIA_RECTANGLE.south && lat <= COLOMBIA_RECTANGLE.north &&
+    lng >= COLOMBIA_RECTANGLE.west && lng <= COLOMBIA_RECTANGLE.east;
+
 // The DB keeps 7 decimals; 6 are about 11 cm, more than enough for a zone.
 export const formatCoordinate = (value) => String(Number(value.toFixed(6)));
 
@@ -78,10 +86,13 @@ export function capacityInUseError(spotsInUse) {
         : `Hay ${spotsInUse} cupos en uso por reservas pendientes o activas. La capacidad no puede ser menor.`;
 }
 
-// Returns the coordinates as numbers when both are valid, or null.
+// Returns the coordinates as numbers when both are valid and inside Colombia,
+// or null. Outside Colombia the map shows no pin and does not move to them.
 export function getValidPosition(latitude, longitude) {
     if (coordinateError(latitude, -90, 90, 'latitud') || coordinateError(longitude, -180, 180, 'longitud')) return null;
-    return [Number(latitude), Number(longitude)];
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    return insideColombia(lat, lng) ? [lat, lng] : null;
 }
 
 // HU-20 AC-01 to AC-06: one message per field, or none when the field is
@@ -110,6 +121,12 @@ export function validateZoneForm(form, { spotsInUse = 0 } = {}) {
     const longitudeError = coordinateError(form.longitude, -180, 180, 'longitud');
     if (longitudeError) errors.longitude = longitudeError;
 
+    // #232: valid coordinates, but outside Colombia
+    if (!latitudeError && !longitudeError && !insideColombia(Number(form.latitude), Number(form.longitude))) {
+        errors.latitude = translateError('COORDINATES_OUTSIDE_COLOMBIA');
+        errors.longitude = errors.latitude;
+    }
+
     return errors;
 }
 
@@ -131,6 +148,7 @@ const FIELD_BY_CODE = {
     INVALID_CAPACITY: ['totalSlots'],
     NEGATIVE_VALUE: ['hourlyRate'],
     INVALID_COORDINATES: ['latitude', 'longitude'],
+    COORDINATES_OUTSIDE_COLOMBIA: ['latitude', 'longitude'],
     CAPACITY_BELOW_IN_USE: ['totalSlots'],
     INSUFFICIENT_AVAILABLE_SPOTS: ['totalSlots'],
 };

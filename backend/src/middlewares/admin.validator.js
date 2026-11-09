@@ -17,7 +17,7 @@ const validarCambiarRol = [
 const validarCambiarEstado = [
     body('isActive')
         .notEmpty().withMessage('isActive is required')
-        .isBoolean().withMessage('isActive must be true or false'),
+        .isBoolean({ strict: true }).withMessage('isActive must be true or false'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {

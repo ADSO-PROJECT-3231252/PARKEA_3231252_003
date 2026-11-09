@@ -1,6 +1,6 @@
 # PARKEA — Frontend
 
-React 18 + Vite + Tailwind CSS.
+React 19 + Vite + Tailwind CSS.
 
 ## Setup
 

@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
-const { Vehiculo, Reserva, sequelize } = require('../models');
+const { Op, UniqueConstraintError } = require('sequelize');
+const { Vehiculo, Reserva, Usuario, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 
 const PLATE_FORMATS = {
@@ -11,6 +12,13 @@ const PLATE_FORMATS = {
 function plateMatchesType(plate, vehicleType) {
     const regex = PLATE_FORMATS[vehicleType];
     return regex ? regex.test(plate.toUpperCase()) : false;
+}
+
+// Only active vehicles have a unique plate (plate_active index), so a unique
+// violation here always means the plate is already registered. It can happen
+// even after the existence check below when two requests arrive together.
+function plateAlreadyRegistered(res) {
+    return res.status(409).json({ code: ErrorCodes.PLATE_ALREADY_REGISTERED, message: 'This plate is already registered' });
 }
 
 // HU-10: Register Vehicle
@@ -33,29 +41,51 @@ async function registrar(req, res, next) {
 
         const existente = await Vehiculo.findOne({ where: { plate } });
         if (existente) {
-            return res.status(409).json({ code: ErrorCodes.PLATE_ALREADY_REGISTERED, message: 'This plate is already registered' });
+            return plateAlreadyRegistered(res);
         }
 
-        // First vehicle for this user is automatically the default (HU-10, AC-09)
-        const cantidadExistente = await Vehiculo.count({ where: { userId } });
-        const isDefault = cantidadExistente === 0;
+        // Counting and creating happen in one transaction that holds the user's
+        // row locked. Without it, two simultaneous requests from the same user
+        // both count 0 vehicles and both become the default (HU-10, AC-09).
+        // The second request waits at the lock and then counts the first one.
+        const vehiculo = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, {
+                attributes: ['id'],
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+            if (!usuario) {
+                return null;
+            }
 
-        const vehiculo = await Vehiculo.create({
-            plate: plate.toUpperCase(),
-            vehicleType,
-            brand,
-            model,
-            color,
-            visualDescription,
-            isDefault,
-            userId,
+            // First vehicle for this user is automatically the default (HU-10, AC-09)
+            const cantidadExistente = await Vehiculo.count({ where: { userId }, transaction: t });
+            const isDefault = cantidadExistente === 0;
+
+            return Vehiculo.create({
+                plate: plate.toUpperCase(),
+                vehicleType,
+                brand,
+                model,
+                color,
+                visualDescription,
+                isDefault,
+                userId,
+            }, { transaction: t });
         });
+
+        if (!vehiculo) {
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
 
         return res.status(201).json({
             message: 'Vehicle registered successfully',
             vehicle: vehiculo,
         });
     } catch (error) {
+        if (error instanceof UniqueConstraintError) {
+            return plateAlreadyRegistered(res);
+        }
         next(error);
     }
 }
@@ -113,6 +143,9 @@ async function editar(req, res, next) {
             vehicle: vehiculo,
         });
     } catch (error) {
+        if (error instanceof UniqueConstraintError) {
+            return plateAlreadyRegistered(res);
+        }
         next(error);
     }
 }
@@ -129,19 +162,44 @@ async function marcarPredeterminado(req, res, next) {
         }
 
         // Only one default per user: clear the previous one first (HU-11, AC-06).
-        // Wrapped in a transaction so the two updates are applied atomically,
-        // without this, two concurrent requests could each read/clear the
-        // previous default before either one applies its own "set new default",
-        // leaving more than one vehicle marked as default at once.
-        await sequelize.transaction(async (t) => {
+        // The two updates happen in one transaction that first locks the user's
+        // row, the same lock registrar and eliminar use (#267, #268, #288).
+        // Without it, setting a default while the default is deleted can leave
+        // two defaults, or none. The transaction returns the vehicle, or null
+        // when another request deleted it while this one was waiting.
+        const actualizado = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, {
+                attributes: ['id'],
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+            if (!usuario) {
+                return null;
+            }
+
+            // Read the vehicle again now that the lock is held
+            const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
+            if (!actual) {
+                return null;
+            }
+
+            // Clear every other default. This vehicle is left out: if it is
+            // already the default (another tab, a second click), clearing it
+            // too would leave the user without one, because update() below
+            // sends nothing when the value it holds is already true.
             await Vehiculo.update(
                 { isDefault: false },
-                { where: { userId, isDefault: true }, transaction: t }
+                { where: { userId, isDefault: true, id: { [Op.ne]: id } }, transaction: t }
             );
-            await vehiculo.update({ isDefault: true }, { transaction: t });
+            await actual.update({ isDefault: true }, { transaction: t });
+            return actual;
         });
 
-        return res.status(200).json({ message: 'Default vehicle updated successfully', vehicle: vehiculo });
+        if (!actualizado) {
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
+        return res.status(200).json({ message: 'Default vehicle updated successfully', vehicle: actualizado });
     } catch (error) {
         next(error);
     }
@@ -158,29 +216,72 @@ async function eliminar(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
-        // Block deletion if the vehicle has an active or pending reservation (HU-13, AC-02)
-        const reservaActiva = await Reserva.findOne({
-            where: { vehicleId: id, status: ['Pending', 'Active'] },
+        // The deletion and the default reassignment happen in one transaction
+        // that holds the user's row locked, the same lock registrar, marcarPredeterminado
+        // and crear (reservations) take first (#267, #288).
+        // Without it, a deletion running at the same time as a registration or
+        // another deletion can leave the user without exactly one default
+        // vehicle (HU-13 AC-04, HU-10 AC-09). The transaction returns null when
+        // everything went well, or the error code to answer with.
+        const fallo = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, {
+                attributes: ['id'],
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+            if (!usuario) {
+                return ErrorCodes.USER_NOT_FOUND;
+            }
+
+            // Read the vehicle again now that the lock is held: another request
+            // may have deleted it, or changed which one is the default, while
+            // this one was waiting.
+            const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
+            if (!actual) {
+                return ErrorCodes.VEHICLE_NOT_FOUND;
+            }
+
+            // Block deletion if the vehicle has an active or pending reservation
+            // (HU-13, AC-02). Checked here, with the lock held: crear takes the
+            // same lock first (#288), so a reservation created at the same time
+            // is either seen here or waits until the vehicle is gone.
+            const reservaActiva = await Reserva.findOne({
+                where: { vehicleId: id, status: ['Pending', 'Active'] },
+                transaction: t,
+            });
+            if (reservaActiva) {
+                return ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION;
+            }
+
+            const eraDefault = actual.isDefault;
+            await actual.destroy({ transaction: t }); // soft delete (paranoid: true on the model)
+
+            // Reassign the default to the most recently registered remaining vehicle (HU-13, AC-04)
+            if (eraDefault) {
+                const siguiente = await Vehiculo.findOne({
+                    where: { userId },
+                    order: [['created_at', 'DESC']],
+                    transaction: t,
+                });
+                if (siguiente) {
+                    await siguiente.update({ isDefault: true }, { transaction: t });
+                }
+            }
+
+            return null;
         });
-        if (reservaActiva) {
+
+        if (fallo === ErrorCodes.USER_NOT_FOUND) {
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+        if (fallo === ErrorCodes.VEHICLE_NOT_FOUND) {
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+        if (fallo === ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION) {
             return res.status(409).json({
                 code: ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION,
                 message: 'This vehicle has an active reservation. Please cancel the reservation before removing the vehicle.',
             });
-        }
-
-        const eraDefault = vehiculo.isDefault;
-        await vehiculo.destroy(); // soft delete (paranoid: true on the model)
-
-        // Reassign the default to the most recently registered remaining vehicle (HU-13, AC-04)
-        if (eraDefault) {
-            const siguiente = await Vehiculo.findOne({
-                where: { userId },
-                order: [['created_at', 'DESC']],
-            });
-            if (siguiente) {
-                await siguiente.update({ isDefault: true });
-            }
         }
 
         return res.status(200).json({ message: 'Vehicle deleted successfully' });

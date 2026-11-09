@@ -32,14 +32,92 @@ const SEARCH_DEBOUNCE_MS = 400;
 const SUCCESS_MESSAGE_MS = 3000;
 const VISIBLE_LOGS = 3;
 
-// #230: when the table is wider than its card (laptops from 640 to about
+// #230: when the table is wider than its card (laptops from 1024 to about
 // 1440 px), the Actions column stays fixed on the right, so "Cambiar rol",
 // the status switch and the locked reason are always in sight. The shadow
-// shows that the other columns continue underneath. Phones (below 640 px)
-// keep the table as it is; #195 turns it into cards.
+// shows that the other columns continue underneath. Below 1024 px the table
+// is hidden and each user is a card instead (#195).
 const STICKY_ACTIONS = 'sm:sticky sm:right-0 sm:z-10 sm:shadow-[inset_8px_0_8px_-8px_rgb(0_0_0/0.12)]';
 
 const percent = (part, total) => (total > 0 ? `${((part / total) * 100).toFixed(1)}% del total` : '—');
+
+// AC-17: role and status are always written out, not color alone.
+function RoleBadge({ role }) {
+    return role === 'admin' ? (
+        <span className="inline-block rounded-md bg-parkea-50 px-2.5 py-0.5 text-caption font-medium text-parkea-700">
+            Administrador
+        </span>
+    ) : (
+        <span className="inline-block rounded-md bg-neutral-100 px-2.5 py-0.5 text-caption font-medium text-neutral-700">
+            Usuario
+        </span>
+    );
+}
+
+function StatusBadge({ isActive }) {
+    return (
+        <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-caption font-medium ${isActive ? 'bg-parkea-50 text-parkea-700' : 'bg-danger-soft text-danger'}`}
+        >
+            <span
+                className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-parkea-600' : 'bg-danger'}`}
+                aria-hidden="true"
+            />
+            {isActive ? 'Activo' : 'Inactivo'}
+        </span>
+    );
+}
+
+function UserName({ user }) {
+    return (
+        <div className="flex items-center gap-2.5">
+            <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-caption font-semibold text-parkea-700"
+                aria-hidden="true"
+            >
+                {getInitials(user.fullName)}
+            </span>
+            <span className="min-w-0 break-words text-body font-medium text-neutral-900">{user.fullName}</span>
+        </div>
+    );
+}
+
+// "Cambiar rol" button, status switch and, when the account can't be changed,
+// the reason why. `reason` is empty when the account can be changed.
+function UserActions({ user, reason, onAction, reasonClassName = 'max-w-[190px]' }) {
+    const locked = Boolean(reason);
+    return (
+        <>
+            <div className="flex items-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => onAction('role', user)}
+                    disabled={locked}
+                    aria-label={`Cambiar rol de ${user.fullName}`}
+                    className="flex items-center gap-1 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-600 disabled:hover:bg-transparent"
+                >
+                    <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
+                    Cambiar rol
+                </button>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-checked={user.isActive}
+                    aria-label={`Cuenta activa de ${user.fullName}`}
+                    onClick={() => onAction('status', user)}
+                    disabled={locked}
+                    className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${user.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-300 bg-neutral-300'}`}
+                >
+                    <span
+                        className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${user.isActive ? 'translate-x-4' : 'translate-x-0'}`}
+                        aria-hidden="true"
+                    />
+                </button>
+            </div>
+            {locked && <p className={`mt-1 text-caption text-neutral-600 ${reasonClassName}`}>{reason}</p>}
+        </>
+    );
+}
 
 export default function AdminUsers() {
     const { user: currentUser } = useAuth();
@@ -294,6 +372,7 @@ export default function AdminUsers() {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Gestión de usuarios | PARKEA</title>
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <h1 className="text-title font-display uppercase text-neutral-900">Gestión de usuarios</h1>
@@ -453,7 +532,8 @@ export default function AdminUsers() {
 
                 {!loading && !error && users.length > 0 && (
                     <>
-                        <div ref={watchTableWidth} className="overflow-x-auto">
+                        {/* AC-03: table on computers */}
+                        <div ref={watchTableWidth} className="hidden overflow-x-auto lg:block">
                             <table className="w-full min-w-[900px] border-collapse text-left">
                                 <thead>
                                     <tr className="border-b border-neutral-200 bg-neutral-50 text-label text-neutral-900">
@@ -479,78 +559,25 @@ export default function AdminUsers() {
                                                 className={`border-b border-neutral-100 align-top last:border-0 ${locked ? 'bg-neutral-50' : ''}`}
                                             >
                                                 <td className="px-4 py-3">
-                                                    <div className="flex items-center gap-2.5">
-                                                        <span
-                                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-caption font-semibold text-parkea-700"
-                                                            aria-hidden="true"
-                                                        >
-                                                            {getInitials(u.fullName)}
-                                                        </span>
-                                                        <span className="text-body font-medium text-neutral-900">{u.fullName}</span>
-                                                    </div>
+                                                    <UserName user={u} />
                                                 </td>
                                                 <td className="px-4 py-3 text-body text-neutral-600">
                                                     {/* <wbr> lets a long email break after the @ instead of widening the table */}
                                                     {u.email.split('@')[0]}@<wbr />{u.email.split('@')[1]}
                                                 </td>
                                                 <td className="px-4 py-3 font-mono text-body text-neutral-600">{u.documentNumber}</td>
-                                                {/* AC-17: role and status are always written out, not color alone. */}
                                                 <td className="px-4 py-3">
-                                                    {u.role === 'admin' ? (
-                                                        <span className="inline-block rounded-md bg-parkea-50 px-2.5 py-0.5 text-caption font-medium text-parkea-700">
-                                                            Administrador
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-block rounded-md bg-neutral-100 px-2.5 py-0.5 text-caption font-medium text-neutral-700">
-                                                            Usuario
-                                                        </span>
-                                                    )}
+                                                    <RoleBadge role={u.role} />
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span
-                                                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-caption font-medium ${u.isActive ? 'bg-parkea-50 text-parkea-700' : 'bg-danger-soft text-danger'}`}
-                                                    >
-                                                        <span
-                                                            className={`h-1.5 w-1.5 rounded-full ${u.isActive ? 'bg-parkea-600' : 'bg-danger'}`}
-                                                            aria-hidden="true"
-                                                        />
-                                                        {u.isActive ? 'Activo' : 'Inactivo'}
-                                                    </span>
+                                                    <StatusBadge isActive={u.isActive} />
                                                 </td>
                                                 <td className="whitespace-nowrap px-4 py-3 font-mono text-body text-neutral-600">{formatDate(u.createdAt)}</td>
                                                 <td className="px-4 py-3 font-mono text-body tabular-nums text-neutral-900">{u.reservationCount}</td>
                                                 <td
                                                     className={`px-4 py-3 ${tableScrolls ? `${STICKY_ACTIONS} ${locked ? 'sm:bg-neutral-50' : 'sm:bg-white'}` : ''}`}
                                                 >
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => openAction('role', u)}
-                                                            disabled={locked}
-                                                            aria-label={`Cambiar rol de ${u.fullName}`}
-                                                            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-2.5 py-1 text-caption text-parkea-600 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-500 disabled:hover:bg-transparent"
-                                                        >
-                                                            <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
-                                                            Cambiar rol
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            role="switch"
-                                                            aria-checked={u.isActive}
-                                                            aria-label={`Cuenta activa de ${u.fullName}`}
-                                                            onClick={() => openAction('status', u)}
-                                                            disabled={locked}
-                                                            className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${u.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-300 bg-neutral-300'}`}
-                                                        >
-                                                            <span
-                                                                className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${u.isActive ? 'translate-x-4' : 'translate-x-0'}`}
-                                                                aria-hidden="true"
-                                                            />
-                                                        </button>
-                                                    </div>
-                                                    {locked && (
-                                                        <p className="mt-1 max-w-[190px] text-caption text-neutral-600">{reason}</p>
-                                                    )}
+                                                    <UserActions user={u} reason={reason} onAction={openAction} />
                                                 </td>
                                             </tr>
                                         );
@@ -559,18 +586,61 @@ export default function AdminUsers() {
                             </table>
                         </div>
 
+                        {/* AC-18: one card per user on phones and tablets */}
+                        <ul className="divide-y divide-neutral-100 lg:hidden">
+                            {users.map((u) => (
+                                <li key={u.id} className="flex flex-col gap-3 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <UserName user={u} />
+                                        </div>
+                                        <StatusBadge isActive={u.isActive} />
+                                    </div>
+                                    <p className="break-words text-body text-neutral-600">
+                                        {u.email.split('@')[0]}@<wbr />{u.email.split('@')[1]}
+                                    </p>
+                                    <dl className="grid grid-cols-2 gap-2 rounded-md bg-neutral-50 p-3">
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Documento</dt>
+                                            <dd className="break-words font-mono text-body text-neutral-900">{u.documentNumber}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Rol</dt>
+                                            <dd>
+                                                <RoleBadge role={u.role} />
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">Fecha de registro</dt>
+                                            <dd className="font-mono text-body text-neutral-900">{formatDate(u.createdAt)}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-caption text-neutral-600">N.º de reservas</dt>
+                                            <dd className="font-mono text-body tabular-nums text-neutral-900">{u.reservationCount}</dd>
+                                        </div>
+                                    </dl>
+                                    <UserActions
+                                        user={u}
+                                        reason={lockedReason(u)}
+                                        reasonClassName=""
+                                        onAction={openAction}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+
                         {/* AC-15: pagination */}
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
                             <p className="text-caption text-neutral-600">
                                 Mostrando {rangeStart} a {rangeEnd} de {pagination.total} usuarios
                             </p>
-                            <nav aria-label="Paginación de usuarios" className="flex items-center gap-1">
+                            <nav aria-label="Paginación de usuarios" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
                                     onClick={() => goToPage(1)}
                                     disabled={page === 1}
                                     aria-label="Primera página"
-                                    className={pageButton}
+                                    className={`${pageButton} max-sm:hidden`}
                                 >
                                     <ChevronsLeft className="h-4 w-4" aria-hidden="true" />
                                 </button>
@@ -591,12 +661,12 @@ export default function AdminUsers() {
                                             onClick={() => goToPage(item)}
                                             aria-label={`Página ${item}`}
                                             aria-current={item === page ? 'page' : undefined}
-                                            className={`flex h-7 w-7 items-center justify-center rounded-md text-label transition-colors ${item === page ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
+                                            className={`flex h-7 w-6 items-center justify-center rounded-md text-label transition-colors sm:w-7 ${item === page ? 'bg-parkea-600 font-medium text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
                                         >
                                             {item}
                                         </button>
                                     ) : (
-                                        <span key={item} className="px-1 text-neutral-600" aria-hidden="true">
+                                        <span key={item} className="px-0.5 text-neutral-600 sm:px-1" aria-hidden="true">
                                             …
                                         </span>
                                     ),
@@ -615,7 +685,7 @@ export default function AdminUsers() {
                                     onClick={() => goToPage(pagination.totalPages)}
                                     disabled={page === pagination.totalPages}
                                     aria-label="Última página"
-                                    className={pageButton}
+                                    className={`${pageButton} max-sm:hidden`}
                                 >
                                     <ChevronsRight className="h-4 w-4" aria-hidden="true" />
                                 </button>

@@ -154,7 +154,8 @@ export default function Register() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-3">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-3">
+            <title>Crear cuenta | PARKEA</title>
             <div className="w-full max-w-5xl bg-white rounded-lg shadow-sm border border-neutral-200 flex flex-col md:flex-row overflow-hidden">
                 {/* Columna del formulario */}
                 <div className="flex-1 px-5 py-4">
@@ -291,7 +292,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowPassword((v) => !v)}
                                         aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -328,7 +329,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowConfirmPassword((v) => !v)}
                                         aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showConfirmPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -346,7 +347,7 @@ export default function Register() {
                         </div>
 
                         {!errors.password && !errors.confirmPassword && (
-                            <p id="password-hint" className="-mt-1 text-caption text-neutral-500">
+                            <p id="password-hint" className="-mt-1 text-caption text-neutral-600">
                                 Entre 8 y 20 caracteres, una mayúscula, un número y un carácter especial.
                             </p>
                         )}
@@ -405,6 +406,6 @@ export default function Register() {
                     </div>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

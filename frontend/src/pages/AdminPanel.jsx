@@ -230,6 +230,8 @@ export default function AdminPanel() {
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Panel administrativo | PARKEA</title>
+            <h1 className="sr-only">Panel administrativo</h1>
             {alerts.length > 0 && (
                 <div className="mb-6 flex flex-col gap-2">
                     {alerts.map((alert, index) => (
@@ -471,7 +473,12 @@ export default function AdminPanel() {
                     ) : recentPayments.length === 0 ? (
                         <SectionEmpty message="No hay pagos registrados." />
                     ) : (
-                        <div className="overflow-x-auto">
+                        <div
+                            className="overflow-x-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
+                            tabIndex={0}
+                            role="region"
+                            aria-label="Pagos recientes"
+                        >
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="border-b border-neutral-200 text-caption text-neutral-600">
@@ -495,7 +502,7 @@ export default function AdminPanel() {
                                             <td className="py-2.5 pr-3 text-label text-neutral-900">
                                                 {formatCurrency(pago.amount)}
                                             </td>
-                                            <td className="py-2.5 pr-3 text-label text-neutral-900">
+                                            <td className="whitespace-nowrap py-2.5 pr-3 text-label text-neutral-900">
                                                 {pago.paidAt
                                                     ? `${formatDate(pago.paidAt)} ${formatTime(pago.paidAt)}`
                                                     : '—'}

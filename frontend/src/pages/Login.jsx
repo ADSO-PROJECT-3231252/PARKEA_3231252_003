@@ -32,6 +32,8 @@ export default function Login() {
     const sessionExpired = searchParams.get('expired') === '1';
     // HU-23 AC-11: set by api.js when the account was deactivated mid-session.
     const accountDeactivated = searchParams.get('deactivated') === '1';
+    // DEF-010: set by api.js when the user lost their role mid-session.
+    const roleChanged = searchParams.get('roleChanged') === '1';
 
     useEffect(() => {
         if (!flash) return;
@@ -84,7 +86,8 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <title>Iniciar sesión | PARKEA</title>
             <div className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200 p-8">
 
                 {/* Logo */}
@@ -110,11 +113,13 @@ export default function Login() {
                             {flash}
                         </p>
                     )}
-                    {(sessionExpired || accountDeactivated) && !serverError && (
+                    {(sessionExpired || accountDeactivated || roleChanged) && !serverError && (
                         <p role="alert" className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 text-center">
-                            {accountDeactivated
-                                ? translateError('ACCOUNT_DEACTIVATED')
-                                : 'Tu sesión expiró. Inicia sesión de nuevo.'}
+                            {roleChanged
+                                ? 'Tus permisos cambiaron. Inicia sesión de nuevo.'
+                                : accountDeactivated
+                                    ? translateError('ACCOUNT_DEACTIVATED')
+                                    : 'Tu sesión expiró. Inicia sesión de nuevo.'}
                         </p>
                     )}
                     {serverError && (
@@ -167,7 +172,7 @@ export default function Login() {
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
                             >
                                 {showPassword ? (
                                     <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -221,6 +226,6 @@ export default function Login() {
                     </p>
                 </form>
             </div>
-        </div>
+        </main>
     );
 }

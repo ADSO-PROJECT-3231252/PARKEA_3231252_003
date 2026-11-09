@@ -60,7 +60,8 @@ export default function AdminLogin() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+        <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-10">
+            <title>Acceso administrador | PARKEA</title>
             <div className="w-full max-w-sm bg-white rounded-lg shadow-sm border border-neutral-200
                 overflow-hidden">
 
@@ -150,7 +151,7 @@ export default function AdminLogin() {
                                     type="button"
                                     onClick={() => setShowPassword((v) => !v)}
                                     aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showPassword ? (
@@ -190,6 +191,6 @@ export default function AdminLogin() {
                     </form>
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

@@ -7,7 +7,8 @@ module.exports = (sequelize, DataTypes) => {
       Reserva.belongsTo(models.Usuario, { foreignKey: 'userId', as: 'user' });
       Reserva.belongsTo(models.Zona, { foreignKey: 'zoneId', as: 'zone' });
       Reserva.belongsTo(models.Vehiculo, { foreignKey: 'vehicleId', as: 'vehicle' });
-      Reserva.hasOne(models.Pago, { foreignKey: 'reservationId', as: 'payment' });
+      // HU-27: besides the initial payment, a balance (HU-27) or extensions (HU-28)
+      Reserva.hasMany(models.Pago, { foreignKey: 'reservationId', as: 'payments' });
       Reserva.belongsTo(models.ParkingSpot, { foreignKey: 'parkingSpotId', as: 'parkingSpot' });
     }
   }
@@ -67,6 +68,13 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: true,
       field: 'parking_spot_id',
+    },
+    // HU-27: no exit time chosen; endTime holds entry + 24 h until the stay ends
+    openEnded: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'open_ended',
     },
   }, {
     sequelize,

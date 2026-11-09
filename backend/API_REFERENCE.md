@@ -40,8 +40,8 @@ frontend can translate messages without comparing English text.
 | GET | `/zones` | Public | List active zones only (HU-09) |
 | GET | `/zones/all` | Admin | List every zone, active and inactive (HU-19) |
 | GET | `/zones/:id` | Public | Single zone detail. Not filtered by active status, so admins can reach a deactivated zone to edit/reactivate it |
-| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates and a whole-number capacity > 0 |
-| PUT | `/zones/:id` | Admin | Edit a zone; adjusts spots if capacity changes (HU-21) |
+| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise) and a whole-number capacity > 0 |
+| PUT | `/zones/:id` | Admin | Edit a zone; adjusts spots if capacity changes (HU-21). Same coordinate rule as creation |
 | PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19) |
 | GET | `/zones/:id/spots` | Admin | Detailed status of every physical spot in a zone |
 

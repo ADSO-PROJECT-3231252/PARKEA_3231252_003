@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Car,
@@ -10,10 +10,19 @@ import {
     Search,
     RefreshCw,
     AlertCircle,
+    CheckCircle2,
+    Flag,
+    Wallet,
+    ClockPlus,
 } from 'lucide-react';
 import { getReservations } from '../services/reservationService';
-import { formatCurrency, formatDuration } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS } from '../utils/reservationStatus';
+import CancelReservationDialog from '../components/CancelReservationDialog';
+import FinishStayDialog from '../components/FinishStayDialog';
+import ExtendStayDialog from '../components/ExtendStayDialog';
+import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
+import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
+import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
 // done by the backend: GET /reservations?status=&page=&limit=
@@ -35,18 +44,6 @@ const PAYMENT_STATUS_LABELS = {
     Cancelled: 'Cancelado',
     Refunded: 'Reembolsado',
 };
-const pad = (n) => String(n).padStart(2, '0');
-// "10/06/2026 08:30", 24-hour clock, in the user's local time (mockup format).
-function formatDateTime(isoString) {
-    const d = new Date(isoString);
-    const fecha = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
-    const hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    return `${fecha} ${hora}`;
-}
-// The backend has no human-readable reservation code, only the UUID. The
-// first 8 characters are shown as a short code; the full ID is still what
-// the confirmation screen (HU-15) displays, and the short code is a prefix of it.
-const shortCode = (id) => String(id).slice(0, 8).toUpperCase();
 function StatusBadge({ status }) {
     const { label = status, Icon, badge } = RESERVATION_STATUS[status] ?? FALLBACK_STATUS;
     return (
@@ -74,7 +71,17 @@ function VehicleInfo({ vehicle }) {
         </div>
     );
 }
-function DateInfo({ startTime, endTime }) {
+function DateInfo({ reservation, now }) {
+    const { startTime, endTime } = reservation;
+    // HU-27: an open stay has no exit time until it ends.
+    let duration = '—';
+    if (endTime) {
+        duration = formatDuration(startTime, endTime);
+    } else if (isRunningStay(reservation, now)) {
+        duration = `${formatDuration(startTime, stayEndSoFar(startTime, now))} hasta ahora`;
+    } else if (['Pending', 'Active'].includes(reservation.status)) {
+        duration = 'Tiempo indefinido';
+    }
     return (
         <div className="flex items-start gap-2">
             <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
@@ -83,22 +90,45 @@ function DateInfo({ startTime, endTime }) {
                     <span className="sr-only">Inicio: </span>
                     {formatDateTime(startTime)}
                 </p>
-                <p className="font-mono text-caption text-neutral-900">
-                    <span className="sr-only">Fin: </span>
-                    {formatDateTime(endTime)}
-                </p>
-                <p className="mt-0.5 text-caption text-neutral-600">{formatDuration(startTime, endTime)}</p>
+                {endTime ? (
+                    <p className="font-mono text-caption text-neutral-900">
+                        <span className="sr-only">Fin: </span>
+                        {formatDateTime(endTime)}
+                    </p>
+                ) : (
+                    <p className="text-caption text-neutral-900">Sin hora de salida</p>
+                )}
+                <p className="mt-0.5 text-caption text-neutral-600">{duration}</p>
             </div>
         </div>
     );
 }
+// AC-03: unpaid → estimated total; paid → amount paid. HU-27: a running open
+// stay shows the amount so far, and one that ended with a balance, its total.
+function amountLabel(reservation, pendingBalance) {
+    if (reservation.amountType === 'so_far') return 'Hasta ahora';
+    if (pendingBalance > 0) return 'Total';
+    if (reservation.openEnded && reservation.status === 'Pending') return 'Primera hora';
+    return reservation.amountType === 'paid' ? 'Pagado' : 'Estimado';
+}
 function AmountInfo({ reservation }) {
-    const { amount, amountType, appliedHourlyRate } = reservation;
+    const { amount, appliedHourlyRate, extensions = 0 } = reservation;
+    const pendingBalance = pendingBalanceOf(reservation);
     return (
         <div>
-            {/* AC-03: unpaid → estimated total; paid → amount paid. */}
-            <p className="text-caption text-neutral-600">{amountType === 'paid' ? 'Pagado' : 'Estimado'}</p>
+            <p className="text-caption text-neutral-600">{amountLabel(reservation, pendingBalance)}</p>
             <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(amount)}</p>
+            {/* HU-28 AC-09: the amount paid includes the extensions */}
+            {extensions > 0 && (
+                <p className="text-caption text-neutral-600">
+                    Incluye {extensions === 1 ? '1 ampliación' : `${extensions} ampliaciones`}
+                </p>
+            )}
+            {pendingBalance > 0 && (
+                <p className="text-caption font-medium text-warning">
+                    Saldo pendiente: <span className="whitespace-nowrap font-mono">{formatCurrency(pendingBalance)}</span>
+                </p>
+            )}
             {appliedHourlyRate != null && (
                 <p
                     className="font-mono text-caption
@@ -111,7 +141,10 @@ text-neutral-600"
     );
 }
 function StatusInfo({ reservation }) {
-    const paymentLabel = PAYMENT_STATUS_LABELS[reservation.paymentStatus] ?? reservation.paymentStatus;
+    const paymentLabel =
+        pendingBalanceOf(reservation) > 0
+            ? 'Saldo pendiente'
+            : (PAYMENT_STATUS_LABELS[reservation.paymentStatus] ?? reservation.paymentStatus);
     return (
         <div className="flex flex-col items-start gap-1 lg:items-center">
             <StatusBadge status={reservation.status} />
@@ -119,8 +152,12 @@ function StatusInfo({ reservation }) {
         </div>
     );
 }
-function Actions({ reservation, onViewDetails, onPay, onCancel, inline = false }) {
+function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, onExtend, inline = false }) {
     const isPending = reservation.status === 'Pending';
+    const canCancel = canCancelReservation(reservation, now);
+    const canFinish = canFinishStay(reservation, now);
+    const canExtend = canExtendStay(reservation, now);
+    const hasBalance = pendingBalanceOf(reservation) > 0;
     // Used in aria-labels so a screen reader announces which reservation each
     // repeated action belongs to (AC-13, WCAG 2.1 AA).
     const which = `reserva ${shortCode(reservation.id)} en ${reservation.zone?.name ?? 'la zona'}`;
@@ -133,28 +170,65 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
         : 'flex w-full flex-col gap-1.5 sm:w-36';
     return (
         <div className={wrapper}>
-            {/* AC-06: only Pending reservations can be paid (HU-17) or cancelled (HU-16). */}
+            {/* AC-06: only Pending reservations can be paid (HU-17). */}
             {isPending && (
-                <>
-                    <button
-                        type="button"
-                        onClick={() => onPay(reservation.id)}
-                        aria-label={`Pagar la ${which}`}
-                        className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
-                    >
-                        <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
-                        Pagar
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onCancel(reservation.id)}
-                        aria-label={`Cancelar la ${which}`}
-                        className={`${base} border-danger text-danger hover:bg-danger-soft`}
-                    >
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                        Cancelar
-                    </button>
-                </>
+                <button
+                    type="button"
+                    onClick={() => onPay(reservation.id)}
+                    aria-label={`Pagar la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <CreditCard className="h-3.5 w-3.5" aria-hidden="true" />
+                    Pagar
+                </button>
+            )}
+            {/* HU-27 AC-05: a running open stay */}
+            {canFinish && (
+                <button
+                    type="button"
+                    onClick={() => onFinish(reservation)}
+                    aria-label={`Terminar la estadía de la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <Flag className="h-3.5 w-3.5" aria-hidden="true" />
+                    Terminar estadía
+                </button>
+            )}
+            {/* HU-27 AC-07: what an open stay still owes after it ended */}
+            {hasBalance && (
+                <button
+                    type="button"
+                    onClick={() => onPay(reservation.id)}
+                    aria-label={`Pagar el saldo de la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <Wallet className="h-3.5 w-3.5" aria-hidden="true" />
+                    Pagar saldo
+                </button>
+            )}
+            {/* HU-28 AC-01: paid, with an exit time that has not been reached */}
+            {canExtend && (
+                <button
+                    type="button"
+                    onClick={() => onExtend(reservation)}
+                    aria-label={`Ampliar la estadía de la ${which}`}
+                    className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
+                >
+                    <ClockPlus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Ampliar estadía
+                </button>
+            )}
+            {/* HU-16 AC-01: Pending or Active (already paid) reservations that have not started. */}
+            {canCancel && (
+                <button
+                    type="button"
+                    onClick={() => onCancel(reservation)}
+                    aria-label={`Cancelar la ${which}`}
+                    className={`${base} border-danger text-danger hover:bg-danger-soft`}
+                >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    Cancelar
+                </button>
             )}
             {/* AC-07: every entry — including Pending, which the mockup omits — opens its confirmation (HU-15). */}
             <button
@@ -222,6 +296,18 @@ export default function Reservations() {
     const [error, setError] = useState(false);
     // Bumped by "Reintentar" to re-run the fetch with the same filter/page.
     const [reloadKey, setReloadKey] = useState(0);
+    // Time of the last load, used to decide which reservations already started.
+    // Set from the fetch callback, never during render.
+    const [now, setNow] = useState(null);
+    // HU-16: the reservation in the cancel dialog (null = closed). HU-27: the
+    // stay in the finish dialog and when it was opened. The message shown
+    // after either action (HU-16 AC-06, HU-27 AC-09).
+    const [cancelTarget, setCancelTarget] = useState(null);
+    const [finishTarget, setFinishTarget] = useState(null);
+    // HU-28: the stay in the extend dialog and when it was opened.
+    const [extendTarget, setExtendTarget] = useState(null);
+    const [resultMessage, setResultMessage] = useState('');
+    const resultMessageRef = useRef(null);
     useEffect(() => {
         // Guards against out-of-order responses: if the user switches filter or
         // page while a request is still in flight, the older response must not
@@ -237,6 +323,7 @@ export default function Reservations() {
                     setPage(totalPages);
                     return;
                 }
+                setNow(Date.now());
                 setReservations(data.reservations);
                 setPagination({ total: data.pagination?.total ?? data.reservations.length, totalPages });
                 setLoading(false);
@@ -250,6 +337,21 @@ export default function Reservations() {
             active = false;
         };
     }, [statusFilter, page, reloadKey]);
+    // HU-28 AC-01: "Ampliar estadía" is offered until the exit time, so the
+    // list updates itself when the next exit time on screen is reached. A
+    // timer cannot wait more than about 24 days, so a longer wait is done in
+    // steps (each step updates `now`, which schedules the next one).
+    const nextExitMs = reservations
+        .filter((r) => r.status === 'Active' && !r.openEnded && r.endTime)
+        .map((r) => new Date(r.endTime).getTime())
+        .filter((ms) => now !== null && ms > now)
+        .reduce((min, ms) => Math.min(min, ms), Infinity);
+    useEffect(() => {
+        if (nextExitMs === Infinity) return;
+        const delay = Math.max(0, nextExitMs - Date.now());
+        const timer = setTimeout(() => setNow(Date.now()), Math.min(delay + 100, MAX_TIMER_MS));
+        return () => clearTimeout(timer);
+    }, [nextExitMs, now]);
     // Every change that triggers a new fetch shows the loading state first; it's
     // set here, in the event, rather than inside the effect.
     const startLoading = () => {
@@ -258,11 +360,13 @@ export default function Reservations() {
     };
     const handleFilterChange = (value) => {
         if (value === statusFilter) return;
+        setResultMessage('');
         startLoading();
         setStatusFilter(value);
         setPage(1);
     };
     const goToPage = (target) => {
+        setResultMessage('');
         startLoading();
         setPage(target);
     };
@@ -272,11 +376,51 @@ export default function Reservations() {
     };
     const handleViewDetails = (id) => navigate(`/reservations/${id}`);
     const handlePay = (id) => navigate(`/reservations/${id}/payment`);
-    // HU-16 not built yet — placeholder only; the confirmation dialog and the
-    // cancel request are built in their own PR on top of this screen.
-    const handleCancel = (id) => {
-        console.log('TODO: HU-16 — open cancel confirmation dialog for reservation', id);
+    // HU-16
+    const handleCancel = (reservation) => setCancelTarget(reservation);
+    const handleCancelClose = ({ stale }) => {
+        setCancelTarget(null);
+        // The reservation changed since the list was loaded (e.g. it started):
+        // load it again so the list shows its current status.
+        if (stale) setReloadKey((k) => k + 1);
     };
+    const handleCancelled = (message) => {
+        setCancelTarget(null);
+        setResultMessage(message);
+        // AC-07: reloaded without the loading state, so the list stays on screen
+        // and the reservation shows up as "Cancelada".
+        setReloadKey((k) => k + 1);
+    };
+    // HU-27: same as cancelling, the list is loaded again and the stay shows
+    // up as "Finalizada".
+    const handleFinish = (reservation) => setFinishTarget({ reservation, openedAt: Date.now() });
+    const handleFinishClose = ({ stale }) => {
+        setFinishTarget(null);
+        if (stale) setReloadKey((k) => k + 1);
+    };
+    const handleFinished = (message) => {
+        setFinishTarget(null);
+        setResultMessage(message);
+        setReloadKey((k) => k + 1);
+    };
+    // HU-28: a later exit time goes to the payment screen; switching to an
+    // open stay reloads the list, where the stay shows without an exit time.
+    const handleExtend = (reservation) => setExtendTarget({ reservation, openedAt: Date.now() });
+    const handleExtendClose = ({ stale }) => {
+        setExtendTarget(null);
+        if (stale) setReloadKey((k) => k + 1);
+    };
+    const handleExtended = (message) => {
+        setExtendTarget(null);
+        setResultMessage(message);
+        setReloadKey((k) => k + 1);
+    };
+    // The "Cancelar" or "Terminar estadía" button disappears after the
+    // action, so the focus goes to the message, which also makes sure it is
+    // read aloud.
+    useEffect(() => {
+        if (resultMessage) resultMessageRef.current?.focus();
+    }, [resultMessage]);
     const isFiltered = statusFilter !== 'All';
     const isEmpty = !loading && !error && reservations.length === 0;
     const showList = !loading && !error && reservations.length > 0;
@@ -284,6 +428,7 @@ export default function Reservations() {
     const lastShown = firstShown + reservations.length - 1;
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+            <title>Mis reservas | PARKEA</title>
             <h1 className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Consulta el historial de tus reservas y su estado.
@@ -334,6 +479,19 @@ text-body text-neutral-900"
                     })}
                 </div>
             </div>
+            {/* HU-16 AC-06 */}
+            {resultMessage && (
+                <p
+                    ref={resultMessageRef}
+                    tabIndex={-1}
+                    role="status"
+                    className="mt-4 flex items-start gap-2 rounded-md bg-parkea-50 px-3 py-2 text-caption
+text-parkea-700 focus:outline-none"
+                >
+                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {resultMessage}
+                </p>
+            )}
             <div className="mt-4">
                 {loading && (
                     <p role="status" aria-live="polite" className="text-body text-neutral-600">
@@ -457,7 +615,7 @@ text-neutral-900"
                                                 <VehicleInfo vehicle={r.vehicle} />
                                             </td>
                                             <td className="px-4 py-4">
-                                                <DateInfo startTime={r.startTime} endTime={r.endTime} />
+                                                <DateInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
                                                 <AmountInfo reservation={r} />
@@ -468,9 +626,12 @@ text-neutral-900"
                                             <td className="px-4 py-4">
                                                 <Actions
                                                     reservation={r}
+                                                    now={now}
                                                     onViewDetails={handleViewDetails}
                                                     onPay={handlePay}
                                                     onCancel={handleCancel}
+                                                    onFinish={handleFinish}
+                                                    onExtend={handleExtend}
                                                 />
                                             </td>
                                         </tr>
@@ -495,16 +656,19 @@ p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-4">
                                         <ZoneInfo reservation={r} />
-                                        <DateInfo startTime={r.startTime} endTime={r.endTime} />
+                                        <DateInfo reservation={r} now={now} />
                                         <VehicleInfo vehicle={r.vehicle} />
                                         <AmountInfo reservation={r} />
                                     </div>
                                     <div className="mt-4">
                                         <Actions
                                             reservation={r}
+                                            now={now}
                                             onViewDetails={handleViewDetails}
                                             onPay={handlePay}
                                             onCancel={handleCancel}
+                                            onFinish={handleFinish}
+                                            onExtend={handleExtend}
                                             inline
                                         />
                                     </div>
@@ -570,6 +734,30 @@ text-center text-caption font-medium text-white"
                     </>
                 )}
             </div>
+            <CancelReservationDialog
+                reservation={cancelTarget}
+                onClose={handleCancelClose}
+                onCancelled={handleCancelled}
+            />
+            {finishTarget && (
+                <FinishStayDialog
+                    reservation={finishTarget.reservation}
+                    hourlyRate={finishTarget.reservation.appliedHourlyRate}
+                    openedAt={finishTarget.openedAt}
+                    onClose={handleFinishClose}
+                    onFinished={handleFinished}
+                />
+            )}
+            {extendTarget && (
+                <ExtendStayDialog
+                    reservation={extendTarget.reservation}
+                    hourlyRate={extendTarget.reservation.appliedHourlyRate}
+                    paid={extendTarget.reservation.amount}
+                    openedAt={extendTarget.openedAt}
+                    onClose={handleExtendClose}
+                    onExtended={handleExtended}
+                />
+            )}
         </div>
     );
 }
