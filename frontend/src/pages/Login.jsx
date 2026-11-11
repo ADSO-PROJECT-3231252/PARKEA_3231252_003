@@ -49,6 +49,9 @@ export default function Login() {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
+        // HU-30: "Reenviar correo" belongs to the email that was just tried,
+        // so it goes away when the email changes
+        if (name === 'email') setUnverifiedEmail('');
     };
 
     const validate = () => {
