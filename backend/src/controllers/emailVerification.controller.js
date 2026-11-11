@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { Usuario, EmailVerificationToken, sequelize } = require('../models');
 const { enviarCorreoVerificacion } = require('../utils/mailer');
 const { hashToken, createSecureToken } = require('../utils/secureToken');
@@ -43,20 +44,25 @@ async function verificarCorreo(req, res, next) {
 
         const vigente = registro && registro.usedAt === null && new Date(registro.expiresAt) > new Date();
 
-        // The link is marked as used only if nobody used it first, so it
-        // works only once even if it is opened twice at the same moment.
+        // Same order as the sign-up: first the account (locked), then its
+        // links. The link is marked as used only if it is still unused and
+        // valid at that moment, so it works only once even if it is opened
+        // twice at the same time, and a sign-up never changes the account
+        // in the middle.
         const usado = vigente && await sequelize.transaction(async (transaction) => {
+            const usuario = await Usuario.findByPk(registro.userId, { transaction, lock: transaction.LOCK.UPDATE });
+            if (!usuario) return false;
+
             const ahora = new Date();
             const [marcados] = await EmailVerificationToken.update(
                 { usedAt: ahora },
-                { where: { id: registro.id, usedAt: null }, transaction }
+                { where: { id: registro.id, usedAt: null, expiresAt: { [Op.gt]: ahora } }, transaction }
             );
             if (marcados === 0) return false;
 
-            await Usuario.update(
-                { emailVerifiedAt: ahora },
-                { where: { id: registro.userId, emailVerifiedAt: null }, transaction }
-            );
+            if (!usuario.emailVerifiedAt) {
+                await usuario.update({ emailVerifiedAt: ahora }, { transaction });
+            }
             return true;
         });
 
@@ -87,8 +93,16 @@ async function reenviarVerificacion(req, res, next) {
             return res.status(200).json(respuestaGenerica);
         }
 
-        const token = await sequelize.transaction((transaction) => crearEnlaceVerificacion(usuario.id, transaction));
-        enviarEnlaceVerificacion(usuario, token);
+        // The account is locked first, like in the sign-up, and read again:
+        // it may have been verified a moment ago
+        const token = await sequelize.transaction(async (transaction) => {
+            const cuenta = await Usuario.findByPk(usuario.id, { transaction, lock: transaction.LOCK.UPDATE });
+            if (!cuenta || cuenta.emailVerifiedAt) return null;
+            return crearEnlaceVerificacion(cuenta.id, transaction);
+        });
+        if (token) {
+            enviarEnlaceVerificacion(usuario, token);
+        }
 
         return res.status(200).json(respuestaGenerica);
     } catch (error) {

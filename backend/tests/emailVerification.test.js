@@ -9,7 +9,7 @@ jest.mock('../src/utils/mailer', () => ({
     enviarCorreoVerificacion: jest.fn(),
 }));
 const { enviarCorreoVerificacion } = require('../src/utils/mailer');
-const { Usuario, Rol, EmailVerificationToken, sequelize } = require('../src/models');
+const { Usuario, Rol, EmailVerificationToken, PasswordResetToken, AdminActionLog, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
@@ -34,7 +34,7 @@ beforeAll(async () => {
 beforeEach(() => {
     enviarCorreoVerificacion.mockReset().mockResolvedValue();
     // Runs the code of each transaction without a database
-    jest.spyOn(sequelize, 'transaction').mockImplementation(async (work) => work({}));
+    jest.spyOn(sequelize, 'transaction').mockImplementation(async (work) => work({ LOCK: { UPDATE: 'UPDATE' } }));
 });
 
 afterEach(() => {
@@ -55,11 +55,27 @@ describe('Signing up creates the account as not verified (HU-30, AC-01)', () => 
     let createUser;
     let saveToken;
     let expireTokens;
+    let validLinks;
 
-    // findOne is asked first for the email and then for the document
+    // findOne is asked first for the email and then for the document. Inside
+    // the transaction the same accounts are read again, locked, by id.
     function existingAccounts({ byEmail = null, byDocument = null }) {
         jest.spyOn(Usuario, 'findOne').mockImplementation(({ where }) =>
             Promise.resolve(where.email ? byEmail : byDocument));
+        jest.spyOn(Usuario, 'findByPk').mockImplementation((id) =>
+            Promise.resolve([byEmail, byDocument].find((account) => account?.id === id) || null));
+    }
+
+    function unverifiedAccount(changes) {
+        return {
+            id: 'user-old',
+            email: NEW_USER.email,
+            documentNumber: '9999',
+            emailVerifiedAt: null,
+            update: jest.fn(async function update(data) { return { ...this, ...data }; }),
+            destroy: jest.fn().mockResolvedValue(),
+            ...changes,
+        };
     }
 
     beforeEach(() => {
@@ -67,6 +83,9 @@ describe('Signing up creates the account as not verified (HU-30, AC-01)', () => 
         createUser = jest.spyOn(Usuario, 'create').mockImplementation(async (data) => ({ id: 'user-laura', ...data }));
         saveToken = jest.spyOn(EmailVerificationToken, 'create').mockResolvedValue({});
         expireTokens = jest.spyOn(EmailVerificationToken, 'update').mockResolvedValue([0]);
+        // By default the old account has no valid link and no admin log
+        validLinks = jest.spyOn(EmailVerificationToken, 'count').mockResolvedValue(0);
+        jest.spyOn(AdminActionLog, 'count').mockResolvedValue(0);
     });
 
     test('a new account is saved without verifying and gets the link by email', async () => {
@@ -116,7 +135,7 @@ describe('Signing up creates the account as not verified (HU-30, AC-01)', () => 
 
     test('an email of a verified account is still taken', async () => {
         // Arrange
-        existingAccounts({ byEmail: { id: 'user-old', emailVerifiedAt: new Date() } });
+        existingAccounts({ byEmail: unverifiedAccount({ emailVerifiedAt: new Date() }) });
 
         // Act
         const res = await post('/api/auth/register', NEW_USER);
@@ -129,7 +148,7 @@ describe('Signing up creates the account as not verified (HU-30, AC-01)', () => 
 
     test('a document of a verified account is still taken', async () => {
         // Arrange
-        existingAccounts({ byDocument: { id: 'user-old', emailVerifiedAt: new Date() } });
+        existingAccounts({ byDocument: unverifiedAccount({ email: 'otra@correo.test', documentNumber: '1001', emailVerifiedAt: new Date() }) });
 
         // Act
         const res = await post('/api/auth/register', NEW_USER);
@@ -139,14 +158,44 @@ describe('Signing up creates the account as not verified (HU-30, AC-01)', () => 
         expect(res.body.code).toBe('DOCUMENT_ALREADY_REGISTERED');
     });
 
-    test('a new sign-up takes the place of an account that was never verified', async () => {
-        // Arrange: someone signed up with Laura's email and never verified it
-        const unverified = {
-            id: 'user-squatter',
-            emailVerifiedAt: null,
-            update: jest.fn(async function update(data) { return { ...this, ...data }; }),
-        };
-        existingAccounts({ byEmail: unverified, byDocument: unverified });
+    test('an account that is not verified but still has a valid link keeps its email', async () => {
+        // Arrange: Ana signed up a few minutes ago and has not opened the email yet
+        const ana = unverifiedAccount({});
+        existingAccounts({ byEmail: ana });
+        validLinks.mockResolvedValue(1);
+
+        // Act
+        const res = await post('/api/auth/register', NEW_USER);
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('EMAIL_ALREADY_REGISTERED');
+        expect(ana.update).not.toHaveBeenCalled();
+        expect(saveToken).not.toHaveBeenCalled();
+        expect(enviarCorreoVerificacion).not.toHaveBeenCalled();
+    });
+
+    test('an account verified while the password was hashed keeps its email (read again, locked)', async () => {
+        // Arrange: the first read says not verified; the locked read says verified
+        const before = unverifiedAccount({});
+        const now = unverifiedAccount({ emailVerifiedAt: new Date() });
+        jest.spyOn(Usuario, 'findOne').mockImplementation(({ where }) => Promise.resolve(where.email ? before : null));
+        const lockedRead = jest.spyOn(Usuario, 'findByPk').mockResolvedValue(now);
+
+        // Act
+        const res = await post('/api/auth/register', NEW_USER);
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('EMAIL_ALREADY_REGISTERED');
+        expect(lockedRead).toHaveBeenCalledWith('user-old', expect.objectContaining({ lock: 'UPDATE' }));
+        expect(now.update).not.toHaveBeenCalled();
+    });
+
+    test('a new sign-up takes the place of an account whose links all expired', async () => {
+        // Arrange
+        const expired = unverifiedAccount({ documentNumber: '1001' });
+        existingAccounts({ byEmail: expired, byDocument: expired });
 
         // Act
         const res = await post('/api/auth/register', NEW_USER);
@@ -155,31 +204,78 @@ describe('Signing up creates the account as not verified (HU-30, AC-01)', () => 
         // Assert
         expect(res.status).toBe(201);
         expect(createUser).not.toHaveBeenCalled();
-        const data = unverified.update.mock.calls[0][0];
+        const data = expired.update.mock.calls[0][0];
         expect(data.fullName).toBe(NEW_USER.fullName);
         expect(data.roleId).toBe('role-user');
         expect(await bcrypt.compare(PASSWORD, data.password)).toBe(true);
         // The links it had before stop working, and the new one goes to the email
         expect(expireTokens).toHaveBeenCalledWith(
             { usedAt: expect.any(Date) },
-            expect.objectContaining({ where: { userId: 'user-squatter', usedAt: null } })
+            expect.objectContaining({ where: { userId: 'user-old', usedAt: null } })
         );
-        expect(saveToken.mock.calls[0][0].userId).toBe('user-squatter');
+        expect(saveToken.mock.calls[0][0].userId).toBe('user-old');
         expect(enviarCorreoVerificacion.mock.calls[0][0]).toBe(NEW_USER.email);
     });
 
-    test('a document taken by another account that was never verified is freed', async () => {
+    test('a document held by another account with a valid link stays taken', async () => {
         // Arrange
-        const otherUnverified = { id: 'user-squatter', emailVerifiedAt: null, update: jest.fn().mockResolvedValue({}) };
-        existingAccounts({ byDocument: otherUnverified });
+        const other = unverifiedAccount({ email: 'otra@correo.test', documentNumber: '1001' });
+        existingAccounts({ byDocument: other });
+        validLinks.mockResolvedValue(1);
+
+        // Act
+        const res = await post('/api/auth/register', NEW_USER);
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('DOCUMENT_ALREADY_REGISTERED');
+        expect(other.destroy).not.toHaveBeenCalled();
+    });
+
+    test('the account that held the document with expired links is deleted', async () => {
+        // Arrange
+        const other = unverifiedAccount({ email: 'otra@correo.test', documentNumber: '1001' });
+        existingAccounts({ byDocument: other });
 
         // Act
         const res = await post('/api/auth/register', NEW_USER);
 
         // Assert
         expect(res.status).toBe(201);
-        expect(otherUnverified.update).toHaveBeenCalledWith({ documentNumber: null }, expect.anything());
+        expect(other.destroy).toHaveBeenCalled();
         expect(createUser.mock.calls[0][0].documentNumber).toBe('1001');
+    });
+
+    test('if an administrator already acted on that account, it only loses the document', async () => {
+        // Arrange
+        const other = unverifiedAccount({ email: 'otra@correo.test', documentNumber: '1001' });
+        existingAccounts({ byDocument: other });
+        AdminActionLog.count.mockResolvedValue(1);
+
+        // Act
+        const res = await post('/api/auth/register', NEW_USER);
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(other.destroy).not.toHaveBeenCalled();
+        expect(other.update).toHaveBeenCalledWith({ documentNumber: null }, expect.anything());
+    });
+
+    test.each([
+        ['email', { email: 'laura@correo.test' }, 'EMAIL_ALREADY_REGISTERED'],
+        ['document', { document_number: '1001' }, 'DOCUMENT_ALREADY_REGISTERED'],
+    ])('two sign-ups with the same new %s at once: the second one answers 409, not 500', async (_, fields, code) => {
+        // Arrange: the database rejects the second insert
+        existingAccounts({});
+        const duplicate = Object.assign(new Error('Validation error'), { name: 'SequelizeUniqueConstraintError', fields });
+        createUser.mockRejectedValue(duplicate);
+
+        // Act
+        const res = await post('/api/auth/register', NEW_USER);
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe(code);
     });
 });
 
@@ -230,7 +326,7 @@ describe('An account that is not verified cannot sign in (HU-30, AC-04)', () => 
 describe('Opening the verification link (HU-30, AC-02 and AC-03)', () => {
     const TOKEN = 'a'.repeat(64);
     let markUsed;
-    let verifyUser;
+    let account;
 
     function storedLink(changes) {
         jest.spyOn(EmailVerificationToken, 'findOne').mockResolvedValue({
@@ -240,10 +336,11 @@ describe('Opening the verification link (HU-30, AC-02 and AC-03)', () => {
 
     beforeEach(() => {
         markUsed = jest.spyOn(EmailVerificationToken, 'update').mockResolvedValue([1]);
-        verifyUser = jest.spyOn(Usuario, 'update').mockResolvedValue([1]);
+        account = { id: 'user-laura', emailVerifiedAt: null, update: jest.fn().mockResolvedValue({}) };
+        jest.spyOn(Usuario, 'findByPk').mockResolvedValue(account);
     });
 
-    test('a valid link verifies the account and is marked as used', async () => {
+    test('a valid link verifies the account (locked first) and is marked as used', async () => {
         // Arrange
         storedLink({});
 
@@ -254,14 +351,10 @@ describe('Opening the verification link (HU-30, AC-02 and AC-03)', () => {
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Your email has been verified. Please sign in.');
         expect(EmailVerificationToken.findOne).toHaveBeenCalledWith({ where: { tokenHash: sha256(TOKEN) } });
-        expect(markUsed).toHaveBeenCalledWith(
-            { usedAt: expect.any(Date) },
-            expect.objectContaining({ where: { id: 'link-1', usedAt: null } })
-        );
-        expect(verifyUser).toHaveBeenCalledWith(
-            { emailVerifiedAt: expect.any(Date) },
-            expect.objectContaining({ where: { id: 'user-laura', emailVerifiedAt: null } })
-        );
+        expect(Usuario.findByPk).toHaveBeenCalledWith('user-laura', expect.objectContaining({ lock: 'UPDATE' }));
+        const [, options] = markUsed.mock.calls[0];
+        expect(options.where).toEqual(expect.objectContaining({ id: 'link-1', usedAt: null }));
+        expect(account.update).toHaveBeenCalledWith({ emailVerifiedAt: expect.any(Date) }, expect.anything());
     });
 
     test.each([
@@ -277,7 +370,7 @@ describe('Opening the verification link (HU-30, AC-02 and AC-03)', () => {
         // Assert
         expect(res.status).toBe(400);
         expect(res.body.code).toBe('VERIFICATION_TOKEN_INVALID');
-        expect(verifyUser).not.toHaveBeenCalled();
+        expect(account.update).not.toHaveBeenCalled();
     });
 
     test('a link that does not exist answers 400 VERIFICATION_TOKEN_INVALID', async () => {
@@ -303,7 +396,7 @@ describe('Opening the verification link (HU-30, AC-02 and AC-03)', () => {
         // Assert
         expect(res.status).toBe(400);
         expect(res.body.code).toBe('VERIFICATION_TOKEN_INVALID');
-        expect(verifyUser).not.toHaveBeenCalled();
+        expect(account.update).not.toHaveBeenCalled();
     });
 
     test('without a token it answers 400 VALIDATION_ERROR', async () => {
@@ -328,7 +421,9 @@ describe('Asking for the verification email again (HU-30, AC-05)', () => {
 
     test('an account that is not verified gets a new link and the previous ones stop working', async () => {
         // Arrange
-        jest.spyOn(Usuario, 'findOne').mockResolvedValue({ id: 'user-laura', fullName: 'Laura Gómez', email: 'laura@correo.test', emailVerifiedAt: null });
+        const laura = { id: 'user-laura', fullName: 'Laura Gómez', email: 'laura@correo.test', emailVerifiedAt: null };
+        jest.spyOn(Usuario, 'findOne').mockResolvedValue(laura);
+        jest.spyOn(Usuario, 'findByPk').mockResolvedValue(laura);
 
         // Act
         const res = await post('/api/auth/resend-verification', { email: 'laura@correo.test' });
@@ -381,5 +476,72 @@ describe('Asking for the verification email again (HU-30, AC-05)', () => {
         // Assert
         expect(res.status).toBe(429);
         expect(res.body.code).toBe('TOO_MANY_REQUESTS');
+    });
+});
+
+describe('The recovery link also verifies the account (HU-30)', () => {
+    const TOKEN = 'b'.repeat(64);
+    const NEW_PASSWORD = 'Nueva123*';
+    let markLinkUsed;
+    let expireVerificationLinks;
+
+    function resetWith(account, linkChanges = {}) {
+        jest.spyOn(PasswordResetToken, 'findOne').mockResolvedValue({
+            id: 'reset-1', userId: account.id, usedAt: null, expiresAt: new Date(Date.now() + HOUR), ...linkChanges,
+        });
+        jest.spyOn(Usuario, 'findByPk').mockResolvedValue(account);
+        return post('/api/auth/reset-password', { token: TOKEN, newPassword: NEW_PASSWORD, confirmNewPassword: NEW_PASSWORD });
+    }
+
+    beforeEach(() => {
+        markLinkUsed = jest.spyOn(PasswordResetToken, 'update').mockResolvedValue([1]);
+        expireVerificationLinks = jest.spyOn(EmailVerificationToken, 'update').mockResolvedValue([1]);
+    });
+
+    test('an account that was not verified gets the new password and is verified', async () => {
+        // Arrange
+        const account = { id: 'user-laura', emailVerifiedAt: null, update: jest.fn().mockResolvedValue({}) };
+
+        // Act
+        const res = await resetWith(account);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(Usuario.findByPk).toHaveBeenCalledWith('user-laura', expect.objectContaining({ lock: 'UPDATE' }));
+        const changes = account.update.mock.calls[0][0];
+        expect(changes.emailVerifiedAt).toEqual(expect.any(Date));
+        expect(await bcrypt.compare(NEW_PASSWORD, changes.password)).toBe(true);
+        expect(expireVerificationLinks).toHaveBeenCalledWith(
+            { usedAt: expect.any(Date) },
+            expect.objectContaining({ where: { userId: 'user-laura', usedAt: null } })
+        );
+    });
+
+    test('a verified account only changes the password', async () => {
+        // Arrange
+        const verifiedAt = new Date('2026-11-01T12:00:00Z');
+        const account = { id: 'user-laura', emailVerifiedAt: verifiedAt, update: jest.fn().mockResolvedValue({}) };
+
+        // Act
+        const res = await resetWith(account);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(account.update.mock.calls[0][0].emailVerifiedAt).toBeUndefined();
+        expect(expireVerificationLinks).not.toHaveBeenCalled();
+    });
+
+    test('if the same recovery link was used a moment before, it answers 400 and changes nothing', async () => {
+        // Arrange
+        markLinkUsed.mockResolvedValue([0]);
+        const account = { id: 'user-laura', emailVerifiedAt: null, update: jest.fn() };
+
+        // Act
+        const res = await resetWith(account);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('RESET_TOKEN_INVALID');
+        expect(account.update).not.toHaveBeenCalled();
     });
 });
