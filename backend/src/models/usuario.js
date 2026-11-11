@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       Usuario.hasMany(models.Vehiculo, { foreignKey: 'userId', as: 'vehicles' });
       Usuario.hasMany(models.Reserva, { foreignKey: 'userId', as: 'reservations' });
       Usuario.hasMany(models.PasswordResetToken, { foreignKey: 'userId', as: 'passwordResetTokens' });
+      Usuario.hasMany(models.EmailVerificationToken, { foreignKey: 'userId', as: 'emailVerificationTokens' });
       Usuario.hasMany(models.AdminActionLog, { foreignKey: 'adminId', as: 'actionsPerformed' });
       Usuario.hasMany(models.AdminActionLog, { foreignKey: 'targetUserId', as: 'actionsReceived' });
     }
