@@ -65,6 +65,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       field: 'role_id',
     },
+    // HU-30: NULL until the user opens the link of the verification email
+    emailVerifiedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'email_verified_at',
+    },
   }, {
     sequelize,
     modelName: 'Usuario',
