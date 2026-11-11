@@ -49,7 +49,9 @@ async function solicitarRecuperacion(req, res, next) {
         // and just as fast, whether the account exists or not. If the email
         // provider fails, it only goes to the server log: a 500 here would
         // tell anyone that the account exists.
-        enviarCorreoRecuperacion(usuario.email, resetUrl).catch((error) => {
+        // The email greets the user by the first name ("Hola, Laura:")
+        const primerNombre = (usuario.fullName || '').trim().split(/\s+/)[0];
+        enviarCorreoRecuperacion(usuario.email, resetUrl, primerNombre).catch((error) => {
             console.error('Could not send the recovery email:', error.message);
         });
 
