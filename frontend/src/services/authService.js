@@ -20,7 +20,6 @@ export const resetPassword = (data) => {
     return api.post('/auth/reset-password', data);
 };
 
-
 // HU-30: confirm the email with the token of the link
 export const verifyEmail = (data) => {
     return api.post('/auth/verify-email', data);
