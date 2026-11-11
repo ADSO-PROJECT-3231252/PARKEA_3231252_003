@@ -176,19 +176,19 @@ describe('PARKEA layout of the recovery email (#280)', () => {
         expect(email.text).toContain('Este correo se envió automáticamente; por favor no lo respondas.');
         expect(email.text).not.toContain('**');
     });
-});
 
-test('the footer shows the year of the day the email is sent, not of the day the server started', async () => {
-    // Arrange: the server started before January 1
-    const { enviarCorreoRecuperacion } = loadMailer({});
-    jest.spyOn(Date.prototype, 'getFullYear').mockReturnValue(2031);
+    test('the footer shows the year of the day the email is sent, not of the day the server started', async () => {
+        // Arrange: the server started before January 1
+        const { enviarCorreoRecuperacion } = loadMailer({});
+        jest.spyOn(Date.prototype, 'getFullYear').mockReturnValue(2031);
 
-    // Act
-    await enviarCorreoRecuperacion('laura@correo.test', RESET_URL, 'Laura');
+        // Act
+        await enviarCorreoRecuperacion('laura@correo.test', RESET_URL, 'Laura');
 
-    // Assert
-    const email = sendMail.mock.calls[0][0];
-    expect(email.html).toContain('PARKEA © 2031');
-    expect(email.text).toContain('PARKEA © 2031');
-    jest.restoreAllMocks();
+        // Assert
+        const email = sendMail.mock.calls[0][0];
+        expect(email.html).toContain('PARKEA © 2031');
+        expect(email.text).toContain('PARKEA © 2031');
+        jest.restoreAllMocks();
+    });
 });
