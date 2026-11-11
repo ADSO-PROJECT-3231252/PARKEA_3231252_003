@@ -1,3 +1,4 @@
+const fs = require('fs');
 // mailer.js reads its settings when it loads, so every test sets the
 // variables first and then loads a fresh copy. nodemailer is replaced by a
 // fake: no email ever leaves the machine.
@@ -93,5 +94,84 @@ describe('Recovery email (#241)', () => {
 
         // Assert
         await expect(sending).rejects.toThrow('550 domain not verified');
+    });
+});
+
+describe('PARKEA layout of the recovery email (#280)', () => {
+    test('carries the logo inside the email and the HTML points to it', async () => {
+        // Arrange
+        const { enviarCorreoRecuperacion } = loadMailer({});
+
+        // Act
+        await enviarCorreoRecuperacion('laura@correo.test', RESET_URL, 'Laura');
+
+        // Assert
+        const email = sendMail.mock.calls[0][0];
+        expect(email.attachments).toHaveLength(1);
+        const [logo] = email.attachments;
+        expect(logo.cid).toBe('parkea-logo');
+        expect(logo.filename).toBe('parkea-logo.png');
+        expect(fs.existsSync(logo.path)).toBe(true);
+        expect(email.html).toContain('src="cid:parkea-logo"');
+        expect(email.html).toContain('alt="PARKEA"');
+    });
+
+    test('greets the user by the first name in the HTML and in the text', async () => {
+        // Arrange
+        const { enviarCorreoRecuperacion } = loadMailer({});
+
+        // Act
+        await enviarCorreoRecuperacion('laura@correo.test', RESET_URL, 'Laura');
+
+        // Assert
+        const email = sendMail.mock.calls[0][0];
+        expect(email.html).toContain('Hola, Laura:');
+        expect(email.text).toContain('Hola, Laura:');
+    });
+
+    test('without a name it still greets ("Hola:")', async () => {
+        // Arrange
+        const { enviarCorreoRecuperacion } = loadMailer({});
+
+        // Act
+        await enviarCorreoRecuperacion('laura@correo.test', RESET_URL, '');
+
+        // Assert
+        const email = sendMail.mock.calls[0][0];
+        expect(email.html).toContain('Hola:');
+        expect(email.text).toContain('Hola:');
+    });
+
+    test('a name with HTML is shown as text, never as HTML', async () => {
+        // Arrange
+        const { enviarCorreoRecuperacion } = loadMailer({});
+
+        // Act
+        await enviarCorreoRecuperacion('laura@correo.test', RESET_URL, '<b>Laura</b>');
+
+        // Assert
+        const email = sendMail.mock.calls[0][0];
+        expect(email.html).toContain('Hola, &lt;b&gt;Laura&lt;/b&gt;:');
+        expect(email.html).not.toContain('<b>Laura</b>');
+    });
+
+    test('has the button, the 1-hour note, the full link and the footer in both copies', async () => {
+        // Arrange
+        const { enviarCorreoRecuperacion } = loadMailer({});
+
+        // Act
+        await enviarCorreoRecuperacion('laura@correo.test', RESET_URL, 'Laura');
+
+        // Assert
+        const email = sendMail.mock.calls[0][0];
+        expect(email.html).toContain('<html lang="es">');
+        expect(email.html).toContain('Crear nueva contraseña');
+        expect(email.html).toContain('El enlace vence en <strong>1 hora</strong> y solo se puede usar <strong>una vez</strong>.');
+        expect(email.html).toContain(`>${RESET_URL}</a>`);
+        expect(email.html).toContain('Sistema de Reservas de Parqueo Urbano');
+        expect(email.text).toContain('El enlace vence en 1 hora y solo se puede usar una vez.');
+        expect(email.text).toContain(`Crear nueva contraseña:\n${RESET_URL}`);
+        expect(email.text).toContain('Este correo se envió automáticamente; por favor no lo respondas.');
+        expect(email.text).not.toContain('**');
     });
 });
