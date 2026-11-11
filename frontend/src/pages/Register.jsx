@@ -128,7 +128,9 @@ export default function Register() {
                 password: form.password,
                 confirmPassword: form.confirmPassword,
             });
-            navigate('/login', { state: { registered: true } });
+            // HU-30 (AC-01): the account is not verified yet, so the next
+            // screen asks to open the email instead of signing in
+            navigate('/verify-email/sent', { state: { email: form.email.trim() } });
         } catch (err) {
             const code = err.response?.data?.code;
 
