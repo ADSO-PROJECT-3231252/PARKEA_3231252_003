@@ -1,15 +1,11 @@
-const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const { Usuario, PasswordResetToken } = require('../models');
 const { enviarCorreoRecuperacion } = require('../utils/mailer');
 const ErrorCodes = require('../constants/errorCodes');
+const { hashToken, createSecureToken } = require('../utils/secureToken');
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const SALT_ROUNDS = 10;
-
-function hashToken(token) {
-    return crypto.createHash('sha256').update(token).digest('hex');
-}
 
 // PHASE 1 — POST /api/auth/forgot-password
 // HU-07, AC-01 a AC-06
@@ -30,8 +26,7 @@ async function solicitarRecuperacion(req, res, next) {
 
         // Generate a random token; only its hash is stored, the raw token
         // goes in the email link and is never persisted anywhere
-        const tokenPlano = crypto.randomBytes(32).toString('hex');
-        const tokenHash = hashToken(tokenPlano);
+        const { token: tokenPlano, tokenHash } = createSecureToken();
         const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
         await PasswordResetToken.create({
