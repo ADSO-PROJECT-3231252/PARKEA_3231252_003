@@ -10,7 +10,7 @@ module.exports = {
       type: Sequelize.DATE,
       allowNull: true,
     });
-    await queryInterface.sequelize.query('UPDATE users SET email_verified_at = NOW()');
+    await queryInterface.sequelize.query('UPDATE users SET email_verified_at = UTC_TIMESTAMP()');
   },
 
   async down(queryInterface) {
