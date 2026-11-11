@@ -49,7 +49,7 @@ describe('Asking for a recovery link (HU-07, #241, #280)', () => {
     test('if the email provider fails, the answer is the same 200 (it does not reveal the account)', async () => {
         // Arrange
         enviarCorreoRecuperacion.mockRejectedValue(new Error('550 domain not verified'));
-        const log = jest.spyOn(console, 'error').mockImplementation(() => { });
+                const log = jest.spyOn(console, 'error').mockImplementation(() => {});
 
         // Act
         const res = await askForLink('198.51.100.2', LAURA.email);

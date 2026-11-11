@@ -1,4 +1,5 @@
 const fs = require('fs');
+
 // mailer.js reads its settings when it loads, so every test sets the
 // variables first and then loads a fresh copy. nodemailer is replaced by a
 // fake: no email ever leaves the machine.
@@ -112,6 +113,7 @@ describe('PARKEA layout of the recovery email (#280)', () => {
         expect(logo.cid).toBe('parkea-logo');
         expect(logo.filename).toBe('parkea-logo.png');
         expect(fs.existsSync(logo.path)).toBe(true);
+        expect(fs.statSync(logo.path).size).toBeGreaterThan(1000);
         expect(email.html).toContain('src="cid:parkea-logo"');
         expect(email.html).toContain('alt="PARKEA"');
     });
