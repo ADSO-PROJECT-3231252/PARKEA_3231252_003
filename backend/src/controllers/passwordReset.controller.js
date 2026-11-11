@@ -1,15 +1,12 @@
-const crypto = require('crypto');
 const bcrypt = require('bcrypt');
-const { Usuario, PasswordResetToken } = require('../models');
+const { Op } = require('sequelize');
+const { Usuario, PasswordResetToken, EmailVerificationToken, sequelize } = require('../models');
 const { enviarCorreoRecuperacion } = require('../utils/mailer');
 const ErrorCodes = require('../constants/errorCodes');
+const { hashToken, createSecureToken } = require('../utils/secureToken');
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const SALT_ROUNDS = 10;
-
-function hashToken(token) {
-    return crypto.createHash('sha256').update(token).digest('hex');
-}
 
 // PHASE 1 — POST /api/auth/forgot-password
 // HU-07, AC-01 a AC-06
@@ -30,8 +27,7 @@ async function solicitarRecuperacion(req, res, next) {
 
         // Generate a random token; only its hash is stored, the raw token
         // goes in the email link and is never persisted anywhere
-        const tokenPlano = crypto.randomBytes(32).toString('hex');
-        const tokenHash = hashToken(tokenPlano);
+        const { token: tokenPlano, tokenHash } = createSecureToken();
         const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
         await PasswordResetToken.create({
@@ -87,16 +83,47 @@ async function restablecerPassword(req, res, next) {
             });
         }
 
-        const usuario = await Usuario.findByPk(registro.userId);
-        if (!usuario) {
+        const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+        const resultado = await sequelize.transaction(async (transaction) => {
+            // Same order as the sign-up: first the account (locked), then
+            // the links
+            const usuario = await Usuario.findByPk(registro.userId, { transaction, lock: transaction.LOCK.UPDATE });
+            if (!usuario) return 'USER_NOT_FOUND';
+
+            // Single-use: the link is marked as used only if it is still
+            // unused and valid, so it can never be used twice
+            const ahora = new Date();
+            const [marcados] = await PasswordResetToken.update(
+                { usedAt: ahora },
+                { where: { id: registro.id, usedAt: null, expiresAt: { [Op.gt]: ahora } }, transaction }
+            );
+            if (marcados === 0) return 'RESET_TOKEN_INVALID';
+
+            // HU-30: the recovery link proves that the email belongs to the
+            // user, so it also verifies an account that was not verified
+            // yet, and its verification links stop working
+            const cambios = { password: passwordHash };
+            if (!usuario.emailVerifiedAt) {
+                cambios.emailVerifiedAt = ahora;
+                await EmailVerificationToken.update(
+                    { usedAt: ahora },
+                    { where: { userId: usuario.id, usedAt: null }, transaction }
+                );
+            }
+            await usuario.update(cambios, { transaction });
+            return 'OK';
+        });
+
+        if (resultado === 'USER_NOT_FOUND') {
             return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
         }
-
-        const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-        await usuario.update({ password: passwordHash });
-
-        // Single-use: mark this token as used so it can never be replayed
-        await registro.update({ usedAt: new Date() });
+        if (resultado === 'RESET_TOKEN_INVALID') {
+            return res.status(400).json({
+                code: ErrorCodes.RESET_TOKEN_INVALID,
+                message: 'This recovery link is no longer valid. Please request a new one.',
+            });
+        }
 
         return res.status(200).json({
             message: 'Your password has been updated. Please sign in.',

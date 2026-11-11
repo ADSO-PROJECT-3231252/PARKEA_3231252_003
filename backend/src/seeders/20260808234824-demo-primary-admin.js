@@ -22,6 +22,8 @@ module.exports = {
         is_active: true,
         is_primary_admin: true,
         role_id: adminRoleId,
+        // HU-30: the administrator does not need to verify the email
+        email_verified_at: new Date(),
         created_at: new Date(),
       },
     ]);

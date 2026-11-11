@@ -192,3 +192,39 @@ describe('PARKEA layout of the recovery email (#280)', () => {
         jest.restoreAllMocks();
     });
 });
+
+describe('Verification email (HU-30)', () => {
+    const VERIFY_URL = 'http://localhost:5173/verify-email?token=abc123';
+
+    test('uses the PARKEA layout with the link, the 24-hour note and the logo', async () => {
+        // Arrange
+        const { enviarCorreoVerificacion } = loadMailer({ MAIL_FROM: 'no-reply@parkeaweb.me' });
+
+        // Act
+        await enviarCorreoVerificacion('laura@correo.test', VERIFY_URL, 'Laura');
+
+        // Assert
+        const email = sendMail.mock.calls[0][0];
+        expect(email.from).toEqual({ name: 'PARKEA', address: 'no-reply@parkeaweb.me' });
+        expect(email.to).toBe('laura@correo.test');
+        expect(email.subject).toBe('Confirma tu correo de PARKEA');
+        expect(email.html).toContain(`href="${VERIFY_URL}"`);
+        expect(email.html).toContain('Hola, Laura:');
+        expect(email.html).toContain('Confirmar mi correo');
+        expect(email.html).toContain('El enlace vence en <strong>24 horas</strong>');
+        expect(email.text).toContain(`Confirmar mi correo:\n${VERIFY_URL}`);
+        expect(email.attachments[0].cid).toBe('parkea-logo');
+    });
+
+    test('a failure of the provider reaches the caller', async () => {
+        // Arrange
+        sendMail.mockRejectedValue(new Error('550 domain not verified'));
+        const { enviarCorreoVerificacion } = loadMailer({});
+
+        // Act
+        const sending = enviarCorreoVerificacion('laura@correo.test', VERIFY_URL, 'Laura');
+
+        // Assert
+        await expect(sending).rejects.toThrow('550 domain not verified');
+    });
+});

@@ -58,14 +58,19 @@ const loginLimiter = [
     rateLimit({ ...loginOptions, keyGenerator: networkKey, limit: 100 }),
 ];
 
-// HU-07: every request can send an email, so all of them are counted.
+// HU-07 and HU-30: every request can send an email, so all of them are
+// counted.
 // - 5 requests every 15 minutes for each email on a network.
 // - 20 requests every hour for the whole network, to protect the daily
 //   email quota.
-const forgotPasswordLimiter = [
+// Password recovery and the verification email have the same limits, each
+// with its own counts.
+const emailLimits = () => [
     rateLimit({ ...common, keyGenerator: accountKey, windowMs: FIFTEEN_MINUTES, limit: 5 }),
     rateLimit({ ...common, keyGenerator: networkKey, windowMs: ONE_HOUR, limit: 20 }),
 ];
+const forgotPasswordLimiter = emailLimits();
+const resendVerificationLimiter = emailLimits();
 
 // HU-01 (Audit 1): 30 new accounts every hour for each network. Only accounts
 // that are created are counted, so mistakes in the form never use tries, and
@@ -78,4 +83,4 @@ const registerLimiter = rateLimit({
     skipFailedRequests: true,
 });
 
-module.exports = { loginLimiter, forgotPasswordLimiter, registerLimiter };
+module.exports = { loginLimiter, forgotPasswordLimiter, resendVerificationLimiter, registerLimiter };

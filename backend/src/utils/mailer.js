@@ -40,4 +40,25 @@ async function enviarCorreoRecuperacion(destinatario, resetUrl, primerNombre) {
     });
 }
 
-module.exports = { enviarCorreoRecuperacion };
+// HU-30: email verification, with the same layout as the recovery email.
+async function enviarCorreoVerificacion(destinatario, verifyUrl, primerNombre) {
+    const email = buildEmail({
+        title: 'Confirma tu correo',
+        preview: 'Activa tu cuenta de PARKEA con este enlace. Vence en 24 horas.',
+        firstName: primerNombre,
+        message: 'Gracias por registrarte en PARKEA. Para activar tu cuenta, confirma que este correo es tuyo con el botón.',
+        buttonLabel: 'Confirmar mi correo',
+        url: verifyUrl,
+        note: 'El enlace vence en **24 horas** y solo se puede usar **una vez**.',
+        notYou: 'Ignora este correo: la cuenta no se activará.',
+    });
+
+    await transporter.sendMail({
+        from: remitente,
+        to: destinatario,
+        subject: 'Confirma tu correo de PARKEA',
+        ...email,
+    });
+}
+
+module.exports = { enviarCorreoRecuperacion, enviarCorreoVerificacion };
