@@ -6,10 +6,10 @@ import { login } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
+import ResendEmailButton from '../components/ResendEmailButton';
 
 // Confirmation messages handed over by other screens through router state.
 const FLASH_MESSAGES = {
-    registered: 'Registro completado. Por favor inicia sesión.',
     passwordReset: 'Tu contraseña fue actualizada. Por favor inicia sesión.',
 };
 
@@ -20,11 +20,14 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    // HU-30 (AC-04): the email of an account that is not verified yet, for
+    // the "Reenviar correo" action
+    const [unverifiedEmail, setUnverifiedEmail] = useState('');
+
     const { loginUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [flash, setFlash] = useState(() => {
-        if (location.state?.registered) return FLASH_MESSAGES.registered;
         if (location.state?.passwordReset) return FLASH_MESSAGES.passwordReset;
         return '';
     });
@@ -46,6 +49,9 @@ export default function Login() {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
+        // HU-30: "Reenviar correo" belongs to the email that was just tried,
+        // so it goes away when the email changes
+        if (name === 'email') setUnverifiedEmail('');
     };
 
     const validate = () => {
@@ -65,6 +71,7 @@ export default function Login() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
+        setUnverifiedEmail('');
         if (!validate()) return;
 
         setLoading(true);
@@ -80,6 +87,7 @@ export default function Login() {
         } catch (err) {
             const code = err.response?.data?.code;
             setServerError(translateError(code));
+            if (code === 'EMAIL_NOT_VERIFIED') setUnverifiedEmail(form.email.trim());
         } finally {
             setLoading(false);
         }
@@ -127,6 +135,7 @@ export default function Login() {
                             {serverError}
                         </p>
                     )}
+                    {unverifiedEmail && <ResendEmailButton email={unverifiedEmail} />}
 
                     <div>
                         <label htmlFor="email" className="block font-sans text-label text-neutral-700 mb-1">

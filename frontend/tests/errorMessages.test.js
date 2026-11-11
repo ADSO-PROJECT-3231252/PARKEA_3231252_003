@@ -17,6 +17,8 @@ describe('translateError', () => {
         ['VEHICLE_HAS_ACTIVE_RESERVATION', 'Este vehículo tiene una reserva activa. Cancélala antes de eliminarlo'],
         ['TOO_MANY_REQUESTS', 'Hiciste demasiados intentos. Espera unos minutos e intenta de nuevo'],
         ['NO_SPOTS_AVAILABLE', 'Este cupo ya no está disponible. Elige otra zona u horario'],
+        ['EMAIL_NOT_VERIFIED', 'Confirma tu correo antes de iniciar sesión. Revisa tu bandeja de entrada'],
+        ['VERIFICATION_TOKEN_INVALID', 'Este enlace de confirmación ya no es válido. Pide uno nuevo'],
     ])('translates %s', (code, text) => {
         expect(translateError(code)).toBe(text);
     });

@@ -15,6 +15,8 @@ const errorMessages = {
     FORBIDDEN_ROLE: 'No tienes permiso para realizar esta acción',
     RESET_TOKEN_INVALID: 'Este enlace de recuperación ya no es válido. Solicita uno nuevo',
     ACCOUNT_DEACTIVATED: 'Tu cuenta ha sido desactivada. Contacta al administrador',
+    EMAIL_NOT_VERIFIED: 'Confirma tu correo antes de iniciar sesión. Revisa tu bandeja de entrada',
+    VERIFICATION_TOKEN_INVALID: 'Este enlace de confirmación ya no es válido. Pide uno nuevo',
 
     // Users / profile
     USER_NOT_FOUND: 'Usuario no encontrado',

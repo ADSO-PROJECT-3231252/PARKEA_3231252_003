@@ -22,6 +22,9 @@ import ResetPassword from '../pages/ResetPassword';
 import ReservationConfirmation from '../pages/ReservationConfirmation';
 import PayReservation from '../pages/PayReservation';
 import NotFound from '../pages/NotFound';
+import CheckEmail from '../pages/CheckEmail';
+import VerifyEmail from '../pages/VerifyEmail';
+import ResendVerification from '../pages/ResendVerification';
 
 export default function AppRoutes() {
     return (
@@ -32,6 +35,9 @@ export default function AppRoutes() {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/verify-email/sent" element={<CheckEmail />} />
+            <Route path="/verify-email/resend" element={<ResendVerification />} />
 
             {/* Everything else shares the Header via Layout */}
             <Route element={<Layout />}>
