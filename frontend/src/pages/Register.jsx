@@ -272,7 +272,6 @@ export default function Register() {
                                     {errors.email}
                                 </p>
                             )}
-
                             {/* HU-30: the email may belong to an account that is still waiting to be confirmed */}
                             {errors.email === EMAIL_TAKEN && (
                                 <p className="mt-0.5 text-caption text-neutral-600">
