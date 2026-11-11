@@ -25,11 +25,6 @@ const LOGO_ATTACHMENT = {
     cid: LOGO_CID,
 };
 
-const FOOTER_LINES = [
-    `PARKEA © ${new Date().getFullYear()} · Sistema de Reservas de Parqueo Urbano · Colombia`,
-    'Este correo se envió automáticamente; por favor no lo respondas.',
-];
-
 // Names come from the users, so they are escaped before going into the HTML.
 function escapeHtml(value) {
     return String(value)
@@ -58,6 +53,12 @@ function noteToText(note) {
  */
 function buildEmail({ title, preview, firstName, message, buttonLabel, url, note, notYou }) {
     const greeting = firstName ? `Hola, ${firstName}:` : 'Hola:';
+    // Built on every email, so the year changes on January 1 without
+    // restarting the server
+    const footerLines = [
+        `PARKEA © ${new Date().getFullYear()} · Sistema de Reservas de Parqueo Urbano · Colombia`,
+        'Este correo se envió automáticamente; por favor no lo respondas.',
+    ];
 
     const html = `<!doctype html>
 <html lang="es">
@@ -99,7 +100,7 @@ function buildEmail({ title, preview, firstName, message, buttonLabel, url, note
     </table>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
       <tr><td align="center" style="padding:20px 24px 0;font-family:${FONT};font-size:12px;line-height:18px;color:${COLORS.muted};">
-        ${FOOTER_LINES.map(escapeHtml).join('<br>')}
+        ${footerLines.map(escapeHtml).join('<br>')}
       </td></tr>
     </table>
   </td></tr>
@@ -123,7 +124,7 @@ function buildEmail({ title, preview, firstName, message, buttonLabel, url, note
         '',
         `¿No fuiste tú? ${notYou}`,
         '',
-        ...FOOTER_LINES,
+        ...footerLines,
     ].join('\n');
 
     return { html, text, attachments: [LOGO_ATTACHMENT] };
