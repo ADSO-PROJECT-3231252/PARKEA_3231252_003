@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { buildEmail } = require('./emailLayout');
 
 // On our machines these settings point to Mailtrap; on the published site
 // they point to Resend (docs/deployment.md).
@@ -18,36 +19,24 @@ const remitente = {
     address: process.env.MAIL_FROM || 'no-reply@parkea.com',
 };
 
-async function enviarCorreoRecuperacion(destinatario, resetUrl) {
+// HU-07: password recovery email, with the shared PARKEA layout (#280).
+async function enviarCorreoRecuperacion(destinatario, resetUrl, primerNombre) {
+    const email = buildEmail({
+        title: 'Recupera tu contraseña',
+        preview: 'Usa el enlace para crear una nueva contraseña. Vence en 1 hora.',
+        firstName: primerNombre,
+        message: 'Recibimos una solicitud para restablecer la contraseña de tu cuenta de PARKEA. Haz clic en el botón para crear una nueva.',
+        buttonLabel: 'Crear nueva contraseña',
+        url: resetUrl,
+        note: 'El enlace vence en **1 hora** y solo se puede usar **una vez**.',
+        notYou: 'Ignora este correo: tu contraseña no cambiará.',
+    });
+
     await transporter.sendMail({
         from: remitente,
         to: destinatario,
         subject: 'Recupera tu contraseña de PARKEA',
-        // Plain-text copy for email apps that do not show HTML. Spam filters
-        // also distrust emails that only come in HTML.
-        text: [
-            'Recupera tu contraseña',
-            '',
-            'Recibimos una solicitud para restablecer tu contraseña de PARKEA.',
-            'Abre el siguiente enlace para crear una nueva contraseña. Este enlace es válido por 1 hora y solo se puede usar una vez.',
-            '',
-            resetUrl,
-            '',
-            'Si no solicitaste esto, puedes ignorar este correo con tranquilidad.',
-        ].join('\n'),
-        html: `
-    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        <h2 style="color: #1F6B4D;">Recupera tu contraseña</h2>
-        <p>Recibimos una solicitud para restablecer tu contraseña de PARKEA.</p>
-        <p>Haz clic en el siguiente enlace para crear una nueva contraseña. Este enlace es válido por 1 hora y solo se puede usar una vez.</p>
-        <p style="margin: 24px 0;">
-        <a href="${resetUrl}" style="background:#1F6B4D; color:#fff; padding:10px 20px; border-radius:8px; text-decoration:none;">
-            Crear nueva contraseña
-        </a>
-        </p>
-        <p style="color:#666; font-size: 13px;">Si no solicitaste esto, puedes ignorar este correo con tranquilidad.</p>
-    </div>
-    `,
+        ...email,
     });
 }
 
