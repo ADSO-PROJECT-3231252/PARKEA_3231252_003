@@ -20,13 +20,18 @@ function verificarToken(req, res, next) {
             // deactivated or its role changed after it was issued, so the
             // current state is read on every request (HU-23, AC-05 and AC-11)
             const usuario = await Usuario.findByPk(payload.id, {
-                attributes: ['isActive'],
+                attributes: ['isActive', 'passwordVersion'],
                 include: { model: Rol, as: 'role', attributes: ['name'] },
             });
             if (!usuario || !usuario.isActive) {
                 return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
             }
 
+            // #199: the password changed after this token was issued (a
+            // token from before the counter existed counts as version 0)
+            if ((payload.pv ?? 0) !== usuario.passwordVersion) {
+                return res.status(403).json({ code: ErrorCodes.INVALID_TOKEN, message: 'Invalid or expired token' });
+            }
             // verificarRol reads req.usuario.rol: use the role stored now, not the one in the token
             req.usuario = { ...payload, rol: usuario.role.name };
             next();

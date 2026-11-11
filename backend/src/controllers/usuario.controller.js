@@ -1,7 +1,8 @@
 const { validationResult } = require('express-validator');
 const bcrypt = require('bcrypt');
-const { Usuario, Rol } = require('../models');
+const { Usuario, Rol, PasswordResetToken, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
+const { createSessionToken } = require('../utils/sessionToken');
 
 // GET /api/users/me — load the authenticated user's profile
 async function obtenerPerfil(req, res, next) {
@@ -91,9 +92,34 @@ async function cambiarPassword(req, res, next) {
         }
 
         const hashNuevo = await bcrypt.hash(newPassword, 10);
-        await usuario.update({ password: hashNuevo });
 
-        return res.status(200).json({ message: 'Password updated successfully' });
+        const actualizado = await sequelize.transaction(async (transaction) => {
+            // The account is read again, locked: the password may have
+            // changed while the new one was hashed (for example, with a
+            // recovery link). In that case the current password that was
+            // checked above is no longer the current one.
+            const cuenta = await Usuario.findByPk(userId, { transaction, lock: transaction.LOCK.UPDATE });
+            if (!cuenta || cuenta.password !== usuario.password) return null;
+
+            // #199: the session tokens issued before this change stop
+            // working, and so do the recovery links of the account
+            await PasswordResetToken.update(
+                { usedAt: new Date() },
+                { where: { userId, usedAt: null }, transaction }
+            );
+            return cuenta.update({ password: hashNuevo, passwordVersion: cuenta.passwordVersion + 1 }, { transaction });
+        });
+
+        if (!actualizado) {
+            return res.status(401).json({ code: ErrorCodes.CURRENT_PASSWORD_INCORRECT, message: 'Current password is incorrect' });
+        }
+
+        // The token of this request is one of the old ones now, so the
+        // answer brings a new one and this session goes on
+        return res.status(200).json({
+            message: 'Password updated successfully',
+            token: createSessionToken(actualizado, req.usuario.rol),
+        });
     } catch (error) {
         next(error);
     }

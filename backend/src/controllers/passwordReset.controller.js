@@ -103,7 +103,8 @@ async function restablecerPassword(req, res, next) {
             // HU-30: the recovery link proves that the email belongs to the
             // user, so it also verifies an account that was not verified
             // yet, and its verification links stop working
-            const cambios = { password: passwordHash };
+            // #199: the session tokens issued before this change stop working
+            const cambios = { password: passwordHash, passwordVersion: usuario.passwordVersion + 1 };
             if (!usuario.emailVerifiedAt) {
                 cambios.emailVerifiedAt = ahora;
                 await EmailVerificationToken.update(

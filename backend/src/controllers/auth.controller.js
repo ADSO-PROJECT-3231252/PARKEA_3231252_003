@@ -1,9 +1,9 @@
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const { Usuario, Rol, EmailVerificationToken, AdminActionLog, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { crearEnlaceVerificacion, enviarEnlaceVerificacion } = require('./emailVerification.controller');
+const { createSessionToken } = require('../utils/sessionToken');
 
 const SALT_ROUNDS = 10;
 
@@ -165,11 +165,7 @@ async function login(req, res) {
             return res.status(403).json({ code: ErrorCodes.EMAIL_NOT_VERIFIED, message: 'Please verify your email before signing in' });
         }
 
-        const token = jwt.sign(
-            { id: usuario.id, email: usuario.email, rol: usuario.role.name },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
-        );
+        const token = createSessionToken(usuario, usuario.role.name);
 
         return res.status(200).json({
             message: 'Login successful',
@@ -213,11 +209,7 @@ async function loginAdmin(req, res) {
             return res.status(403).json({ code: ErrorCodes.NOT_ADMIN_ACCOUNT, message: 'This account does not have administrator privileges' });
         }
 
-        const token = jwt.sign(
-            { id: usuario.id, email: usuario.email, rol: usuario.role.name },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
-        );
+        const token = createSessionToken(usuario, usuario.role.name);
 
         return res.status(200).json({
             message: 'Login successful',
