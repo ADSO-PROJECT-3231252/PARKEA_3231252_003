@@ -216,4 +216,34 @@ describe('Signing up goes to "Revisa tu correo" (HU-30, AC-01)', () => {
         expect(await screen.findByRole('heading', { name: 'Revisa tu correo' })).toBeInTheDocument();
         expect(screen.getByText('laura@correo.test')).toBeInTheDocument();
     });
+
+    test('an email that is already registered links to ask for a new link', async () => {
+        // Arrange
+        const { register } = jest.requireMock('../src/services/authService');
+        register.mockRejectedValue({ response: { status: 409, data: { code: 'EMAIL_ALREADY_REGISTERED' } } });
+        const Register = jest.requireActual('../src/pages/Register').default;
+        const user = userEvent.setup();
+        render(
+            <MemoryRouter initialEntries={['/register']}>
+                <Register />
+            </MemoryRouter>,
+        );
+
+        // Act
+        await user.type(document.getElementById('documentNumber'), '1001');
+        await user.type(document.getElementById('fullName'), 'Laura Gómez');
+        await user.type(document.getElementById('email'), 'laura@correo.test');
+        await user.type(document.getElementById('password'), 'Clave123*');
+        await user.type(document.getElementById('confirmPassword'), 'Clave123*');
+        await user.type(document.getElementById('phone'), '3001234567');
+        await user.click(screen.getByRole('button', { name: /crear cuenta/i }));
+
+        // Assert
+        expect(await screen.findByText('Este correo ya está registrado')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Pide un nuevo enlace' })).toHaveAttribute('href', '/verify-email/resend');
+
+        // The link goes away when the email changes
+        await user.type(document.getElementById('email'), 'x');
+        expect(screen.queryByRole('link', { name: 'Pide un nuevo enlace' })).not.toBeInTheDocument();
+    });
 });

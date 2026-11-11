@@ -66,6 +66,23 @@ describe('Login screen', () => {
         expect(localStorage.getItem('token')).toBeNull();
     });
 
+    test('"Reenviar correo" goes away when the email changes', async () => {
+        // Arrange
+        login.mockRejectedValue({ response: { status: 403, data: { code: 'EMAIL_NOT_VERIFIED' } } });
+        const user = userEvent.setup();
+        renderLogin();
+        await user.type(screen.getByLabelText(/correo/i), 'laura@correo.com');
+        await user.type(screen.getByLabelText(/contraseña/i, { selector: 'input' }), 'Clave#123');
+        await user.click(screen.getByRole('button', { name: /iniciar sesión/i }));
+        expect(await screen.findByRole('button', { name: 'Reenviar correo' })).toBeInTheDocument();
+
+        // Act
+        await user.type(screen.getByLabelText(/correo/i), 'x');
+
+        // Assert
+        expect(screen.queryByRole('button', { name: 'Reenviar correo' })).not.toBeInTheDocument();
+    });
+
     test('a wrong password does not offer "Reenviar correo"', async () => {
         login.mockRejectedValue({ response: { status: 401, data: { code: 'INVALID_CREDENTIALS' } } });
         const user = userEvent.setup();
