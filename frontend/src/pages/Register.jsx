@@ -34,6 +34,8 @@ const SERVER_FIELD_MESSAGES = {
     phone: 'El teléfono debe tener 10 dígitos y solo números.',
 };
 
+const EMAIL_TAKEN = translateError('EMAIL_ALREADY_REGISTERED');
+
 export default function Register() {
     const [form, setForm] = useState({
         documentType: 'CC',
@@ -268,6 +270,16 @@ export default function Register() {
                             {errors.email && (
                                 <p id="email-error" role="alert" className="mt-0.5 text-caption text-danger">
                                     {errors.email}
+                                </p>
+                            )}
+
+                            {/* HU-30: the email may belong to an account that is still waiting to be confirmed */}
+                            {errors.email === EMAIL_TAKEN && (
+                                <p className="mt-0.5 text-caption text-neutral-600">
+                                    ¿Aún no confirmas tu correo?{' '}
+                                    <Link to="/verify-email/resend" className="text-parkea-600 underline hover:text-parkea-700">
+                                        Pide un nuevo enlace
+                                    </Link>
                                 </p>
                             )}
                         </div>
