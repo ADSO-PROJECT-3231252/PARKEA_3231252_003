@@ -1,11 +1,21 @@
 const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const { Usuario, Rol, EmailVerificationToken, AdminActionLog, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { crearEnlaceVerificacion, enviarEnlaceVerificacion } = require('./emailVerification.controller');
+const { createSessionToken } = require('../utils/sessionToken');
 
 const SALT_ROUNDS = 10;
+
+// #199: when the email is not registered, the password is still compared
+// with this hash, so the answer takes the same time as for a real account
+// and the time never reveals whether an email is registered
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', SALT_ROUNDS);
+
+async function passwordMatches(usuario, password) {
+    const matches = await bcrypt.compare(password, usuario ? usuario.password : DUMMY_HASH);
+    return Boolean(usuario) && matches;
+}
 
 const CONFLICTS = {
     email: { code: ErrorCodes.EMAIL_ALREADY_REGISTERED, message: 'This email is already registered' },
@@ -146,12 +156,7 @@ async function login(req, res) {
         const { email, password } = req.body;
 
         const usuario = await Usuario.findOne({ where: { email }, include: { model: Rol, as: 'role' } });
-        if (!usuario) {
-            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
-        }
-
-        const validPassword = await bcrypt.compare(password, usuario.password);
-        if (!validPassword) {
+        if (!(await passwordMatches(usuario, password))) {
             return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
         }
 
@@ -165,11 +170,7 @@ async function login(req, res) {
             return res.status(403).json({ code: ErrorCodes.EMAIL_NOT_VERIFIED, message: 'Please verify your email before signing in' });
         }
 
-        const token = jwt.sign(
-            { id: usuario.id, email: usuario.email, rol: usuario.role.name },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
-        );
+        const token = createSessionToken(usuario, usuario.role.name);
 
         return res.status(200).json({
             message: 'Login successful',
@@ -188,12 +189,7 @@ async function loginAdmin(req, res) {
         const { email, password } = req.body;
 
         const usuario = await Usuario.findOne({ where: { email }, include: { model: Rol, as: 'role' } });
-        if (!usuario) {
-            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
-        }
-
-        const validPassword = await bcrypt.compare(password, usuario.password);
-        if (!validPassword) {
+        if (!(await passwordMatches(usuario, password))) {
             return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
         }
 
@@ -213,11 +209,7 @@ async function loginAdmin(req, res) {
             return res.status(403).json({ code: ErrorCodes.NOT_ADMIN_ACCOUNT, message: 'This account does not have administrator privileges' });
         }
 
-        const token = jwt.sign(
-            { id: usuario.id, email: usuario.email, rol: usuario.role.name },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' }
-        );
+        const token = createSessionToken(usuario, usuario.role.name);
 
         return res.status(200).json({
             message: 'Login successful',

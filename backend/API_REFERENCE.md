@@ -4,7 +4,8 @@ Base URL: `http://localhost:3000/api`
 
 All protected endpoints require the header `Authorization: Bearer <token>`,
 obtained from `POST /auth/login` or `POST /auth/login-admin`. Tokens expire
-after 1 hour.
+after 1 hour, and stop working as soon as the password of the account changes
+(from the profile or with a recovery link): they answer `403 INVALID_TOKEN`.
 
 Every error response includes a short `code` field (see
 `src/constants/errorCodes.js`) in addition to the `message`, so the
@@ -26,8 +27,8 @@ A route that does not exist answers 404 `ROUTE_NOT_FOUND`.
 | POST | `/auth/register` | Public | Register a new user (HU-01). The account is created as not verified and gets a verification email (HU-30). The email and the document of an account that is not verified stay taken while one of its links is valid; after that, a new sign-up takes the place of that account. Two sign-ups with the same data at the same moment answer 201 and 409. Attempt limit, see below |
 | POST | `/auth/login` | Public | Log in and receive a JWT (HU-05). An account that is not verified answers `403 EMAIL_NOT_VERIFIED`, only after the right password (HU-30). Attempt limit, see below |
 | POST | `/auth/login-admin` | Public | Log in as administrator; rejects non-admin accounts (HU-06) and accounts that are not verified (HU-30). Shares the attempt limit of `/auth/login` |
-| POST | `/auth/forgot-password` | Public | Request a password recovery email (HU-07, phase 1). Always responds the same way whether the email exists or not. Attempt limit, see below |
-| POST | `/auth/reset-password` | Public | Set a new password using the emailed token (HU-07, phase 2). Token is single-use, expires in 1 hour. It also verifies an account that was not verified yet, because the link proves the email is the user's (HU-30) |
+| POST | `/auth/forgot-password` | Public | Request a password recovery email (HU-07, phase 1). Always responds the same way, and just as fast, whether the email exists or not. A new link makes the previous ones stop working. Attempt limit, see below |
+| POST | `/auth/reset-password` | Public | Set a new password using the emailed token (HU-07, phase 2). Token is single-use, expires in 1 hour. It also verifies an account that was not verified yet, because the link proves the email is the user's (HU-30). The sessions of the account and its other recovery links stop working. The same password as the current one answers `400 PASSWORD_UNCHANGED`, and the link still works after that answer |
 | POST | `/auth/verify-email` | Public | Verify the email with the token of the link `{ token }` (HU-30). Single-use, expires in 24 hours; a used, expired or unknown token answers `400 VERIFICATION_TOKEN_INVALID` |
 | POST | `/auth/resend-verification` | Public | Send a new verification link `{ email }`; the previous links stop working (HU-30). Always responds the same way whether the email exists or not. Attempt limit, see below |
 
@@ -91,7 +92,7 @@ on that network, so on a shared Wi-Fi each person has their own tries.
 |---|---|---|---|
 | GET | `/users/me` | Authenticated | Load my profile (HU-08) |
 | PUT | `/users/me` | Authenticated | Edit full name and phone (HU-08). Email and document are never editable |
-| PUT | `/users/me/password` | Authenticated | Change password (HU-08) |
+| PUT | `/users/me/password` | Authenticated | Change password (HU-08). The other sessions of the account and its recovery links stop working; the answer brings a new `token` so this session goes on |
 
 ## Admin
 

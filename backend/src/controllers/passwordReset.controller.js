@@ -21,40 +21,52 @@ async function solicitarRecuperacion(req, res, next) {
         };
 
         const usuario = await Usuario.findOne({ where: { email } });
-        if (!usuario) {
-            return res.status(200).json(respuestaGenerica);
-        }
 
-        // Generate a random token; only its hash is stored, the raw token
-        // goes in the email link and is never persisted anywhere
-        const { token: tokenPlano, tokenHash } = createSecureToken();
-        const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
+        // #199: the answer goes out here, before the link is created, so it
+        // takes the same time whether the account exists or not. Everything
+        // below runs after the answer; if it fails it only goes to the
+        // server log (a 500 would tell anyone that the account exists).
+        res.status(200).json(respuestaGenerica);
+        if (!usuario) return;
 
-        await PasswordResetToken.create({
-            userId: usuario.id,
-            tokenHash,
-            expiresAt,
-        });
-
-        // Link to the web app that sent the request: the hosted site in
-        // production, the local Vite server in development.
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        const resetUrl = `${frontendUrl}/reset-password?token=${tokenPlano}`;
-
-        // The email goes out in the background, so the answer is the same,
-        // and just as fast, whether the account exists or not. If the email
-        // provider fails, it only goes to the server log: a 500 here would
-        // tell anyone that the account exists.
-        // The email greets the user by the first name ("Hola, Laura:")
-        const primerNombre = (usuario.fullName || '').trim().split(/\s+/)[0];
-        enviarCorreoRecuperacion(usuario.email, resetUrl, primerNombre).catch((error) => {
+        crearYEnviarEnlace(usuario).catch((error) => {
             console.error('Could not send the recovery email:', error.message);
         });
-
-        return res.status(200).json(respuestaGenerica);
     } catch (error) {
         next(error);
     }
+}
+
+// Creates the recovery link of the account and sends it by email. The links
+// it had before stop working, so only the newest one can be used (#199).
+async function crearYEnviarEnlace(usuario) {
+    // Only the hash of the token is stored; the token itself goes in the
+    // link of the email and is never saved anywhere
+    const { token: tokenPlano, tokenHash } = createSecureToken();
+
+    await sequelize.transaction(async (transaction) => {
+        // Same order as everywhere else: first the account (locked), then
+        // its links
+        await Usuario.findByPk(usuario.id, { transaction, lock: transaction.LOCK.UPDATE });
+        await PasswordResetToken.update(
+            { usedAt: new Date() },
+            { where: { userId: usuario.id, usedAt: null }, transaction }
+        );
+        await PasswordResetToken.create({
+            userId: usuario.id,
+            tokenHash,
+            expiresAt: new Date(Date.now() + TOKEN_TTL_MS),
+        }, { transaction });
+    });
+
+    // Link to the web app that sent the request: the hosted site in
+    // production, the local Vite server in development.
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetUrl = `${frontendUrl}/reset-password?token=${tokenPlano}`;
+
+    // The email greets the user by the first name ("Hola, Laura:")
+    const primerNombre = (usuario.fullName || '').trim().split(/\s+/)[0];
+    await enviarCorreoRecuperacion(usuario.email, resetUrl, primerNombre);
 }
 
 // PHASE 2 — POST /api/auth/reset-password
@@ -91,6 +103,11 @@ async function restablecerPassword(req, res, next) {
             const usuario = await Usuario.findByPk(registro.userId, { transaction, lock: transaction.LOCK.UPDATE });
             if (!usuario) return 'USER_NOT_FOUND';
 
+            // The new password must be different from the current one, like
+            // in the profile (HU-08). The link is not used, so the user can
+            // try again with another password.
+            if (await bcrypt.compare(newPassword, usuario.password)) return 'PASSWORD_UNCHANGED';
+
             // Single-use: the link is marked as used only if it is still
             // unused and valid, so it can never be used twice
             const ahora = new Date();
@@ -100,10 +117,17 @@ async function restablecerPassword(req, res, next) {
             );
             if (marcados === 0) return 'RESET_TOKEN_INVALID';
 
+            // #199: the session tokens issued before this change stop
+            // working, and so do the other recovery links of the account
+            const cambios = { password: passwordHash, passwordVersion: usuario.passwordVersion + 1 };
+            await PasswordResetToken.update(
+                { usedAt: ahora },
+                { where: { userId: usuario.id, usedAt: null }, transaction }
+            );
+
             // HU-30: the recovery link proves that the email belongs to the
             // user, so it also verifies an account that was not verified
             // yet, and its verification links stop working
-            const cambios = { password: passwordHash };
             if (!usuario.emailVerifiedAt) {
                 cambios.emailVerifiedAt = ahora;
                 await EmailVerificationToken.update(
@@ -117,6 +141,12 @@ async function restablecerPassword(req, res, next) {
 
         if (resultado === 'USER_NOT_FOUND') {
             return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+        if (resultado === 'PASSWORD_UNCHANGED') {
+            return res.status(400).json({
+                code: ErrorCodes.PASSWORD_UNCHANGED,
+                message: 'New password must be different from the current one',
+            });
         }
         if (resultado === 'RESET_TOKEN_INVALID') {
             return res.status(400).json({

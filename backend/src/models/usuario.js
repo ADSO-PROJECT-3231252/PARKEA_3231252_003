@@ -66,6 +66,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       field: 'role_id',
     },
+    // #199: goes up on every password change; older session tokens stop working
+    passwordVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'password_version',
+    },
     // HU-30: NULL until the user opens the link of the verification email
     emailVerifiedAt: {
       type: DataTypes.DATE,

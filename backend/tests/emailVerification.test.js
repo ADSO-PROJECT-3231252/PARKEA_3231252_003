@@ -500,7 +500,7 @@ describe('The recovery link also verifies the account (HU-30)', () => {
 
     test('an account that was not verified gets the new password and is verified', async () => {
         // Arrange
-        const account = { id: 'user-laura', emailVerifiedAt: null, update: jest.fn().mockResolvedValue({}) };
+        const account = { id: 'user-laura', password: passwordHash, emailVerifiedAt: null, update: jest.fn().mockResolvedValue({}) };
 
         // Act
         const res = await resetWith(account);
@@ -520,7 +520,7 @@ describe('The recovery link also verifies the account (HU-30)', () => {
     test('a verified account only changes the password', async () => {
         // Arrange
         const verifiedAt = new Date('2026-11-01T12:00:00Z');
-        const account = { id: 'user-laura', emailVerifiedAt: verifiedAt, update: jest.fn().mockResolvedValue({}) };
+        const account = { id: 'user-laura', password: passwordHash, emailVerifiedAt: verifiedAt, update: jest.fn().mockResolvedValue({}) };
 
         // Act
         const res = await resetWith(account);
@@ -534,7 +534,7 @@ describe('The recovery link also verifies the account (HU-30)', () => {
     test('if the same recovery link was used a moment before, it answers 400 and changes nothing', async () => {
         // Arrange
         markLinkUsed.mockResolvedValue([0]);
-        const account = { id: 'user-laura', emailVerifiedAt: null, update: jest.fn() };
+        const account = { id: 'user-laura', password: passwordHash, emailVerifiedAt: null, update: jest.fn() };
 
         // Act
         const res = await resetWith(account);
