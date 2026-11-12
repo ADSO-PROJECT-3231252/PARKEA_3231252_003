@@ -7,6 +7,17 @@ const { createSessionToken } = require('../utils/sessionToken');
 
 const SALT_ROUNDS = 10;
 
+
+// #199: when the email is not registered, the password is still compared
+// with this hash, so the answer takes the same time as for a real account
+// and the time never reveals whether an email is registered
+const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', SALT_ROUNDS);
+
+async function passwordMatches(usuario, password) {
+    const matches = await bcrypt.compare(password, usuario ? usuario.password : DUMMY_HASH);
+    return Boolean(usuario) && matches;
+}
+
 const CONFLICTS = {
     email: { code: ErrorCodes.EMAIL_ALREADY_REGISTERED, message: 'This email is already registered' },
     document: { code: ErrorCodes.DOCUMENT_ALREADY_REGISTERED, message: 'This document number is already registered' },
@@ -146,12 +157,7 @@ async function login(req, res) {
         const { email, password } = req.body;
 
         const usuario = await Usuario.findOne({ where: { email }, include: { model: Rol, as: 'role' } });
-        if (!usuario) {
-            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
-        }
-
-        const validPassword = await bcrypt.compare(password, usuario.password);
-        if (!validPassword) {
+        if (!(await passwordMatches(usuario, password))) {
             return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
         }
 
@@ -184,12 +190,7 @@ async function loginAdmin(req, res) {
         const { email, password } = req.body;
 
         const usuario = await Usuario.findOne({ where: { email }, include: { model: Rol, as: 'role' } });
-        if (!usuario) {
-            return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
-        }
-
-        const validPassword = await bcrypt.compare(password, usuario.password);
-        if (!validPassword) {
+        if (!(await passwordMatches(usuario, password))) {
             return res.status(401).json({ code: ErrorCodes.INVALID_CREDENTIALS, message: 'Invalid credentials' });
         }
 
