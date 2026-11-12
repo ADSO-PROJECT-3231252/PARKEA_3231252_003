@@ -21,6 +21,18 @@ import { formatCurrency, formatDuration } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { isNotEmpty, REQUIRED_MESSAGE } from '../utils/validators';
 import { translateError } from '../utils/errorMessages';
+import {
+    closingOf,
+    colombiaTime,
+    entryProblem,
+    exitProblem,
+    formatHour,
+    hoursErrorMessage,
+    hoursSentence,
+    lastEntry,
+    openingOfDay,
+    weekHours,
+} from '../utils/zoneHours';
 
 // Same palette used by Zones.jsx's ZoneCard badge, reused here so the
 // availability badge looks identical across both screens.
@@ -38,6 +50,43 @@ function combineDateTime(date, time) {
     if (!date || !time) return null;
     const d = new Date(`${date}T${time}`);
     return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// HU-29: the hours of the day picked in a date field (null for a zone open
+// 24 hours, a closed day or no date yet), for the limits of the time fields
+function hoursOfDate(zone, date) {
+    if (!zone || zone.open24h || !date) return null;
+    const noon = combineDateTime(date, '12:00');
+    return noon ? openingOfDay(zone, noon).hours : null;
+}
+
+// HU-29 AC-06: the hours of the week of the zone, Monday to Sunday
+function ZoneHours({ zone }) {
+    return (
+        <section aria-labelledby="zone-hours-title" className="mt-4 rounded-lg border border-neutral-200 bg-white p-5">
+            <h2 id="zone-hours-title" className="flex items-center gap-2 text-label font-medium text-neutral-900">
+                <Clock className="h-4 w-4 shrink-0 text-parkea-600" aria-hidden="true" />
+                Horario de la zona
+            </h2>
+            {zone.open24h ? (
+                <p className="mt-2 text-body text-neutral-700">Abierta 24 horas, todos los días.</p>
+            ) : (
+                <>
+                    <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-4">
+                        {weekHours(zone).map(({ day, name, text }) => (
+                            <div key={day} className="flex justify-between gap-3 border-b border-neutral-100 pb-1.5 text-body">
+                                <dt className="text-neutral-600">{name}</dt>
+                                <dd className={text === 'Cerrada' ? 'text-neutral-600' : 'text-neutral-900'}>{text}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <p className="mt-3 text-caption text-neutral-600">
+                        Toda la reserva debe quedar dentro del horario de su día, con la entrada al menos 30 minutos antes del cierre.
+                    </p>
+                </>
+            )}
+        </section>
+    );
 }
 
 export default function ReserveSpot() {
@@ -123,6 +172,10 @@ export default function ReserveSpot() {
         setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
         // HU-27: without an exit time, its error no longer applies.
         if (name === 'openEnded' && checked) setErrors((prev) => ({ ...prev, end: undefined }));
+        // HU-29: a date or time that changes takes its old error away; the
+        // hours of the zone are checked again below as it is typed
+        const field = { startDate: 'start', startTime: 'start', endDate: 'end', endTime: 'end' }[name];
+        if (field) setErrors((prev) => ({ ...prev, [field]: undefined }));
     };
 
     const startDateTime = combineDateTime(form.startDate, form.startTime);
@@ -147,6 +200,33 @@ export default function ReserveSpot() {
     // only the first hour is paid to confirm it.
     const showSummary = form.openEnded ? Boolean(startDateTime) : hasValidRange;
 
+    // HU-29 AC-03 / AC-06: the hours of the zone are checked as the dates are
+    // typed, so the problem shows before sending. The exit is only checked
+    // once the entry fits.
+    const startHoursProblem = zone && startDateTime ? entryProblem(zone, startDateTime) : null;
+    const endHoursProblem =
+        zone && !form.openEnded && !startHoursProblem && hasValidRange ? exitProblem(zone, startDateTime, endDateTime) : null;
+    // AC-04: an open stay ends at the closing time of its day at the latest
+    const openStayClosing = zone && form.openEnded && startDateTime && !startHoursProblem ? closingOf(zone, startDateTime) : null;
+    // How the open stay ends: in the summary, and at the end of the line
+    // under "Tiempo indefinido"
+    let openStayEnd = 'Hasta el cierre de la zona';
+    let openStayHelpEnd = '. Termina a más tardar a la hora de cierre de la zona.';
+    if (zone?.open24h) {
+        openStayEnd = 'Máximo 24 horas';
+        openStayHelpEnd = ' (máximo 24 horas).';
+    } else if (openStayClosing) {
+        const closing = formatHour(colombiaTime(openStayClosing));
+        openStayEnd = `Hasta las ${closing} como máximo`;
+        openStayHelpEnd = `. Termina a más tardar a las ${closing}, cuando cierra la zona.`;
+    }
+    // The limits of the time fields, for the browsers that show them
+    const startDayHours = hoursOfDate(zone, form.startDate);
+    const endDayHours = form.endDate === form.startDate ? startDayHours : null;
+    // The hours of the day of the entry, under it, once it fits
+    const startOpening = zone && !zone.open24h && startDateTime && !startHoursProblem ? openingOfDay(zone, startDateTime) : null;
+    const startDayNote = startOpening ? hoursSentence({ day: startOpening.day, ...startOpening.hours }) : null;
+
     const validate = () => {
         const newErrors = {};
         const now = new Date();
@@ -161,6 +241,9 @@ export default function ReserveSpot() {
             newErrors.start = translateError('START_TIME_IN_PAST');
         } else if (startDateTime - now > MAX_ADVANCE_HOURS * 60 * 60 * 1000) {
             newErrors.start = translateError('RESERVATION_TOO_FAR_AHEAD');
+        } else if (startHoursProblem) {
+            // HU-29 AC-03: a closed day or outside the hours of that day
+            newErrors.start = startHoursProblem;
         }
 
         if (form.openEnded) {
@@ -173,6 +256,9 @@ export default function ReserveSpot() {
             const totalMinutes = Math.round((endDateTime - startDateTime) / 60000);
             if (totalMinutes < MIN_DURATION_MINUTES || totalMinutes > MAX_DURATION_MINUTES) {
                 newErrors.end = translateError('INVALID_DURATION');
+            } else if (endHoursProblem) {
+                // HU-29 AC-03: the exit after the closing time of that day
+                newErrors.end = endHoursProblem;
             }
         }
 
@@ -207,6 +293,13 @@ export default function ReserveSpot() {
                 setErrors((prev) => ({ ...prev, end: translateError(code) }));
             } else if (code === 'VEHICLE_RESERVATION_OVERLAP' || code === 'VEHICLE_NOT_FOUND') {
                 setErrors((prev) => ({ ...prev, vehicle: translateError(code) }));
+            } else if (code === 'OUTSIDE_ZONE_HOURS' || code === 'ZONE_CLOSED_THAT_DAY') {
+                // HU-29 AC-03: the hours may have changed since the page opened;
+                // the message shows the hours of that day
+                setErrors((prev) => ({
+                    ...prev,
+                    start: hoursErrorMessage(code, err.response.data.hours) ?? translateError(code),
+                }));
             } else {
                 // NO_SPOTS_AVAILABLE (AC-14), ZONE_NOT_FOUND, ZONE_INACTIVE,
                 // MISSING_REQUIRED_FIELDS, PENDING_BALANCE (HU-27 AC-11), or
@@ -328,6 +421,8 @@ export default function ReserveSpot() {
                 </div>
             </div>
 
+            <ZoneHours zone={zone} />
+
             <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
                 <h3 className="text-body font-medium text-neutral-900">Información de la reserva</h3>
                 <div className="mt-4 border-t border-neutral-100" />
@@ -403,8 +498,8 @@ export default function ReserveSpot() {
                                     type="date"
                                     value={form.startDate}
                                     onChange={handleChange}
-                                    aria-invalid={Boolean(errors.start)}
-                                    aria-describedby={errors.start ? 'start-error' : undefined}
+                                    aria-invalid={Boolean(errors.start || startHoursProblem)}
+                                    aria-describedby={errors.start || startHoursProblem ? 'start-error' : startDayNote ? 'start-hint' : undefined}
                                     className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.start ? 'border-danger' : 'border-neutral-200'
                                         }`}
                                 />
@@ -420,19 +515,23 @@ export default function ReserveSpot() {
                                     type="time"
                                     value={form.startTime}
                                     onChange={handleChange}
-                                    aria-invalid={Boolean(errors.start)}
-                                    aria-describedby={errors.start ? 'start-error' : undefined}
+                                    min={startDayHours?.opensAt}
+                                    max={startDayHours ? lastEntry(startDayHours) : undefined}
+                                    aria-invalid={Boolean(errors.start || startHoursProblem)}
+                                    aria-describedby={errors.start || startHoursProblem ? 'start-error' : startDayNote ? 'start-hint' : undefined}
                                     className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.start ? 'border-danger' : 'border-neutral-200'
                                         }`}
                                 />
                             </div>
                         </div>
-                        {errors.start ? (
+                        {errors.start || startHoursProblem ? (
                             <p id="start-error" role="alert" className="mt-1 text-caption text-danger">
-                                {errors.start}
+                                {errors.start || startHoursProblem}
                             </p>
                         ) : (
-                            <p className="mt-1 text-caption text-neutral-600">Selecciona cuándo vas a ingresar al parqueadero.</p>
+                            <p id="start-hint" className="mt-1 text-caption text-neutral-600">
+                                {startDayNote ?? 'Selecciona cuándo vas a ingresar al parqueadero.'}
+                            </p>
                         )}
                     </div>
 
@@ -450,7 +549,8 @@ export default function ReserveSpot() {
                             <span className="text-label text-neutral-900">Tiempo indefinido</span>
                         </label>
                         <p id="openEnded-help" className="mt-1 pl-6 text-caption text-neutral-600">
-                            Pagas la primera hora al confirmar y el resto cuando termines, por cada hora empezada (máximo 24 horas).
+                            Pagas la primera hora al confirmar y el resto cuando termines, por cada hora empezada
+                            {openStayHelpEnd}
                         </p>
                     </div>
 
@@ -472,8 +572,8 @@ export default function ReserveSpot() {
                                         type="date"
                                         value={form.endDate}
                                         onChange={handleChange}
-                                        aria-invalid={Boolean(errors.end)}
-                                        aria-describedby={errors.end ? 'end-error' : undefined}
+                                        aria-invalid={Boolean(errors.end || endHoursProblem)}
+                                        aria-describedby={errors.end || endHoursProblem ? 'end-error' : undefined}
                                         className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
                                             }`}
                                     />
@@ -489,16 +589,17 @@ export default function ReserveSpot() {
                                         type="time"
                                         value={form.endTime}
                                         onChange={handleChange}
-                                        aria-invalid={Boolean(errors.end)}
-                                        aria-describedby={errors.end ? 'end-error' : undefined}
+                                        max={endDayHours?.closesAt}
+                                        aria-invalid={Boolean(errors.end || endHoursProblem)}
+                                        aria-describedby={errors.end || endHoursProblem ? 'end-error' : undefined}
                                         className={`w-full rounded-md border py-2.5 pl-9 pr-3 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.end ? 'border-danger' : 'border-neutral-200'
                                             }`}
                                     />
                                 </div>
                             </div>
-                            {errors.end ? (
+                            {errors.end || endHoursProblem ? (
                                 <p id="end-error" role="alert" className="mt-1 text-caption text-danger">
-                                    {errors.end}
+                                    {errors.end || endHoursProblem}
                                 </p>
                             ) : (
                                 <p className="mt-1 text-caption text-neutral-600">Selecciona cuándo planeas salir del parqueadero.</p>
@@ -520,6 +621,8 @@ export default function ReserveSpot() {
                                         <p className="break-words text-body font-medium text-neutral-900">
                                             {form.openEnded ? 'Tiempo indefinido' : durationLabel}
                                         </p>
+                                        {/* HU-29 AC-04: when an open stay ends at the latest */}
+                                        {form.openEnded && <p className="text-caption text-neutral-600">{openStayEnd}</p>}
                                     </div>
                                 </div>
                                 <div className="flex min-w-0 items-center gap-3">

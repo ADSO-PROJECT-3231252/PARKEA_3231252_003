@@ -52,6 +52,9 @@ const errorMessages = {
     END_BEFORE_START: 'La hora de fin debe ser posterior a la de inicio',
     INVALID_DURATION: 'La reserva debe durar entre 30 minutos y 24 horas',
     RESERVATION_TOO_FAR_AHEAD: 'Solo puedes reservar con un máximo de 48 horas de anticipación',
+    // HU-29: the screens add the hours of that day when the API sends them
+    OUTSIDE_ZONE_HOURS: 'La reserva debe estar dentro del horario de la zona, con la entrada al menos 30 minutos antes del cierre',
+    ZONE_CLOSED_THAT_DAY: 'Esta zona no abre ese día',
     VEHICLE_RESERVATION_OVERLAP: 'Este vehículo ya tiene una reserva en ese horario',
     NO_SPOTS_AVAILABLE: 'Este cupo ya no está disponible. Elige otra zona u horario',
     RESERVATION_NOT_FOUND: 'Reserva no encontrada',

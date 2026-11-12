@@ -19,6 +19,8 @@ describe('translateError', () => {
         ['NO_SPOTS_AVAILABLE', 'Este cupo ya no está disponible. Elige otra zona u horario'],
         ['EMAIL_NOT_VERIFIED', 'Confirma tu correo antes de iniciar sesión. Revisa tu bandeja de entrada'],
         ['VERIFICATION_TOKEN_INVALID', 'Este enlace de confirmación ya no es válido. Pide uno nuevo'],
+        ['OUTSIDE_ZONE_HOURS', 'La reserva debe estar dentro del horario de la zona, con la entrada al menos 30 minutos antes del cierre'],
+        ['ZONE_CLOSED_THAT_DAY', 'Esta zona no abre ese día'],
     ])('translates %s', (code, text) => {
         expect(translateError(code)).toBe(text);
     });

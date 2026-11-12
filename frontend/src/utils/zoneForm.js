@@ -1,5 +1,6 @@
 import { isNotEmpty, REQUIRED_MESSAGE } from './validators';
 import { translateError } from './errorMessages';
+import { DAYS, MIN_OPEN_MINUTES, minutesOf } from './zoneHours';
 
 // Rules of the zone form, shared by create (HU-20) and edit (HU-21).
 // They mirror validarZona in the backend (zona.controller.js), so most
@@ -12,8 +13,18 @@ export const ZONE_LIMITS = {
     rateDigits: 8,
 };
 
+// HU-29: the key of the error of one day of the schedule ("day1" ... "day7")
+export const dayField = (day) => `day${day}`;
+
 // Order of the fields on screen: the first one with an error gets the focus.
-export const ZONE_FIELDS = ['name', 'address', 'totalSlots', 'hourlyRate', 'latitude', 'longitude'];
+export const ZONE_FIELDS = [
+    'name', 'address', 'totalSlots', 'hourlyRate', 'latitude', 'longitude',
+    'open24h', 'schedule', ...DAYS.map(dayField),
+];
+
+// HU-29 AC-02: one row per day, Monday to Sunday. A new row is open, with
+// its times still to be written.
+export const emptyWeek = () => DAYS.map((day) => ({ day, open: true, opensAt: '', closesAt: '' }));
 
 export const EMPTY_ZONE_FORM = {
     name: '',
@@ -22,7 +33,28 @@ export const EMPTY_ZONE_FORM = {
     hourlyRate: '',
     latitude: '',
     longitude: '',
+    // HU-29 AC-01: null until the admin chooses "Abierta 24 horas" (true) or
+    // "Horario personalizado" (false); neither is chosen by default
+    open24h: null,
+    schedule: emptyWeek(),
 };
+
+export const SCHEDULE_MESSAGES = {
+    choose: 'Elige si la zona abre las 24 horas o tiene un horario personalizado.',
+    noOpenDay: 'Marca al menos un día como abierto.',
+    missingTime: 'Escribe la hora de apertura y la de cierre.',
+    tooShort: 'La apertura debe ser al menos 30 minutos antes del cierre. Si la zona abre de noche, elige Abierta 24 horas.',
+    fromApi: 'Revisa las horas de este día.',
+    scheduleFromApi: 'Revisa el horario: marca al menos un día como abierto.',
+};
+
+// HU-29 AC-02: the error of one open day, or '' when its times are valid
+export function dayError(row) {
+    if (!row.open) return '';
+    if (!row.opensAt || !row.closesAt) return SCHEDULE_MESSAGES.missingTime;
+    if (minutesOf(row.closesAt) - minutesOf(row.opensAt) < MIN_OPEN_MINUTES) return SCHEDULE_MESSAGES.tooShort;
+    return '';
+}
 
 // Capacity and rate only accept digits: the rate is in whole pesos, so a
 // typed "2.000" stays "2000" instead of becoming 2.
@@ -67,7 +99,10 @@ function coordinateError(value, min, max, label) {
 // HU-21 AC-01: the zone as the API returns it, as the form holds it. Numbers
 // become text; String(Number()) drops the zeros the DB adds ("4.8284000",
 // "2500.00") but keeps every decimal, so saving without changes moves nothing.
+// HU-29 AC-01: the current choice of hours is shown; the days a custom
+// schedule does not list are closed.
 export function zoneToForm(zone) {
+    const custom = zone.open24h === false;
     return {
         name: zone.name ?? '',
         address: zone.address ?? '',
@@ -75,6 +110,15 @@ export function zoneToForm(zone) {
         hourlyRate: zone.hourlyRate == null ? '' : String(Number(zone.hourlyRate)),
         latitude: zone.latitude == null ? '' : String(Number(zone.latitude)),
         longitude: zone.longitude == null ? '' : String(Number(zone.longitude)),
+        open24h: typeof zone.open24h === 'boolean' ? zone.open24h : null,
+        schedule: custom
+            ? DAYS.map((day) => {
+                const hours = (zone.schedule ?? []).find((s) => s.day === day);
+                return hours
+                    ? { day, open: true, opensAt: hours.opensAt, closesAt: hours.closesAt }
+                    : { day, open: false, opensAt: '', closesAt: '' };
+            })
+            : emptyWeek(),
     };
 }
 
@@ -127,6 +171,18 @@ export function validateZoneForm(form, { spotsInUse = 0 } = {}) {
         errors.longitude = errors.latitude;
     }
 
+    // HU-29 AC-01 / AC-02: the hours must be chosen; a custom schedule needs
+    // at least one open day, and each open day valid times
+    if (typeof form.open24h !== 'boolean') {
+        errors.open24h = SCHEDULE_MESSAGES.choose;
+    } else if (!form.open24h) {
+        if (!form.schedule.some((row) => row.open)) errors.schedule = SCHEDULE_MESSAGES.noOpenDay;
+        for (const row of form.schedule) {
+            const error = dayError(row);
+            if (error) errors[dayField(row.day)] = error;
+        }
+    }
+
     return errors;
 }
 
@@ -140,6 +196,11 @@ export function buildZonePayload(form) {
         hourlyRate: Number(form.hourlyRate),
         latitude: Number(Number(form.latitude).toFixed(7)),
         longitude: Number(Number(form.longitude).toFixed(7)),
+        // HU-29: the open days only; a day that is not sent is closed
+        open24h: form.open24h,
+        ...(form.open24h
+            ? {}
+            : { schedule: form.schedule.filter((row) => row.open).map(({ day, opensAt, closesAt }) => ({ day, opensAt, closesAt })) }),
     };
 }
 
@@ -172,8 +233,14 @@ export function mapZoneApiError(err) {
             fields.totalSlots = capacityInUseError(data.spotsInUse);
         }
     } else if (data.code === 'VALIDATION_ERROR' && Array.isArray(data.errors)) {
-        for (const { path } of data.errors) {
+        for (const { path, day } of data.errors) {
             if (VALIDATION_MESSAGES[path]) fields[path] = VALIDATION_MESSAGES[path];
+            // HU-29 AC-02: an error about one day goes next to that day
+            if (path === 'open24h') fields.open24h = SCHEDULE_MESSAGES.choose;
+            if (path === 'schedule') {
+                if (DAYS.includes(day)) fields[dayField(day)] = SCHEDULE_MESSAGES.fromApi;
+                else fields.schedule = SCHEDULE_MESSAGES.scheduleFromApi;
+            }
         }
     }
 

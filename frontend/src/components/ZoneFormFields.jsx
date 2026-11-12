@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Info } from 'lucide-react';
 import { ZONE_LIMITS, onlyDigits, cleanCoordinate } from '../utils/zoneForm';
+import ZoneScheduleFields from './ZoneScheduleFields';
 
 // Leaflet is only downloaded when a zone form opens (like the zones map in
 // HU-25), so it doesn't add weight to every other page.
@@ -47,7 +48,8 @@ function Field({ id, label, hint, error, children }) {
 
 // Fields of the zone form, shared by create (HU-20) and edit (HU-21).
 // zoneForm is what useZoneForm returns; hints has the line under the name,
-// address, capacity and rate, which each screen words for its own case.
+// address, capacity and rate, which each screen words for its own case, and
+// optionally under the opening hours (HU-29).
 export default function ZoneFormFields({ zoneForm, hints }) {
     const {
         form,
@@ -244,6 +246,9 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                     </div>
                 </fieldset>
             </div>
+
+            {/* HU-29: opening hours */}
+            <ZoneScheduleFields zoneForm={zoneForm} hint={hints.schedule} />
         </>
     );
 }

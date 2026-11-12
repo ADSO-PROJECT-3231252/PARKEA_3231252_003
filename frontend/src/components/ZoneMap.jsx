@@ -4,9 +4,10 @@ import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'rea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './ZoneMap.css';
-import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info } from 'lucide-react';
+import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info, Clock } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { todayHoursLabel } from '../utils/zoneHours';
 
 // HU-25: map view of the active zones. Base map: OpenStreetMap standard
 // tiles (free, no API key, attribution required).
@@ -118,6 +119,12 @@ function ZoneSummary({ zone, availability, onReserve }) {
                     <span className="min-w-0 break-words">{zone.address}</span>
                 </p>
             )}
+
+            {/* HU-29 AC-06: the hours of today */}
+            <p className="mt-1 flex items-start gap-2 text-body text-neutral-900">
+                <Clock className="mt-1 h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
+                <span className="min-w-0 break-words">{todayHoursLabel(zone)}</span>
+            </p>
 
             <div className="mt-3 flex items-center justify-between gap-x-3 gap-y-2 border-t border-neutral-200 pt-3 max-[319px]:flex-wrap">
                 <span className="flex items-center gap-2 text-body text-neutral-900">
