@@ -44,11 +44,12 @@ async function finalizarReservasVencidas() {
 
             await reservaActual.update({ status: 'Finished' }, { transaction: t });
 
-            // HU-27 AC-10: an open stay not finished within 24 hours closes here.
-            // Its exit time is already entry + 24 h; 24 hours are charged and
-            // what was not paid yet stays as a pending balance. What it paid
-            // before is the first hour, or more if it was extended before
-            // switching to an open stay (HU-28).
+            // HU-27 AC-10: an open stay not finished in time closes here. Its
+            // exit time is already entry + 24 h, or the closing time of its
+            // zone (HU-29 AC-04); the hours up to it are charged and what was
+            // not paid yet stays as a pending balance. What it paid before is
+            // the first hour, or more if it was extended before switching to
+            // an open stay (HU-28).
             if (reservaActual.openEnded) {
                 const pagos = await Pago.findAll({ where: { reservationId: reservaActual.id }, transaction: t });
                 const cobro = openStayCharge(reservaActual, reservaActual.endTime, paidBeforeBalance(reservaActual, pagos));

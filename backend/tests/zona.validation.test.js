@@ -1,4 +1,4 @@
-const { validarZona } = require('../src/controllers/zona.controller');
+const { validarZona, validarHorario } = require('../src/controllers/zona.controller');
 
 // A zone that passes every rule; each test changes only the hourly rate
 const validZone = {
@@ -109,5 +109,56 @@ describe('validarZona: location inside Colombia', () => {
         // Assert
         expect(error.status).toBe(400);
         expect(error.body.code).toBe('INVALID_COORDINATES');
+    });
+});
+
+// HU-29 (AC-01, AC-02): the admin must choose "Abierta 24 horas" or a custom
+// schedule. The rules of each day are tested in zoneHours.test.js.
+describe('validarHorario: the opening hours of a zone', () => {
+    test('accepts a zone open 24 hours, without a schedule', () => {
+        // Act
+        const error = validarHorario({ open24h: true });
+
+        // Assert
+        expect(error).toBeNull();
+    });
+
+    test('accepts a custom schedule', () => {
+        // Act
+        const error = validarHorario({ open24h: false, schedule: [{ day: 1, opensAt: '06:00', closesAt: '20:00' }] });
+
+        // Assert
+        expect(error).toBeNull();
+    });
+
+    test.each([
+        ['missing', undefined],
+        ['sent as text', 'true'],
+        ['sent as a number', 1],
+    ])('rejects open24h %s with VALIDATION_ERROR on open24h', (_label, open24h) => {
+        // Act
+        const error = validarHorario({ open24h });
+
+        // Assert
+        expect(error.status).toBe(400);
+        expect(error.body).toEqual({ code: 'VALIDATION_ERROR', errors: [{ path: 'open24h', msg: 'open24h must be true or false' }] });
+    });
+
+    test('a custom schedule without open days answers VALIDATION_ERROR on schedule', () => {
+        // Act
+        const error = validarHorario({ open24h: false, schedule: [] });
+
+        // Assert
+        expect(error.status).toBe(400);
+        expect(error.body.errors).toEqual([{ path: 'schedule', msg: 'At least one day must be open' }]);
+    });
+
+    test('a wrong day answers VALIDATION_ERROR naming that day', () => {
+        // Act
+        const error = validarHorario({ open24h: false, schedule: [{ day: 5, opensAt: '20:00', closesAt: '08:00' }] });
+
+        // Assert
+        expect(error.status).toBe(400);
+        expect(error.body.errors[0]).toMatchObject({ path: 'schedule', day: 5 });
     });
 });

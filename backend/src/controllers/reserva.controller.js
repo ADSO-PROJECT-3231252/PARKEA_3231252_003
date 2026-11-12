@@ -1,13 +1,31 @@
 const { Op } = require('sequelize');
-const { Reserva, Zona, Vehiculo, Pago, ParkingSpot, Usuario } = require('../models');
+const { Reserva, Zona, Vehiculo, Pago, ParkingSpot, Usuario, ZoneSchedule } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
+const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
 const ANTICIPACION_MAX_MS = 48 * 60 * 60 * 1000;
+
+// HU-29: the zone is read with its opening hours
+const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
+
+// HU-29 (AC-03, AC-05): a stay that does not fit the hours of its day. The
+// answer carries the hours of that day ({ day, opensAt, closesAt } or
+// { day, closed: true }), so the screen can show them.
+function fueraDeHorario(res, hours) {
+    if (hours.closed) {
+        return res.status(400).json({ code: ErrorCodes.ZONE_CLOSED_THAT_DAY, message: 'This zone does not open on that day', hours });
+    }
+    return res.status(400).json({
+        code: ErrorCodes.OUTSIDE_ZONE_HOURS,
+        message: `On that day this zone opens from ${hours.opensAt} to ${hours.closesAt}, and the entry must be at least 30 minutes before closing`,
+        hours,
+    });
+}
 
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
@@ -24,9 +42,10 @@ async function crear(req, res, next) {
         }
 
         const start = new Date(startTime);
-        // An open stay keeps entry + 24 h as a provisional exit time, so the
-        // overlap check and the jobs work as with any other reservation
-        const end = isOpenStay ? provisionalEndTime(start) : new Date(endTime);
+        // An open stay keeps a provisional exit time, so the overlap check and
+        // the jobs work as with any other reservation: entry + 24 h, or the
+        // closing time of a zone that is not open 24 hours (set below, HU-29)
+        let end = isOpenStay ? provisionalEndTime(start) : new Date(endTime);
         const now = new Date();
         // A value that is not a date ("abc") gives an invalid Date, and every
         // comparison below would let it through until the database rejects it
@@ -84,6 +103,25 @@ async function crear(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
+        const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t });
+        if (!zona) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
+        }
+        if (!zona.isActive) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
+        }
+
+        // HU-29 (AC-03, AC-04): the whole stay must fit the hours of the day
+        // of the entry. An open stay ends at the closing time of that day.
+        const horario = checkStay(zona, start, isOpenStay ? null : end);
+        if (horario.problem) {
+            await t.rollback();
+            return fueraDeHorario(res, horario.problem);
+        }
+        if (isOpenStay && horario.closesAt) end = horario.closesAt;
+
         // HU-27 AC-12: an unpaid balance from an open stay blocks new reservations
         const saldoPendiente = await Pago.findOne({
             where: { type: 'balance', paymentStatus: 'Pending' },
@@ -109,16 +147,6 @@ async function crear(req, res, next) {
         if (solapada) {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
-        }
-
-        const zona = await Zona.findByPk(zoneId, { transaction: t });
-        if (!zona) {
-            await t.rollback();
-            return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
-        }
-        if (!zona.isActive) {
-            await t.rollback();
-            return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
         }
 
         // Lock and claim one available physical spot, skipping locked rows so two
@@ -218,6 +246,19 @@ function resumenPagos(pagos = []) {
     };
 }
 
+// HU-29: the latest exit time of a stay that has not ended. For an open stay,
+// when it ends by itself (the closing time of the zone, or entry + 24 h). For
+// a stay with an exit time, how far an extension can take it now, with the
+// current hours of the zone (never earlier than its exit time). Null once the
+// reservation is over.
+function salidaMaxima(reserva) {
+    if (!['Pending', 'Active'].includes(reserva.status)) return null;
+    if (reserva.openEnded) return reserva.endTime;
+    const limite = latestExit(reserva.zone, reserva.startTime);
+    if (!limite || limite < new Date(reserva.endTime)) return reserva.endTime;
+    return limite;
+}
+
 // HU-15: View Reservation Confirmation
 async function obtenerConfirmacion(req, res, next) {
     try {
@@ -227,7 +268,7 @@ async function obtenerConfirmacion(req, res, next) {
         const reserva = await Reserva.findOne({
             where: { id, userId },
             include: [
-                { model: Zona, as: 'zone' },
+                { model: Zona, as: 'zone', include: [CON_HORARIO] },
                 { model: Vehiculo, as: 'vehicle', paranoid: false },
                 { model: Pago, as: 'payments', attributes: ['amount', 'paymentStatus', 'type'] },
             ],
@@ -260,6 +301,7 @@ async function obtenerConfirmacion(req, res, next) {
                 durationHours: duracionMostrada,
                 holdExpiresAt: reserva.holdExpiresAt,
                 openEnded: reserva.openEnded,
+                latestEndTime: salidaMaxima(reserva),
                 openStay: estadiaAbierta,
                 zone: {
                     id: reserva.zone.id,
@@ -488,7 +530,8 @@ async function ampliar(req, res, next) {
 
         const inicio = new Date(reserva.startTime);
         // AC-07: an open stay keeps entry + 24 h as its provisional exit time
-        const salidaNueva = aTiempoIndefinido ? provisionalEndTime(inicio) : new Date(newEndTime);
+        // (or the closing time of the zone, set below, HU-29)
+        let salidaNueva = aTiempoIndefinido ? provisionalEndTime(inicio) : new Date(newEndTime);
         if (!aTiempoIndefinido && salidaNueva <= salidaActual) {
             await t.rollback();
             return res.status(400).json({ code: ErrorCodes.EXTENSION_NOT_LATER, message: 'The new exit time must be later than the current one' });
@@ -517,6 +560,23 @@ async function ampliar(req, res, next) {
             transaction: t,
             lock: t.LOCK.UPDATE,
         });
+
+        // HU-29 (AC-05): in a zone that is not open 24 hours, the exit cannot
+        // go past the closing time of the day of the entry, with the hours the
+        // zone has now (decision 8), and a switch to an open stay ends at that
+        // closing time. The zone is read after the lock of the vehicle, so the
+        // overlap check below still sees a reservation another request has
+        // just created for it.
+        const zona = await Zona.findByPk(reserva.zoneId, { include: [CON_HORARIO], transaction: t });
+        if (!zona.open24h) {
+            const cierre = latestExit(zona, inicio);
+            if (aTiempoIndefinido && cierre) salidaNueva = cierre;
+            if (!cierre || salidaNueva > cierre || salidaNueva <= salidaActual) {
+                await t.rollback();
+                return fueraDeHorario(res, hoursOfStart(zona, inicio));
+            }
+        }
+
         const solapada = await Reserva.findOne({
             where: {
                 id: { [Op.ne]: reserva.id },
@@ -589,7 +649,8 @@ async function misReservas(req, res, next) {
             // multiply the rows (one per payment)
             distinct: true,
             include: [
-                { model: Zona, as: 'zone', attributes: ['id', 'name', 'address'] },
+                // HU-29: the hours of the zone give the latest exit time
+                { model: Zona, as: 'zone', attributes: ['id', 'name', 'address', 'open24h'], include: [CON_HORARIO] },
                 { model: Vehiculo, as: 'vehicle', paranoid: false, attributes: ['id', 'plate', 'brand', 'model', 'color'] },
                 { model: Pago, as: 'payments', attributes: ['amount', 'paymentStatus', 'type'] },
             ],
@@ -636,6 +697,7 @@ async function misReservas(req, res, next) {
                 startTime: r.startTime,
                 endTime: sinSalidaAun ? null : r.endTime,
                 openEnded: r.openEnded,
+                latestEndTime: salidaMaxima(r),
                 openStay,
                 zone: r.zone,
                 vehicle: r.vehicle,
