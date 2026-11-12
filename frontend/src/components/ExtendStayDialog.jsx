@@ -5,14 +5,23 @@ import { extendStay } from '../services/reservationService';
 import { translateError } from '../utils/errorMessages';
 import { formatCurrency, formatDate, formatTime, keepTogether } from '../utils/format';
 import { hoursLabel } from '../utils/openStay';
-import { extendErrorMessage, extensionCharge, extensionOptions, formatAddedTime } from '../utils/extendStay';
+import { extendErrorMessage, extendLimitMs, extensionCharge, extensionOptions, formatAddedTime, limitedByClosing } from '../utils/extendStay';
 
 // Value of the "Tiempo indefinido" option; the others are the new exit times.
 const OPEN_STAY = 'open';
 
 // Codes that mean the screen behind the dialog is out of date (the stay
 // ended, changed or no longer exists), so it is loaded again on close.
-const STALE_CODES = ['RESERVATION_NOT_FOUND', 'STAY_NOT_ACTIVE', 'ALREADY_OPEN_STAY', 'EXIT_TIME_PASSED', 'RESERVATION_CHANGED'];
+// HU-29: the hours of the zone changed too (its latest exit time is another).
+const STALE_CODES = [
+    'RESERVATION_NOT_FOUND',
+    'STAY_NOT_ACTIVE',
+    'ALREADY_OPEN_STAY',
+    'EXIT_TIME_PASSED',
+    'RESERVATION_CHANGED',
+    'OUTSIDE_ZONE_HOURS',
+    'ZONE_CLOSED_THAT_DAY',
+];
 
 // A time such as "03:00 p. m." already ends with a period, which also closes
 // the sentence, so a second one is not added.
@@ -37,12 +46,20 @@ function groupByDay(options) {
     return groups;
 }
 
+// HU-29: how far the stay can go: "hasta 24 horas" or, in a zone that is not
+// open 24 hours, "hasta las 08:00 p. m., cuando cierra la zona"
+function limitText(reservation) {
+    return limitedByClosing(reservation)
+        ? `hasta las ${timeOf(new Date(extendLimitMs(reservation)).toISOString())}, cuando cierra la zona`
+        : 'hasta 24 horas';
+}
+
 // What the chosen option means, under the field (AC-06, AC-07).
 function choiceSummary(choice, reservation, hourlyRate, paid) {
     if (choice === OPEN_STAY) {
         return (
             `No pagas nada ahora. Cuando salgas, usa “Terminar estadía”: se cobra ${moneyOf(hourlyRate)} ` +
-            `por cada hora empezada desde la entrada, hasta 24 horas, menos los ${moneyOf(paid)} que ya ` +
+            `por cada hora empezada desde la entrada, ${limitText(reservation)}, menos los ${moneyOf(paid)} que ya ` +
             'pagaste. Lo que ya pagaste no se devuelve.'
         );
     }
@@ -76,6 +93,11 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
     const zoneName = reservation.zone?.name ?? 'la zona';
     const toOpenStay = choice === OPEN_STAY;
     const exitText = `el ${formatDate(reservation.endTime)} a las ${timeOf(reservation.endTime)}`;
+    // HU-29: up to 24 hours, or up to the closing time of the zone
+    const howFar = limitedByClosing(reservation) ? `${limitText(reservation)}, ` : 'hasta 24 horas desde la entrada ';
+    const message = exitPassed
+        ? sentence(`Tu salida era ${exitText}`)
+        : `${sentence(`Tu salida actual es ${exitText}`)} Puedes ampliarla ${howFar}y conservas el mismo cupo (${reservation.spotNumber}).`;
 
     const handleClose = () => {
         if (saving) return;
@@ -107,7 +129,7 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
             )
             .catch((err) => {
                 const code = err.response?.data?.code;
-                setError(extendErrorMessage(code, true));
+                setError(extendErrorMessage(code, true, err.response?.data?.hours));
                 if (STALE_CODES.includes(code)) setStale(true);
             })
             .finally(() => setSaving(false));
@@ -117,12 +139,7 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
         <ConfirmDialog
             open
             title="Ampliar estadía"
-            message={
-                exitPassed
-                    ? sentence(`Tu salida era ${exitText}`)
-                    : `${sentence(`Tu salida actual es ${exitText}`)} Puedes ampliarla hasta 24 horas desde la ` +
-                      `entrada y conservas el mismo cupo (${reservation.spotNumber}).`
-            }
+            message={message}
             confirmLabel={toOpenStay ? 'Cambiar a tiempo indefinido' : 'Continuar al pago'}
             cancelLabel="Volver"
             confirming={saving}
