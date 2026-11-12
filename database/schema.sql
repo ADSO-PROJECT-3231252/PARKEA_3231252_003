@@ -24,6 +24,8 @@ CREATE TABLE roles (
 -- email_verified_at: NULL until the user opens the link of the verification
 -- email (HU-30); an account that is not verified cannot sign in. Accounts
 -- created before HU-30 and the administrator of the seeders are verified
+-- password_version goes up on every password change, and a session token
+-- issued with an older version stops working (#199)
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     full_name VARCHAR(100) NOT NULL,
@@ -37,6 +39,7 @@ CREATE TABLE users (
     role_id VARCHAR(36) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     email_verified_at DATETIME NULL,
+    password_version INT NOT NULL DEFAULT 0,
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
 
@@ -161,8 +164,11 @@ CREATE TABLE payments (
 );
 
 -- 8. Table: password_reset_tokens
+-- Relation: users (1) - (N) password_reset_tokens
 -- Single-use tokens, valid for one hour (HU-07)
 -- Only the hash of the token is stored, never the token itself
+-- A new link, a reset or a password change from the profile marks the other
+-- links of the account as used (#199)
 CREATE TABLE password_reset_tokens (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     user_id VARCHAR(36) NOT NULL,
