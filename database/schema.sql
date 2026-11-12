@@ -22,8 +22,9 @@ CREATE TABLE roles (
 -- never signed in, so it has no vehicles or reservations). If an
 -- administrator action names it, it only loses the document
 -- email_verified_at: NULL until the user opens the link of the verification
--- email (HU-30); an account that is not verified cannot sign in. Accounts
--- created before HU-30 and the administrator of the seeders are verified
+-- email, or sets a new password with a recovery link (HU-30); an account that
+-- is not verified cannot sign in. Accounts created before HU-30 and the
+-- administrator of the seeders are verified
 -- password_version goes up on every password change, and a session token
 -- issued with an older version stops working (#199)
 CREATE TABLE users (
@@ -208,7 +209,8 @@ CREATE TABLE password_reset_tokens (
 -- 10. Table: email_verification_tokens
 -- Relation: users (1) - (N) email_verification_tokens
 -- Links of the verification email (HU-30): single-use, valid for 24 hours. A
--- new link marks the previous ones as used, so only the newest one works
+-- new link marks the previous ones as used, so only the newest one works. A
+-- new password set with a recovery link also marks them as used
 -- Only the SHA-256 hash of the token is stored (64 characters), never the
 -- token itself; opening a link looks the hash up in the unique index
 CREATE TABLE email_verification_tokens (
