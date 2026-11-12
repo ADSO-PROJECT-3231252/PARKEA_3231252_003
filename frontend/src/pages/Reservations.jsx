@@ -78,7 +78,7 @@ function DateInfo({ reservation, now }) {
     if (endTime) {
         duration = formatDuration(startTime, endTime);
     } else if (isRunningStay(reservation, now)) {
-        duration = `${formatDuration(startTime, stayEndSoFar(startTime, now))} hasta ahora`;
+        duration = `${formatDuration(startTime, stayEndSoFar(startTime, now, reservation.latestEndTime))} hasta ahora`;
     } else if (['Pending', 'Active'].includes(reservation.status)) {
         duration = 'Tiempo indefinido';
     }
