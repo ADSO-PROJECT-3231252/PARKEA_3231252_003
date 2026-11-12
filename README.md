@@ -359,34 +359,36 @@ VITE_API_URL=http://localhost:3000/api
 
 ## API Endpoints
 
-Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signed-in account. **Admin**: administrator role only. Protected routes expect the header `Authorization: Bearer <token>`.
+Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signed-in account. **Admin**: administrator role only. Protected routes expect the header `Authorization: Bearer <token>`; a token stops working when the password of its account changes.
 
 | Module | Method and route | Access | Story |
 |--------|------------------|--------|-------|
 | Health | `GET /health` | Public | — |
-| Auth | `POST /auth/register` | Public | HU-01 |
-| Auth | `POST /auth/login` | Public | HU-05 |
-| Auth | `POST /auth/login-admin` | Public | HU-06 |
+| Auth | `POST /auth/register` (the account is created as not verified) | Public | HU-01, HU-30 |
+| Auth | `POST /auth/login` | Public | HU-05, HU-30 |
+| Auth | `POST /auth/login-admin` | Public | HU-06, HU-30 |
+| Auth | `POST /auth/verify-email`, `POST /auth/resend-verification` | Public | HU-30 |
 | Auth | `POST /auth/forgot-password`, `POST /auth/reset-password` | Public | HU-07 |
 | Profile | `GET /users/me`, `PUT /users/me`, `PUT /users/me/password` | User | HU-08 |
 | Vehicles | `POST /vehicles`, `GET /vehicles`, `GET /vehicles/:id` | User | HU-10, HU-11 |
 | Vehicles | `PUT /vehicles/:id`, `PATCH /vehicles/:id/default` | User | HU-11, HU-12 |
 | Vehicles | `DELETE /vehicles/:id` (soft delete) | User | HU-13 |
-| Zones | `GET /zones`, `GET /zones/:id` | Public | HU-09 |
+| Zones | `GET /zones`, `GET /zones/:id` (with the opening hours) | Public | HU-09, HU-29 |
 | Zones | `GET /zones/all`, `GET /zones/:id/spots` | Admin | HU-19 |
-| Zones | `POST /zones`, `PUT /zones/:id`, `PATCH /zones/:id/toggle` | Admin | HU-19, HU-20, HU-21 |
-| Reservations | `POST /reservations` (with `openEnded: true` for a stay without an exit time) | User | HU-14, HU-27 |
+| Zones | `POST /zones`, `PUT /zones/:id` (with the opening hours) | Admin | HU-20, HU-21, HU-29 |
+| Zones | `PATCH /zones/:id/toggle` | Admin | HU-19 |
+| Reservations | `POST /reservations` (inside the opening hours; with `openEnded: true` for a stay without an exit time) | User | HU-14, HU-27, HU-29 |
 | Reservations | `GET /reservations` (paginated), `GET /reservations/:id` | User | HU-15, HU-18 |
 | Reservations | `PATCH /reservations/:id/cancel` | User | HU-16 |
 | Reservations | `PATCH /reservations/:id/finish` (finish an open stay) | User | HU-27 |
-| Reservations | `PATCH /reservations/:id/extend` (extend a stay or switch it to an open stay) | User | HU-28 |
+| Reservations | `PATCH /reservations/:id/extend` (extend a stay or switch it to an open stay, up to the closing time) | User | HU-28, HU-29 |
 | Payments | `POST /payments/:reservationId` | User | HU-17 |
 | Payments | `POST /payments/:reservationId/balance` (balance of an open stay) | User | HU-27 |
 | Dashboard | `GET /admin/dashboard` and `/admin/dashboard/{occupancy, payments-status, recent-payments, reservations-by-zone, alerts}` | Admin | HU-22 |
 | Users | `GET /admin/users`, `GET /admin/users/logs` | Admin | HU-23 |
 | Users | `PATCH /admin/users/:id/role`, `PATCH /admin/users/:id/status` | Admin | HU-23 |
 
-Business errors come back as `{ "code": "...", "message": "..." }`. Validation errors come back as `{ "code": "VALIDATION_ERROR", "errors": [...] }`, without `message`: each item of `errors` names the field (`path`) and its message (`msg`). A route that does not exist returns 404 `ROUTE_NOT_FOUND`. Sign-in, sign-up and password recovery have attempt limits and answer 429 `TOO_MANY_REQUESTS` when one is reached. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`. Every endpoint, with its rules, its errors and the attempt limits, is described in [backend/API_REFERENCE.md](backend/API_REFERENCE.md).
+Business errors come back as `{ "code": "...", "message": "..." }`. Validation errors come back as `{ "code": "VALIDATION_ERROR", "errors": [...] }`, without `message`: each item of `errors` names the field (`path`) and its message (`msg`), and an item about one day of the opening hours also has its `day`. The errors of a reservation outside the opening hours (`OUTSIDE_ZONE_HOURS`, `ZONE_CLOSED_THAT_DAY`) also bring `hours`, the hours of that day. A route that does not exist returns 404 `ROUTE_NOT_FOUND`. Sign-in, sign-up, password recovery and the verification email have attempt limits and answer 429 `TOO_MANY_REQUESTS` when one is reached. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`. Every endpoint, with its rules, its errors and the attempt limits, is described in [backend/API_REFERENCE.md](backend/API_REFERENCE.md).
 
 ---
 
