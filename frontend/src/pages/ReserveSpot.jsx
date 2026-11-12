@@ -21,6 +21,7 @@ import { formatCurrency, formatDuration } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { isNotEmpty, REQUIRED_MESSAGE } from '../utils/validators';
 import { translateError } from '../utils/errorMessages';
+import { weekHours } from '../utils/zoneHours';
 
 // Same palette used by Zones.jsx's ZoneCard badge, reused here so the
 // availability badge looks identical across both screens.
@@ -38,6 +39,35 @@ function combineDateTime(date, time) {
     if (!date || !time) return null;
     const d = new Date(`${date}T${time}`);
     return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// HU-29 AC-06: the hours of the week of the zone, Monday to Sunday
+function ZoneHours({ zone }) {
+    return (
+        <section aria-labelledby="zone-hours-title" className="mt-4 rounded-lg border border-neutral-200 bg-white p-5">
+            <h2 id="zone-hours-title" className="flex items-center gap-2 text-label font-medium text-neutral-900">
+                <Clock className="h-4 w-4 shrink-0 text-parkea-600" aria-hidden="true" />
+                Horario de la zona
+            </h2>
+            {zone.open24h ? (
+                <p className="mt-2 text-body text-neutral-700">Abierta 24 horas, todos los días.</p>
+            ) : (
+                <>
+                    <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-4">
+                        {weekHours(zone).map(({ day, name, text }) => (
+                            <div key={day} className="flex justify-between gap-3 border-b border-neutral-100 pb-1.5 text-body">
+                                <dt className="text-neutral-600">{name}</dt>
+                                <dd className={text === 'Cerrada' ? 'text-neutral-600' : 'text-neutral-900'}>{text}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <p className="mt-3 text-caption text-neutral-600">
+                        Toda la reserva debe quedar dentro del horario de su día, con la entrada al menos 30 minutos antes del cierre.
+                    </p>
+                </>
+            )}
+        </section>
+    );
 }
 
 export default function ReserveSpot() {
@@ -327,6 +357,8 @@ export default function ReserveSpot() {
                     </div>
                 </div>
             </div>
+
+            <ZoneHours zone={zone} />
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
                 <h3 className="text-body font-medium text-neutral-900">Información de la reserva</h3>
