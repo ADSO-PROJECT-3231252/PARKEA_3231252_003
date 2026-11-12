@@ -103,6 +103,12 @@ async function restablecerPassword(req, res, next) {
             const usuario = await Usuario.findByPk(registro.userId, { transaction, lock: transaction.LOCK.UPDATE });
             if (!usuario) return 'USER_NOT_FOUND';
 
+
+            // The new password must be different from the current one, like
+            // in the profile (HU-08). The link is not used, so the user can
+            // try again with another password.
+            if (await bcrypt.compare(newPassword, usuario.password)) return 'PASSWORD_UNCHANGED';
+
             // Single-use: the link is marked as used only if it is still
             // unused and valid, so it can never be used twice
             const ahora = new Date();
@@ -136,6 +142,12 @@ async function restablecerPassword(req, res, next) {
 
         if (resultado === 'USER_NOT_FOUND') {
             return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+        if (resultado === 'PASSWORD_UNCHANGED') {
+            return res.status(400).json({
+                code: ErrorCodes.PASSWORD_UNCHANGED,
+                message: 'New password must be different from the current one',
+            });
         }
         if (resultado === 'RESET_TOKEN_INVALID') {
             return res.status(400).json({

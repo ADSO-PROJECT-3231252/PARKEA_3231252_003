@@ -174,10 +174,10 @@ describe('Changing the password in the profile (#199)', () => {
     });
 });
 
-describe('Resetting the password with the email link (#199)', () => {
+describe('Resetting the password with the email link (#199 and the audit comment)', () => {
     test('raises the password version and closes every other recovery link of the account', async () => {
         // Arrange
-        const account = { id: 'user-laura', emailVerifiedAt: new Date(), passwordVersion: 5, update: jest.fn().mockResolvedValue({}) };
+        const account = { id: 'user-laura', password: passwordHash, emailVerifiedAt: new Date(), passwordVersion: 5, update: jest.fn().mockResolvedValue({}) };
         jest.spyOn(PasswordResetToken, 'findOne').mockResolvedValue({
             id: 'reset-1', userId: 'user-laura', usedAt: null, expiresAt: new Date(Date.now() + HOUR),
         });
@@ -195,6 +195,27 @@ describe('Resetting the password with the email link (#199)', () => {
         // First this link (only if it is still unused), then all the others
         expect(closeLinks.mock.calls[0][1].where).toEqual(expect.objectContaining({ id: 'reset-1', usedAt: null }));
         expect(closeLinks.mock.calls[1][1].where).toEqual({ userId: 'user-laura', usedAt: null });
+    });
+
+    test('the same password as the current one answers 400 PASSWORD_UNCHANGED and the link still works', async () => {
+        // Arrange
+        const account = { id: 'user-laura', password: passwordHash, emailVerifiedAt: new Date(), passwordVersion: 5, update: jest.fn() };
+        jest.spyOn(PasswordResetToken, 'findOne').mockResolvedValue({
+            id: 'reset-1', userId: 'user-laura', usedAt: null, expiresAt: new Date(Date.now() + HOUR),
+        });
+        jest.spyOn(Usuario, 'findByPk').mockResolvedValue(account);
+        const closeLinks = jest.spyOn(PasswordResetToken, 'update').mockResolvedValue([1]);
+
+        // Act
+        const res = await fromNewIp(request(app).post('/api/auth/reset-password'))
+            .send({ token: 'c'.repeat(64), newPassword: PASSWORD, confirmNewPassword: PASSWORD });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('PASSWORD_UNCHANGED');
+        expect(account.update).not.toHaveBeenCalled();
+        // The link is not marked as used, so the user can try another password
+        expect(closeLinks).not.toHaveBeenCalled();
     });
 });
 
