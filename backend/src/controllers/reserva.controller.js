@@ -246,6 +246,19 @@ function resumenPagos(pagos = []) {
     };
 }
 
+// HU-29: the latest exit time of a stay that has not ended. For an open stay,
+// when it ends by itself (the closing time of the zone, or entry + 24 h). For
+// a stay with an exit time, how far an extension can take it now, with the
+// current hours of the zone (never earlier than its exit time). Null once the
+// reservation is over.
+function salidaMaxima(reserva) {
+    if (!['Pending', 'Active'].includes(reserva.status)) return null;
+    if (reserva.openEnded) return reserva.endTime;
+    const limite = latestExit(reserva.zone, reserva.startTime);
+    if (!limite || limite < new Date(reserva.endTime)) return reserva.endTime;
+    return limite;
+}
+
 // HU-15: View Reservation Confirmation
 async function obtenerConfirmacion(req, res, next) {
     try {
@@ -255,7 +268,7 @@ async function obtenerConfirmacion(req, res, next) {
         const reserva = await Reserva.findOne({
             where: { id, userId },
             include: [
-                { model: Zona, as: 'zone' },
+                { model: Zona, as: 'zone', include: [CON_HORARIO] },
                 { model: Vehiculo, as: 'vehicle', paranoid: false },
                 { model: Pago, as: 'payments', attributes: ['amount', 'paymentStatus', 'type'] },
             ],
@@ -288,6 +301,7 @@ async function obtenerConfirmacion(req, res, next) {
                 durationHours: duracionMostrada,
                 holdExpiresAt: reserva.holdExpiresAt,
                 openEnded: reserva.openEnded,
+                latestEndTime: salidaMaxima(reserva),
                 openStay: estadiaAbierta,
                 zone: {
                     id: reserva.zone.id,
@@ -635,7 +649,8 @@ async function misReservas(req, res, next) {
             // multiply the rows (one per payment)
             distinct: true,
             include: [
-                { model: Zona, as: 'zone', attributes: ['id', 'name', 'address'] },
+                // HU-29: the hours of the zone give the latest exit time
+                { model: Zona, as: 'zone', attributes: ['id', 'name', 'address', 'open24h'], include: [CON_HORARIO] },
                 { model: Vehiculo, as: 'vehicle', paranoid: false, attributes: ['id', 'plate', 'brand', 'model', 'color'] },
                 { model: Pago, as: 'payments', attributes: ['amount', 'paymentStatus', 'type'] },
             ],
@@ -682,6 +697,7 @@ async function misReservas(req, res, next) {
                 startTime: r.startTime,
                 endTime: sinSalidaAun ? null : r.endTime,
                 openEnded: r.openEnded,
+                latestEndTime: salidaMaxima(r),
                 openStay,
                 zone: r.zone,
                 vehicle: r.vehicle,
