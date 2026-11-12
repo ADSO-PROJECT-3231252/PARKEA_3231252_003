@@ -5,7 +5,7 @@ const request = require('supertest');
 // models this route uses (tests/setup.js: the tests never reach MySQL).
 jest.mock('../src/utils/mailer', () => ({ enviarCorreoRecuperacion: jest.fn() }));
 const { enviarCorreoRecuperacion } = require('../src/utils/mailer');
-const { Usuario, PasswordResetToken } = require('../src/models');
+const { Usuario, PasswordResetToken, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 const GENERIC_ANSWER = { message: "If an account exists for that email, we've sent a recovery link" };
@@ -15,12 +15,20 @@ const LAURA = { id: 'user-laura', fullName: 'Laura Gómez Ríos', email: 'laura@
 const askForLink = (ip, email) =>
     request(app).post('/api/auth/forgot-password').set('X-Forwarded-For', ip).send({ email });
 
+// The link is created and sent after the answer (#199); this waits for it
+const flushBackground = () => new Promise((resolve) => setTimeout(resolve, 20));
+
 let findUser;
 let saveToken;
+let expireLinks;
 
 beforeEach(() => {
     findUser = jest.spyOn(Usuario, 'findOne').mockResolvedValue(LAURA);
+    jest.spyOn(Usuario, 'findByPk').mockResolvedValue(LAURA);
     saveToken = jest.spyOn(PasswordResetToken, 'create').mockResolvedValue({});
+    expireLinks = jest.spyOn(PasswordResetToken, 'update').mockResolvedValue([0]);
+    // Runs the code of the transaction without a database
+    jest.spyOn(sequelize, 'transaction').mockImplementation(async (work) => work({ LOCK: { UPDATE: 'UPDATE' } }));
     enviarCorreoRecuperacion.mockReset().mockResolvedValue();
 });
 
@@ -32,6 +40,7 @@ describe('Asking for a recovery link (HU-07, #241, #280)', () => {
     test('sends the link and the first name to the account and stores only the hash of its token', async () => {
         // Act
         const res = await askForLink('198.51.100.1', LAURA.email);
+        await flushBackground();
 
         // Assert
         expect(res.status).toBe(200);
@@ -53,7 +62,7 @@ describe('Asking for a recovery link (HU-07, #241, #280)', () => {
 
         // Act
         const res = await askForLink('198.51.100.2', LAURA.email);
-        await new Promise((resolve) => setImmediate(resolve));
+        await flushBackground();
 
         // Assert
         expect(res.status).toBe(200);
@@ -71,7 +80,38 @@ describe('Asking for a recovery link (HU-07, #241, #280)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(res.body).toEqual(GENERIC_ANSWER);
+        await flushBackground();
         expect(saveToken).not.toHaveBeenCalled();
         expect(enviarCorreoRecuperacion).not.toHaveBeenCalled();
+    });
+
+    test('a new link makes the previous ones stop working (#199)', async () => {
+        // Act
+        await askForLink('198.51.100.4', LAURA.email);
+        await flushBackground();
+
+        // Assert: the account is locked first, then its unused links are closed
+        expect(Usuario.findByPk).toHaveBeenCalledWith(LAURA.id, expect.objectContaining({ lock: 'UPDATE' }));
+        expect(expireLinks).toHaveBeenCalledWith(
+            { usedAt: expect.any(Date) },
+            expect.objectContaining({ where: { userId: LAURA.id, usedAt: null } })
+        );
+        expect(expireLinks.mock.invocationCallOrder[0]).toBeLessThan(saveToken.mock.invocationCallOrder[0]);
+    });
+
+    test('if the link cannot be saved, the answer is still 200 and no email goes out (#199)', async () => {
+        // Arrange
+        saveToken.mockRejectedValue(new Error('database is down'));
+        const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        // Act
+        const res = await askForLink('198.51.100.5', LAURA.email);
+        await flushBackground();
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual(GENERIC_ANSWER);
+        expect(enviarCorreoRecuperacion).not.toHaveBeenCalled();
+        expect(log).toHaveBeenCalledWith('Could not send the recovery email:', 'database is down');
     });
 });
