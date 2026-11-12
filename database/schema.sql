@@ -16,7 +16,14 @@ CREATE TABLE roles (
 
 -- 2. Table: users
 -- Relation: roles (1) - (N) users
--- Accounts are never deleted: they are deactivated with is_active = FALSE
+-- Accounts are deactivated with is_active = FALSE instead of being deleted.
+-- The only exception is an account that was never verified (HU-30): once its
+-- links have expired, a new sign-up with the same document deletes it (it
+-- never signed in, so it has no vehicles or reservations). If an
+-- administrator action names it, it only loses the document
+-- email_verified_at: NULL until the user opens the link of the verification
+-- email (HU-30); an account that is not verified cannot sign in. Accounts
+-- created before HU-30 and the administrator of the seeders are verified
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     full_name VARCHAR(100) NOT NULL,
@@ -29,6 +36,7 @@ CREATE TABLE users (
     is_primary_admin BOOLEAN NOT NULL DEFAULT FALSE,
     role_id VARCHAR(36) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    email_verified_at DATETIME NULL,
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
 
@@ -165,7 +173,24 @@ CREATE TABLE password_reset_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 9. Table: admin_action_logs
+-- 9. Table: email_verification_tokens
+-- Relation: users (1) - (N) email_verification_tokens
+-- Links of the verification email (HU-30): single-use, valid for 24 hours. A
+-- new link marks the previous ones as used, so only the newest one works
+-- Only the SHA-256 hash of the token is stored (64 characters), never the
+-- token itself; opening a link looks the hash up in the unique index
+CREATE TABLE email_verification_tokens (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id VARCHAR(36) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY email_verification_tokens_token_hash (token_hash),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 10. Table: admin_action_logs
 -- Relation: users (1) - (N) admin_action_logs, twice (admin and target)
 -- Audit trail of role and account-status changes made by administrators
 -- (HU-23, AC-14). RESTRICT keeps the trail even if an account is removed
