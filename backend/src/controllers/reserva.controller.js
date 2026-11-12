@@ -4,7 +4,7 @@ const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
-const { checkStay } = require('../utils/zoneHours');
+const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -516,7 +516,8 @@ async function ampliar(req, res, next) {
 
         const inicio = new Date(reserva.startTime);
         // AC-07: an open stay keeps entry + 24 h as its provisional exit time
-        const salidaNueva = aTiempoIndefinido ? provisionalEndTime(inicio) : new Date(newEndTime);
+        // (or the closing time of the zone, set below, HU-29)
+        let salidaNueva = aTiempoIndefinido ? provisionalEndTime(inicio) : new Date(newEndTime);
         if (!aTiempoIndefinido && salidaNueva <= salidaActual) {
             await t.rollback();
             return res.status(400).json({ code: ErrorCodes.EXTENSION_NOT_LATER, message: 'The new exit time must be later than the current one' });
@@ -545,6 +546,23 @@ async function ampliar(req, res, next) {
             transaction: t,
             lock: t.LOCK.UPDATE,
         });
+
+        // HU-29 (AC-05): in a zone that is not open 24 hours, the exit cannot
+        // go past the closing time of the day of the entry, with the hours the
+        // zone has now (decision 8), and a switch to an open stay ends at that
+        // closing time. The zone is read after the lock of the vehicle, so the
+        // overlap check below still sees a reservation another request has
+        // just created for it.
+        const zona = await Zona.findByPk(reserva.zoneId, { include: [CON_HORARIO], transaction: t });
+        if (!zona.open24h) {
+            const cierre = latestExit(zona, inicio);
+            if (aTiempoIndefinido && cierre) salidaNueva = cierre;
+            if (!cierre || salidaNueva > cierre || salidaNueva <= salidaActual) {
+                await t.rollback();
+                return fueraDeHorario(res, hoursOfStart(zona, inicio));
+            }
+        }
+
         const solapada = await Reserva.findOne({
             where: {
                 id: { [Op.ne]: reserva.id },
