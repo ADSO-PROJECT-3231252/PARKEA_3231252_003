@@ -1,6 +1,6 @@
 -- PARKEA (SIGMUI) — Official database schema
--- Mirrors the Sequelize migrations in backend/src/migrations (21 migrations,
--- up to 20261103080100-add-open-ended-to-reservations). The application's
+-- Mirrors the Sequelize migrations in backend/src/migrations (26 migrations,
+-- up to 20261112090100-create-zone-schedules). The application's
 -- database is created with those migrations and seeders (see README); this
 -- file is the readable reference of the same design. The CHECK constraints
 -- below document rules that the backend also validates.
