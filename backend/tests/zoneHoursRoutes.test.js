@@ -149,11 +149,13 @@ describe('Editing the opening hours of a zone (HU-29, AC-02 and AC-07)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(zona.update).toHaveBeenCalledWith(expect.objectContaining({ open24h: false }), expect.anything());
-        expect(deleteHours).toHaveBeenCalledWith(expect.objectContaining({ where: { zoneId: ZONE_ID } }));
+        expect(deleteHours).toHaveBeenCalledWith(expect.objectContaining({ where: { zoneId: ZONE_ID }, transaction }));
         expect(saveHours).toHaveBeenCalledWith(
             WEEKDAYS.map(({ day, opensAt, closesAt }) => ({ zoneId: ZONE_ID, dayOfWeek: day, opensAt, closesAt })),
-            expect.anything(),
+            expect.objectContaining({ transaction }),
         );
+        // The old hours go first, or the new rows would be deleted too
+        expect(deleteHours.mock.invocationCallOrder[0]).toBeLessThan(saveHours.mock.invocationCallOrder[0]);
         expect(changeReservations).not.toHaveBeenCalled();
     });
 
