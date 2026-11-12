@@ -7,7 +7,6 @@ const { createSessionToken } = require('../utils/sessionToken');
 
 const SALT_ROUNDS = 10;
 
-
 // #199: when the email is not registered, the password is still compared
 // with this hash, so the answer takes the same time as for a real account
 // and the time never reveals whether an email is registered
