@@ -1,6 +1,10 @@
 const { Op } = require('sequelize');
-const { Zona, Reserva, ParkingSpot, sequelize } = require('../models');
+const { Zona, Reserva, ParkingSpot, ZoneSchedule, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
+const { scheduleErrors } = require('../utils/zoneHours');
+
+// HU-29: every zone is sent with its opening hours (Zona.toJSON)
+const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
 
 // GET /api/zones — public, list only active zones, ordered by highest availability first
 async function getZonas(req, res, next) {
@@ -83,9 +87,30 @@ function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRat
   return null;
 }
 
+// HU-29 (AC-01, AC-02): the admin chooses "Abierta 24 horas" (open24h: true)
+// or a custom schedule (open24h: false) with the days the zone opens. Same
+// shape of error as validarZona; an error about one day carries that day.
+function validarHorario({ open24h, schedule }) {
+  if (typeof open24h !== 'boolean') {
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'open24h', msg: 'open24h must be true or false' }] } };
+  }
+  if (open24h) return null;
+  const errors = scheduleErrors(schedule);
+  if (errors.length > 0) {
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors } };
+  }
+  return null;
+}
+
+// The rows of zone_schedules for a custom schedule (none when open 24 hours)
+function filasHorario(zoneId, { open24h, schedule }) {
+  if (open24h) return [];
+  return schedule.map(({ day, opensAt, closesAt }) => ({ zoneId, dayOfWeek: day, opensAt, closesAt }));
+}
+
 // POST /api/zones — admin only
 async function createZona(req, res, next) {
-  const error = validarZona(req.body);
+  const error = validarZona(req.body) || validarHorario(req.body);
   if (error) {
     return res.status(error.status).json(error.body);
   }
@@ -112,7 +137,9 @@ async function createZona(req, res, next) {
       totalSlots,
       availableSlots: totalSlots,
       hourlyRate,
+      open24h: req.body.open24h,
     }, { transaction: t });
+    await ZoneSchedule.bulkCreate(filasHorario(zona.id, req.body), { transaction: t });
 
     const spots = Array.from({ length: totalSlots }, (_, i) => ({
       zoneId: zona.id,
@@ -122,6 +149,7 @@ async function createZona(req, res, next) {
     await ParkingSpot.bulkCreate(spots, { transaction: t });
 
     await t.commit();
+    await zona.reload({ include: [CON_HORARIO] });
     return res.status(201).json({ message: 'Zone created successfully', zone: zona });
   } catch (err) {
     await t.rollback();
@@ -131,7 +159,7 @@ async function createZona(req, res, next) {
 
 // PUT /api/zones/:id — admin only
 async function updateZona(req, res, next) {
-  const error = validarZona(req.body);
+  const error = validarZona(req.body) || validarHorario(req.body);
   if (error) {
     return res.status(error.status).json(error.body);
   }
@@ -228,9 +256,16 @@ async function updateZona(req, res, next) {
       totalSlots,
       hourlyRate,
       availableSlots: disponibles,
+      open24h: req.body.open24h,
     }, { transaction: t });
 
+    // HU-29: the new hours replace the old ones. The reservations that
+    // already exist keep their times (decision 8, AC-07).
+    await ZoneSchedule.destroy({ where: { zoneId: id }, transaction: t });
+    await ZoneSchedule.bulkCreate(filasHorario(id, req.body), { transaction: t });
+
     await t.commit();
+    await zona.reload({ include: [CON_HORARIO] });
     return res.status(200).json({ message: 'Zone updated successfully', zone: zona });
   } catch (err) {
     await t.rollback();
@@ -334,5 +369,5 @@ async function getTodasLasZonas(req, res, next) {
   }
 }
 
-// validarZona is exported only so the tests can call it without a database
-module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId, validarZona };
+// validarZona and validarHorario are exported only so the tests can call them without a database
+module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId, validarZona, validarHorario };
