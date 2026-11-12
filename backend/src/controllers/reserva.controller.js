@@ -1,13 +1,31 @@
 const { Op } = require('sequelize');
-const { Reserva, Zona, Vehiculo, Pago, ParkingSpot, Usuario } = require('../models');
+const { Reserva, Zona, Vehiculo, Pago, ParkingSpot, Usuario, ZoneSchedule } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
+const { checkStay } = require('../utils/zoneHours');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
 const ANTICIPACION_MAX_MS = 48 * 60 * 60 * 1000;
+
+// HU-29: the zone is read with its opening hours
+const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
+
+// HU-29 (AC-03, AC-05): a stay that does not fit the hours of its day. The
+// answer carries the hours of that day ({ day, opensAt, closesAt } or
+// { day, closed: true }), so the screen can show them.
+function fueraDeHorario(res, hours) {
+    if (hours.closed) {
+        return res.status(400).json({ code: ErrorCodes.ZONE_CLOSED_THAT_DAY, message: 'This zone does not open on that day', hours });
+    }
+    return res.status(400).json({
+        code: ErrorCodes.OUTSIDE_ZONE_HOURS,
+        message: `On that day this zone opens from ${hours.opensAt} to ${hours.closesAt}, and the entry must be at least 30 minutes before closing`,
+        hours,
+    });
+}
 
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
@@ -24,9 +42,10 @@ async function crear(req, res, next) {
         }
 
         const start = new Date(startTime);
-        // An open stay keeps entry + 24 h as a provisional exit time, so the
-        // overlap check and the jobs work as with any other reservation
-        const end = isOpenStay ? provisionalEndTime(start) : new Date(endTime);
+        // An open stay keeps a provisional exit time, so the overlap check and
+        // the jobs work as with any other reservation: entry + 24 h, or the
+        // closing time of a zone that is not open 24 hours (set below, HU-29)
+        let end = isOpenStay ? provisionalEndTime(start) : new Date(endTime);
         const now = new Date();
         // A value that is not a date ("abc") gives an invalid Date, and every
         // comparison below would let it through until the database rejects it
@@ -84,6 +103,25 @@ async function crear(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
+        const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t });
+        if (!zona) {
+            await t.rollback();
+            return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
+        }
+        if (!zona.isActive) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
+        }
+
+        // HU-29 (AC-03, AC-04): the whole stay must fit the hours of the day
+        // of the entry. An open stay ends at the closing time of that day.
+        const horario = checkStay(zona, start, isOpenStay ? null : end);
+        if (horario.problem) {
+            await t.rollback();
+            return fueraDeHorario(res, horario.problem);
+        }
+        if (isOpenStay && horario.closesAt) end = horario.closesAt;
+
         // HU-27 AC-12: an unpaid balance from an open stay blocks new reservations
         const saldoPendiente = await Pago.findOne({
             where: { type: 'balance', paymentStatus: 'Pending' },
@@ -109,16 +147,6 @@ async function crear(req, res, next) {
         if (solapada) {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
-        }
-
-        const zona = await Zona.findByPk(zoneId, { transaction: t });
-        if (!zona) {
-            await t.rollback();
-            return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
-        }
-        if (!zona.isActive) {
-            await t.rollback();
-            return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
         }
 
         // Lock and claim one available physical spot, skipping locked rows so two
