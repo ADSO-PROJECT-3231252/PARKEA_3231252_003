@@ -144,7 +144,7 @@ PARKEA_3231252_003/
 │   │   ├── 📁 models/        # Sequelize models (11 tables)
 │   │   ├── 📁 routes/        # API route definitions
 │   │   ├── 📁 seeders/       # Demo data: roles, zones and the primary administrator
-│   │   └── 📁 utils/         # Helpers (mailer and email layout, simulated payment, stay pricing, zone hours, validation)
+│   │   └── 📁 utils/         # Helpers (mailer and email layout, link and session tokens, simulated payment, stay pricing, zone hours, validation)
 │   ├── 📁 tests/             # Jest + Supertest tests (npm test)
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
@@ -158,7 +158,7 @@ PARKEA_3231252_003/
 │   │   ├── App.jsx           # Router + AuthProvider
 │   │   ├── index.css         # Tailwind CSS + PARKEA theme (design tokens via @theme)
 │   │   ├── 📁 assets/        # Images, logos, illustrations
-│   │   ├── 📁 components/    # Shared UI (Header, Footer, Layout, AuthCard, dialogs, FieldRow, MetricCard, ZoneMap, LocationPicker, ZoneFormFields, ZoneScheduleFields)
+│   │   ├── 📁 components/    # Shared UI (Header, Footer, Layout, AuthCard, ResendEmailButton, dialogs, FieldRow, MetricCard, ZoneMap, LocationPicker, ZoneFormFields, ZoneScheduleFields)
 │   │   ├── 📁 context/       # Global state (AuthContext)
 │   │   ├── 📁 hooks/         # Custom React hooks (useAuth, useZoneForm)
 │   │   ├── 📁 pages/         # Route-based views
