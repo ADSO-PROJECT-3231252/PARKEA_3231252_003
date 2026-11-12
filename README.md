@@ -64,6 +64,7 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 | **Stiven Sánchez** | Scrum Master (Sprint 4) · Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend`, `stiven_frontend` |
 | **David León** | Scrum Master (Sprint 2) · Developer | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_frontend`, `leon_sql` |
 | **Jhoan Almario** | Scrum Master (Sprint 3) · Developer | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
+| **Julián Quintero** | Developer | [@JulianQuintero-02](https://github.com/JulianQuintero-02) | `julian_backend`, `julian_frontend` |
 
 > The Product Owner is the same for the whole project. The Scrum Master rotates every sprint.
 
