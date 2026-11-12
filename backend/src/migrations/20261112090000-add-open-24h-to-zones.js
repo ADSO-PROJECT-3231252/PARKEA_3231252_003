@@ -4,15 +4,15 @@
 // the week (zone_schedules). Every zone that already exists stays open 24
 // hours, so nothing changes for it (decision 1).
 module.exports = {
-  async up(queryInterface, Sequelize) {
-    await queryInterface.addColumn('zones', 'open_24h', {
-      type: Sequelize.BOOLEAN,
-      allowNull: false,
-      defaultValue: true,
-    });
-  },
+    async up(queryInterface, Sequelize) {
+        await queryInterface.addColumn('zones', 'open_24h', {
+            type: Sequelize.BOOLEAN,
+            allowNull: false,
+            defaultValue: true,
+        });
+    },
 
-  async down(queryInterface) {
-    await queryInterface.removeColumn('zones', 'open_24h');
-  },
+    async down(queryInterface) {
+        await queryInterface.removeColumn('zones', 'open_24h');
+    },
 };
