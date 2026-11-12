@@ -1,6 +1,6 @@
 -- PARKEA (SIGMUI) — Official database schema
--- Mirrors the Sequelize migrations in backend/src/migrations (21 migrations,
--- up to 20261103080100-add-open-ended-to-reservations). The application's
+-- Mirrors the Sequelize migrations in backend/src/migrations (26 migrations,
+-- up to 20261112090100-create-zone-schedules). The application's
 -- database is created with those migrations and seeders (see README); this
 -- file is the readable reference of the same design. The CHECK constraints
 -- below document rules that the backend also validates.
@@ -16,7 +16,17 @@ CREATE TABLE roles (
 
 -- 2. Table: users
 -- Relation: roles (1) - (N) users
--- Accounts are never deleted: they are deactivated with is_active = FALSE
+-- Accounts are deactivated with is_active = FALSE instead of being deleted.
+-- The only exception is an account that was never verified (HU-30): once its
+-- links have expired, a new sign-up with the same document deletes it (it
+-- never signed in, so it has no vehicles or reservations). If an
+-- administrator action names it, it only loses the document
+-- email_verified_at: NULL until the user opens the link of the verification
+-- email, or sets a new password with a recovery link (HU-30); an account that
+-- is not verified cannot sign in. Accounts created before HU-30 and the
+-- administrator of the seeders are verified
+-- password_version goes up on every password change, and a session token
+-- issued with an older version stops working (#199)
 CREATE TABLE users (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     full_name VARCHAR(100) NOT NULL,
@@ -29,6 +39,8 @@ CREATE TABLE users (
     is_primary_admin BOOLEAN NOT NULL DEFAULT FALSE,
     role_id VARCHAR(36) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    email_verified_at DATETIME NULL,
+    password_version INT NOT NULL DEFAULT 0,
     FOREIGN KEY (role_id) REFERENCES roles(id)
 );
 
@@ -60,6 +72,8 @@ CREATE TABLE vehicles (
 -- 4. Table: zones
 -- Coordinates are required to locate the zone on a map (HU-25)
 -- Zones are never deleted: they are deactivated with is_active = FALSE
+-- open_24h: TRUE for a zone open 24 hours, FALSE when its hours are in
+-- zone_schedules (HU-29). Zones created before HU-29 are open 24 hours
 CREATE TABLE zones (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     name VARCHAR(100) NOT NULL,
@@ -69,10 +83,33 @@ CREATE TABLE zones (
     total_slots INT NOT NULL DEFAULT 0,
     available_slots INT NOT NULL CHECK (available_slots >= 0),
     hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate >= 0),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    open_24h BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- 5. Table: parking_spots
+-- 5. Table: zone_schedules
+-- Relation: zones (1) - (N) zone_schedules
+-- The hours of a zone that is not open 24 hours (HU-29): one row for each day
+-- the zone opens, in Colombia time (1 = Monday ... 7 = Sunday). A day without
+-- a row is a closed day. The hours never cross midnight (the latest closing
+-- time is 23:59), have no seconds, and the zone opens at least 30 minutes
+-- before it closes
+-- New hours apply to new reservations and extensions: the reservations that
+-- already exist keep their times
+CREATE TABLE zone_schedules (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    zone_id VARCHAR(36) NOT NULL,
+    day_of_week TINYINT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+    opens_at TIME NOT NULL,
+    closes_at TIME NOT NULL,
+    CHECK (TIME_TO_SEC(closes_at) - TIME_TO_SEC(opens_at) >= 30 * 60),
+    CHECK (opens_at >= '00:00:00' AND closes_at <= '23:59:00'),
+    CHECK (SECOND(opens_at) = 0 AND SECOND(closes_at) = 0),
+    UNIQUE KEY zone_schedules_zone_day_unique (zone_id, day_of_week),
+    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+);
+
+-- 6. Table: parking_spots
 -- Relation: zones (1) - (N) parking_spots
 -- One row per physical spot. Created automatically (1..total_slots) when a
 -- zone is created, and adjusted when its capacity changes. Spots are never
@@ -87,7 +124,7 @@ CREATE TABLE parking_spots (
     FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 );
 
--- 6. Table: reservations
+-- 7. Table: reservations
 -- Relations: users (1) - (N) | zones (1) - (N) | vehicles (1) - (N) | parking_spots (1) - (N)
 -- parking_spot_id links the reservation to the exact physical spot assigned
 -- automatically at booking time (spot_number is kept as a denormalized
@@ -96,7 +133,8 @@ CREATE TABLE parking_spots (
 -- changes never alter the price of an existing reservation
 -- hold_expires_at: an unpaid reservation expires and releases its spot (HU-26)
 -- open_ended: a stay without a chosen exit time (HU-27). Its end_time keeps a
--- provisional value (entry + 24 h) until the stay ends, so this flag is what
+-- provisional value until the stay ends: entry + 24 h, or the closing time of
+-- that day when the zone is not open 24 hours (HU-29). This flag is what
 -- tells it apart from a reservation with an exit time
 -- Foreign keys use RESTRICT so removing a user, zone, vehicle, or spot can
 -- never destroy the booking history
@@ -124,7 +162,7 @@ CREATE TABLE reservations (
         REFERENCES parking_spots(id) ON DELETE RESTRICT
 );
 
--- 7. Table: payments
+-- 8. Table: payments
 -- Relation: reservations (1) - (N) payments
 -- type: the initial payment pays the whole stay, or the first hour of an open
 -- stay (HU-27); later a reservation can get extension payments (HU-28) and
@@ -152,9 +190,12 @@ CREATE TABLE payments (
     FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE RESTRICT
 );
 
--- 8. Table: password_reset_tokens
+-- 9. Table: password_reset_tokens
+-- Relation: users (1) - (N) password_reset_tokens
 -- Single-use tokens, valid for one hour (HU-07)
 -- Only the hash of the token is stored, never the token itself
+-- A new link, a reset or a password change from the profile marks the other
+-- links of the account as used (#199)
 CREATE TABLE password_reset_tokens (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     user_id VARCHAR(36) NOT NULL,
@@ -165,7 +206,25 @@ CREATE TABLE password_reset_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 9. Table: admin_action_logs
+-- 10. Table: email_verification_tokens
+-- Relation: users (1) - (N) email_verification_tokens
+-- Links of the verification email (HU-30): single-use, valid for 24 hours. A
+-- new link marks the previous ones as used, so only the newest one works. A
+-- new password set with a recovery link also marks them as used
+-- Only the SHA-256 hash of the token is stored (64 characters), never the
+-- token itself; opening a link looks the hash up in the unique index
+CREATE TABLE email_verification_tokens (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    user_id VARCHAR(36) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY email_verification_tokens_token_hash (token_hash),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 11. Table: admin_action_logs
 -- Relation: users (1) - (N) admin_action_logs, twice (admin and target)
 -- Audit trail of role and account-status changes made by administrators
 -- (HU-23, AC-14). RESTRICT keeps the trail even if an account is removed

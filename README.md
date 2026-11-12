@@ -38,11 +38,12 @@
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
-- Explore available parking zones in their city
+- Create an account and confirm it from their email
+- Explore available parking zones in their city, with their opening hours
 - Reserve a spot in advance to guarantee their space
 - Make simulated payments (no real money is charged)
 - Manage their registered vehicles
-- Administrators: manage zones, users, and view real-time metrics
+- Administrators: manage zones and their opening hours, users, and view real-time metrics
 
 The system is designed under a **MERN-like** architecture (React + Node.js + MySQL) with clear separation between frontend, backend, and persistence layer.
 
@@ -63,6 +64,7 @@ The system is designed under a **MERN-like** architecture (React + Node.js + MyS
 | **Stiven Sánchez** | Scrum Master (Sprint 4) · Developer | [@Stiven5-ctrl](https://github.com/Stiven5-ctrl) | `stiven_backend`, `stiven_frontend` |
 | **David León** | Scrum Master (Sprint 2) · Developer | [@David-Leon1089](https://github.com/David-Leon1089) | `leon_backend`, `leon_frontend`, `leon_sql` |
 | **Jhoan Almario** | Scrum Master (Sprint 3) · Developer | [@centinel117](https://github.com/centinel117) | `almario_backend`, `almario_frontend` |
+| **Julián Quintero** | Developer | [@JulianQuintero-02](https://github.com/JulianQuintero-02) | `julian_backend`, `julian_frontend` |
 
 > The Product Owner is the same for the whole project. The Scrum Master rotates every sprint.
 
@@ -100,8 +102,8 @@ Versions are the ranges declared in each `package.json`.
 | Helmet | ^8.3.0 | HTTP security headers |
 | CORS | ^2.8.6 | Cross-origin policy |
 | dotenv | ^17.4.2 | Loads the `.env` file |
-| express-rate-limit | ^8.7.1 | Attempt limits on sign-in, sign-up and password recovery |
-| Nodemailer | ^10.1.7 | Password recovery emails (Mailtrap on your computer, Resend on the published site) |
+| express-rate-limit | ^8.7.1 | Attempt limits on sign-in, sign-up, password recovery and the verification email |
+| Nodemailer | ^10.1.7 | Verification and password recovery emails (Mailtrap on your computer, Resend on the published site) |
 | UUID | ^14.0.1 | Unique identifiers |
 | nodemon | ^3.1.14 | Auto-reload in development (dev dependency) |
 | Jest + Supertest | ^30.5.2 / ^7.3.1 | Backend tests (dev dependencies) |
@@ -132,16 +134,17 @@ PARKEA_3231252_003/
 │   ├── src/
 │   │   ├── app.js            # Express config (middlewares, routes, error handler)
 │   │   ├── server.js         # Entry point (checks the DB connection, starts the jobs, listens)
+│   │   ├── 📁 assets/        # Logo that travels inside the emails
 │   │   ├── 📁 config/        # Sequelize config (reads DATABASE_URL)
 │   │   ├── 📁 constants/     # Centralized error codes (errorCodes.js)
 │   │   ├── 📁 controllers/   # Business logic (one per module)
 │   │   ├── 📁 jobs/          # Background jobs (reservation expiration and finalization)
 │   │   ├── 📁 middlewares/   # Auth, attempt limits (rateLimit.js) and express-validator rules (*.validator.js)
-│   │   ├── 📁 migrations/    # 21 Sequelize migrations: they create the database
-│   │   ├── 📁 models/        # Sequelize models (9 tables)
+│   │   ├── 📁 migrations/    # 26 Sequelize migrations: they create the database
+│   │   ├── 📁 models/        # Sequelize models (11 tables)
 │   │   ├── 📁 routes/        # API route definitions
 │   │   ├── 📁 seeders/       # Demo data: roles, zones and the primary administrator
-│   │   └── 📁 utils/         # Helpers (mailer, simulated payment, stay pricing, validation)
+│   │   └── 📁 utils/         # Helpers (mailer and email layout, link and session tokens, simulated payment, stay pricing, zone hours, validation)
 │   ├── 📁 tests/             # Jest + Supertest tests (npm test)
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
@@ -155,13 +158,13 @@ PARKEA_3231252_003/
 │   │   ├── App.jsx           # Router + AuthProvider
 │   │   ├── index.css         # Tailwind CSS + PARKEA theme (design tokens via @theme)
 │   │   ├── 📁 assets/        # Images, logos, illustrations
-│   │   ├── 📁 components/    # Shared UI (Header, Footer, Layout, dialogs, FieldRow, MetricCard, ZoneMap, LocationPicker, ZoneFormFields)
+│   │   ├── 📁 components/    # Shared UI (Header, Footer, Layout, AuthCard, ResendEmailButton, dialogs, FieldRow, MetricCard, ZoneMap, LocationPicker, ZoneFormFields, ZoneScheduleFields)
 │   │   ├── 📁 context/       # Global state (AuthContext)
 │   │   ├── 📁 hooks/         # Custom React hooks (useAuth, useZoneForm)
 │   │   ├── 📁 pages/         # Route-based views
 │   │   ├── 📁 routes/        # Route definitions and ProtectedRoute
 │   │   ├── 📁 services/      # API calls (Axios)
-│   │   ├── 📁 utils/         # Helpers: format, validators, error messages, statuses, open and extended stays
+│   │   ├── 📁 utils/         # Helpers: format, validators, error messages, statuses, open and extended stays, zone hours
 │   │   └── config.js         # Address of the API (VITE_API_URL)
 │   ├── 📁 tests/             # Jest + React Testing Library tests (npm test)
 │   ├── .env.example
@@ -172,7 +175,7 @@ PARKEA_3231252_003/
 │   └── vite.config.js
 │
 ├── 📁 database/
-│   ├── schema.sql            # Readable reference of the database design (9 tables)
+│   ├── schema.sql            # Readable reference of the database design (11 tables)
 │   └── README.md
 │
 ├── 📁 docs/
@@ -242,8 +245,9 @@ npx sequelize-cli db:migrate
 npx sequelize-cli db:seed:all
 ```
 
-> The 21 migrations create the 9 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens and admin_action_logs.
-> The seeders add the `admin` and `user` roles, 4 demo zones with their parking spots, and the primary administrator `admin@parkea.com` (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
+> The 26 migrations create the 11 tables: roles, users, vehicles, zones, zone_schedules, parking_spots, reservations, payments, password_reset_tokens, email_verification_tokens and admin_action_logs.
+> The seeders add the `admin` and `user` roles, 4 demo zones open 24 hours with their parking spots, and the primary administrator `admin@parkea.com`, already verified (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
+> A new account must confirm its email before signing in. On your computer the email arrives in your Mailtrap inbox, so fill in the `MAILTRAP_*` variables (see Environment Variables).
 
 6. Start the development server:
 
@@ -299,7 +303,7 @@ JWT_EXPIRES_IN=1h
 # CORS: address of the frontend
 FRONTEND_URL=http://localhost:5173
 
-# Emails (password recovery): Mailtrap on your computer
+# Emails (verification and password recovery): Mailtrap on your computer
 MAIL_FROM=
 MAILTRAP_HOST=sandbox.smtp.mailtrap.io
 MAILTRAP_PORT=2525
@@ -313,8 +317,8 @@ MAILTRAP_PASS=your_mailtrap_password
 | `NODE_ENV` | Sequelize environment (default `development`) |
 | `DATABASE_URL` | MySQL connection, used by the server and by sequelize-cli |
 | `JWT_SECRET` / `JWT_EXPIRES_IN` | Signing and lifetime of the session token (default 1h) |
-| `FRONTEND_URL` | Origin allowed by CORS (default `http://localhost:5173`) |
-| `MAILTRAP_*` | SMTP account for the password recovery emails. On your computer, the Mailtrap sandbox; the published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
+| `FRONTEND_URL` | Origin allowed by CORS, and address of the links in the emails (default `http://localhost:5173`) |
+| `MAILTRAP_*` | SMTP account for the verification and password recovery emails. On your computer, the Mailtrap sandbox: without it a new account cannot be confirmed. The published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
 | `MAIL_FROM` | Sender of the emails. Leave it empty on your computer; the published site uses `no-reply@parkeaweb.me` |
 
 > If the MySQL password has special characters, encode them in `DATABASE_URL` (for example `$` → `%24`, `@` → `%40`).
@@ -359,34 +363,36 @@ VITE_API_URL=http://localhost:3000/api
 
 ## API Endpoints
 
-Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signed-in account. **Admin**: administrator role only. Protected routes expect the header `Authorization: Bearer <token>`.
+Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signed-in account. **Admin**: administrator role only. Protected routes expect the header `Authorization: Bearer <token>`; a token stops working when the password of its account changes.
 
 | Module | Method and route | Access | Story |
 |--------|------------------|--------|-------|
 | Health | `GET /health` | Public | — |
-| Auth | `POST /auth/register` | Public | HU-01 |
-| Auth | `POST /auth/login` | Public | HU-05 |
-| Auth | `POST /auth/login-admin` | Public | HU-06 |
+| Auth | `POST /auth/register` (the account is created as not verified) | Public | HU-01, HU-30 |
+| Auth | `POST /auth/login` | Public | HU-05, HU-30 |
+| Auth | `POST /auth/login-admin` | Public | HU-06, HU-30 |
+| Auth | `POST /auth/verify-email`, `POST /auth/resend-verification` | Public | HU-30 |
 | Auth | `POST /auth/forgot-password`, `POST /auth/reset-password` | Public | HU-07 |
 | Profile | `GET /users/me`, `PUT /users/me`, `PUT /users/me/password` | User | HU-08 |
 | Vehicles | `POST /vehicles`, `GET /vehicles`, `GET /vehicles/:id` | User | HU-10, HU-11 |
 | Vehicles | `PUT /vehicles/:id`, `PATCH /vehicles/:id/default` | User | HU-11, HU-12 |
 | Vehicles | `DELETE /vehicles/:id` (soft delete) | User | HU-13 |
-| Zones | `GET /zones`, `GET /zones/:id` | Public | HU-09 |
+| Zones | `GET /zones`, `GET /zones/:id` (with the opening hours) | Public | HU-09, HU-29 |
 | Zones | `GET /zones/all`, `GET /zones/:id/spots` | Admin | HU-19 |
-| Zones | `POST /zones`, `PUT /zones/:id`, `PATCH /zones/:id/toggle` | Admin | HU-19, HU-20, HU-21 |
-| Reservations | `POST /reservations` (with `openEnded: true` for a stay without an exit time) | User | HU-14, HU-27 |
+| Zones | `POST /zones`, `PUT /zones/:id` (with the opening hours) | Admin | HU-20, HU-21, HU-29 |
+| Zones | `PATCH /zones/:id/toggle` | Admin | HU-19 |
+| Reservations | `POST /reservations` (inside the opening hours; with `openEnded: true` for a stay without an exit time) | User | HU-14, HU-27, HU-29 |
 | Reservations | `GET /reservations` (paginated), `GET /reservations/:id` | User | HU-15, HU-18 |
 | Reservations | `PATCH /reservations/:id/cancel` | User | HU-16 |
 | Reservations | `PATCH /reservations/:id/finish` (finish an open stay) | User | HU-27 |
-| Reservations | `PATCH /reservations/:id/extend` (extend a stay or switch it to an open stay) | User | HU-28 |
+| Reservations | `PATCH /reservations/:id/extend` (extend a stay or switch it to an open stay, up to the closing time) | User | HU-28, HU-29 |
 | Payments | `POST /payments/:reservationId` | User | HU-17 |
 | Payments | `POST /payments/:reservationId/balance` (balance of an open stay) | User | HU-27 |
 | Dashboard | `GET /admin/dashboard` and `/admin/dashboard/{occupancy, payments-status, recent-payments, reservations-by-zone, alerts}` | Admin | HU-22 |
 | Users | `GET /admin/users`, `GET /admin/users/logs` | Admin | HU-23 |
 | Users | `PATCH /admin/users/:id/role`, `PATCH /admin/users/:id/status` | Admin | HU-23 |
 
-Business errors come back as `{ "code": "...", "message": "..." }`. Validation errors come back as `{ "code": "VALIDATION_ERROR", "errors": [...] }`, without `message`: each item of `errors` names the field (`path`) and its message (`msg`). A route that does not exist returns 404 `ROUTE_NOT_FOUND`. Sign-in, sign-up and password recovery have attempt limits and answer 429 `TOO_MANY_REQUESTS` when one is reached. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`. Every endpoint, with its rules, its errors and the attempt limits, is described in [backend/API_REFERENCE.md](backend/API_REFERENCE.md).
+Business errors come back as `{ "code": "...", "message": "..." }`. Validation errors come back as `{ "code": "VALIDATION_ERROR", "errors": [...] }`, without `message`: each item of `errors` names the field (`path`) and its message (`msg`), and an item about one day of the opening hours also has its `day`. The errors of a reservation outside the opening hours (`OUTSIDE_ZONE_HOURS`, `ZONE_CLOSED_THAT_DAY`) also bring `hours`, the hours of that day. A route that does not exist returns 404 `ROUTE_NOT_FOUND`. Sign-in, sign-up, password recovery and the verification email have attempt limits and answer 429 `TOO_MANY_REQUESTS` when one is reached. The codes are listed in `backend/src/constants/errorCodes.js`, and the frontend shows them in Spanish with `translateError(code)`. Every endpoint, with its rules, its errors and the attempt limits, is described in [backend/API_REFERENCE.md](backend/API_REFERENCE.md).
 
 ---
 
@@ -496,6 +502,8 @@ Each user story is an issue with its acceptance criteria, traceability and Defin
 | HU-26 | Reservation Expiration | @MichaelIsaza | [#161](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/161) |
 | HU-27 | Open-Ended Stay | @jhoanmarin227 | [#225](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/225) |
 | HU-28 | Extend Stay | @jhoanmarin227 | [#226](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/226) |
+| HU-29 | Parking Zone Opening Hours | @MichaelIsaza | [#242](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/242) |
+| HU-30 | Email Verification | @jhoanmarin227 | [#265](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/265) |
 
 ---
 

@@ -31,7 +31,7 @@ Open `backend/.env` and fill in:
 
 - `DATABASE_URL`: your local MySQL user and password, for example `mysql://root:your_password@localhost:3306/parkea_db`. If the password has special characters, encode them (`$` → `%24`, `@` → `%40`). The user must be allowed to create databases.
 - `JWT_SECRET`: any long random text.
-- `MAILTRAP_HOST`, `MAILTRAP_PORT`, `MAILTRAP_USER`, `MAILTRAP_PASS`: only needed to send the password recovery emails. Leave them empty otherwise.
+- `MAILTRAP_HOST`, `MAILTRAP_PORT`, `MAILTRAP_USER`, `MAILTRAP_PASS`: the SMTP settings of your Mailtrap sandbox inbox. They send the email that confirms a new account and the password recovery email. Without them you can still sign in as the administrator, but a new account cannot be confirmed.
 
 The `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` lines are not used.
 
@@ -71,8 +71,8 @@ Open http://localhost:5173.
 
 ## 5. Sign in
 
-- Administrator: `admin@parkea.com`, at http://localhost:5173/admin/login. Its password is in `backend/src/seeders/20260808234824-demo-primary-admin.js`.
-- User: create an account with “Crear cuenta” at http://localhost:5173/register.
+- Administrator: `admin@parkea.com`, at http://localhost:5173/admin/login. Its password is in `backend/src/seeders/20260808234824-demo-primary-admin.js`. It is already verified, so it needs no email.
+- User: create an account with “Crear cuenta” at http://localhost:5173/register. Then open the email “Confirma tu correo de PARKEA” in your Mailtrap inbox and click “Confirmar mi correo”: from then on the account can sign in. The link works for 24 hours. If it expired, try to sign in: the page tells you to confirm the email and offers “Reenviar correo”.
 
 ## 6. Start over with a clean database
 
