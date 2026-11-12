@@ -103,7 +103,6 @@ async function restablecerPassword(req, res, next) {
             const usuario = await Usuario.findByPk(registro.userId, { transaction, lock: transaction.LOCK.UPDATE });
             if (!usuario) return 'USER_NOT_FOUND';
 
-
             // The new password must be different from the current one, like
             // in the profile (HU-08). The link is not used, so the user can
             // try again with another password.
