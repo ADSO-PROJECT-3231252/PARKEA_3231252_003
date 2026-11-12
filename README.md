@@ -496,6 +496,8 @@ Each user story is an issue with its acceptance criteria, traceability and Defin
 | HU-26 | Reservation Expiration | @MichaelIsaza | [#161](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/161) |
 | HU-27 | Open-Ended Stay | @jhoanmarin227 | [#225](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/225) |
 | HU-28 | Extend Stay | @jhoanmarin227 | [#226](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/226) |
+| HU-29 | Parking Zone Opening Hours | @MichaelIsaza | [#242](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/242) |
+| HU-30 | Email Verification | @jhoanmarin227 | [#265](https://github.com/ADSO-PROJECT-3231252/PARKEA_3231252_003/issues/265) |
 
 ---
 
