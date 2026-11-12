@@ -11,6 +11,7 @@ async function getZonas(req, res, next) {
   try {
     const zonas = await Zona.findAll({
       where: { isActive: true },
+      include: [CON_HORARIO],
       order: [
         [Zona.sequelize.literal('available_slots / total_slots'), 'DESC'],
       ],
@@ -277,7 +278,7 @@ async function updateZona(req, res, next) {
 async function toggleZona(req, res, next) {
   try {
     const { id } = req.params;
-    const zona = await Zona.findByPk(id);
+    const zona = await Zona.findByPk(id, { include: [CON_HORARIO] });
     if (!zona) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
@@ -335,7 +336,7 @@ async function getZonaPorId(req, res, next) {
   try {
     const { id } = req.params;
 
-    const zona = await Zona.findByPk(id);
+    const zona = await Zona.findByPk(id, { include: [CON_HORARIO] });
     if (!zona) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
@@ -361,6 +362,7 @@ async function getTodasLasZonas(req, res, next) {
           'activeReservations',
         ]],
       },
+      include: [CON_HORARIO],
       order: [['name', 'ASC']],
     });
     return res.status(200).json({ zones: zonas });
