@@ -32,7 +32,7 @@ function verificarToken(req, res, next) {
             if ((payload.pv ?? 0) !== usuario.passwordVersion) {
                 return res.status(403).json({ code: ErrorCodes.INVALID_TOKEN, message: 'Invalid or expired token' });
             }
-            
+
             // verificarRol reads req.usuario.rol: use the role stored now, not the one in the token
             req.usuario = { ...payload, rol: usuario.role.name };
             next();
