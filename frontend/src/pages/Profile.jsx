@@ -19,7 +19,7 @@ const EMPTY_PASSWORD_FORM = { currentPassword: '', newPassword: '', confirmNewPa
 const FULL_NAME_MAX_LENGTH = 70;
 
 export default function Profile() {
-    const { updateUser } = useAuth();
+    const { updateUser, updateToken } = useAuth();
 
     const [profile, setProfile] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
@@ -139,7 +139,10 @@ export default function Profile() {
         // attempt never leaves the account half-updated.
         if (passwordTouched) {
             try {
-                await changePassword(pwForm);
+                const { data } = await changePassword(pwForm);
+                // #199: the token used until now stopped working with the
+                // password change; the answer brings the new one
+                if (data?.token) updateToken(data.token);
                 setPwSuccess('Contraseña actualizada correctamente.');
                 setPwForm(EMPTY_PASSWORD_FORM);
             } catch (err) {

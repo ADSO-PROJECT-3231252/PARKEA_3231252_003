@@ -58,6 +58,10 @@ export default function ResetPassword() {
             // link back to phase 1.
             if (code === 'RESET_TOKEN_INVALID') {
                 setTokenInvalid(true);
+            } else if (code === 'PASSWORD_UNCHANGED') {
+                // #199: the new password is the current one; the link still
+                // works, so the error goes on the field to try another one
+                setErrors((prev) => ({ ...prev, newPassword: translateError(code) }));
             } else {
                 setServerError(translateError(code));
             }
