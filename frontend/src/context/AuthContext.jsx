@@ -30,6 +30,13 @@ export function AuthProvider({ children }) {
         });
     };
 
+    // #199: after a password change the API answers with a new token, because
+    // the old one stops working. The session goes on with the new one.
+    const updateToken = (token) => {
+        localStorage.setItem('token', token);
+        setUser((prev) => (prev ? { ...prev, token } : prev));
+    };
+
     const logoutUser = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -37,7 +44,7 @@ export function AuthProvider({ children }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loginUser, updateUser, logoutUser, loading }}>
+        <AuthContext.Provider value={{ user, loginUser, updateUser, updateToken, logoutUser, loading }}>
             {children}
         </AuthContext.Provider>
     );
