@@ -1,10 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info } from 'lucide-react';
+import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { todayHoursLabel } from '../utils/zoneHours';
 
 // HU-25: Leaflet is only downloaded when the map view is opened. If that
 // download fails, the page falls back to the list like any other map error.
@@ -46,6 +47,12 @@ function ZoneCard({ zone, onReserve }) {
             </div>
 
             {zone.address && <p className="mt-1 pl-[22px] text-body text-neutral-600">{zone.address}</p>}
+
+            {/* HU-29 AC-06: the hours of today */}
+            <p className="mt-2 flex items-start gap-1.5 text-body text-neutral-900">
+                <Clock className="mt-1 h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                <span>{todayHoursLabel(zone)}</span>
+            </p>
 
             <div className="mt-4 flex flex-col gap-3 @sm:flex-row @sm:items-end @sm:justify-between">
                 <span className="flex items-center gap-1.5 text-body text-neutral-900">
