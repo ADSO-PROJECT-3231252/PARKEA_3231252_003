@@ -402,6 +402,10 @@ export default function PayReservation() {
     const statusInfo = RESERVATION_STATUS[reservation.status] ?? RESERVATION_STATUS.Pending;
     // HU-27: an open stay has no exit time until it ends.
     const hasExit = Boolean(reservation.endTime);
+    // HU-29 AC-04: when an open stay ends by itself at the latest
+    const openExitText = reservation.latestEndTime
+        ? `Sin hora de salida (termina a más tardar el ${formatDate(reservation.latestEndTime)}, ${formatTime(reservation.latestEndTime)})`
+        : 'Sin hora de salida (máximo 24 horas)';
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = expiredByServer || (remainingMs !== null && remainingMs <= 0);
     const payDisabled = processing || approved || isTimeUp || extendBlocked;
@@ -462,7 +466,7 @@ export default function PayReservation() {
             // HU-28: nothing was charged. A declined payment can be tried
             // again; after the other codes the extension cannot go on.
             if (EXTEND_FINAL_CODES.includes(code)) setExtendBlocked(true);
-            setMessage({ type: 'error', text: extendErrorMessage(code) });
+            setMessage({ type: 'error', text: extendErrorMessage(code, false, result.reason.response?.data?.hours) });
             return;
         }
         if (code === 'NO_PENDING_BALANCE') {
@@ -669,7 +673,7 @@ export default function PayReservation() {
                                         <SummaryItem label="Fecha y hora de salida">
                                             {hasExit
                                                 ? `${formatDate(reservation.endTime)}, ${formatTime(reservation.endTime)}`
-                                                : 'Sin hora de salida (máximo 24 horas)'}
+                                                : openExitText}
                                         </SummaryItem>
                                         <SummaryItem label="Duración">
                                             {hasExit
