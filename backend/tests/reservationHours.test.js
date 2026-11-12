@@ -43,8 +43,9 @@ const send = (method, path, body) => request(app)[method](path).set('Authorizati
 beforeEach(() => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask'] });
     jest.spyOn(sequelize, 'transaction').mockResolvedValue(transaction);
-    // The session (auth middleware) and the lock of the user
-    jest.spyOn(Usuario, 'findByPk').mockResolvedValue({ id: USER_ID, isActive: true, role: { name: 'user' } });
+    // The session (auth middleware) and the lock of the user. The token has
+    // no password version, so the account is at version 0 (#199)
+    jest.spyOn(Usuario, 'findByPk').mockResolvedValue({ id: USER_ID, isActive: true, passwordVersion: 0, role: { name: 'user' } });
 });
 
 afterEach(() => {
