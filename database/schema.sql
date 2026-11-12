@@ -90,8 +90,9 @@ CREATE TABLE zones (
 -- Relation: zones (1) - (N) zone_schedules
 -- The hours of a zone that is not open 24 hours (HU-29): one row for each day
 -- the zone opens, in Colombia time (1 = Monday ... 7 = Sunday). A day without
--- a row is a closed day. The hours never cross midnight, and the zone opens
--- at least 30 minutes before it closes
+-- a row is a closed day. The hours never cross midnight (the latest closing
+-- time is 23:59), have no seconds, and the zone opens at least 30 minutes
+-- before it closes
 -- New hours apply to new reservations and extensions: the reservations that
 -- already exist keep their times
 CREATE TABLE zone_schedules (
@@ -101,6 +102,8 @@ CREATE TABLE zone_schedules (
     opens_at TIME NOT NULL,
     closes_at TIME NOT NULL,
     CHECK (TIME_TO_SEC(closes_at) - TIME_TO_SEC(opens_at) >= 30 * 60),
+    CHECK (opens_at >= '00:00:00' AND closes_at <= '23:59:00'),
+    CHECK (SECOND(opens_at) = 0 AND SECOND(closes_at) = 0),
     UNIQUE KEY zone_schedules_zone_day_unique (zone_id, day_of_week),
     FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 );
