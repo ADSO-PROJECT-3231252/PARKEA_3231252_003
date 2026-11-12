@@ -38,11 +38,12 @@
 
 **PARKEA** is an intelligent urban parking reservation system that allows users to:
 
-- Explore available parking zones in their city
+- Create an account and confirm it from their email
+- Explore available parking zones in their city, with their opening hours
 - Reserve a spot in advance to guarantee their space
 - Make simulated payments (no real money is charged)
 - Manage their registered vehicles
-- Administrators: manage zones, users, and view real-time metrics
+- Administrators: manage zones and their opening hours, users, and view real-time metrics
 
 The system is designed under a **MERN-like** architecture (React + Node.js + MySQL) with clear separation between frontend, backend, and persistence layer.
 
@@ -100,8 +101,8 @@ Versions are the ranges declared in each `package.json`.
 | Helmet | ^8.3.0 | HTTP security headers |
 | CORS | ^2.8.6 | Cross-origin policy |
 | dotenv | ^17.4.2 | Loads the `.env` file |
-| express-rate-limit | ^8.7.1 | Attempt limits on sign-in, sign-up and password recovery |
-| Nodemailer | ^10.1.7 | Password recovery emails (Mailtrap on your computer, Resend on the published site) |
+| express-rate-limit | ^8.7.1 | Attempt limits on sign-in, sign-up, password recovery and the verification email |
+| Nodemailer | ^10.1.7 | Verification and password recovery emails (Mailtrap on your computer, Resend on the published site) |
 | UUID | ^14.0.1 | Unique identifiers |
 | nodemon | ^3.1.14 | Auto-reload in development (dev dependency) |
 | Jest + Supertest | ^30.5.2 / ^7.3.1 | Backend tests (dev dependencies) |
@@ -132,16 +133,17 @@ PARKEA_3231252_003/
 │   ├── src/
 │   │   ├── app.js            # Express config (middlewares, routes, error handler)
 │   │   ├── server.js         # Entry point (checks the DB connection, starts the jobs, listens)
+│   │   ├── 📁 assets/        # Logo that travels inside the emails
 │   │   ├── 📁 config/        # Sequelize config (reads DATABASE_URL)
 │   │   ├── 📁 constants/     # Centralized error codes (errorCodes.js)
 │   │   ├── 📁 controllers/   # Business logic (one per module)
 │   │   ├── 📁 jobs/          # Background jobs (reservation expiration and finalization)
 │   │   ├── 📁 middlewares/   # Auth, attempt limits (rateLimit.js) and express-validator rules (*.validator.js)
-│   │   ├── 📁 migrations/    # 21 Sequelize migrations: they create the database
-│   │   ├── 📁 models/        # Sequelize models (9 tables)
+│   │   ├── 📁 migrations/    # 26 Sequelize migrations: they create the database
+│   │   ├── 📁 models/        # Sequelize models (11 tables)
 │   │   ├── 📁 routes/        # API route definitions
 │   │   ├── 📁 seeders/       # Demo data: roles, zones and the primary administrator
-│   │   └── 📁 utils/         # Helpers (mailer, simulated payment, stay pricing, validation)
+│   │   └── 📁 utils/         # Helpers (mailer and email layout, simulated payment, stay pricing, zone hours, validation)
 │   ├── 📁 tests/             # Jest + Supertest tests (npm test)
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
@@ -155,13 +157,13 @@ PARKEA_3231252_003/
 │   │   ├── App.jsx           # Router + AuthProvider
 │   │   ├── index.css         # Tailwind CSS + PARKEA theme (design tokens via @theme)
 │   │   ├── 📁 assets/        # Images, logos, illustrations
-│   │   ├── 📁 components/    # Shared UI (Header, Footer, Layout, dialogs, FieldRow, MetricCard, ZoneMap, LocationPicker, ZoneFormFields)
+│   │   ├── 📁 components/    # Shared UI (Header, Footer, Layout, AuthCard, dialogs, FieldRow, MetricCard, ZoneMap, LocationPicker, ZoneFormFields, ZoneScheduleFields)
 │   │   ├── 📁 context/       # Global state (AuthContext)
 │   │   ├── 📁 hooks/         # Custom React hooks (useAuth, useZoneForm)
 │   │   ├── 📁 pages/         # Route-based views
 │   │   ├── 📁 routes/        # Route definitions and ProtectedRoute
 │   │   ├── 📁 services/      # API calls (Axios)
-│   │   ├── 📁 utils/         # Helpers: format, validators, error messages, statuses, open and extended stays
+│   │   ├── 📁 utils/         # Helpers: format, validators, error messages, statuses, open and extended stays, zone hours
 │   │   └── config.js         # Address of the API (VITE_API_URL)
 │   ├── 📁 tests/             # Jest + React Testing Library tests (npm test)
 │   ├── .env.example
@@ -172,7 +174,7 @@ PARKEA_3231252_003/
 │   └── vite.config.js
 │
 ├── 📁 database/
-│   ├── schema.sql            # Readable reference of the database design (9 tables)
+│   ├── schema.sql            # Readable reference of the database design (11 tables)
 │   └── README.md
 │
 ├── 📁 docs/
