@@ -41,7 +41,7 @@ import {
     pendingBalanceOf,
     stayEndSoFar,
 } from '../utils/openStay';
-import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
+import { MAX_TIMER_MS, canExtendStay, limitedByClosing } from '../utils/extendStay';
 
 // Once the 15-minute hold runs out, the backend job (every 60 s) is what
 // actually marks the reservation as Expired, so the screen asks again every
@@ -86,13 +86,15 @@ const money = (amount) => keepTogether(formatCurrency(amount));
 // HU-27 AC-03/AC-07: how an open stay is charged, and what is left to pay.
 // HU-28: a reservation switched to an open stay paid another amount than the
 // first hour, so the text names it.
-function openStayNote(isRunning, soFar, paid, hourlyRate) {
+// HU-29: in a zone that is not open 24 hours, the stay lasts until the
+// closing time of the zone (`limit`), not 24 hours.
+function openStayNote(isRunning, soFar, paid, hourlyRate, limit = 'hasta 24 horas') {
     const firstHourOnly = paidOnlyFirstHour(paid, hourlyRate);
     const rate = money(hourlyRate);
     if (!isRunning) {
         return firstHourOnly
-            ? `Se cobra ${rate} por cada hora empezada, hasta 24 horas. La primera hora se paga al confirmar y el resto al terminar.`
-            : `Se cobra ${rate} por cada hora empezada desde la entrada, hasta 24 horas. Ya pagaste ${money(paid)} y el resto se paga al terminar.`;
+            ? `Se cobra ${rate} por cada hora empezada, ${limit}. La primera hora se paga al confirmar y el resto al terminar.`
+            : `Se cobra ${rate} por cada hora empezada desde la entrada, ${limit}. Ya pagaste ${money(paid)} y el resto se paga al terminar.`;
     }
     const started = hoursLabel(soFar.chargedHours, 'empezada');
     if (soFar.balance > 0) {
@@ -204,16 +206,22 @@ export default function ReservationConfirmation() {
     // estadía" appear on time; while it runs, it updates the amount so far.
     const openStaySince =
         reservation?.openEnded && reservation.status === 'Active' ? reservation.startTime : null;
+    const openStayLatestEnd = openStaySince ? reservation.latestEndTime : null;
 
     useEffect(() => {
         if (!openStaySince) return;
 
-        const limitMs = new Date(openStaySince).getTime() + MAX_OPEN_STAY_MS;
+        // HU-29: the closing time of the zone when it comes before 24 hours
+        const limitMs = Math.min(
+            new Date(openStaySince).getTime() + MAX_OPEN_STAY_MS,
+            openStayLatestEnd ? new Date(openStayLatestEnd).getTime() : Infinity,
+        );
         const interval = setInterval(() => {
             const current = Date.now();
             setNow(current);
-            // AC-10: after 24 hours the backend job ends the stay by itself, so
-            // the screen asks again until the new status arrives.
+            // AC-10: after 24 hours (or at the closing time of the zone, HU-29)
+            // the backend job ends the stay by itself, so the screen asks again
+            // until the new status arrives.
             if (current >= limitMs && current - lastPollRef.current >= EXPIRED_POLL_MS) {
                 lastPollRef.current = current;
                 fetchReservation(true);
@@ -221,7 +229,7 @@ export default function ReservationConfirmation() {
         }, OPEN_STAY_TICK_MS);
 
         return () => clearInterval(interval);
-    }, [openStaySince, fetchReservation]);
+    }, [openStaySince, openStayLatestEnd, fetchReservation]);
 
     // HU-28 AC-01: "Ampliar estadía" is offered until the exit time, so the
     // screen updates itself at that moment. A timer cannot wait more than
@@ -380,12 +388,12 @@ export default function ReservationConfirmation() {
     // What an open stay paid before it ends: the first hour, or another amount
     // if it was switched from a reservation with an exit time (HU-28).
     const paidBefore = isOpenStay ? paidBeforeEnd(reservation, hourlyRate) : 0;
-    const soFar = isRunning ? openStayCharge(reservation.startTime, hourlyRate, now, paidBefore) : null;
+    const soFar = isRunning ? openStayCharge(reservation.startTime, hourlyRate, now, paidBefore, reservation.latestEndTime) : null;
     let durationLabel = '—';
     if (hasExit) {
         durationLabel = formatDuration(reservation.startTime, reservation.endTime);
     } else if (isRunning) {
-        durationLabel = `${formatDuration(reservation.startTime, stayEndSoFar(reservation.startTime, now))} hasta ahora`;
+        durationLabel = `${formatDuration(reservation.startTime, stayEndSoFar(reservation.startTime, now, reservation.latestEndTime))} hasta ahora`;
     } else if (['Pending', 'Active'].includes(reservation.status)) {
         durationLabel = 'Tiempo indefinido';
     }
@@ -574,7 +582,8 @@ export default function ReservationConfirmation() {
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex shrink-0 items-start gap-3">
+                            {/* HU-29: without an exit time, the text of its latest end can wrap */}
+                            <div className={`flex items-start gap-3 ${hasExit ? 'shrink-0' : 'min-w-0'}`}>
                                 <span className={ICON_CIRCLE}>
                                     <LogOut className="h-4 w-4" aria-hidden="true" />
                                 </span>
@@ -591,9 +600,21 @@ export default function ReservationConfirmation() {
                                     ) : (
                                         <>
                                             <p className="text-body font-medium text-neutral-900">Sin hora de salida</p>
-                                            {['Pending', 'Active'].includes(reservation.status) && (
-                                                <p className="text-caption text-neutral-600">Máximo 24 horas</p>
-                                            )}
+                                            {/* HU-29 AC-04: when it ends by itself at the latest */}
+                                            {['Pending', 'Active'].includes(reservation.status) &&
+                                                (reservation.latestEndTime ? (
+                                                    <>
+                                                        <p className="break-words text-caption text-neutral-600">
+                                                            Termina a más tardar el {formatDate(reservation.latestEndTime)}
+                                                        </p>
+                                                        <p className="flex items-center gap-1 text-caption text-neutral-600">
+                                                            <Clock className="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                            {formatTime(reservation.latestEndTime)}
+                                                        </p>
+                                                    </>
+                                                ) : (
+                                                    <p className="text-caption text-neutral-600">Máximo 24 horas</p>
+                                                ))}
                                         </>
                                     )}
                                 </div>
@@ -680,7 +701,15 @@ export default function ReservationConfirmation() {
                     {/* HU-27 AC-03/AC-07: how an open stay is charged, and what is left to pay */}
                     {isOpenStay && ['Pending', 'Active'].includes(reservation.status) && (
                         <p className="mt-3 text-caption text-neutral-600">
-                            {openStayNote(isRunning, soFar, paidBefore, hourlyRate)}
+                            {openStayNote(
+                                isRunning,
+                                soFar,
+                                paidBefore,
+                                hourlyRate,
+                                reservation.latestEndTime && limitedByClosing(reservation)
+                                    ? `hasta las ${keepTogether(formatTime(reservation.latestEndTime))}, cuando cierra la zona`
+                                    : undefined,
+                            )}
                         </p>
                     )}
                     {isOpenStay && reservation.status === 'Finished' && (
