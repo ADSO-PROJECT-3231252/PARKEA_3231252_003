@@ -78,6 +78,38 @@ describe('openStayCharge', () => {
     });
 });
 
+// HU-29 (AC-04): in a zone that is not open 24 hours an open stay is saved
+// with the closing time as its exit time, and it is never charged past it
+describe('openStayCharge stops at the saved exit time (HU-29 AC-04)', () => {
+    // Entry at 08:00 UTC, the zone closes 3 hours later
+    const reserva = { startTime: START, endTime: after(180), appliedHourlyRate: '2500.00' };
+
+    test('finished after the closing time, it is charged up to the closing time', () => {
+        // Act
+        const charge = openStayCharge(reserva, after(200));
+
+        // Assert
+        expect(charge).toMatchObject({ usedMinutes: 180, chargedHours: 3, total: 7500, balance: 5000 });
+        expect(charge.endTime).toEqual(after(180));
+    });
+
+    test('finished before the closing time, it is charged up to that moment', () => {
+        // Act
+        const charge = openStayCharge(reserva, after(70));
+
+        // Assert
+        expect(charge).toMatchObject({ usedMinutes: 70, chargedHours: 2, total: 5000 });
+    });
+
+    test('without a saved exit time it keeps the 24-hour limit', () => {
+        // Act
+        const charge = openStayCharge({ startTime: START, appliedHourlyRate: '2500.00' }, after(30 * 60));
+
+        // Assert
+        expect(charge.chargedHours).toBe(24);
+    });
+});
+
 describe('openStayCharge with what was already paid (HU-28 AC-07)', () => {
     const reserva = { startTime: START, appliedHourlyRate: '2500.00' };
 
