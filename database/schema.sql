@@ -71,6 +71,8 @@ CREATE TABLE vehicles (
 -- 4. Table: zones
 -- Coordinates are required to locate the zone on a map (HU-25)
 -- Zones are never deleted: they are deactivated with is_active = FALSE
+-- open_24h: TRUE for a zone open 24 hours, FALSE when its hours are in
+-- zone_schedules (HU-29). Zones created before HU-29 are open 24 hours
 CREATE TABLE zones (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     name VARCHAR(100) NOT NULL,
@@ -80,10 +82,30 @@ CREATE TABLE zones (
     total_slots INT NOT NULL DEFAULT 0,
     available_slots INT NOT NULL CHECK (available_slots >= 0),
     hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate >= 0),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    open_24h BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- 5. Table: parking_spots
+-- 5. Table: zone_schedules
+-- Relation: zones (1) - (N) zone_schedules
+-- The hours of a zone that is not open 24 hours (HU-29): one row for each day
+-- the zone opens, in Colombia time (1 = Monday ... 7 = Sunday). A day without
+-- a row is a closed day. The hours never cross midnight, and the zone opens
+-- at least 30 minutes before it closes
+-- New hours apply to new reservations and extensions: the reservations that
+-- already exist keep their times
+CREATE TABLE zone_schedules (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    zone_id VARCHAR(36) NOT NULL,
+    day_of_week TINYINT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
+    opens_at TIME NOT NULL,
+    closes_at TIME NOT NULL,
+    CHECK (TIME_TO_SEC(closes_at) - TIME_TO_SEC(opens_at) >= 30 * 60),
+    UNIQUE KEY zone_schedules_zone_day_unique (zone_id, day_of_week),
+    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
+);
+
+-- 6. Table: parking_spots
 -- Relation: zones (1) - (N) parking_spots
 -- One row per physical spot. Created automatically (1..total_slots) when a
 -- zone is created, and adjusted when its capacity changes. Spots are never
@@ -98,7 +120,7 @@ CREATE TABLE parking_spots (
     FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 );
 
--- 6. Table: reservations
+-- 7. Table: reservations
 -- Relations: users (1) - (N) | zones (1) - (N) | vehicles (1) - (N) | parking_spots (1) - (N)
 -- parking_spot_id links the reservation to the exact physical spot assigned
 -- automatically at booking time (spot_number is kept as a denormalized
@@ -107,7 +129,8 @@ CREATE TABLE parking_spots (
 -- changes never alter the price of an existing reservation
 -- hold_expires_at: an unpaid reservation expires and releases its spot (HU-26)
 -- open_ended: a stay without a chosen exit time (HU-27). Its end_time keeps a
--- provisional value (entry + 24 h) until the stay ends, so this flag is what
+-- provisional value until the stay ends: entry + 24 h, or the closing time of
+-- that day when the zone is not open 24 hours (HU-29). This flag is what
 -- tells it apart from a reservation with an exit time
 -- Foreign keys use RESTRICT so removing a user, zone, vehicle, or spot can
 -- never destroy the booking history
@@ -135,7 +158,7 @@ CREATE TABLE reservations (
         REFERENCES parking_spots(id) ON DELETE RESTRICT
 );
 
--- 7. Table: payments
+-- 8. Table: payments
 -- Relation: reservations (1) - (N) payments
 -- type: the initial payment pays the whole stay, or the first hour of an open
 -- stay (HU-27); later a reservation can get extension payments (HU-28) and
@@ -163,7 +186,7 @@ CREATE TABLE payments (
     FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE RESTRICT
 );
 
--- 8. Table: password_reset_tokens
+-- 9. Table: password_reset_tokens
 -- Relation: users (1) - (N) password_reset_tokens
 -- Single-use tokens, valid for one hour (HU-07)
 -- Only the hash of the token is stored, never the token itself
@@ -179,7 +202,7 @@ CREATE TABLE password_reset_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 9. Table: email_verification_tokens
+-- 10. Table: email_verification_tokens
 -- Relation: users (1) - (N) email_verification_tokens
 -- Links of the verification email (HU-30): single-use, valid for 24 hours. A
 -- new link marks the previous ones as used, so only the newest one works
@@ -196,7 +219,7 @@ CREATE TABLE email_verification_tokens (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 10. Table: admin_action_logs
+-- 11. Table: admin_action_logs
 -- Relation: users (1) - (N) admin_action_logs, twice (admin and target)
 -- Audit trail of role and account-status changes made by administrators
 -- (HU-23, AC-14). RESTRICT keeps the trail even if an account is removed
