@@ -218,6 +218,8 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
                 : rateChanged
                   ? `Las reservas nuevas pagarán ${formatCurrency(rate)} por hora. Las que ya existen mantienen ${formatCurrency(original.hourlyRate)}.`
                   : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
+        // HU-29 AC-07: new hours do not move the reservations already made
+        schedule: 'Si cambias el horario, aplica a las reservas y ampliaciones nuevas. Las reservas que ya existen no cambian.',
     };
 
     const dialog = getZoneToggleDialog({ ...zone, activeReservations: spotsInUse });
