@@ -244,8 +244,9 @@ npx sequelize-cli db:migrate
 npx sequelize-cli db:seed:all
 ```
 
-> The 21 migrations create the 9 tables: roles, users, vehicles, zones, parking_spots, reservations, payments, password_reset_tokens and admin_action_logs.
-> The seeders add the `admin` and `user` roles, 4 demo zones with their parking spots, and the primary administrator `admin@parkea.com` (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
+> The 26 migrations create the 11 tables: roles, users, vehicles, zones, zone_schedules, parking_spots, reservations, payments, password_reset_tokens, email_verification_tokens and admin_action_logs.
+> The seeders add the `admin` and `user` roles, 4 demo zones open 24 hours with their parking spots, and the primary administrator `admin@parkea.com`, already verified (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
+> A new account must confirm its email before signing in. On your computer the email arrives in your Mailtrap inbox, so fill in the `MAILTRAP_*` variables (see Environment Variables).
 
 6. Start the development server:
 
@@ -301,7 +302,7 @@ JWT_EXPIRES_IN=1h
 # CORS: address of the frontend
 FRONTEND_URL=http://localhost:5173
 
-# Emails (password recovery): Mailtrap on your computer
+# Emails (verification and password recovery): Mailtrap on your computer
 MAIL_FROM=
 MAILTRAP_HOST=sandbox.smtp.mailtrap.io
 MAILTRAP_PORT=2525
@@ -315,8 +316,8 @@ MAILTRAP_PASS=your_mailtrap_password
 | `NODE_ENV` | Sequelize environment (default `development`) |
 | `DATABASE_URL` | MySQL connection, used by the server and by sequelize-cli |
 | `JWT_SECRET` / `JWT_EXPIRES_IN` | Signing and lifetime of the session token (default 1h) |
-| `FRONTEND_URL` | Origin allowed by CORS (default `http://localhost:5173`) |
-| `MAILTRAP_*` | SMTP account for the password recovery emails. On your computer, the Mailtrap sandbox; the published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
+| `FRONTEND_URL` | Origin allowed by CORS, and address of the links in the emails (default `http://localhost:5173`) |
+| `MAILTRAP_*` | SMTP account for the verification and password recovery emails. On your computer, the Mailtrap sandbox: without it a new account cannot be confirmed. The published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
 | `MAIL_FROM` | Sender of the emails. Leave it empty on your computer; the published site uses `no-reply@parkeaweb.me` |
 
 > If the MySQL password has special characters, encode them in `DATABASE_URL` (for example `$` → `%24`, `@` → `%40`).
