@@ -313,6 +313,21 @@ describe('Deleting a vehicle (HU-13)', () => {
         expect(readVehicle).toHaveBeenCalledWith({ where: { id: VEHICLE_ID, userId: USER_ID } });
     });
 
+    test('a vehicle deleted by another request while this one waited answers 404 and deletes nothing', async () => {
+        // Arrange: read before the lock, and already gone after it
+        const stale = vehicle();
+        readVehicle.mockResolvedValueOnce(stale).mockResolvedValueOnce(null);
+
+        // Act
+        const res = await send('delete', `/api/vehicles/${VEHICLE_ID}`);
+
+        // Assert
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('VEHICLE_NOT_FOUND');
+        expect(stale.destroy).not.toHaveBeenCalled();
+        expect(findActiveReservation).not.toHaveBeenCalled();
+    });
+
     test('the reservations are checked after locking the user, so a reservation created at the same time is seen (#288)', async () => {
         // Arrange
         readVehicle.mockResolvedValueOnce(vehicle()).mockResolvedValueOnce(vehicle());
