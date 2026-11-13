@@ -285,6 +285,7 @@ describe('What a new reservation needs (HU-14)', () => {
         // Assert
         expect(claimSpot).toHaveBeenCalledWith(expect.objectContaining({
             where: { zoneId: ZONE_ID, status: 'Available' },
+            order: [['spotNumber', 'ASC']],
             transaction,
             lock: 'UPDATE',
             skipLocked: true,
