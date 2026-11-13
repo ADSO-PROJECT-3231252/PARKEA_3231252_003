@@ -326,6 +326,19 @@ describe('Deleting a vehicle (HU-13)', () => {
 });
 
 describe('Editing a vehicle (HU-12)', () => {
+    test('a vehicle of another user answers 404 VEHICLE_NOT_FOUND', async () => {
+        // Arrange: the vehicle is only searched among the vehicles of this user
+        const findVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(null);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Rojo' });
+
+        // Assert
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('VEHICLE_NOT_FOUND');
+        expect(findVehicle).toHaveBeenCalledWith({ where: { id: VEHICLE_ID, userId: USER_ID } });
+    });
+
     test('changing the type to one that does not match the plate answers 400 INVALID_PLATE_FORMAT (AC-05)', async () => {
         // Arrange
         const actual = vehicle({ plate: 'ABC123', vehicleType: 'car' });
