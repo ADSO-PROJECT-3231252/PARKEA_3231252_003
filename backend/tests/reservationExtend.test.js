@@ -199,7 +199,7 @@ describe('The new exit time (HU-28, AC-02 and AC-03)', () => {
         ['without the exit time the user saw', { fromEndTime: undefined, newEndTime: colombia('10:00').toISOString() }],
         ['without a new exit time', { paymentMethod: 'pse' }],
         ['with a new exit time and an open stay at once', { newEndTime: colombia('10:00').toISOString(), openEnded: true }],
-        ['with openEnded false', { openEnded: false }],
+        ['with openEnded false', { openEnded: false, newEndTime: colombia('10:00').toISOString(), paymentMethod: 'pse' }],
     ])('a request %s answers 400 VALIDATION_ERROR', async (name, body) => {
         // Arrange
         const reserva = arrange();
