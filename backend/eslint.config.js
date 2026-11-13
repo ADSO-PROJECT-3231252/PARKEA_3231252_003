@@ -12,11 +12,20 @@ module.exports = defineConfig([
             sourceType: 'commonjs',
             globals: globals.node,
         },
+    },
+    // Express knows the error handler of app.js by its four arguments, so
+    // its `next` stays even if it is not used
+    {
+        files: ['src/app.js'],
         rules: {
-            // Express knows the error handler of app.js by its four
-            // arguments, so its `next` stays even if it is not used; and
-            // sequelize-cli gives every migration (queryInterface, Sequelize)
-            'no-unused-vars': ['error', { argsIgnorePattern: '^(next|Sequelize)$' }],
+            'no-unused-vars': ['error', { argsIgnorePattern: '^next$' }],
+        },
+    },
+    // sequelize-cli gives every migration (queryInterface, Sequelize)
+    {
+        files: ['src/migrations/*.js'],
+        rules: {
+            'no-unused-vars': ['error', { argsIgnorePattern: '^Sequelize$' }],
         },
     },
     // Jest tests: describe, test, expect and jest are globals there
