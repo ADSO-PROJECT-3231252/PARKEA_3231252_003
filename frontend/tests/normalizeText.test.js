@@ -1,9 +1,17 @@
 import { normalizeText } from '../src/utils/normalizeText';
 
 describe('normalizeText', () => {
-    test.each(['simon', 'SIMON', 'Simón', 'SIMÓN', 'Simo\u0301n'])('"%s" becomes "simon"', (text) => {
+    test.each(['simon', 'SIMON', 'Simón', 'SIMÓN'])('"%s" becomes "simon"', (text) => {
         // Act
         const result = normalizeText(text);
+
+        // Assert
+        expect(result).toBe('simon');
+    });
+
+    test('an accent written as a separate mark is removed too', () => {
+        // Act: "o" followed by the combining acute accent, as some keyboards send it
+        const result = normalizeText('Simo\u0301n');
 
         // Assert
         expect(result).toBe('simon');
