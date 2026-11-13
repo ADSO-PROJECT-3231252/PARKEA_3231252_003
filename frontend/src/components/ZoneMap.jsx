@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -8,6 +7,7 @@ import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info, Cloc
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { todayHoursLabel } from '../utils/zoneHours';
+import { buildPinHtml } from '../utils/zonePin';
 
 // HU-25: map view of the active zones. Base map: OpenStreetMap standard
 // tiles (free, no API key, attribution required).
@@ -22,12 +22,6 @@ const SINGLE_ZONE_ZOOM = 16;
 
 // AC-08: if this many tiles fail before any tile loads, the map is unusable.
 const MAX_TILE_ERRORS = 3;
-
-const PIN_CLASSES = {
-    available: 'bg-parkea-600',
-    almost: 'bg-warning',
-    full: 'bg-danger',
-};
 
 const BADGE_CLASSES = {
     available: 'bg-parkea-50 text-parkea-600',
@@ -47,27 +41,11 @@ function getPosition(zone) {
 }
 
 // AC-02/AC-03: one pin per zone, colored by availability; full zones also get
-// a different icon so the state is not conveyed by color alone.
+// a different icon so the state is not conveyed by color alone. The HTML is
+// built in utils/zonePin.js, where it is tested.
 function buildIcon(name, availableSlots, totalSlots) {
-    const availability = getZoneAvailability(availableSlots, totalSlots);
-    const Icon = availability.state === 'full' ? Ban : SquareParking;
-    const html = renderToStaticMarkup(
-        <span className="relative block h-10 w-8">
-            <span
-                className={`zone-marker-pin absolute left-0 top-0 flex h-8 w-8 items-center justify-center border-2 border-white shadow-md ${PIN_CLASSES[availability.state]}`}
-            >
-                <Icon className="h-4 w-4 text-white" aria-hidden="true" />
-            </span>
-            <span className="absolute left-9 top-1 max-w-[160px] truncate whitespace-nowrap rounded-md border border-neutral-200 bg-white px-2 py-0.5 text-caption font-medium text-neutral-900 shadow-sm">
-                {name}
-            </span>
-            <span className="sr-only">
-                {`, ${availability.text}, ${availableSlots} de ${totalSlots} cupos`}
-            </span>
-        </span>,
-    );
     return L.divIcon({
-        html,
+        html: buildPinHtml(name, availableSlots, totalSlots),
         className: 'zone-marker-icon',
         iconSize: [32, 40],
         // The pin's tip: bottom-center of the rotated square
