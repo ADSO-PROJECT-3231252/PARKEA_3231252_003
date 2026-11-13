@@ -7,6 +7,7 @@ import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info, Cloc
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { todayHoursLabel } from '../utils/zoneHours';
+import { buildPinHtml } from '../utils/zonePin';
 
 // HU-25: map view of the active zones. Base map: OpenStreetMap standard
 // tiles (free, no API key, attribution required).
@@ -22,40 +23,11 @@ const SINGLE_ZONE_ZOOM = 16;
 // AC-08: if this many tiles fail before any tile loads, the map is unusable.
 const MAX_TILE_ERRORS = 3;
 
-const PIN_CLASSES = {
-    available: 'bg-parkea-600',
-    almost: 'bg-warning',
-    full: 'bg-danger',
-};
-
 const BADGE_CLASSES = {
     available: 'bg-parkea-50 text-parkea-600',
     almost: 'bg-warning-soft text-warning',
     full: 'bg-danger-soft text-danger',
 };
-
-// The pin HTML is built as a plain string (not with react-dom/server) so the
-// map chunk does not have to bundle the React server renderer. These are the
-// same lucide icons used elsewhere in this file (SquareParking and Ban), with
-// the same attributes lucide-react gives them.
-const PIN_ICON_ATTRS =
-    'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
-
-const PIN_ICON_PATHS = {
-    parking: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>',
-    ban: '<circle cx="12" cy="12" r="10"/><path d="M4.929 4.929 19.07 19.071"/>',
-};
-
-// Zone names are user data and now go into an HTML string, so they must be
-// escaped (React did this automatically before).
-function escapeHtml(value) {
-    return String(value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
 
 // Coordinates come from MySQL DECIMAL columns, so they arrive as strings and
 // may be null for zones created before they were required (HU-20).
@@ -69,24 +41,11 @@ function getPosition(zone) {
 }
 
 // AC-02/AC-03: one pin per zone, colored by availability; full zones also get
-// a different icon so the state is not conveyed by color alone.
+// a different icon so the state is not conveyed by color alone. The HTML is
+// built in utils/zonePin.js, where it is tested.
 function buildIcon(name, availableSlots, totalSlots) {
-    const availability = getZoneAvailability(availableSlots, totalSlots);
-    const iconPaths = availability.state === 'full' ? PIN_ICON_PATHS.ban : PIN_ICON_PATHS.parking;
-    const html =
-        '<span class="relative block h-10 w-8">' +
-        `<span class="zone-marker-pin absolute left-0 top-0 flex h-8 w-8 items-center justify-center border-2 border-white shadow-md ${PIN_CLASSES[availability.state]}">` +
-        `<svg ${PIN_ICON_ATTRS} class="h-4 w-4 text-white">${iconPaths}</svg>` +
-        '</span>' +
-        '<span class="absolute left-9 top-1 max-w-[160px] truncate whitespace-nowrap rounded-md border border-neutral-200 bg-white px-2 py-0.5 text-caption font-medium text-neutral-900 shadow-sm">' +
-        escapeHtml(name) +
-        '</span>' +
-        '<span class="sr-only">' +
-        escapeHtml(`, ${availability.text}, ${availableSlots} de ${totalSlots} cupos`) +
-        '</span>' +
-        '</span>';
     return L.divIcon({
-        html,
+        html: buildPinHtml(name, availableSlots, totalSlots),
         className: 'zone-marker-icon',
         iconSize: [32, 40],
         // The pin's tip: bottom-center of the rotated square
