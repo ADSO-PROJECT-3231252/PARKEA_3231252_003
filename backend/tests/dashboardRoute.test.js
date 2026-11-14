@@ -102,3 +102,72 @@ describe('GET /api/admin/dashboard uses the range of the request (#298)', () => 
         expect(Pago.sum).not.toHaveBeenCalled();
     });
 });
+
+// The other two endpoints that take a range (#298). They search with the same
+// getRangoFecha, so each one could also ignore the range of the request.
+const getEndpoint = (endpoint, query = '') => request(app)
+    .get(`/api/admin/dashboard/${endpoint}${query}`)
+    .set('Authorization', `Bearer ${adminToken}`);
+
+// The moments each endpoint searched between
+const searchedRange = {
+    // It counts with raw SQL, so it sends the moments as UTC text
+    'reservations-by-zone': () => {
+        const { replacements } = Zona.findAll.mock.calls[0][0];
+        return [replacements.inicio, replacements.fin].map((text) => new Date(`${text.replace(' ', 'T')}Z`));
+    },
+    'payments-status': () => Pago.findAll.mock.calls[0][0].where.created_at[Op.between],
+};
+
+describe.each(Object.keys(searchedRange))('GET /api/admin/dashboard/%s uses the range of the request (#298)', (endpoint) => {
+    beforeEach(() => {
+        jest.spyOn(Zona, 'findAll').mockResolvedValue([]);
+        jest.spyOn(Pago, 'findAll').mockResolvedValue([]);
+    });
+
+    test('range=week searches from midnight 6 days ago until now', async () => {
+        // Act
+        const res = await getEndpoint(endpoint, '?range=week');
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body.range).toBe('week');
+        expect(searchedRange[endpoint]()).toEqual([new Date('2026-11-04T05:00:00.000Z'), NOW]);
+    });
+
+    test('without a range it uses today', async () => {
+        // Act
+        const res = await getEndpoint(endpoint);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body.range).toBe('today');
+        expect(searchedRange[endpoint]()).toEqual([new Date('2026-11-10T05:00:00.000Z'), NOW]);
+    });
+
+    test('a range that does not exist answers 400 INVALID_RANGE and searches nothing', async () => {
+        // Act
+        const res = await getEndpoint(endpoint, '?range=year');
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('INVALID_RANGE');
+        expect(Zona.findAll).not.toHaveBeenCalled();
+        expect(Pago.findAll).not.toHaveBeenCalled();
+    });
+});
+
+test('reservations-by-zone counts the reservations that start inside the range, in UTC (#298)', async () => {
+    // Arrange
+    jest.spyOn(Zona, 'findAll').mockResolvedValue([]);
+
+    // Act
+    await getEndpoint('reservations-by-zone', '?range=week');
+
+    // Assert: the database keeps UTC. A Date in the replacements would be
+    // written in the time zone of the server (America/Bogota on Azure).
+    const { attributes, replacements } = Zona.findAll.mock.calls[0][0];
+    const [count] = attributes.find(Array.isArray);
+    expect(count.val).toContain('r.start_time BETWEEN :inicio AND :fin');
+    expect(replacements).toEqual({ inicio: '2026-11-04 05:00:00', fin: '2026-11-10 15:00:00' });
+});
