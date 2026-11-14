@@ -1,19 +1,24 @@
 const { Usuario, Rol, Zona, Reserva, Pago, AdminActionLog, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const ErrorCodes = require('../constants/errorCodes');
+const { colombiaDay } = require('../utils/zoneHours');
 
 const RANGOS_VALIDOS = ['today', 'week', 'month'];
 
-function getRangoFecha(range) {
-  const ahora = new Date();
-  const inicio = new Date(ahora);
-  if (range === 'today') {
-    inicio.setHours(0, 0, 0, 0);
-  } else if (range === 'week') {
-    inicio.setDate(inicio.getDate() - 7);
-  } else {
-    inicio.setMonth(inicio.getMonth() - 1);
-  }
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// HU-22 AC-03: every range ends now and starts at midnight in Colombia
+// (12:00 a. m.), counting back whole days: "today" is Hoy, "week" is the last
+// 7 days (today and the 6 before) and "month" is the last 30 days (today and
+// the 29 before). They are rolling days, not the calendar week or month.
+// Colombia has no daylight saving time, so subtracting days of 24 hours always
+// lands on midnight, and the start does not depend on the time zone of the
+// server.
+const DIAS_ANTERIORES = { today: 0, week: 6, month: 29 };
+
+function getRangoFecha(range, ahora = new Date()) {
+  if (!Object.hasOwn(DIAS_ANTERIORES, range)) throw new Error(`Unknown range: ${range}`);
+  const inicio = new Date(colombiaDay(ahora).midnight - DIAS_ANTERIORES[range] * DAY_MS);
   return { inicio, fin: ahora };
 }
 
@@ -407,4 +412,6 @@ module.exports = {
   getRegistroDeCambios,
   cambiarRol,
   cambiarEstado,
+  // getRangoFecha is exported only so the tests can call it without a database
+  getRangoFecha,
 };

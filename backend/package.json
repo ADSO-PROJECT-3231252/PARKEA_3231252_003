@@ -38,6 +38,7 @@
   },
   "jest": {
     "verbose": true,
+    "globalSetup": "<rootDir>/tests/timezone.js",
     "setupFiles": [
       "<rootDir>/tests/setup.js"
     ]
