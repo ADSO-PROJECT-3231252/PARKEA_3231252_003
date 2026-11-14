@@ -94,14 +94,14 @@ describe('getRangoFecha', () => {
         });
 
         test('is always 30 days, also after a long month (October has 31 days)', () => {
-            // Arrange: December 1, 10:00 a. m. in Colombia. A calendar month back would be November 1.
-            const now = '2026-12-01T15:00:00Z';
+            // Arrange: November 1, 10:00 a. m. in Colombia. A calendar month back would be October 1.
+            const now = '2026-11-01T15:00:00Z';
 
             // Act
             const start = startOf('month', now);
 
             // Assert
-            expect(start).toBe('2026-11-02T05:00:00.000Z');
+            expect(start).toBe('2026-10-03T05:00:00.000Z');
         });
     });
 
