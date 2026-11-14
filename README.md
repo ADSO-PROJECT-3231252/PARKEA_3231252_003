@@ -149,6 +149,7 @@ PARKEA_3231252_003/
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
 │   ├── API_REFERENCE.md      # Every endpoint with its rules and error codes
+│   ├── eslint.config.js
 │   └── package.json
 │
 ├── 📁 frontend/
