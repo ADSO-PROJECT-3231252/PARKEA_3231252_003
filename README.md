@@ -339,6 +339,7 @@ VITE_API_URL=http://localhost:3000/api
 |--------|---------|-------------|
 | Development | `npm run dev` | nodemon + auto-reload |
 | Production | `npm start` | Plain Node |
+| Lint | `npm run lint` | ESLint |
 | Tests | `npm test` | Jest + Supertest, no MySQL needed |
 
 ### Database (run inside `backend/`)
