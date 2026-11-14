@@ -24,16 +24,16 @@ import {
 
 const RANGE_OPTIONS = [
     { value: 'today', label: 'Hoy' },
-    { value: 'week', label: 'Esta semana' },
-    { value: 'month', label: 'Este mes' },
+    { value: 'week', label: 'Últimos 7 días' },
+    { value: 'month', label: 'Últimos 30 días' },
 ];
 
 // AC-04: the revenue tile must make clear which range it totals — a fixed
-// "hoy" would be wrong once the admin switches to "Esta semana"/"Este mes".
+// "hoy" would be wrong once the admin switches to "Últimos 7 días"/"Últimos 30 días".
 const REVENUE_LABEL = {
     today: 'Ingresos de hoy',
-    week: 'Ingresos de esta semana',
-    month: 'Ingresos de este mes',
+    week: 'Ingresos de los últimos 7 días',
+    month: 'Ingresos de los últimos 30 días',
 };
 
 // AC-06: semantic colours + a text label on every segment, never colour alone.
