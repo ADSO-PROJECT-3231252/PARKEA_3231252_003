@@ -121,7 +121,7 @@ Versions are the ranges declared in each `package.json`.
 | Azure (App Service + Azure Database for MySQL) | Hosting of the published site |
 | Resend | Sending the emails of the published site |
 | VS Code | Primary IDE |
-| ESLint | JavaScript linter (frontend, ^10.6.0) |
+| ESLint | JavaScript linter (frontend and backend, ^10.6.0) |
 
 ---
 
