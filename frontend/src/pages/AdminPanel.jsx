@@ -28,13 +28,9 @@ const RANGE_OPTIONS = [
     { value: 'month', label: 'Últimos 30 días' },
 ];
 
-// AC-04: the revenue tile must make clear which range it totals — a fixed
-// "hoy" would be wrong once the admin switches to "Últimos 7 días"/"Últimos 30 días".
-const REVENUE_LABEL = {
-    today: 'Ingresos de hoy',
-    week: 'Ingresos de los últimos 7 días',
-    month: 'Ingresos de los últimos 30 días',
-};
+// AC-04: the revenue tile must make clear which range it totals, so it shows
+// the name of the selected range under the amount, like the range buttons.
+const rangeLabel = (range) => RANGE_OPTIONS.find((opt) => opt.value === range).label;
 
 // AC-06: semantic colours + a text label on every segment, never colour alone.
 const PAYMENT_STATUS_META = {
@@ -273,7 +269,7 @@ export default function AdminPanel() {
                             type="button"
                             aria-pressed={range === opt.value}
                             onClick={() => setRange(opt.value)}
-                            className={`rounded px-3 py-1.5 text-label transition-colors ${range === opt.value
+                            className={`rounded px-2 py-1.5 text-label transition-colors sm:px-3 ${range === opt.value
                                 ? 'bg-parkea-600 text-white'
                                 : 'text-neutral-600 hover:text-parkea-600'
                                 }`}
@@ -298,9 +294,9 @@ export default function AdminPanel() {
                     />
                     <MetricCard
                         icon={DollarSign}
-                        label={REVENUE_LABEL[range]}
+                        label="Ingresos"
                         value={formatCurrency(metrics.revenue)}
-                        sublabel="Total ingresos"
+                        sublabel={rangeLabel(range)}
                     />
                     <MetricCard
                         icon={MapPin}
