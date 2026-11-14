@@ -22,6 +22,11 @@ function getRangoFecha(range, ahora = new Date()) {
   return { inicio, fin: ahora };
 }
 
+// A date as MySQL DATETIME text in UTC ('2026-11-10 05:00:00')
+function toUtcText(date) {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 // GET /api/admin/dashboard?range=today|week|month
 async function getDashboard(req, res, next) {
   try {
@@ -91,7 +96,9 @@ async function getReservasPorZona(req, res, next) {
           'reservationCount',
         ],
       ],
-      replacements: { inicio, fin },
+      // A raw query writes its dates in the time zone of the server, but the
+      // database keeps UTC (Sequelize writes UTC in a where), so they go as UTC
+      replacements: { inicio: toUtcText(inicio), fin: toUtcText(fin) },
     });
 
     const result = zonas.map((z) => ({
