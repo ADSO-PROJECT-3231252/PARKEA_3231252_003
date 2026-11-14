@@ -7,14 +7,14 @@ const after = (minutes) => new Date(START.getTime() + minutes * 60 * 1000);
 
 describe('chargedHours: every started hour counts (AC-07, AC-08)', () => {
     test.each([
-        ['1 minute', 1, 1],
-        ['59 minutes', 59, 1],
-        ['exactly 60 minutes', 60, 1],
-        ['61 minutes', 61, 2],
-        ['1 hour and 59 minutes', 119, 2],
-        ['exactly 2 hours', 120, 2],
-        ['23 hours and 1 minute', 23 * 60 + 1, 24],
-    ])('%s is charged as %i hour(s)', (_label, minutes, hours) => {
+        { label: '1 minute', minutes: 1, hours: 1 },
+        { label: '59 minutes', minutes: 59, hours: 1 },
+        { label: 'exactly 60 minutes', minutes: 60, hours: 1 },
+        { label: '61 minutes', minutes: 61, hours: 2 },
+        { label: '1 hour and 59 minutes', minutes: 119, hours: 2 },
+        { label: 'exactly 2 hours', minutes: 120, hours: 2 },
+        { label: '23 hours and 1 minute', minutes: 23 * 60 + 1, hours: 24 },
+    ])('$label is charged as $hours hour(s)', ({ minutes, hours }) => {
         // Act
         const result = chargedHours(START, after(minutes));
 
@@ -179,11 +179,11 @@ describe('extensionCharge: every started hour of the extra time (HU-28 AC-06)', 
     const reserva = { startTime: START, appliedHourlyRate: '1500.55' };
 
     test.each([
-        ['20 minutes', 20, 1, 1500.55],
-        ['exactly 1 hour', 60, 1, 1500.55],
-        ['1 hour and 1 minute', 61, 2, 3001.1],
-        ['5 hours', 300, 5, 7502.75],
-    ])('%s more is charged as %i hour(s)', (_label, minutes, hours, amount) => {
+        { label: '20 minutes', minutes: 20, hours: 1, amount: 1500.55 },
+        { label: 'exactly 1 hour', minutes: 60, hours: 1, amount: 1500.55 },
+        { label: '1 hour and 1 minute', minutes: 61, hours: 2, amount: 3001.1 },
+        { label: '5 hours', minutes: 300, hours: 5, amount: 7502.75 },
+    ])('$label more is charged as $hours hour(s)', ({ minutes, hours, amount }) => {
         // Act
         const charge = extensionCharge(reserva, after(120), after(120 + minutes));
 
