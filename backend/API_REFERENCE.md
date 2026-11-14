@@ -144,7 +144,7 @@ opens, in Colombia time; a day that is not in the list is closed:
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| GET | `/admin/dashboard?range=today\|week\|month` | Admin | Summary metrics: active reservations, revenue, active zones, new users (HU-22) |
+| GET | `/admin/dashboard?range=today\|week\|month` | Admin | Summary metrics: active reservations, revenue, active zones and registered users, which is the total number of accounts and not the new ones (HU-22). Ranges, see below |
 | GET | `/admin/dashboard/reservations-by-zone?range=today\|week\|month` | Admin | Reservation count per active zone (HU-22) |
 | GET | `/admin/dashboard/occupancy` | Admin | Occupied vs. total slots per zone, real-time (HU-22) |
 | GET | `/admin/dashboard/payments-status?range=today\|week\|month` | Admin | Payment count by status (HU-22) |
@@ -154,6 +154,27 @@ opens, in Colombia time; a day that is not in the list is closed:
 | GET | `/admin/users/logs` | Admin | Last 10 role/status changes made by admins (HU-23) |
 | PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin |
 | PATCH | `/admin/users/:id/status` | Admin | Activate/deactivate an account (HU-23). Same protections as above |
+
+### Dashboard ranges (HU-22)
+
+The `range` of the dashboard endpoints is `today`, `week` or `month`. It is
+`today` when it is missing, and any other value answers 400 `INVALID_RANGE`.
+Every range ends at the moment of the request and starts at midnight
+(12:00 a. m.) in Colombia time, whatever the time zone of the server:
+
+| `range` | Name on the screen | Starts at midnight of |
+|---|---|---|
+| `today` | Hoy | today |
+| `week` | Últimos 7 días | 6 days ago (today and the 6 days before) |
+| `month` | Últimos 30 días | 29 days ago (today and the 29 days before) |
+
+- They are rolling days, not calendar periods: `week` does not start on
+  Monday and `month` does not start on day 1.
+- What each endpoint compares with the range: active reservations that
+  overlap it, revenue by payment date (`paidAt`), reservations per zone by
+  start time, and payments by status by creation date.
+- Active zones, registered users, occupancy, recent payments and alerts
+  show the situation right now and do not change with the range.
 
 ---
 
