@@ -1,3 +1,5 @@
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Ban, SquareParking } from 'lucide-react';
 import { buildPinHtml, escapeHtml } from '../src/utils/zonePin';
 
 // HU-25 AC-02/AC-03: the pins of the map are built as an HTML string, so the
@@ -47,11 +49,11 @@ describe('buildPinHtml: zone name escaping', () => {
 
 describe('buildPinHtml: state of the pin (AC-02, AC-03)', () => {
     test.each([
-        ['available', 5, 10, 'bg-parkea-600'],
-        ['almost full', 1, 10, 'bg-warning'],
-        ['full', 0, 10, 'bg-danger'],
-    ])('a zone %s has the color %s', (_label, available, total, colorClass) => {
-        const pin = render(buildPinHtml('Zona Centro', available, total));
+        { label: 'available', available: 5, colorClass: 'bg-parkea-600' },
+        { label: 'almost full', available: 1, colorClass: 'bg-warning' },
+        { label: 'full', available: 0, colorClass: 'bg-danger' },
+    ])('a zone $label has the color $colorClass', ({ available, colorClass }) => {
+        const pin = render(buildPinHtml('Zona Centro', available, 10));
         expect(pin.querySelector('.zone-marker-pin').classList.contains(colorClass)).toBe(true);
     });
 
@@ -84,5 +86,21 @@ describe('buildPinHtml: text for screen readers (AC-02)', () => {
     ])('%i of %i slots', (available, total, text) => {
         const pin = render(buildPinHtml('Zona Centro', available, total));
         expect(pin.querySelector('.sr-only').textContent).toBe(text);
+    });
+});
+
+// The pin draws its icons by hand (see utils/zonePin.js). This fails if they
+// stop matching the installed lucide-react, for example after an upgrade.
+describe('buildPinHtml: icons copied from lucide-react', () => {
+    const LUCIDE_ATTRS = ['viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin'];
+
+    test.each([
+        ['an available zone', 5, SquareParking],
+        ['a full zone', 0, Ban],
+    ])('%s draws the same icon as lucide-react', (_label, available, Icon) => {
+        const pin = render(buildPinHtml('Zona Centro', available, 10)).querySelector('svg');
+        const lucide = render(renderToStaticMarkup(<Icon />)).querySelector('svg');
+        expect(pin.innerHTML).toBe(lucide.innerHTML);
+        LUCIDE_ATTRS.forEach((name) => expect(pin.getAttribute(name)).toBe(lucide.getAttribute(name)));
     });
 });

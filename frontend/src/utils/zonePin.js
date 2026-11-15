@@ -12,7 +12,8 @@ const PIN_CLASSES = {
 
 // The icon strokes below are copied from lucide-react 1.33.0 (SquareParking
 // and Ban). Unlike the other icons in the app, they do NOT update with the
-// package: whoever upgrades lucide-react must check these two by hand.
+// package. tests/zonePin.test.js fails if they stop matching the installed
+// lucide-react, for example after an upgrade; if it does, copy the new strokes.
 const ICON_ATTRS =
     'xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
 
