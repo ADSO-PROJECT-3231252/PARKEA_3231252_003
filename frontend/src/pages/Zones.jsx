@@ -6,6 +6,7 @@ import { getZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { todayHoursLabel } from '../utils/zoneHours';
+import { normalizeText } from '../utils/normalizeText';
 
 // HU-25: Leaflet is only downloaded when the map view is opened. If that
 // download fails, the page falls back to the list like any other map error.
@@ -133,9 +134,9 @@ export default function Zones() {
     };
 
     const filteredZones = useMemo(() => {
-        const term = search.trim().toLowerCase();
+        const term = normalizeText(search.trim());
         if (!term) return zones;
-        return zones.filter((zone) => zone.name.toLowerCase().includes(term));
+        return zones.filter((zone) => normalizeText(zone.name).includes(term));
     }, [zones, search]);
 
     const totalPages = Math.max(1, Math.ceil(filteredZones.length / PAGE_SIZE));

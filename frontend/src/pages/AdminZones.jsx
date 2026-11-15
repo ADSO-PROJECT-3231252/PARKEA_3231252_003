@@ -15,6 +15,7 @@ import {
 import { getAllZones, toggleZone } from '../services/zoneService';
 import { translateError } from '../utils/errorMessages';
 import { formatCurrency } from '../utils/format';
+import { normalizeText } from '../utils/normalizeText';
 import { getZoneAvailability, getZoneToggleDialog, getZoneToggleSuccess } from '../utils/zones';
 import { getPageWindow } from '../utils/adminUsersHelpers';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -190,12 +191,12 @@ export default function AdminZones() {
     };
 
     const filteredZones = useMemo(() => {
-        const term = search.trim().toLowerCase();
+        const term = normalizeText(search.trim());
         return zones.filter((zone) => {
             if (status === 'active' && !zone.isActive) return false;
             if (status === 'inactive' && zone.isActive) return false;
             if (!term) return true;
-            return zone.name.toLowerCase().includes(term) || (zone.address ?? '').toLowerCase().includes(term);
+            return normalizeText(zone.name).includes(term) || normalizeText(zone.address).includes(term);
         });
     }, [zones, search, status]);
 
