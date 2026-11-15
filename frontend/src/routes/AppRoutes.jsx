@@ -1,38 +1,67 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { RefreshCw } from 'lucide-react';
 import ProtectedRoute from './ProtectedRoute';
 import Layout from '../components/Layout';
 
-// Every page is downloaded only when its route is opened
-const Home = lazy(() => import('../pages/Home'));
-const Login = lazy(() => import('../pages/Login'));
-const Register = lazy(() => import('../pages/Register'));
-const Profile = lazy(() => import('../pages/Profile'));
-const Zones = lazy(() => import('../pages/Zones'));
-const VehicleList = lazy(() => import('../pages/VehicleList'));
-const Reservations = lazy(() => import('../pages/Reservations'));
-const RegisterVehicle = lazy(() => import('../pages/RegisterVehicle'));
-const EditVehicle = lazy(() => import('../pages/EditVehicle'));
-const AdminPanel = lazy(() => import('../pages/AdminPanel'));
-const ReserveSpot = lazy(() => import('../pages/ReserveSpot'));
-const AdminLogin = lazy(() => import('../pages/AdminLogin'));
-const AdminUsers = lazy(() => import('../pages/AdminUsers'));
-const AdminZones = lazy(() => import('../pages/AdminZones'));
-const CreateZone = lazy(() => import('../pages/CreateZone'));
-const EditZone = lazy(() => import('../pages/EditZone'));
-const ForgotPassword = lazy(() => import('../pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('../pages/ResetPassword'));
-const ReservationConfirmation = lazy(() => import('../pages/ReservationConfirmation'));
-const PayReservation = lazy(() => import('../pages/PayReservation'));
-const NotFound = lazy(() => import('../pages/NotFound'));
-const CheckEmail = lazy(() => import('../pages/CheckEmail'));
-const VerifyEmail = lazy(() => import('../pages/VerifyEmail'));
-const ResendVerification = lazy(() => import('../pages/ResendVerification'));
+// Shown instead of a blank screen when the file of a page can't be downloaded:
+// the connection dropped for a moment, or a new version was published and the
+// files of the old one are gone. Reloading downloads the current version.
+// The pages without the Header (standalone) have no <main> around them.
+function PageLoadError({ standalone }) {
+    const Wrapper = standalone ? 'main' : 'div';
+    return (
+        <Wrapper className={`flex ${standalone ? 'min-h-screen' : 'min-h-[60vh]'} items-center justify-center px-4`}>
+            <div role="alert" className="flex flex-col items-center gap-3 text-center">
+                <h1 className="text-subtitle text-neutral-900">No pudimos cargar esta página</h1>
+                <p className="text-body text-neutral-600">Revisa tu conexión e inténtalo de nuevo.</p>
+                <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                >
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    Reintentar
+                </button>
+            </div>
+        </Wrapper>
+    );
+}
+
+// Every page is downloaded only when its route is opened. Like the map in
+// Zones.jsx, a failed download shows PageLoadError instead of a blank screen.
+const lazyPage = (load, standalone = false) =>
+    lazy(() => load().catch(() => ({ default: () => <PageLoadError standalone={standalone} /> })));
+
+const Home = lazyPage(() => import('../pages/Home'));
+const Login = lazyPage(() => import('../pages/Login'), true);
+const Register = lazyPage(() => import('../pages/Register'), true);
+const Profile = lazyPage(() => import('../pages/Profile'));
+const Zones = lazyPage(() => import('../pages/Zones'));
+const VehicleList = lazyPage(() => import('../pages/VehicleList'));
+const Reservations = lazyPage(() => import('../pages/Reservations'));
+const RegisterVehicle = lazyPage(() => import('../pages/RegisterVehicle'));
+const EditVehicle = lazyPage(() => import('../pages/EditVehicle'));
+const AdminPanel = lazyPage(() => import('../pages/AdminPanel'));
+const ReserveSpot = lazyPage(() => import('../pages/ReserveSpot'));
+const AdminLogin = lazyPage(() => import('../pages/AdminLogin'), true);
+const AdminUsers = lazyPage(() => import('../pages/AdminUsers'));
+const AdminZones = lazyPage(() => import('../pages/AdminZones'));
+const CreateZone = lazyPage(() => import('../pages/CreateZone'));
+const EditZone = lazyPage(() => import('../pages/EditZone'));
+const ForgotPassword = lazyPage(() => import('../pages/ForgotPassword'), true);
+const ResetPassword = lazyPage(() => import('../pages/ResetPassword'), true);
+const ReservationConfirmation = lazyPage(() => import('../pages/ReservationConfirmation'));
+const PayReservation = lazyPage(() => import('../pages/PayReservation'));
+const NotFound = lazyPage(() => import('../pages/NotFound'), true);
+const CheckEmail = lazyPage(() => import('../pages/CheckEmail'), true);
+const VerifyEmail = lazyPage(() => import('../pages/VerifyEmail'), true);
+const ResendVerification = lazyPage(() => import('../pages/ResendVerification'), true);
 
 // Shown while the file of a page is being downloaded
 function PageFallback() {
     return (
-        <div role="status" className="flex min-h-screen items-center justify-center text-neutral-600">
+        <div role="status" className="flex min-h-screen items-center justify-center text-body text-neutral-600">
             Cargando…
         </div>
     );
