@@ -121,7 +121,7 @@ Versions are the ranges declared in each `package.json`.
 | Azure (App Service + Azure Database for MySQL) | Hosting of the published site |
 | Resend | Sending the emails of the published site |
 | VS Code | Primary IDE |
-| ESLint | JavaScript linter (frontend, ^10.6.0) |
+| ESLint | JavaScript linter (frontend and backend, ^10.6.0) |
 
 ---
 
@@ -149,6 +149,7 @@ PARKEA_3231252_003/
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
 │   ├── API_REFERENCE.md      # Every endpoint with its rules and error codes
+│   ├── eslint.config.js
 │   └── package.json
 │
 ├── 📁 frontend/
@@ -338,6 +339,7 @@ VITE_API_URL=http://localhost:3000/api
 |--------|---------|-------------|
 | Development | `npm run dev` | nodemon + auto-reload |
 | Production | `npm start` | Plain Node |
+| Lint | `npm run lint` | ESLint |
 | Tests | `npm test` | Jest + Supertest, no MySQL needed |
 
 ### Database (run inside `backend/`)
