@@ -19,7 +19,7 @@ All the resources live in the **Azure for Students** subscription, in the resour
 | Azure Database for MySQL (flexible server) | `parkea-db-sena` | Burstable B1ms, 20 GiB, MySQL 8.4 | Database `parkea_db` (utf8mb4) |
 | App Service plan | `parkea-plan` | Free F1, Linux | Runs both apps below |
 | App Service (web app) | `parkea-api-sena` | Node 22 LTS | Backend (Express API) |
-| App Service (web app) | `parkea-web-sena` | Node 22 LTS | Frontend (React build served with PM2) |
+| App Service (web app) | `parkea-web-sena` | Node 22 LTS | Frontend (React build served by `server.cjs`, with security headers) |
 
 Notes:
 
@@ -89,15 +89,34 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 ### Frontend (`parkea-web-sena`)
 
-The frontend has no variables in Azure. The API address is written into the build, from the file `frontend/.env.production.local` on the computer that builds it. That file is ignored by Git.
+The API address is written into the build, from the file `frontend/.env.production.local` on the computer that builds it. That file is ignored by Git.
+
+| Name | Value |
+|---|---|
+| `API_URL` | The same address as `VITE_API_URL` in the build: the API URL, ending in `/api` |
+
+`server.cjs` uses `API_URL` in the `Content-Security-Policy`, so the pages can only call that API. Without it the site still works, but the pages may call any `https://` address, and the log says `API_URL is not set`.
 
 The web app has this **startup command** (Settings > Configuration > General settings):
 
 ```
-pm2 serve /home/site/wwwroot --no-daemon --spa
+node /home/site/wwwroot/server.cjs
 ```
 
-`--spa` returns `index.html` for any route, so reloading a page like `/zones` works.
+`server.cjs` lives in `frontend/public`, and every build copies it into `dist`, so it is always in the zip. It serves the site (#302):
+
+- It returns `index.html` for any route, so reloading a page like `/zones` works. A file that does not exist answers 404.
+- It adds the security headers that `pm2 serve` did not send: `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Strict-Transport-Security`, `Cross-Origin-Opener-Policy` and `Permissions-Policy`.
+- The policy allows the files of the build, the fonts of Google, the map tiles of OpenStreetMap and the API. If a page starts using another site (a new map, font or service), add it to `contentSecurityPolicy` in `server.cjs`, or the browser blocks it.
+- It only uses Node, so the zip needs no `npm install`.
+
+To check it on your computer before deploying, run `npm run build` in `frontend`, then run it from `frontend/dist` and open `http://localhost:8080`:
+
+```
+node server.cjs
+```
+
+The pages and their headers can be checked like that. Signing in from there also needs `API_URL` set to the API of the build (for example `API_URL=http://localhost:3000/api node server.cjs`), and that API must have `FRONTEND_URL=http://localhost:8080`.
 
 ## Deploy the backend
 
@@ -164,6 +183,8 @@ If the backend also changed, deploy the backend first.
    ```
 
 5. Open the web app URL and reload with Ctrl + F5.
+
+6. Check the security headers: press F12, open the **Network** tab, reload, click the first row (the page) and look at **Response Headers**. `Content-Security-Policy`, `X-Content-Type-Options` and `X-Frame-Options` must be there. The **Console** tab must not show messages that say `Content Security Policy`.
 
 ## Database changes (migrations and seeders)
 
@@ -267,4 +288,6 @@ To stop or start an app: web app, **Overview**, **Stop** or **Start**.
 | Migrations fail with `ETIMEDOUT` | Your IP is not in the database firewall. See Database changes. |
 | Creating a resource fails with "policy violation" | The region is not allowed. Use one of the allowed regions listed above. |
 | The recovery email does not arrive | Check the spam folder, then Resend > Emails. If it is not there, read the API log (row below) and look for `Could not send the recovery email`. If Resend is down or the domain expired, switch back to Mailtrap (see Email (Resend)). |
+| The website shows "Application Error" or does not open | The startup command is not `node /home/site/wwwroot/server.cjs`, or the zip has no `server.cjs` (it was built before #302). Check the startup command, build again and deploy. |
+| Login shows "Ocurrió un error inesperado" and the browser console says "Refused to connect" and "Content Security Policy" | `API_URL` of the web app is different from the API address of the build. Fix it in Environment variables and click Apply twice. |
 | The API does not start | Read the live log: `az webapp log tail --resource-group parkea-rg --name parkea-api-sena` (stop with Ctrl + C). |
