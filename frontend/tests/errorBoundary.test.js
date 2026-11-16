@@ -92,6 +92,23 @@ describe('The error screen (#315)', () => {
         expect(console.error).toHaveBeenCalled();
     });
 
+    test('"Recargar" reloads the page', async () => {
+        // Arrange
+        const user = userEvent.setup();
+        renderAt(['/broken']);
+        const reload = await screen.findByRole('button', { name: 'Recargar' });
+        console.error.mockClear();
+
+        // Act
+        await user.click(reload);
+
+        // Assert: jsdom cannot reload a page, so it reports the navigation it
+        // was asked for in the console
+        expect(console.error).toHaveBeenCalledWith(
+            expect.objectContaining({ message: expect.stringContaining('Not implemented: navigation') }),
+        );
+    });
+
     test('"Volver al inicio" opens the home page, which renders normally', async () => {
         // Arrange
         const user = userEvent.setup();
