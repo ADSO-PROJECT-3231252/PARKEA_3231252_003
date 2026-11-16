@@ -67,8 +67,7 @@ describe('"Mis reservas" (HU-18 AC-02, #349)', () => {
         render(<MemoryRouter><Reservations /></MemoryRouter>);
 
         // Assert: the table and the card of the reservation say the same
-        const labels = await screen.findAllByText('Pago: Sin pago');
-        expect(labels.length).toBeGreaterThan(0);
+        expect(await screen.findAllByText('Pago: Sin pago')).toHaveLength(2);
         expect(screen.queryByText('Pago: Pendiente')).not.toBeInTheDocument();
     });
 });
