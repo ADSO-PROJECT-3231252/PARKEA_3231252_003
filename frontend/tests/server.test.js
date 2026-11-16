@@ -25,6 +25,7 @@ beforeAll(() => {
     fs.writeFileSync(path.join(root, 'robots.txt'), 'User-agent: *');
     fs.writeFileSync(path.join(root, 'server.cjs'), '// the server itself');
     fs.writeFileSync(path.join(root, '.env'), 'SECRET=1');
+    fs.writeFileSync(path.join(root, 'assets', '.secret'), 'SECRET=2');
 });
 
 afterAll(() => {
@@ -43,9 +44,12 @@ async function start(apiUrl) {
 function rawGet(address) {
     return new Promise((resolve, reject) => {
         const { hostname, port } = new URL(base);
-        http.get({ hostname, port, path: address }, (res) => {
+        // A server that stopped answering fails the test instead of hanging it
+        http.get({ hostname, port, path: address, timeout: 2000 }, (res) => {
             res.resume();
             res.on('end', () => resolve(res.statusCode));
+        }).on('timeout', function onTimeout() {
+            this.destroy(new Error(`no answer for ${address}`));
         }).on('error', reject);
     });
 }
@@ -68,6 +72,9 @@ describe('The server of the website (#302)', () => {
             expect(res.headers.get('x-content-type-options')).toBe('nosniff');
             expect(res.headers.get('x-frame-options')).toBe('DENY');
             expect(res.headers.get('referrer-policy')).toBe('strict-origin-when-cross-origin');
+            expect(res.headers.get('strict-transport-security')).toBe('max-age=31536000');
+            expect(res.headers.get('cross-origin-opener-policy')).toBe('same-origin');
+            expect(res.headers.get('permissions-policy')).toBe('camera=(), microphone=(), geolocation=(), payment=()');
         }
     });
 
@@ -115,6 +122,7 @@ describe('The server of the website (#302)', () => {
     test.each([
         ['/server.cjs', 'the server itself'],
         ['/.env', 'a hidden file'],
+        ['/assets/.secret', 'a hidden file inside a folder'],
         ['/..%2fsecret.txt', 'a file outside the build, with an encoded slash'],
         ['/%2e%2e%2fsecret.txt', 'a file outside the build, with encoded dots and slash'],
         ['/assets%2f..%2f..%2fsecret.txt', 'a file outside the build, through assets/'],
@@ -127,6 +135,19 @@ describe('The server of the website (#302)', () => {
 
         // Assert
         expect(status).toBe(404);
+    });
+
+    test('a null byte (%00) answers 400 and the server keeps working', async () => {
+        // Arrange
+        await start();
+
+        // Act
+        const status = await rawGet('/index%00.html');
+        const next = await fetch(`${base}/`);
+
+        // Assert
+        expect(status).toBe(400);
+        expect(next.status).toBe(200);
     });
 
     test('an address that cannot be decoded answers 400', async () => {
@@ -161,13 +182,19 @@ describe('The Content-Security-Policy (#302)', () => {
         // Act
         const policy = contentSecurityPolicy('https://parkea-api.example.net/api');
 
-        // Assert
-        expect(policy).toContain("script-src 'self';");
-        expect(policy).toContain("style-src 'self' https://fonts.googleapis.com;");
-        expect(policy).toContain("font-src 'self' https://fonts.gstatic.com;");
-        expect(policy).toContain("img-src 'self' data: https://tile.openstreetmap.org;");
-        expect(policy).toContain("connect-src 'self' https://parkea-api.example.net;");
-        expect(policy).toContain("object-src 'none'");
+        // Assert: the whole policy, so a directive cannot be lost or widened
+        expect(policy).toBe([
+            "default-src 'self'",
+            "script-src 'self'",
+            "style-src 'self' https://fonts.googleapis.com",
+            "font-src 'self' https://fonts.gstatic.com",
+            "img-src 'self' data: https://tile.openstreetmap.org",
+            "connect-src 'self' https://parkea-api.example.net",
+            "object-src 'none'",
+            "base-uri 'self'",
+            "form-action 'self'",
+            "frame-ancestors 'none'",
+        ].join('; '));
     });
 
     test.each([

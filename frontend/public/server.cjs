@@ -99,6 +99,9 @@ function createServer({ root = __dirname, apiUrl = process.env.API_URL } = {}) {
         } catch {
             return fail(res, 400, 'Bad request');
         }
+        // A file name cannot have a null byte (%00), and Node throws when it
+        // gets one, which would stop the whole server
+        if (pathname.includes('\0')) return fail(res, 400, 'Bad request');
 
         // Only files inside the folder of the build, and never this file or a
         // hidden one (for example .env)
