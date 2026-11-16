@@ -25,9 +25,11 @@ export default defineConfig([
       globals: { ...globals.browser, ...globals.jest },
     },
   },
-  // babel.config.cjs and the test mocks use CommonJS (module.exports)
+  // babel.config.cjs, the server of the build (public/server.cjs) and the test
+  // mocks use CommonJS (module.exports)
   {
     files: ['**/*.cjs', 'tests/mocks/*.js'],
+    extends: [js.configs.recommended],
     languageOptions: {
       globals: globals.node,
       sourceType: 'commonjs',
