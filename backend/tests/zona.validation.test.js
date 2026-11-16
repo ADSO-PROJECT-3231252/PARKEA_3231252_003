@@ -10,11 +10,12 @@ const validZone = {
     hourlyRate: 2500,
 };
 
-// The hourly rate is DECIMAL(10, 2): a third decimal would be rounded by the
-// database without a warning (HU-20, HU-21)
-describe('validarZona: decimals of the hourly rate', () => {
+// The hourly rate must be greater than 0 (#316), and it is DECIMAL(10, 2): a
+// third decimal would be rounded by the database without a warning (HU-20,
+// HU-21)
+describe('validarZona: the hourly rate', () => {
     test.each([
-        ['zero (HU-20 AC-04)', 0],
+        ['the smallest rate the column holds', 0.01],
         ['a whole number', 3500],
         ['one decimal', 3500.5],
         ['two decimals', 3500.12],
@@ -42,6 +43,22 @@ describe('validarZona: decimals of the hourly rate', () => {
         expect(error.body.errors[0]).toMatchObject({
             path: 'hourlyRate',
             msg: 'hourlyRate must have at most 2 decimals',
+        });
+    });
+
+    test.each([
+        ['zero', 0],
+        ['minus zero', -0],
+    ])('rejects a rate of %s: it must be greater than 0 (HU-20 AC-04, #316)', (_label, hourlyRate) => {
+        // Act
+        const error = validarZona({ ...validZone, hourlyRate });
+
+        // Assert
+        expect(error.status).toBe(400);
+        expect(error.body.code).toBe('VALIDATION_ERROR');
+        expect(error.body.errors[0]).toMatchObject({
+            path: 'hourlyRate',
+            msg: 'hourlyRate must be greater than 0',
         });
     });
 
