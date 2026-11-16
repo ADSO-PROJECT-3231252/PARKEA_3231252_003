@@ -6,8 +6,9 @@ const request = require('supertest');
 const { Usuario, Zona, Reserva, ParkingSpot, sequelize } = require('../src/models');
 const app = require('../src/app');
 
-// HU-16: cancelling a reservation before its entry time. The times are in
-// Colombia (UTC-5), and "now" is Monday 2026-11-16 at 8:00 a. m.
+// HU-16: cancelling a reservation: a paid one only before its entry time, one
+// that is not paid yet also after it (#316). The times are in Colombia
+// (UTC-5), and "now" is Monday 2026-11-16 at 8:00 a. m.
 const colombia = (time) => new Date(`2026-11-16T${time}:00-05:00`);
 const NOW = colombia('08:00');
 
@@ -94,7 +95,7 @@ describe('When a reservation can be cancelled (HU-16)', () => {
     test.each([
         ['at its entry time', '08:00'],
         ['after its entry time', '07:00'],
-    ])('a reservation %s answers 409 RESERVATION_ALREADY_STARTED', async (name, startTime) => {
+    ])('a paid reservation (Active) %s answers 409 RESERVATION_ALREADY_STARTED', async (name, startTime) => {
         // Arrange
         const reserva = arrange(reservation({ startTime: colombia(startTime) }));
 
@@ -108,9 +109,14 @@ describe('When a reservation can be cancelled (HU-16)', () => {
         expect(transaction.rollback).toHaveBeenCalled();
     });
 
-    test.each(['Cancelled', 'Expired', 'Finished'])('a reservation with status %s answers 409 RESERVATION_NOT_CANCELLABLE', async (status) => {
+    test.each([
+        ['Cancelled', '10:00'],
+        ['Expired', '10:00'],
+        ['Finished', '10:00'],
+        ['Finished', '07:00'],
+    ])('a reservation with status %s (entry at %s) answers 409 RESERVATION_NOT_CANCELLABLE', async (status, startTime) => {
         // Arrange
-        const reserva = arrange(reservation({ status }));
+        const reserva = arrange(reservation({ status, startTime: colombia(startTime) }));
 
         // Act
         const res = await cancel();
@@ -132,6 +138,24 @@ describe('When a reservation can be cancelled (HU-16)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(reserva.update).toHaveBeenCalledWith({ status: 'Cancelled' }, { transaction });
+    });
+
+    test.each([
+        ['at its entry time', '08:00'],
+        ['after its entry time', '07:50'],
+    ])('a reservation that is not paid yet (Pending) can still be cancelled %s, while it waits for its payment (#316)', async (name, startTime) => {
+        // Arrange: it was made at 7:45 a. m., so its 15 minutes to pay end at 8:00 a. m.
+        const reserva = arrange(reservation({ status: 'Pending', startTime: colombia(startTime), payments: [] }));
+
+        // Act
+        const res = await cancel();
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(reserva.update).toHaveBeenCalledWith({ status: 'Cancelled' }, { transaction });
+        expect(spot.update).toHaveBeenCalledWith({ status: 'Available' }, { transaction });
+        expect(zona.increment).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
+        expect(transaction.commit).toHaveBeenCalled();
     });
 });
 
