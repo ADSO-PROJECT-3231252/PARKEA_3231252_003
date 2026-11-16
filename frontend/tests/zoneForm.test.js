@@ -48,6 +48,16 @@ describe('validateZoneForm', () => {
         expect(validateZoneForm({ ...validForm(), totalSlots })).toEqual({});
     });
 
+    // HU-20 AC-04 (#316): every zone charges for its hours
+    test.each(['0', '000'])('a rate of %s is rejected: it must be more than $ 0', (hourlyRate) => {
+        const errors = validateZoneForm({ ...validForm(), hourlyRate });
+        expect(errors.hourlyRate).toBe('La tarifa por hora debe ser mayor que $ 0.');
+    });
+
+    test('a rate of $ 1 is accepted', () => {
+        expect(validateZoneForm({ ...validForm(), hourlyRate: '1' })).toEqual({});
+    });
+
     test('capacity below the spots in use is rejected when editing', () => {
         const errors = validateZoneForm({ ...validForm(), totalSlots: '3' }, { spotsInUse: 4 });
         expect(errors.totalSlots).toBe('Hay 4 cupos en uso por reservas pendientes o activas. La capacidad no puede ser menor.');

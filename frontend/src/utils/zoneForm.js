@@ -158,7 +158,12 @@ export function validateZoneForm(form, { spotsInUse = 0 } = {}) {
         }
     }
 
-    if (!isNotEmpty(form.hourlyRate)) errors.hourlyRate = REQUIRED_MESSAGE;
+    if (!isNotEmpty(form.hourlyRate)) {
+        errors.hourlyRate = REQUIRED_MESSAGE;
+    } else if (Number(form.hourlyRate) <= 0) {
+        // HU-20 AC-04 (#316): every zone charges for its hours
+        errors.hourlyRate = 'La tarifa por hora debe ser mayor que $ 0.';
+    }
 
     const latitudeError = coordinateError(form.latitude, -90, 90, 'latitud');
     if (latitudeError) errors.latitude = latitudeError;

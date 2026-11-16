@@ -137,7 +137,7 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                         )}
                     </Field>
 
-                    {/* HU-20 AC-04: zero or more, in whole pesos */}
+                    {/* HU-20 AC-04: more than zero, in whole pesos (#316) */}
                     <Field id="hourlyRate" label="Tarifa por hora (COP)" hint={hints.hourlyRate} error={errors.hourlyRate}>
                         {(a11y) => (
                             <div
