@@ -19,9 +19,9 @@ import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 
-import heroVisitorIllustration from '../assets/hero-visitor.png';
-import heroUserIllustration from '../assets/hero-user.png';
-import heroAdminIllustration from '../assets/hero-admin.png';
+import heroVisitorIllustration from '../assets/hero-visitor.webp';
+import heroUserIllustration from '../assets/hero-user.webp';
+import heroAdminIllustration from '../assets/hero-admin.webp';
 
 // height and right accept a number (px) or any CSS length, e.g. clamp(), so an
 // illustration can shrink with the viewport instead of covering the headline.
