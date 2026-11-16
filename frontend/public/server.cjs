@@ -3,8 +3,9 @@
 // Node itself (no npm packages), so the zip of dist keeps working as it is,
 // without an npm install. Vite copies it from public/ into dist/ on every build.
 //
-// Start it with: node server.cjs (the startup command of the web app in
-// Azure, see docs/deployment.md). Variables:
+// In Azure it starts with "pm2 start server.cjs --no-daemon" (the startup
+// command, see docs/deployment.md), which starts it again if it ever stops.
+// To try it on a computer: node server.cjs. Variables:
 // - PORT: given by Azure; 8080 when it is not set.
 // - API_URL: the address of the API, the same as VITE_API_URL of the build.
 //   The browser may only call that origin. Without it, any https:// address
