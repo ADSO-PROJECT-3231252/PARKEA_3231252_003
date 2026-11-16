@@ -82,7 +82,7 @@ CREATE TABLE zones (
     longitude DECIMAL(10,7),
     total_slots INT NOT NULL DEFAULT 0,
     available_slots INT NOT NULL CHECK (available_slots >= 0),
-    hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate >= 0),
+    hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate > 0),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     open_24h BOOLEAN NOT NULL DEFAULT TRUE
 );
