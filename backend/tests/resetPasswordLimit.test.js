@@ -1,4 +1,6 @@
+const bcrypt = require('bcrypt');
 const request = require('supertest');
+const { Usuario, PasswordResetToken, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // Limit on failed tries of the recovery link (card #301): 10 every 15
@@ -7,6 +9,10 @@ const app = require('../src/app');
 // from its own IP address (X-Forwarded-For, trusted because of "trust proxy"
 // in app.js), so the counts of one test never affect another.
 const reset = (ip) => request(app).post('/api/auth/reset-password').set('X-Forwarded-For', ip).send({});
+
+afterEach(() => {
+    jest.restoreAllMocks();
+});
 
 async function resetTimes(times, ip) {
     const statuses = [];
@@ -40,5 +46,35 @@ describe('Recovery link limit (10 failed tries per network every 15 minutes)', (
         // Assert
         expect(res.status).toBe(400);
         expect(res.body.code).toBe('VALIDATION_ERROR');
+    });
+
+    test('a link that works is not counted, so a class on the same Wi-Fi can use theirs', async () => {
+        // Arrange: a valid link of an account whose password is another one
+        // (the database is replaced by spies, tests/setup.js)
+        const account = {
+            id: 'user-fabio',
+            password: await bcrypt.hash('Anterior1*', 4),
+            passwordVersion: 0,
+            emailVerifiedAt: new Date(),
+            update: jest.fn(),
+        };
+        const link = { id: 'link-1', userId: account.id, usedAt: null, expiresAt: new Date(Date.now() + 60 * 60 * 1000) };
+        jest.spyOn(PasswordResetToken, 'findOne').mockResolvedValue(link);
+        jest.spyOn(PasswordResetToken, 'update').mockResolvedValue([1]);
+        jest.spyOn(Usuario, 'findByPk').mockResolvedValue(account);
+        jest.spyOn(sequelize, 'transaction').mockImplementation(async (work) => work({ LOCK: { UPDATE: 'UPDATE' } }));
+        const ip = '203.0.113.4';
+        await resetTimes(9, ip);
+        const works = await request(app)
+            .post('/api/auth/reset-password')
+            .set('X-Forwarded-For', ip)
+            .send({ token: 'a-valid-link', newPassword: 'Nueva123*', confirmNewPassword: 'Nueva123*' });
+
+        // Act: if the link that worked counted, this would be the eleventh
+        const res = await reset(ip);
+
+        // Assert
+        expect(works.status).toBe(200);
+        expect(res.status).toBe(400);
     });
 });

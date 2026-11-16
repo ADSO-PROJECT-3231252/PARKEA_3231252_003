@@ -101,6 +101,26 @@ describe('Password change limit (5 failed changes per account every 15 minutes)'
         expect(res.body.token).toEqual(expect.any(String));
     });
 
+    test('a new password that is not valid also counts', async () => {
+        // Arrange: 5 tries with the right current password but a new one
+        // without a special character (the validator answers 400)
+        accounts('user-fer');
+        const token = createSessionToken({ id: 'user-fer', email: 'user-fer@correo.test', passwordVersion: 0 }, 'user');
+        for (let i = 0; i < 5; i++) {
+            await request(app)
+                .put('/api/users/me/password')
+                .set('X-Forwarded-For', '198.51.100.5')
+                .set('Authorization', `Bearer ${token}`)
+                .send({ currentPassword: PASSWORD, newPassword: 'Nueva1234', confirmNewPassword: 'Nueva1234' });
+        }
+
+        // Act
+        const res = await change('user-fer', PASSWORD, '198.51.100.5');
+
+        // Assert
+        expect(res.status).toBe(429);
+    });
+
     test('a change that works is not counted', async () => {
         // Arrange: 4 wrong tries and one that works
         accounts('user-elena');
