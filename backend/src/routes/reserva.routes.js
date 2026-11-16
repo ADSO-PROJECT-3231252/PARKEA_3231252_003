@@ -1,9 +1,12 @@
 const router = require('express').Router();
 const { body, validationResult } = require('express-validator');
-const { verificarToken } = require('../middlewares/auth.middleware');
+const { verificarToken, verificarRol } = require('../middlewares/auth.middleware');
 const reservaController = require('../controllers/reserva.controller');
 const ErrorCodes = require('../constants/errorCodes');
 const { isTextOrMissing } = require('../utils/validation');
+
+// #316: only user accounts make reservations; an administrator gets 403 FORBIDDEN_ROLE
+const soloUsuarios = [verificarToken, verificarRol('user')];
 
 // The ids and the dates must be text; missing ones are still reported by the
 // controller as MISSING_REQUIRED_FIELDS
@@ -53,21 +56,21 @@ const validarAmpliar = [
 ];
 
 // POST /api/reservations — create a reservation (HU-14)
-router.post('/', verificarToken, validarCamposReserva, reservaController.crear);
+router.post('/', soloUsuarios, validarCamposReserva, reservaController.crear);
 
 // GET /api/reservations — list the authenticated user's reservations (HU-18)
-router.get('/', verificarToken, reservaController.misReservas);
+router.get('/', soloUsuarios, reservaController.misReservas);
 
 // GET /api/reservations/:id — reservation confirmation details (HU-15)
-router.get('/:id', verificarToken, reservaController.obtenerConfirmacion);
+router.get('/:id', soloUsuarios, reservaController.obtenerConfirmacion);
 
 // PATCH /api/reservations/:id/cancel — cancel a reservation (HU-16)
-router.patch('/:id/cancel', verificarToken, reservaController.cancelar);
+router.patch('/:id/cancel', soloUsuarios, reservaController.cancelar);
 
 // PATCH /api/reservations/:id/finish — finish an open stay (HU-27)
-router.patch('/:id/finish', verificarToken, validarTerminar, reservaController.terminar);
+router.patch('/:id/finish', soloUsuarios, validarTerminar, reservaController.terminar);
 
 // PATCH /api/reservations/:id/extend — extend a stay or leave it open (HU-28)
-router.patch('/:id/extend', verificarToken, validarAmpliar, reservaController.ampliar);
+router.patch('/:id/extend', soloUsuarios, validarAmpliar, reservaController.ampliar);
 
 module.exports = router;

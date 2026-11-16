@@ -172,6 +172,23 @@ describe('When a reservation can be paid (HU-17, HU-26)', () => {
         expect(reserva.save).not.toHaveBeenCalled();
     });
 
+    test('a reservation whose entry time passed can still be paid while its 15 minutes last (HU-17, #316)', async () => {
+        // Arrange: made at 7:50 a. m. to enter at 7:55 a. m.; it can be paid until 8:05 a. m.
+        const reserva = arrange(reservation({
+            startTime: colombia('07:55'),
+            endTime: colombia('09:55'),
+            holdExpiresAt: colombia('08:05'),
+        }));
+
+        // Act
+        const res = await pay(CARD);
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 4000, paymentStatus: 'Paid' }), { transaction });
+        expect(reserva.status).toBe('Active');
+    });
+
     test.each(['Active', 'Cancelled', 'Finished'])('a reservation with status %s answers 400 RESERVATION_NOT_PENDING', async (status) => {
         // Arrange
         arrange(reservation({ status, holdExpiresAt: null }));

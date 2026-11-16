@@ -354,15 +354,17 @@ async function cancelar(req, res, next) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
         }
-        const now = new Date();
-        const yaEmpezo = new Date(reserva.startTime) <= now;
-        if (yaEmpezo) {
-            await t.rollback();
-            return res.status(409).json({ code: ErrorCodes.RESERVATION_ALREADY_STARTED, message: 'This reservation has already started and cannot be cancelled' });
-        }
         if (reserva.status !== 'Pending' && reserva.status !== 'Active') {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.RESERVATION_NOT_CANCELLABLE, message: `A reservation with status "${reserva.status}" cannot be cancelled` });
+        }
+        // #316: a Pending reservation was not paid, so it can be cancelled
+        // while it waits for its payment, even after its entry time. A paid
+        // one (Active) only before its entry time.
+        const yaEmpezo = new Date(reserva.startTime) <= new Date();
+        if (reserva.status === 'Active' && yaEmpezo) {
+            await t.rollback();
+            return res.status(409).json({ code: ErrorCodes.RESERVATION_ALREADY_STARTED, message: 'This reservation has already started and cannot be cancelled' });
         }
 
         // Release the physical spot, not just the zone counter

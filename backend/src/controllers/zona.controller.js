@@ -72,6 +72,11 @@ function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRat
   if (hourlyRate < 0) {
     return { status: 400, body: { code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' } };
   }
+  // #316: every zone charges for its hours. With a rate of 0 the reservation
+  // would ask the user to pay $ 0
+  if (hourlyRate === 0) {
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'hourlyRate', msg: 'hourlyRate must be greater than 0' }] } };
+  }
   // hourly_rate is DECIMAL(10, 2): the database would round a third decimal
   // without any warning, so a rate is valid only when rounding it to 2
   // decimals does not change it. Checking rate * 100 for a whole number is not
