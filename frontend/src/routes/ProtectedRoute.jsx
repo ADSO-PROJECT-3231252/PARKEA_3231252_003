@@ -34,8 +34,11 @@ export default function ProtectedRoute({ children, role }) {
         return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
     }
 
+    // #316: a screen of the other role sends the account to its own start: an
+    // administrator on "Mis vehículos" or "Mis reservas" goes to its
+    // dashboard, and a user on an admin screen to the home page
     if (role && user.role !== role) {
-        return <Navigate to="/" replace />;
+        return <Navigate to={user.role === 'admin' ? '/admin/dashboard' : '/'} replace />;
     }
 
     return children;

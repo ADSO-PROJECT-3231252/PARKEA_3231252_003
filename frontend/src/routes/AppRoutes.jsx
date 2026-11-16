@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import ProtectedRoute from './ProtectedRoute';
+import NotForAdminRoute from './NotForAdminRoute';
 import Layout from '../components/Layout';
 
 // Shown instead of a blank screen when the file of a page can't be downloaded:
@@ -84,17 +85,20 @@ export default function AppRoutes() {
                 {/* Everything else shares the Header via Layout */}
                 <Route element={<Layout />}>
                     <Route path="/" element={<Home />} />
-                    <Route path="/zones" element={<Zones />} />
+                    {/* #316: the zones list is open to visitors and users; an
+                        administrator has its own list of zones */}
+                    <Route path="/zones" element={<NotForAdminRoute adminPath="/admin/zones"><Zones /></NotForAdminRoute>} />
                     <Route path="/zones/map" element={<Navigate to="/zones?view=map" replace />} />
 
                     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                    <Route path="/vehicles" element={<ProtectedRoute><VehicleList /></ProtectedRoute>} />
-                    <Route path="/vehicles/new" element={<ProtectedRoute><RegisterVehicle /></ProtectedRoute>} />
-                    <Route path="/vehicles/:id/edit" element={<ProtectedRoute><EditVehicle /></ProtectedRoute>} />
-                    <Route path="/reserve/:zoneId" element={<ProtectedRoute><ReserveSpot /></ProtectedRoute>} />
-                    <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-                    <Route path="/reservations/:id" element={<ProtectedRoute><ReservationConfirmation /></ProtectedRoute>} />
-                    <Route path="/reservations/:id/payment" element={<ProtectedRoute><PayReservation /></ProtectedRoute>} />
+                    {/* #316: vehicles and reservations are only for users */}
+                    <Route path="/vehicles" element={<ProtectedRoute role="user"><VehicleList /></ProtectedRoute>} />
+                    <Route path="/vehicles/new" element={<ProtectedRoute role="user"><RegisterVehicle /></ProtectedRoute>} />
+                    <Route path="/vehicles/:id/edit" element={<ProtectedRoute role="user"><EditVehicle /></ProtectedRoute>} />
+                    <Route path="/reserve/:zoneId" element={<ProtectedRoute role="user"><ReserveSpot /></ProtectedRoute>} />
+                    <Route path="/reservations" element={<ProtectedRoute role="user"><Reservations /></ProtectedRoute>} />
+                    <Route path="/reservations/:id" element={<ProtectedRoute role="user"><ReservationConfirmation /></ProtectedRoute>} />
+                    <Route path="/reservations/:id/payment" element={<ProtectedRoute role="user"><PayReservation /></ProtectedRoute>} />
 
                     <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><Home /></ProtectedRoute>} />
                     <Route path="/admin/panel" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />
