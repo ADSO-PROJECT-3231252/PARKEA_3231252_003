@@ -165,8 +165,7 @@ function VisitorHome() {
 }
 
 function AuthenticatedHome({ user }) {
-    const [activeReservations, setActiveReservations] = useState([]);
-    const [lastReservation, setLastReservation] = useState(null);
+    const [reservations, setReservations] = useState([]);
     const [reservationsLoading, setReservationsLoading] = useState(true);
     const [reservationsError, setReservationsError] = useState(false);
 
@@ -181,13 +180,11 @@ function AuthenticatedHome({ user }) {
     useEffect(() => {
         let active = true;
 
-        // #306: the confirmed ones, to find the stay running now or the next one,
-        // and the latest of any status, for the ones that have nothing else
-        Promise.all([getReservations({ status: 'Active', limit: 100 }), getReservations({ limit: 1 })])
-            .then(([activeRes, latestRes]) => {
-                if (!active) return;
-                setActiveReservations(activeRes.data.reservations);
-                setLastReservation(latestRes.data.reservations[0] ?? null);
+        // #306: all of them, the latest first (100 is the most the list gives):
+        // the stay running now, the next ones and the latest of any status
+        getReservations({ limit: 100 })
+            .then((res) => {
+                if (active) setReservations(res.data.reservations);
             })
             .catch(() => {
                 if (active) setReservationsError(true);
@@ -226,8 +223,8 @@ function AuthenticatedHome({ user }) {
     // #306: the stay running now, else the next one, else the last finished.
     // The last finished one is the first of the history (the latest first).
     const currentReservation = useMemo(
-        () => pickHomeReservation({ active: activeReservations, lastFinished: history[0] ?? null, latest: lastReservation }),
-        [activeReservations, history, lastReservation],
+        () => pickHomeReservation({ reservations, lastFinished: history[0] ?? null }),
+        [reservations, history],
     );
     const cardLoading = reservationsLoading || historyLoading;
 
