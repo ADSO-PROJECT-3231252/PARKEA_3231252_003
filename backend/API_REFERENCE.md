@@ -38,7 +38,9 @@ Over a limit the API answers 429 `TOO_MANY_REQUESTS`, and the `RateLimit`
 headers say how many tries are left and when the count starts again. The
 counts are kept per network (IP address) and, where it says so, per email
 on that network or per account, so on a shared Wi-Fi each person has their
-own tries.
+own tries. The sign-up and the recovery link are the exception: they are
+counted only per network, so everyone on that network shares their count
+(the request of the recovery link has no email).
 
 | Route | Limit | What counts |
 |---|---|---|
