@@ -71,3 +71,127 @@ describe('Searching zones without accents (#182)', () => {
         expect(shown('Av. Simón Bolívar')).toBe(false);
     });
 });
+
+// #331 (WCAG 2.1 SC 4.1.3): a screen reader hears how many zones a search found
+// The hidden status message of the screen (the admin screen has another status
+// for the messages of its actions)
+const searchStatus = () => screen.getAllByRole('status').find((element) => element.className.includes('sr-only'));
+
+async function openPublicList() {
+    const user = userEvent.setup();
+    render(<MemoryRouter><AuthProvider><Zones /></AuthProvider></MemoryRouter>);
+    await screen.findByText('Parqueadero Centro');
+    return { user, searchBox: screen.getByLabelText('Buscar zonas por nombre') };
+}
+
+async function openZoneManagement() {
+    const user = userEvent.setup();
+    render(<MemoryRouter><AdminZones /></MemoryRouter>);
+    await screen.findAllByText('Parqueadero Centro');
+    return { user, searchBox: screen.getByLabelText('Buscar zona por nombre o dirección') };
+}
+
+describe.each([
+    ['the public list', openPublicList, 'No se encontraron zonas con ese nombre.'],
+    ['zone management', openZoneManagement, 'No se encontraron zonas con esa búsqueda o estado.'],
+])('%s announces the result of the search (#331)', (name, open, noResults) => {
+    beforeEach(() => {
+        localStorage.clear();
+        getZones.mockReset().mockResolvedValue({ data: { zones: [SIMON, CENTRO] } });
+        getAllZones.mockReset().mockResolvedValue({ data: { zones: [SIMON, CENTRO] } });
+    });
+
+    test('the status message is in the page and empty while there is no search', async () => {
+        // Act
+        await open();
+
+        // Assert
+        expect(searchStatus()).toBeInTheDocument();
+        expect(searchStatus()).toBeEmptyDOMElement();
+    });
+
+    test('it says how many zones were found', async () => {
+        // Arrange: both names have an "r"
+        const { user, searchBox } = await open();
+
+        // Act
+        await user.type(searchBox, 'r');
+
+        // Assert
+        expect(searchStatus()).toHaveTextContent('2 zonas encontradas');
+    });
+
+    test('it says "1 zona encontrada" in singular', async () => {
+        // Arrange
+        const { user, searchBox } = await open();
+
+        // Act
+        await user.type(searchBox, 'simon');
+
+        // Assert
+        expect(searchStatus()).toHaveTextContent('1 zona encontrada');
+    });
+
+    test('it says that no zone was found', async () => {
+        // Arrange
+        const { user, searchBox } = await open();
+
+        // Act
+        await user.type(searchBox, 'zzz');
+
+        // Assert
+        expect(searchStatus()).toHaveTextContent(noResults);
+    });
+
+    test('it is empty again when the search is cleared', async () => {
+        // Arrange
+        const { user, searchBox } = await open();
+        await user.type(searchBox, 'simon');
+
+        // Act
+        await user.clear(searchBox);
+
+        // Assert
+        expect(searchStatus()).toBeEmptyDOMElement();
+    });
+});
+
+describe('Zone management also announces the status filter and the address (#331)', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        getAllZones.mockReset().mockResolvedValue({ data: { zones: [SIMON, CENTRO] } });
+    });
+
+    test('filtering by inactive zones announces that there are none', async () => {
+        // Arrange: both zones are active
+        const { user } = await openZoneManagement();
+
+        // Act
+        await user.selectOptions(screen.getByLabelText('Filtrar por estado'), 'inactive');
+
+        // Assert
+        expect(searchStatus()).toHaveTextContent('No se encontraron zonas con esa búsqueda o estado.');
+    });
+
+    test('filtering by active zones announces how many there are', async () => {
+        // Arrange
+        const { user } = await openZoneManagement();
+
+        // Act
+        await user.selectOptions(screen.getByLabelText('Filtrar por estado'), 'active');
+
+        // Assert
+        expect(searchStatus()).toHaveTextContent('2 zonas encontradas');
+    });
+
+    test('searching by an address announces the zone it finds', async () => {
+        // Arrange
+        const { user, searchBox } = await openZoneManagement();
+
+        // Act
+        await user.type(searchBox, 'cordoba');
+
+        // Assert
+        expect(searchStatus()).toHaveTextContent('1 zona encontrada');
+    });
+});
