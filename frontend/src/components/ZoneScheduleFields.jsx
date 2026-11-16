@@ -3,8 +3,13 @@ import { Clock, CopyCheck } from 'lucide-react';
 import { capitalized, dayName, formatHour } from '../utils/zoneHours';
 import { dayError, dayField } from '../utils/zoneForm';
 
-// The columns of a day on a wide screen: day, state, opens, closes, button
-const ROW_COLUMNS = 'lg:grid-cols-[7rem_9rem_minmax(0,1fr)_minmax(0,1fr)_auto]';
+// The columns of a day on a wide screen: day, state, opens, closes, button.
+// The titles use them too, so the button column has a fixed width: with
+// `auto` it would be as wide as the button in the rows but almost empty in
+// the titles, and the time columns would not line up. 10rem fits "Aplicar a
+// todos" in one line also with the fonts the browser uses if Barlow fails to
+// load (#339)
+const ROW_COLUMNS = 'lg:grid-cols-[7rem_9rem_minmax(0,1fr)_minmax(0,1fr)_10rem]';
 
 const timeClass = (hasError) =>
     `w-full rounded-md border bg-white px-3 py-2 font-mono text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
@@ -111,7 +116,7 @@ function DayRow({ row, error, onChange, onApplyToAll, fieldRef }) {
                     disabled={!canApply}
                     aria-label={`Aplicar a todos los días el horario del ${name}`}
                     title={canApply ? undefined : 'Escribe primero las horas de este día'}
-                    className="flex items-center justify-center gap-1.5 rounded-md border border-parkea-600 bg-white px-3 py-2 text-label text-parkea-700 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-500 disabled:hover:bg-white"
+                    className="flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-parkea-600 bg-white px-3 py-2 text-label text-parkea-700 transition-colors hover:bg-parkea-50 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:text-neutral-500 disabled:hover:bg-white"
                 >
                     <CopyCheck className="h-4 w-4" aria-hidden="true" />
                     Aplicar a todos
@@ -195,7 +200,9 @@ export default function ZoneScheduleFields({ zoneForm, hint }) {
             {/* AC-02: one row per day, Monday to Sunday */}
             {form.open24h === false && (
                 <div className="mt-5">
-                    <div className={`hidden gap-x-3 pb-2 text-caption text-neutral-600 lg:grid ${ROW_COLUMNS}`}>
+                    {/* The same border and padding as the list below, so each title
+                        starts at the left edge of its field (#339) */}
+                    <div className={`hidden gap-x-3 border-x border-transparent px-4 pb-2 text-caption text-neutral-600 lg:grid ${ROW_COLUMNS}`}>
                         <span>Día</span>
                         <span>Estado</span>
                         <span className="flex items-center gap-1">
