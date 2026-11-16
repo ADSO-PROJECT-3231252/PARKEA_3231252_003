@@ -22,6 +22,7 @@ import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
 import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
 import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
+import { paymentLabelOf } from '../utils/paymentStatus';
 import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
@@ -37,13 +38,6 @@ const STATUS_FILTERS = [
     { value: 'Cancelled', label: 'Canceladas' },
     { value: 'Expired', label: 'Expiradas' },
 ];
-// AC-02: payment status is required on every entry.
-const PAYMENT_STATUS_LABELS = {
-    Pending: 'Pendiente',
-    Paid: 'Pagado',
-    Cancelled: 'Cancelado',
-    Refunded: 'Reembolsado',
-};
 function StatusBadge({ status }) {
     const { label = status, Icon, badge } = RESERVATION_STATUS[status] ?? FALLBACK_STATUS;
     return (
@@ -141,14 +135,11 @@ text-neutral-600"
     );
 }
 function StatusInfo({ reservation }) {
-    const paymentLabel =
-        pendingBalanceOf(reservation) > 0
-            ? 'Saldo pendiente'
-            : (PAYMENT_STATUS_LABELS[reservation.paymentStatus] ?? reservation.paymentStatus);
     return (
         <div className="flex flex-col items-start gap-1 lg:items-center">
             <StatusBadge status={reservation.status} />
-            <p className="text-caption text-neutral-600">Pago: {paymentLabel}</p>
+            {/* AC-02: payment status is required on every entry */}
+            <p className="text-caption text-neutral-600">Pago: {paymentLabelOf(reservation)}</p>
         </div>
     );
 }
