@@ -195,7 +195,9 @@ export default function ZoneScheduleFields({ zoneForm, hint }) {
             {/* AC-02: one row per day, Monday to Sunday */}
             {form.open24h === false && (
                 <div className="mt-5">
-                    <div className={`hidden gap-x-3 pb-2 text-caption text-neutral-600 lg:grid ${ROW_COLUMNS}`}>
+                    {/* The same border and padding as the list below, so each title
+                        starts at the left edge of its field (#339) */}
+                    <div className={`hidden gap-x-3 border-x border-transparent px-4 pb-2 text-caption text-neutral-600 lg:grid ${ROW_COLUMNS}`}>
                         <span>Día</span>
                         <span>Estado</span>
                         <span className="flex items-center gap-1">
