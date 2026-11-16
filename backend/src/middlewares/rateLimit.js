@@ -36,26 +36,28 @@ const common = {
     message: { code: ErrorCodes.TOO_MANY_REQUESTS, message: 'Too many attempts. Please try again later' },
 };
 
-// In each list the limit per email goes first: a request it rejects never
-// reaches the limit per network, so a person who keeps trying after being
-// blocked does not use up the tries of everyone else on the same network.
-
-// HU-05 and HU-06: only failed sign-ins are counted. A sign-in that works is
-// not counted, and neither is a server error (for example, the database is
-// down), because it is not the person's mistake. The user and admin sign-ins
-// share the counts.
-// - 10 failed sign-ins every 15 minutes for each email on a network.
-// - 100 failed sign-ins every 15 minutes for the whole network, so one
-//   computer cannot try many different emails.
-const loginOptions = {
+// Options of the limits that count only failed tries, every 15 minutes. A
+// try that works is not counted, and neither is a server error (for example,
+// the database is down), because it is not the person's mistake.
+const failedTries = {
     ...common,
     windowMs: FIFTEEN_MINUTES,
     skipSuccessfulRequests: true,
     requestWasSuccessful: (req, res) => res.statusCode < 400 || res.statusCode >= 500,
 };
+
+// In each list the limit per email goes first: a request it rejects never
+// reaches the limit per network, so a person who keeps trying after being
+// blocked does not use up the tries of everyone else on the same network.
+
+// HU-05 and HU-06: only failed sign-ins are counted. The user and admin
+// sign-ins share the counts.
+// - 10 failed sign-ins every 15 minutes for each email on a network.
+// - 100 failed sign-ins every 15 minutes for the whole network, so one
+//   computer cannot try many different emails.
 const loginLimiter = [
-    rateLimit({ ...loginOptions, keyGenerator: accountKey, limit: 10 }),
-    rateLimit({ ...loginOptions, keyGenerator: networkKey, limit: 100 }),
+    rateLimit({ ...failedTries, keyGenerator: accountKey, limit: 10 }),
+    rateLimit({ ...failedTries, keyGenerator: networkKey, limit: 100 }),
 ];
 
 // HU-07 and HU-30: every request can send an email, so all of them are
