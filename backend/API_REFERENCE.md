@@ -7,6 +7,12 @@ obtained from `POST /auth/login` or `POST /auth/login-admin`. Tokens expire
 after 1 hour, and stop working as soon as the password of the account changes
 (from the profile or with a recovery link): they answer `403 INVALID_TOKEN`.
 
+In the Access column, **Authenticated** is any signed-in account, **User**
+only an account with the user role and **Admin** only an administrator. The
+vehicles, reservations and payments belong to users: an administrator gets
+403 `FORBIDDEN_ROLE` there (#316). The role is read from the database on
+every request, not from the token.
+
 Every error response includes a short `code` field (see
 `src/constants/errorCodes.js`) in addition to the `message`, so the
 frontend can translate messages without comparing English text.
@@ -49,12 +55,12 @@ on that network, so on a shared Wi-Fi each person has their own tries.
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/vehicles` | Authenticated | Register a vehicle (HU-10). First vehicle is auto-set as default |
-| GET | `/vehicles` | Authenticated | List my vehicles (HU-11). Default vehicle always first |
-| GET | `/vehicles/:id` | Authenticated (owner) | Single vehicle detail, used to prefill the edit form |
-| PUT | `/vehicles/:id` | Authenticated (owner) | Edit a vehicle (HU-12). Plate is never editable |
-| PATCH | `/vehicles/:id/default` | Authenticated (owner) | Set this vehicle as the default one |
-| DELETE | `/vehicles/:id` | Authenticated (owner) | Soft-delete a vehicle (HU-13). Blocked if it has a Pending/Active reservation |
+| POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default |
+| GET | `/vehicles` | User | List my vehicles (HU-11). Default vehicle always first |
+| GET | `/vehicles/:id` | User (owner) | Single vehicle detail, used to prefill the edit form |
+| PUT | `/vehicles/:id` | User (owner) | Edit a vehicle (HU-12). Plate is never editable |
+| PATCH | `/vehicles/:id/default` | User (owner) | Set this vehicle as the default one |
+| DELETE | `/vehicles/:id` | User (owner) | Soft-delete a vehicle (HU-13). Blocked if it has a Pending/Active reservation |
 
 ## Zones
 
@@ -63,7 +69,7 @@ on that network, so on a shared Wi-Fi each person has their own tries.
 | GET | `/zones` | Public | List active zones only (HU-09). Every zone has `open24h` and its `schedule` (HU-29, see below) |
 | GET | `/zones/all` | Admin | List every zone, active and inactive (HU-19) |
 | GET | `/zones/:id` | Public | Single zone detail. Not filtered by active status, so admins can reach a deactivated zone to edit/reactivate it |
-| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate of 0 or more with at most 2 decimals, and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule` |
+| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate greater than 0 with at most 2 decimals (#316: a rate of 0 answers 400 `VALIDATION_ERROR` on `hourlyRate`, a negative one `NEGATIVE_VALUE`), and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule` |
 | PUT | `/zones/:id` | Admin | Edit a zone; adjusts spots if capacity changes (HU-21). Same rules as creation, opening hours included. New hours apply to new reservations and extensions; existing reservations keep their times (HU-29) |
 | PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19) |
 | GET | `/zones/:id/spots` | Admin | Detailed status of every physical spot in a zone |
@@ -99,12 +105,12 @@ opens, in Colombia time; a day that is not in the list is closed:
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/reservations` | Authenticated | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE` |
-| GET | `/reservations` | Authenticated | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `openEnded`, `latestEndTime` (HU-29), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
-| GET | `/reservations/:id` | Authenticated (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
-| PATCH | `/reservations/:id/cancel` | Authenticated (owner) | Cancel a reservation before its start (HU-16). What was paid is marked Refunded, extensions included |
-| PATCH | `/reservations/:id/finish` | Authenticated (owner) | Finish an open stay when the user leaves (HU-27). Charges every started hour, subtracts what was paid and creates a pending balance if something is still owed. Optional `expectedHours` (the hours shown to the user): if another hour started meanwhile it answers 409 `STAY_AMOUNT_CHANGED` with the new amount |
-| PATCH | `/reservations/:id/extend` | Authenticated (owner) | Extend a paid stay that has not ended (HU-28). `{ fromEndTime, newEndTime, paymentMethod, cardLastFour }` pays the added time now; `{ fromEndTime, openEnded: true }` turns it into an open stay, paid when it ends. Never more than 24 hours from the entry, nor past the closing time of the zone (HU-29). If the exit time changed in another tab it answers 409 `RESERVATION_CHANGED` |
+| POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE` |
+| GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `openEnded`, `latestEndTime` (HU-29), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
+| GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
+| PATCH | `/reservations/:id/cancel` | User (owner) | Cancel a reservation (HU-16). A `Pending` one (not paid) at any moment while it waits for its payment, even after its start time; an `Active` one (paid) only before its start time, otherwise 409 `RESERVATION_ALREADY_STARTED` (#316). Any other status answers 409 `RESERVATION_NOT_CANCELLABLE`. What was paid is marked Refunded, extensions included |
+| PATCH | `/reservations/:id/finish` | User (owner) | Finish an open stay when the user leaves (HU-27). Charges every started hour, subtracts what was paid and creates a pending balance if something is still owed. Optional `expectedHours` (the hours shown to the user): if another hour started meanwhile it answers 409 `STAY_AMOUNT_CHANGED` with the new amount |
+| PATCH | `/reservations/:id/extend` | User (owner) | Extend a paid stay that has not ended (HU-28). `{ fromEndTime, newEndTime, paymentMethod, cardLastFour }` pays the added time now; `{ fromEndTime, openEnded: true }` turns it into an open stay, paid when it ends. Never more than 24 hours from the entry, nor past the closing time of the zone (HU-29). If the exit time changed in another tab it answers 409 `RESERVATION_CHANGED` |
 
 ### Reservations and opening hours (HU-29)
 
@@ -129,8 +135,8 @@ opens, in Colombia time; a day that is not in the list is closed:
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/payments/:reservationId` | Authenticated (owner) | Pay a pending reservation, simulated (HU-17). Card ending in `0002` simulates a decline. Paying an expired reservation returns a specific error (HU-26). An open stay pays only its first hour here (HU-27) |
-| POST | `/payments/:reservationId/balance` | Authenticated (owner) | Pay the balance a finished open stay still owes (HU-27). Same payment fields and test card; 400 `NO_PENDING_BALANCE` if nothing is owed |
+| POST | `/payments/:reservationId` | User (owner) | Pay a pending reservation, simulated (HU-17). Card ending in `0002` simulates a decline. It can be paid until its 15 minutes to pay end, even if its start time has passed (#316); after that it answers 400 `RESERVATION_EXPIRED` (HU-26). An open stay pays only its first hour here (HU-27) |
+| POST | `/payments/:reservationId/balance` | User (owner) | Pay the balance a finished open stay still owes (HU-27). Same payment fields and test card; 400 `NO_PENDING_BALANCE` if nothing is owed |
 
 ## User profile
 
@@ -194,7 +200,8 @@ Every range ends at the moment of the request and starts at midnight
 - Parking spot assignment is fully automatic; there is no endpoint for a
   user to choose a specific spot.
 - Unpaid (`Pending`) reservations expire automatically 15 minutes after
-  creation, releasing their spot back to the zone (HU-26).
+  creation, releasing their spot back to the zone (HU-26). Until then they
+  can be paid or cancelled, even if their start time has passed (#316).
 - Paid (`Active`) reservations are automatically marked `Finished` once
   their end time passes, also releasing their spot.
 - An open stay keeps a provisional exit time: entry + 24 hours, or the
