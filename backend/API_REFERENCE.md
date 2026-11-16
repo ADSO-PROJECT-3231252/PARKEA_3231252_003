@@ -28,7 +28,7 @@ A route that does not exist answers 404 `ROUTE_NOT_FOUND`.
 | POST | `/auth/login` | Public | Log in and receive a JWT (HU-05). An account that is not verified answers `403 EMAIL_NOT_VERIFIED`, only after the right password (HU-30). Attempt limit, see below |
 | POST | `/auth/login-admin` | Public | Log in as administrator; rejects non-admin accounts (HU-06) and accounts that are not verified (HU-30). Shares the attempt limit of `/auth/login` |
 | POST | `/auth/forgot-password` | Public | Request a password recovery email (HU-07, phase 1). Always responds the same way, and just as fast, whether the email exists or not. A new link makes the previous ones stop working. Attempt limit, see below |
-| POST | `/auth/reset-password` | Public | Set a new password using the emailed token (HU-07, phase 2). Token is single-use, expires in 1 hour. It also verifies an account that was not verified yet, because the link proves the email is the user's (HU-30). The sessions of the account and its other recovery links stop working. The same password as the current one answers `400 PASSWORD_UNCHANGED`, and the link still works after that answer |
+| POST | `/auth/reset-password` | Public | Set a new password using the emailed token (HU-07, phase 2). Token is single-use, expires in 1 hour. It also verifies an account that was not verified yet, because the link proves the email is the user's (HU-30). The sessions of the account and its other recovery links stop working. The same password as the current one answers `400 PASSWORD_UNCHANGED`, and the link still works after that answer. Attempt limit, see below |
 | POST | `/auth/verify-email` | Public | Verify the email with the token of the link `{ token }` (HU-30). Single-use, expires in 24 hours; a used, expired or unknown token answers `400 VERIFICATION_TOKEN_INVALID` |
 | POST | `/auth/resend-verification` | Public | Send a new verification link `{ email }`; the previous links stop working (HU-30). Always responds the same way whether the email exists or not. Attempt limit, see below |
 
@@ -37,13 +37,16 @@ A route that does not exist answers 404 `ROUTE_NOT_FOUND`.
 Over a limit the API answers 429 `TOO_MANY_REQUESTS`, and the `RateLimit`
 headers say how many tries are left and when the count starts again. The
 counts are kept per network (IP address) and, where it says so, per email
-on that network, so on a shared Wi-Fi each person has their own tries.
+on that network or per account, so on a shared Wi-Fi each person has their
+own tries.
 
 | Route | Limit | What counts |
 |---|---|---|
 | `/auth/login` and `/auth/login-admin` | 10 every 15 minutes per email, and 100 every 15 minutes per network | Only failed sign-ins (not the ones that work, not server errors). The user and admin sign-ins share the counts |
 | `/auth/forgot-password` and `/auth/resend-verification` | 5 every 15 minutes per email, and 20 every hour per network, each route with its own counts | Every request, because each one can send an email |
 | `/auth/register` | 30 every hour per network | Only the accounts that are created |
+| `/auth/reset-password` | 10 every 15 minutes per network | Only failed tries (a link that is not valid, used or expired, a password that is not valid). Not the ones that work, not server errors |
+| `/users/me/password` | 5 every 15 minutes per account, from any network | Only failed changes (a wrong current password, a new password that is not valid or is the same). Not the ones that work, not server errors |
 
 ## Vehicles
 
@@ -138,7 +141,7 @@ opens, in Colombia time; a day that is not in the list is closed:
 |---|---|---|---|
 | GET | `/users/me` | Authenticated | Load my profile (HU-08) |
 | PUT | `/users/me` | Authenticated | Edit full name and phone (HU-08). Email and document are never editable |
-| PUT | `/users/me/password` | Authenticated | Change password (HU-08). The other sessions of the account and its recovery links stop working; the answer brings a new `token` so this session goes on |
+| PUT | `/users/me/password` | Authenticated | Change password (HU-08). The other sessions of the account and its recovery links stop working; the answer brings a new `token` so this session goes on. Attempt limit, see [Attempt limits](#attempt-limits) |
 
 ## Admin
 
