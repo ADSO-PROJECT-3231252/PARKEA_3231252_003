@@ -54,7 +54,8 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       field: 'hourly_rate',
-      validate: { min: 0 },
+      // #316: every zone charges for its hours
+      validate: { min: 0.01 },
     },
     latitude: {
       type: DataTypes.DECIMAL(10, 7),
