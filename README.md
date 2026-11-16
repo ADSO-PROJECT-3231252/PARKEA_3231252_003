@@ -365,7 +365,7 @@ VITE_API_URL=http://localhost:3000/api
 
 ## API Endpoints
 
-Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signed-in account. **Admin**: administrator role only. Protected routes expect the header `Authorization: Bearer <token>`; a token stops working when the password of its account changes.
+Base URL: `http://localhost:3000/api`. **Public**: no token. **Account**: any signed-in account. **User**: user role only; an administrator gets 403 `FORBIDDEN_ROLE` (#316). **Admin**: administrator role only. Protected routes expect the header `Authorization: Bearer <token>`; a token stops working when the password of its account changes.
 
 | Module | Method and route | Access | Story |
 |--------|------------------|--------|-------|
@@ -375,7 +375,7 @@ Base URL: `http://localhost:3000/api`. **Public**: no token. **User**: any signe
 | Auth | `POST /auth/login-admin` | Public | HU-06, HU-30 |
 | Auth | `POST /auth/verify-email`, `POST /auth/resend-verification` | Public | HU-30 |
 | Auth | `POST /auth/forgot-password`, `POST /auth/reset-password` | Public | HU-07 |
-| Profile | `GET /users/me`, `PUT /users/me`, `PUT /users/me/password` | User | HU-08 |
+| Profile | `GET /users/me`, `PUT /users/me`, `PUT /users/me/password` | Account | HU-08 |
 | Vehicles | `POST /vehicles`, `GET /vehicles`, `GET /vehicles/:id` | User | HU-10, HU-11 |
 | Vehicles | `PUT /vehicles/:id`, `PATCH /vehicles/:id/default` | User | HU-11, HU-12 |
 | Vehicles | `DELETE /vehicles/:id` (soft delete) | User | HU-13 |
