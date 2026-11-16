@@ -73,6 +73,14 @@ const loginLimiter = [
 // - 5 failed changes every 15 minutes for each account.
 const changePasswordLimiter = rateLimit({ ...failedTries, keyGenerator: userKey, limit: 5 });
 
+// HU-07 phase 2 (#301): the token of the link is long and random, so it
+// cannot be guessed, but nothing stopped a script from sending tries without
+// end. Only failed tries count (a link that is not valid, used or expired, or
+// a password that is not valid), so a class on the same Wi-Fi can still set
+// new passwords.
+// - 10 failed tries every 15 minutes for each network.
+const resetPasswordLimiter = rateLimit({ ...failedTries, keyGenerator: networkKey, limit: 10 });
+
 // HU-07 and HU-30: every request can send an email, so all of them are
 // counted.
 // - 5 requests every 15 minutes for each email on a network.
@@ -104,4 +112,5 @@ module.exports = {
     resendVerificationLimiter,
     registerLimiter,
     changePasswordLimiter,
+    resetPasswordLimiter,
 };
