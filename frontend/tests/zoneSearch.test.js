@@ -143,6 +143,20 @@ describe.each([
         expect(searchStatus()).toHaveTextContent(noResults);
     });
 
+    test('it counts every zone found, not only the ones of the first page', async () => {
+        // Arrange: 11 zones have "parqueadero" in their name, more than one page
+        const others = Array.from({ length: 10 }, (_, i) => zone(`zone-${i + 1}`, `Zona Parqueadero ${i + 1}`, `Calle ${i + 1}`));
+        getZones.mockResolvedValue({ data: { zones: [SIMON, CENTRO, ...others] } });
+        getAllZones.mockResolvedValue({ data: { zones: [SIMON, CENTRO, ...others] } });
+        const { user, searchBox } = await open();
+
+        // Act
+        await user.type(searchBox, 'parqueadero');
+
+        // Assert
+        expect(searchStatus()).toHaveTextContent('11 zonas encontradas');
+    });
+
     test('it is empty again when the search is cleared', async () => {
         // Arrange
         const { user, searchBox } = await open();
