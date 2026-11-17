@@ -707,6 +707,9 @@ async function misReservas(req, res, next) {
                 spotNumber: r.spotNumber,
                 startTime: r.startTime,
                 endTime: sinSalidaAun ? null : r.endTime,
+                // #347: the end of the 15 minutes to pay a Pending reservation,
+                // so the list can hide "Pagar" and "Cancelar" when they end
+                holdExpiresAt: r.holdExpiresAt,
                 openEnded: r.openEnded,
                 latestEndTime: salidaMaxima(r),
                 openStay,
