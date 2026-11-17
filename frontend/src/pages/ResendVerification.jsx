@@ -84,7 +84,7 @@ export default function ResendVerification() {
                                 onChange={handleChange}
                                 aria-invalid={Boolean(error)}
                                 aria-describedby={error ? 'email-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${error ? 'border-danger' : 'border-neutral-200'}`}
+                                className={`w-full rounded-md border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${error ? 'border-danger' : 'border-neutral-200'}`}
                             />
                             {error && (
                                 <p id="email-error" role="alert" className="mt-1 text-caption text-danger">
