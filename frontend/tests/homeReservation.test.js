@@ -181,4 +181,24 @@ describe('Reservation shown on the home (#306)', () => {
         // Assert
         expect(shown.id).toBe('running');
     });
+
+    test('an expired reservation whose hours include now is not running: it shows the next confirmed one', () => {
+        // Arrange
+        const expired = reservation('expired', 'Expired', -0.5, 1.5);
+        const confirmed = reservation('confirmed', 'Active', 30, 32);
+        // Act
+        const shown = pickHomeReservation({ reservations: [confirmed, expired] }, NOW);
+        // Assert
+        expect(shown.id).toBe('confirmed');
+    });
+
+    test('an expired reservation for tomorrow is not next: it shows the confirmed one after it', () => {
+        // Arrange
+        const expired = reservation('expired', 'Expired', 20, 22);
+        const confirmed = reservation('confirmed', 'Active', 30, 32);
+        // Act
+        const shown = pickHomeReservation({ reservations: [confirmed, expired] }, NOW);
+        // Assert
+        expect(shown.id).toBe('confirmed');
+    });
 });
