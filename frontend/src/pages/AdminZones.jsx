@@ -207,6 +207,17 @@ export default function AdminZones() {
     const rangeEnd = Math.min(currentPage * PAGE_SIZE, filteredZones.length);
     const pageWindow = getPageWindow(currentPage, totalPages);
 
+    // #331 (WCAG 2.1 SC 4.1.3): while there is a search or a status filter, a
+    // hidden status message tells a screen reader how many zones were found.
+    // The element is always in the page (empty without them), so the change is
+    // announced.
+    let searchStatus = '';
+    if ((search.trim() || status) && !loading && !error) {
+        searchStatus = filteredZones.length === 0
+            ? 'No se encontraron zonas con esa búsqueda o estado.'
+            : `${filteredZones.length} ${filteredZones.length === 1 ? 'zona encontrada' : 'zonas encontradas'}`;
+    }
+
     const handleSearchChange = (value) => {
         setSearch(value);
         setPage(1);
@@ -322,6 +333,11 @@ export default function AdminZones() {
                     <option value="inactive">Inactivas</option>
                 </select>
             </div>
+
+            {/* #331: announces the result of the search and the filter to screen readers */}
+            <p role="status" className="sr-only">
+                {searchStatus}
+            </p>
 
             <div className="mt-6 rounded-lg border border-neutral-200 bg-white">
                 {loading && (

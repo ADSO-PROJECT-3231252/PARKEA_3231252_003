@@ -143,6 +143,16 @@ export default function Zones() {
     const currentPage = Math.min(page, totalPages);
     const paginatedZones = filteredZones.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
+    // #331 (WCAG 2.1 SC 4.1.3): while there is a search, a hidden status message
+    // tells a screen reader how many zones were found. The element is always in
+    // the page (empty without a search), so the change is announced.
+    let searchStatus = '';
+    if (search.trim() && !loading && !error) {
+        searchStatus = filteredZones.length === 0
+            ? 'No se encontraron zonas con ese nombre.'
+            : `${filteredZones.length} ${filteredZones.length === 1 ? 'zona encontrada' : 'zonas encontradas'}`;
+    }
+
     const handleSearchChange = (e) => {
         setSearch(e.target.value);
         setPage(1);
@@ -235,6 +245,11 @@ export default function Zones() {
                     </button>
                 )}
             </div>
+
+            {/* #331: announces the result of the search to screen readers */}
+            <p role="status" className="sr-only">
+                {searchStatus}
+            </p>
 
             <div className="mt-6">
                 {mapFailed && view === 'list' && (
