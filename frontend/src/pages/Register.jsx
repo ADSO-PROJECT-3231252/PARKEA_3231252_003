@@ -193,7 +193,7 @@ export default function Register() {
                                     name="documentType"
                                     value={form.documentType}
                                     onChange={handleChange}
-                                    className="w-full rounded-md border border-neutral-200 px-3 py-1.5 font-sans text-body text-neutral-900 focus:outline-nonefocus:ring-2 focus:ring-parkea-600"
+                                    className="w-full rounded-md border border-neutral-200 px-3 py-1.5 font-sans text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                                 >
                                     {DOCUMENT_TYPES.map((opt) => (
                                         <option key={opt.value} value={opt.value}>{opt.label}</option>

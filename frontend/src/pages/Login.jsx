@@ -204,7 +204,7 @@ export default function Login() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+                        className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
                     >
                         {loading ? 'Ingresando...' : 'Iniciar sesión'}
                     </button>
