@@ -92,9 +92,9 @@ async function openZoneManagement() {
 }
 
 describe.each([
-    ['the public list', openPublicList, 'No se encontraron zonas con ese nombre.'],
-    ['zone management', openZoneManagement, 'No se encontraron zonas con esa búsqueda o estado.'],
-])('%s announces the result of the search (#331)', (name, open, noResults) => {
+    ['the public list', openPublicList, 'No se encontraron zonas con ese nombre.', Zones],
+    ['zone management', openZoneManagement, 'No se encontraron zonas con esa búsqueda o estado.', AdminZones],
+])('%s announces the result of the search (#331)', (name, open, noResults, Screen) => {
     beforeEach(() => {
         localStorage.clear();
         getZones.mockReset().mockResolvedValue({ data: { zones: [SIMON, CENTRO] } });
@@ -157,6 +157,29 @@ describe.each([
         expect(searchStatus()).toHaveTextContent('11 zonas encontradas');
     });
 
+    test('it stays empty while the zones cannot be loaded or are loading again', async () => {
+        // Arrange: the zones cannot be loaded
+        getZones.mockRejectedValue(new Error('Network Error'));
+        getAllZones.mockRejectedValue(new Error('Network Error'));
+        const user = userEvent.setup();
+        render(<MemoryRouter><AuthProvider><Screen /></AuthProvider></MemoryRouter>);
+        const retry = await screen.findByRole('button', { name: 'Reintentar' });
+
+        // Act: a search while the error is shown
+        await user.type(screen.getByRole('textbox'), 'r');
+
+        // Assert: "no zones found" is not announced over the error
+        expect(searchStatus()).toBeEmptyDOMElement();
+
+        // Act: a retry that has not answered yet
+        getZones.mockReturnValue(new Promise(() => {}));
+        getAllZones.mockReturnValue(new Promise(() => {}));
+        await user.click(retry);
+
+        // Assert: nor while the zones are loading again
+        expect(searchStatus()).toBeEmptyDOMElement();
+    });
+    
     test('it is empty again when the search is cleared', async () => {
         // Arrange
         const { user, searchBox } = await open();
