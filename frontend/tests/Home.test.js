@@ -165,4 +165,33 @@ describe('Reservation card of the home (#306)', () => {
         expect(await within(card).findByRole('alert')).toBeInTheDocument();
         expect(within(card).queryByText('Aún no tienes reservas registradas.')).not.toBeInTheDocument();
     });
+
+    test('with two finished stays in the history, the card shows the latest one', async () => {
+        // Arrange
+        answerLikeTheApi([
+            reservation('old', 'Zona Antigua', 'Finished', -80, -78),
+            reservation('latest', 'Zona Reciente', 'Finished', -10, -8),
+        ]);
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+        // Assert
+        expect(await within(card).findByText('Zona Reciente')).toBeInTheDocument();
+        expect(within(card).queryByText('Zona Antigua')).not.toBeInTheDocument();
+    });
+
+    test('when the history answers after the list, the card still shows the last finished one', async () => {
+        // Arrange: a newer cancelled one in the list, and the history comes later
+        const finished = reservation('finished', 'Zona Finalizada', 'Finished', -40, -38);
+        const cancelled = reservation('cancelled', 'Zona Cancelada', 'Cancelled', -5, -3);
+        getReservations.mockImplementation(({ status } = {}) => (status
+            ? new Promise((resolve) => setTimeout(() => resolve({ data: { reservations: [finished] } }), 50))
+            : Promise.resolve({ data: { reservations: [cancelled, finished] } })));
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+        // Assert
+        expect(await within(card).findByText('Zona Finalizada')).toBeInTheDocument();
+        expect(within(card).queryByText('Zona Cancelada')).not.toBeInTheDocument();
+    });
 });
