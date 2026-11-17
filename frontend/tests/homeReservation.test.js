@@ -162,6 +162,16 @@ describe('Reservation shown on the home (#306)', () => {
         expect(shown.id).toBe('running');
     });
 
+    test('a pending one whose start time already passed and an old finished one: it shows the pending', () => {
+        // Arrange
+        const pending = reservation('pending', 'Pending', -0.1, 1);
+        const lastFinished = reservation('finished', 'Finished', -30, -28);
+        // Act
+        const shown = pickHomeReservation({ reservations: [pending], lastFinished }, NOW);
+        // Assert
+        expect(shown.id).toBe('pending');
+    });
+
     test('a pending reservation is never running, even if its start time has passed', () => {
         // Arrange
         const pending = reservation('pending', 'Pending', -2, 1);
