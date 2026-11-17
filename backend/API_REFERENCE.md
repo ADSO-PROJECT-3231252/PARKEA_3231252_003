@@ -111,9 +111,9 @@ opens, in Colombia time; a day that is not in the list is closed:
 | Method | Route | Access | Description |
 |---|---|---|---|
 | POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE` |
-| GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `openEnded`, `latestEndTime` (HU-29), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
+| GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `holdExpiresAt` (until when a `Pending` one can be paid or cancelled, #347; `null` once it is paid), `openEnded`, `latestEndTime` (HU-29), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
 | GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
-| PATCH | `/reservations/:id/cancel` | User (owner) | Cancel a reservation (HU-16). A `Pending` one (not paid) at any moment while it waits for its payment, even after its start time; an `Active` one (paid) only before its start time, otherwise 409 `RESERVATION_ALREADY_STARTED` (#316). Any other status answers 409 `RESERVATION_NOT_CANCELLABLE`. What was paid is marked Refunded, extensions included |
+| PATCH | `/reservations/:id/cancel` | User (owner) | Cancel a reservation (HU-16). A `Pending` one (not paid) while its 15 minutes to pay last, even after its start time (#316); once they end it answers 400 `RESERVATION_EXPIRED` and changes nothing, like the payment, even if the job has not marked it `Expired` yet (#347). An `Expired` one answers the same. An `Active` one (paid) only before its start time, otherwise 409 `RESERVATION_ALREADY_STARTED` (#316). A `Cancelled` or `Finished` one answers 409 `RESERVATION_NOT_CANCELLABLE`. What was paid is marked Refunded, extensions included |
 | PATCH | `/reservations/:id/finish` | User (owner) | Finish an open stay when the user leaves (HU-27). Charges every started hour, subtracts what was paid and creates a pending balance if something is still owed. Optional `expectedHours` (the hours shown to the user): if another hour started meanwhile it answers 409 `STAY_AMOUNT_CHANGED` with the new amount |
 | PATCH | `/reservations/:id/extend` | User (owner) | Extend a paid stay that has not ended (HU-28). `{ fromEndTime, newEndTime, paymentMethod, cardLastFour }` pays the added time now; `{ fromEndTime, openEnded: true }` turns it into an open stay, paid when it ends. Never more than 24 hours from the entry, nor past the closing time of the zone (HU-29). If the exit time changed in another tab it answers 409 `RESERVATION_CHANGED` |
 
@@ -207,6 +207,9 @@ Every range ends at the moment of the request and starts at midnight
 - Unpaid (`Pending`) reservations expire automatically 15 minutes after
   creation, releasing their spot back to the zone (HU-26). Until then they
   can be paid or cancelled, even if their start time has passed (#316).
+  The job runs every minute, but the 15 minutes decide: from that moment
+  paying or cancelling answers 400 `RESERVATION_EXPIRED`, even if the job
+  has not marked the reservation `Expired` yet (#347).
 - Paid (`Active`) reservations are automatically marked `Finished` once
   their end time passes, also releasing their spot.
 - An open stay keeps a provisional exit time: entry + 24 hours, or the
