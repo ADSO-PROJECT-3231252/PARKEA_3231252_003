@@ -111,13 +111,15 @@ export default function ForgotPassword() {
                                     id="email"
                                     name="email"
                                     type="email"
+                                    autoComplete="email"
+                                    aria-required="true"
                                     placeholder="Ej: correo@ejemplo.com"
                                     value={email}
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.email)}
                                     aria-describedby={errors.email ? 'email-error' : undefined}
                                     className={`w-full rounded-md border px-3 py-2.5 font-sans text-body
-text-neutral-900 placeholder:text-neutral-400 focus:outline-none
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none
 focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'}`}
                                 />
                                 {errors.email && (
