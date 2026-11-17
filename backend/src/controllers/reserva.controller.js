@@ -9,6 +9,8 @@ const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
 const ANTICIPACION_MAX_MS = 48 * 60 * 60 * 1000;
+// A user can wait for the payment of at most this many reservations at once
+const MAX_PENDING_RESERVATIONS = 2;
 
 // HU-29: the zone is read with its opening hours
 const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
@@ -101,6 +103,23 @@ async function crear(req, res, next) {
         if (!vehiculo) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+
+        // A user can hold at most MAX_PENDING_RESERVATIONS unpaid reservations
+        // at the same time, because each one keeps a spot for 15 minutes. The
+        // count goes after the lock of the user, so two requests at the same
+        // time cannot both see room for one more: the second one waits at the
+        // lock and then counts the reservation the first one created.
+        const pendientes = await Reserva.count({
+            where: { userId, status: 'Pending' },
+            transaction: t,
+        });
+        if (pendientes >= MAX_PENDING_RESERVATIONS) {
+            await t.rollback();
+            return res.status(409).json({
+                code: ErrorCodes.TOO_MANY_PENDING_RESERVATIONS,
+                message: `You can have at most ${MAX_PENDING_RESERVATIONS} reservations waiting for payment at the same time. Pay or cancel one first`,
+            });
         }
 
         const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t });

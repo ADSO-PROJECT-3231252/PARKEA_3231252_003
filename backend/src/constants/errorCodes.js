@@ -72,6 +72,8 @@ module.exports = {
     // HU-29: the stay does not fit the hours of the zone
     OUTSIDE_ZONE_HOURS: 'OUTSIDE_ZONE_HOURS',
     ZONE_CLOSED_THAT_DAY: 'ZONE_CLOSED_THAT_DAY',
+    // A user cannot hold more than 2 unpaid reservations at the same time
+    TOO_MANY_PENDING_RESERVATIONS: 'TOO_MANY_PENDING_RESERVATIONS',
 
     // Payments
     INVALID_PAYMENT_METHOD: 'INVALID_PAYMENT_METHOD',
