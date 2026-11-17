@@ -194,4 +194,17 @@ describe('Reservation card of the home (#306)', () => {
         expect(await within(card).findByText('Zona Finalizada')).toBeInTheDocument();
         expect(within(card).queryByText('Zona Cancelada')).not.toBeInTheDocument();
     });
+
+    test('the card finds the stay running now among many newer reservations', async () => {
+        // Arrange: a stay running now and 12 reservations that start later, all cancelled
+        const cancelled = Array.from({ length: 12 }, (_, i) => (
+            reservation(`cancelled-${i}`, `Zona Cancelada ${i}`, 'Cancelled', i + 1, i + 2)
+        ));
+        answerLikeTheApi([...cancelled, reservation('running', 'Zona En Curso', 'Active', -1, 2)]);
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+        // Assert
+        expect(await within(card).findByText('Zona En Curso')).toBeInTheDocument();
+    });
 });
