@@ -1,7 +1,8 @@
 import { getInitials } from '../utils/format';
 import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, Info, Calendar, Save } from 'lucide-react';
-import { isNotEmpty, isValidPhone, normalizePhone } from '../utils/validators';
+import { isNotEmpty, normalizePhone } from '../utils/validators';
+import { isValidName, isValidPhone, NAME_MAX_LENGTH, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { getProfile, updateProfile, changePassword } from '../services/userService';
 import { translateError } from '../utils/errorMessages';
 import { useAuth } from '../hooks/useAuth';
@@ -15,8 +16,12 @@ const DOCUMENT_LABELS = {
 
 const EMPTY_PASSWORD_FORM = { currentPassword: '', newPassword: '', confirmNewPassword: '' };
 
-// Same limit as the registration form (HU-08 AC-02 follows HU-01's rules).
-const FULL_NAME_MAX_LENGTH = 70;
+// #312: when the backend rejects a field (VALIDATION_ERROR with errors[].path),
+// its message goes under that field, as in the registration form.
+const SERVER_FIELD_MESSAGES = {
+    fullName: NAME_RULE_MESSAGE,
+    phone: PHONE_RULE_MESSAGE,
+};
 
 export default function Profile() {
     const { updateUser, updateToken } = useAuth();
@@ -80,14 +85,18 @@ export default function Profile() {
     // saving a change to the other one.
     const validateProfile = () => {
         const errors = {};
-        if (nameChanged && !isNotEmpty(form.fullName)) {
-            errors.fullName = 'El nombre completo es obligatorio.';
+        if (nameChanged) {
+            if (!isNotEmpty(form.fullName)) {
+                errors.fullName = 'El nombre completo es obligatorio.';
+            } else if (!isValidName(form.fullName)) {
+                errors.fullName = NAME_RULE_MESSAGE;
+            }
         }
         if (phoneChanged) {
             if (!isNotEmpty(form.phone)) {
                 errors.phone = 'El teléfono es obligatorio.';
-            } else if (!isValidPhone(form.phone)) {
-                errors.phone = 'El teléfono debe tener 10 dígitos y solo números.';
+            } else if (!isValidPhone(normalizePhone(form.phone))) {
+                errors.phone = PHONE_RULE_MESSAGE;
             }
         }
         setProfileErrors(errors);
@@ -173,7 +182,19 @@ export default function Profile() {
                 updateUser({ fullName: data.user.fullName, phone: data.user.phone });
                 setProfileSuccess('Perfil actualizado correctamente.');
             } catch (err) {
-                setProfileServerError(translateError(err.response?.data?.code));
+                const code = err.response?.data?.code;
+                if (code === 'VALIDATION_ERROR') {
+                    const fieldErrors = {};
+                    for (const { path } of err.response.data.errors ?? []) {
+                        if (SERVER_FIELD_MESSAGES[path]) fieldErrors[path] = SERVER_FIELD_MESSAGES[path];
+                    }
+                    const markedAny = Object.keys(fieldErrors).length > 0;
+                    setProfileErrors((prev) => ({ ...prev, ...fieldErrors }));
+                    // "Revisa los campos marcados" only makes sense if a field was marked
+                    setProfileServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
+                } else {
+                    setProfileServerError(translateError(code));
+                }
             }
         }
 
@@ -248,7 +269,7 @@ export default function Profile() {
                                     id="fullName"
                                     name="fullName"
                                     type="text"
-                                    maxLength={FULL_NAME_MAX_LENGTH}
+                                    maxLength={NAME_MAX_LENGTH}
                                     value={form.fullName}
                                     onChange={handleProfileChange}
                                     aria-invalid={Boolean(profileErrors.fullName)}
