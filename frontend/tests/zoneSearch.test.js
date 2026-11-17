@@ -179,7 +179,7 @@ describe.each([
         // Assert: nor while the zones are loading again
         expect(searchStatus()).toBeEmptyDOMElement();
     });
-    
+
     test('it is empty again when the search is cleared', async () => {
         // Arrange
         const { user, searchBox } = await open();
