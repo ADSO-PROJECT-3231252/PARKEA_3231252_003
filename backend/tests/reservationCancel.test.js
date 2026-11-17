@@ -7,8 +7,9 @@ const { Usuario, Zona, Reserva, ParkingSpot, sequelize } = require('../src/model
 const app = require('../src/app');
 
 // HU-16: cancelling a reservation: a paid one only before its entry time, one
-// that is not paid yet also after it (#316). The times are in Colombia
-// (UTC-5), and "now" is Monday 2026-11-16 at 8:00 a. m.
+// that is not paid yet also after it (#316), but only while its 15 minutes to
+// pay last (#347). The times are in Colombia (UTC-5), and "now" is Monday
+// 2026-11-16 at 8:00 a. m.
 const colombia = (time) => new Date(`2026-11-16T${time}:00-05:00`);
 const NOW = colombia('08:00');
 
@@ -111,7 +112,6 @@ describe('When a reservation can be cancelled (HU-16)', () => {
 
     test.each([
         ['Cancelled', '10:00'],
-        ['Expired', '10:00'],
         ['Finished', '10:00'],
         ['Finished', '07:00'],
     ])('a reservation with status %s (entry at %s) answers 409 RESERVATION_NOT_CANCELLABLE', async (status, startTime) => {
@@ -129,8 +129,8 @@ describe('When a reservation can be cancelled (HU-16)', () => {
     });
 
     test('a reservation that is not paid yet (Pending) can be cancelled', async () => {
-        // Arrange
-        const reserva = arrange(reservation({ status: 'Pending', payments: [] }));
+        // Arrange: it was made at 7:55 a. m., so its 15 minutes to pay end at 8:10 a. m.
+        const reserva = arrange(reservation({ status: 'Pending', holdExpiresAt: colombia('08:10'), payments: [] }));
 
         // Act
         const res = await cancel();
@@ -144,8 +144,8 @@ describe('When a reservation can be cancelled (HU-16)', () => {
         ['at its entry time', '08:00'],
         ['after its entry time', '07:50'],
     ])('a reservation that is not paid yet (Pending) can still be cancelled %s, while it waits for its payment (#316)', async (name, startTime) => {
-        // Arrange: it was made at 7:45 a. m., so its 15 minutes to pay end at 8:00 a. m.
-        const reserva = arrange(reservation({ status: 'Pending', startTime: colombia(startTime), payments: [] }));
+        // Arrange: it was made at 7:50 a. m., so its 15 minutes to pay end at 8:05 a. m.
+        const reserva = arrange(reservation({ status: 'Pending', startTime: colombia(startTime), holdExpiresAt: colombia('08:05'), payments: [] }));
 
         // Act
         const res = await cancel();
@@ -156,6 +156,89 @@ describe('When a reservation can be cancelled (HU-16)', () => {
         expect(spot.update).toHaveBeenCalledWith({ status: 'Available' }, { transaction });
         expect(zona.increment).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
         expect(transaction.commit).toHaveBeenCalled();
+    });
+});
+
+describe('When the 15 minutes to pay end (#347)', () => {
+    // Nothing is saved and nothing is released: the expiration job marks the
+    // reservation Expired and gives its spot back
+    function expectNothingChanged(reserva) {
+        expect(reserva.update).not.toHaveBeenCalled();
+        expect(ParkingSpot.findByPk).not.toHaveBeenCalled();
+        expect(Zona.findByPk).not.toHaveBeenCalled();
+        expect(transaction.commit).not.toHaveBeenCalled();
+        expect(transaction.rollback).toHaveBeenCalled();
+    }
+
+    test.each([
+        ['at that very moment', '08:00'],
+        ['a minute later, before the job marks it Expired', '07:59'],
+    ])('a reservation still Pending answers 400 RESERVATION_EXPIRED %s, like the payment', async (name, holdEnd) => {
+        // Arrange: it was made 15 minutes before its holdExpiresAt
+        const reserva = arrange(reservation({ status: 'Pending', holdExpiresAt: colombia(holdEnd), payments: [] }));
+
+        // Act
+        const res = await cancel();
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({
+            code: 'RESERVATION_EXPIRED',
+            message: 'This reservation expired because it was not paid in time. Please make a new reservation.',
+        });
+        expectNothingChanged(reserva);
+    });
+
+    test('a Pending reservation whose entry time also passed answers 400 RESERVATION_EXPIRED', async () => {
+        // Arrange: entry at 7:50 a. m., made at 7:44 a. m. and never paid
+        const reserva = arrange(reservation({ status: 'Pending', startTime: colombia('07:50'), holdExpiresAt: colombia('07:59'), payments: [] }));
+
+        // Act
+        const res = await cancel();
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('RESERVATION_EXPIRED');
+        expectNothingChanged(reserva);
+    });
+
+    test('a reservation the job already marked Expired gets the same answer', async () => {
+        // Arrange
+        const reserva = arrange(reservation({ status: 'Expired', holdExpiresAt: colombia('07:59'), payments: [] }));
+
+        // Act
+        const res = await cancel();
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('RESERVATION_EXPIRED');
+        expectNothingChanged(reserva);
+    });
+
+    test('a millisecond before they end, it can still be cancelled', async () => {
+        // Arrange
+        const reserva = arrange(reservation({ status: 'Pending', holdExpiresAt: new Date(NOW.getTime() + 1), payments: [] }));
+
+        // Act
+        const res = await cancel();
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(reserva.update).toHaveBeenCalledWith({ status: 'Cancelled' }, { transaction });
+        expect(transaction.commit).toHaveBeenCalled();
+    });
+
+    test('a paid reservation (Active) does not depend on them: it follows its entry time', async () => {
+        // Arrange: the payment clears holdExpiresAt; even an old value left
+        // there does not make it expired
+        const reserva = arrange(reservation({ holdExpiresAt: colombia('07:00') }));
+
+        // Act
+        const res = await cancel();
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(reserva.update).toHaveBeenCalledWith({ status: 'Cancelled' }, { transaction });
     });
 });
 
