@@ -5,7 +5,7 @@ import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { loginAdmin } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
 import { useAuth } from '../hooks/useAuth';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 
 export default function AdminLogin() {
     const [form, setForm] = useState({ email: '', password: '' });

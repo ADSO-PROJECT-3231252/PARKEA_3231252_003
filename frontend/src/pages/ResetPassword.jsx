@@ -4,7 +4,7 @@ import { Eye, EyeOff, Lock } from 'lucide-react';
 import { isNotEmpty } from '../utils/validators';
 import { resetPassword } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 const PASSWORD_RULE = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/;
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();

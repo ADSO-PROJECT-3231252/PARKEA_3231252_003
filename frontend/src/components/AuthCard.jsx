@@ -1,4 +1,4 @@
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 
 // HU-30: the card of the email confirmation screens, with the same look as
 // the other sign-in screens (Login, ForgotPassword, ResetPassword): logo,

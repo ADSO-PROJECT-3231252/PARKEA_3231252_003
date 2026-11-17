@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { login } from '../services/authService';

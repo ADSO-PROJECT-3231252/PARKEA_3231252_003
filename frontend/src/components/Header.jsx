@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getInitials } from '../utils/format';
-import logo from '../assets/logo.png';
-import logoMark from '../assets/logo-mark.png';
+import logo from '../assets/logo.webp';
+import logoMark from '../assets/logo-mark.webp';
 
 const NAV_ITEMS_USER = [
     { to: '/', label: 'Inicio', icon: Home, end: true },

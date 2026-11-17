@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty, isValidPhone, normalizePhone } from '../utils/validators';
 import { register } from '../services/authService';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import carImage from '../assets/car_register.webp';
 import { Eye, EyeOff } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
