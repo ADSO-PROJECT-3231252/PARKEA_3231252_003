@@ -18,6 +18,7 @@ import { getZones } from '../services/zoneService';
 import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import DecorativeImage from '../components/DecorativeImage';
 
 import heroVisitorIllustration from '../assets/hero-visitor.webp';
 import heroUserIllustration from '../assets/hero-user.webp';
@@ -29,11 +30,11 @@ const toCssLength = (value) => (typeof value === 'number' ? `${value}px` : value
 
 function HeroIllustration({ src, height = 132, right = 32, top }) {
     if (!src) return null;
+    // Below lg the illustration is hidden, so it is not downloaded either.
     return (
-        <img
+        <DecorativeImage
             src={src}
-            alt=""
-            aria-hidden="true"
+            minWidth="64rem"
             style={
                 top !== undefined
                     ? { height: toCssLength(height), right: toCssLength(right), top: `${top}px` }
