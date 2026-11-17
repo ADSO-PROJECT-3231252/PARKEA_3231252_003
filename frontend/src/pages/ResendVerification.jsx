@@ -78,6 +78,8 @@ export default function ResendVerification() {
                                 id="email"
                                 name="email"
                                 type="email"
+                                autoComplete="email"
+                                aria-required="true"
                                 maxLength={100}
                                 placeholder="Ej: correo@ejemplo.com"
                                 value={email}
