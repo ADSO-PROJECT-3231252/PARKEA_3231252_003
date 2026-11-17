@@ -110,7 +110,7 @@ export default function ResendVerification() {
             <div className="text-center">
                 <Link
                     to="/login"
-                    className="inline-flex items-center gap-1 text-caption text-parkea-600 underline hover:text-parkea-700"
+                    className="inline-flex min-h-6 items-center gap-1 text-caption text-parkea-600 underline hover:text-parkea-700"
                 >
                     <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                     Volver a iniciar sesión

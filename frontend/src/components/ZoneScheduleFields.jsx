@@ -30,7 +30,7 @@ function Choice({ name, value, checked, title, description, onChange, inputRef, 
                 checked={checked}
                 onChange={onChange}
                 aria-describedby={describedBy}
-                className="mt-1 h-4 w-4 shrink-0 accent-parkea-600"
+                className="h-6 w-6 shrink-0 accent-parkea-600"
             />
             <span>
                 <span className="block text-label text-neutral-900">{title}</span>
