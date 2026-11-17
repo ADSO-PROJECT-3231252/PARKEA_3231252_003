@@ -19,7 +19,7 @@ function MapUnavailable() {
 }
 
 const inputClass = (hasError) =>
-    `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
+    `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
 
 // Label, input and one line under it: the hint, or the error in its place.
 // The input gets aria-describedby with whichever line is showing.
@@ -160,7 +160,7 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                                     onChange={(e) => setField('hourlyRate', onlyDigits(e.target.value))}
                                     placeholder="Ej. 2000"
                                     autoComplete="off"
-                                    className="w-full min-w-0 px-3 py-2.5 font-mono text-body text-neutral-900 placeholder:font-sans placeholder:text-neutral-400 focus:outline-none"
+                                    className="w-full min-w-0 px-3 py-2.5 font-mono text-body text-neutral-900 placeholder:font-sans placeholder:text-neutral-500 focus:outline-none"
                                     {...a11y}
                                 />
                             </div>

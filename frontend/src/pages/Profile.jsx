@@ -248,6 +248,8 @@ export default function Profile() {
                                     id="fullName"
                                     name="fullName"
                                     type="text"
+                                    autoComplete="name"
+                                    aria-required="true"
                                     maxLength={FULL_NAME_MAX_LENGTH}
                                     value={form.fullName}
                                     onChange={handleProfileChange}
@@ -274,6 +276,8 @@ export default function Profile() {
                                     id="phone"
                                     name="phone"
                                     type="tel"
+                                    autoComplete="tel"
+                                    aria-required="true"
                                     value={form.phone}
                                     onChange={handleProfileChange}
                                     aria-invalid={Boolean(profileErrors.phone)}
@@ -353,13 +357,15 @@ export default function Profile() {
                                     id="currentPassword"
                                     name="currentPassword"
                                     type={showCurrent ? 'text' : 'password'}
+                                    autoComplete="current-password"
                                     placeholder="Ingresa tu contraseña actual"
                                     value={pwForm.currentPassword}
                                     onChange={handlePwChange}
                                     aria-invalid={Boolean(pwErrors.currentPassword)}
                                     aria-describedby={pwErrors.currentPassword ? 'currentPassword-error' : undefined}
                                     className={`w-full rounded-md border px-3 py-2 pr-9 text-body text-neutral-900
-                                        focus:outline-none focus:ring-2 focus:ring-parkea-600 ${pwErrors.currentPassword
+                                        placeholder:text-neutral-500 focus:outline-none focus:ring-2
+                                        focus:ring-parkea-600 ${pwErrors.currentPassword
                                             ? 'border-danger'
                                             : 'border-neutral-200'
                                         }`}
@@ -368,7 +374,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowCurrent((v) => !v)}
                                     aria-label={showCurrent ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showCurrent ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
@@ -390,6 +396,7 @@ export default function Profile() {
                                     id="newPassword"
                                     name="newPassword"
                                     type={showNew ? 'text' : 'password'}
+                                    autoComplete="new-password"
                                     maxLength={20}
                                     placeholder="Ingresa tu nueva contraseña"
                                     value={pwForm.newPassword}
@@ -397,7 +404,8 @@ export default function Profile() {
                                     aria-invalid={Boolean(pwErrors.newPassword)}
                                     aria-describedby={pwErrors.newPassword ? 'newPassword-error' : 'newPassword-hint'}
                                     className={`w-full rounded-md border px-3 py-2 pr-9 text-body text-neutral-900
-                                        focus:outline-none focus:ring-2 focus:ring-parkea-600 ${pwErrors.newPassword
+                                        placeholder:text-neutral-500 focus:outline-none focus:ring-2
+                                        focus:ring-parkea-600 ${pwErrors.newPassword
                                             ? 'border-danger'
                                             : 'border-neutral-200'
                                         }`}
@@ -406,7 +414,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowNew((v) => !v)}
                                     aria-label={showNew ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showNew ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
@@ -432,6 +440,7 @@ export default function Profile() {
                                     id="confirmNewPassword"
                                     name="confirmNewPassword"
                                     type={showConfirm ? 'text' : 'password'}
+                                    autoComplete="new-password"
                                     maxLength={20}
                                     placeholder="Confirma tu nueva contraseña"
                                     value={pwForm.confirmNewPassword}
@@ -441,7 +450,8 @@ export default function Profile() {
                                         pwErrors.confirmNewPassword ? 'confirmNewPassword-error' : undefined
                                     }
                                     className={`w-full rounded-md border px-3 py-2 pr-9 text-body text-neutral-900
-                                        focus:outline-none focus:ring-2 focus:ring-parkea-600 ${pwErrors.confirmNewPassword
+                                        placeholder:text-neutral-500 focus:outline-none focus:ring-2
+                                        focus:ring-parkea-600 ${pwErrors.confirmNewPassword
                                             ? 'border-danger'
                                             : 'border-neutral-200'
                                         }`}
@@ -450,7 +460,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowConfirm((v) => !v)}
                                     aria-label={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showConfirm ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}

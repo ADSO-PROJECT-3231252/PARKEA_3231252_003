@@ -210,12 +210,13 @@ export default function Register() {
                                     name="documentNumber"
                                     maxLength={MAX_LENGTH.documentNumber}
                                     type="text"
+                                    aria-required="true"
                                     placeholder="1234567890"
                                     value={form.documentNumber}
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.documentNumber)}
                                     aria-describedby={errors.documentNumber ? 'documentNumber-error' : undefined}
-                                    className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.documentNumber ? 'border-danger' : 'border-neutral-200'
+                                    className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.documentNumber ? 'border-danger' : 'border-neutral-200'
                                         }`}
                                 />
                                 {errors.documentNumber && (
@@ -235,12 +236,14 @@ export default function Register() {
                                 name="fullName"
                                 maxLength={MAX_LENGTH.fullName}
                                 type="text"
+                                autoComplete="name"
+                                aria-required="true"
                                 placeholder="Ej. Juan Pérez"
                                 value={form.fullName}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.fullName)}
                                 aria-describedby={errors.fullName ? 'fullName-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.fullName ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.fullName ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.fullName && (
@@ -259,12 +262,14 @@ export default function Register() {
                                 name="email"
                                 maxLength={MAX_LENGTH.email}
                                 type="email"
+                                autoComplete="email"
+                                aria-required="true"
                                 placeholder="ejemplo@correo.com"
                                 value={form.email}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.email)}
                                 aria-describedby={errors.email ? 'email-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.email && (
@@ -293,6 +298,8 @@ export default function Register() {
                                         id="password"
                                         name="password"
                                         type={showPassword ? 'text' : 'password'}
+                                        autoComplete="new-password"
+                                        aria-required="true"
                                         maxLength={20}
                                         value={form.password}
                                         onChange={handleChange}
@@ -305,7 +312,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowPassword((v) => !v)}
                                         aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -330,6 +337,8 @@ export default function Register() {
                                         id="confirmPassword"
                                         name="confirmPassword"
                                         type={showConfirmPassword ? 'text' : 'password'}
+                                        autoComplete="new-password"
+                                        aria-required="true"
                                         maxLength={20}
                                         value={form.confirmPassword}
                                         onChange={handleChange}
@@ -342,7 +351,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowConfirmPassword((v) => !v)}
                                         aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showConfirmPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -373,12 +382,14 @@ export default function Register() {
                                 id="phone"
                                 name="phone"
                                 type="tel"
+                                autoComplete="tel"
+                                aria-required="true"
                                 placeholder="300 123 4567"
                                 value={form.phone}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.phone)}
                                 aria-describedby={errors.phone ? 'phone-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.phone ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.phone ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.phone && (

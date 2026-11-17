@@ -548,7 +548,7 @@ export default function PayReservation() {
                                                     setMethod(value);
                                                     setMessage(null);
                                                 }}
-                                                className="mt-1 h-4 w-4 shrink-0 accent-parkea-600"
+                                                className="h-6 w-6 shrink-0 accent-parkea-600"
                                             />
                                             <span className="min-w-0">
                                                 <span className="flex items-center gap-2 text-label font-medium text-neutral-900">
