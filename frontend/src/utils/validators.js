@@ -15,15 +15,11 @@ export const isValidPlate = (plate, vehicleType) => {
     return regex ? regex.test(plate.toUpperCase()) : false;
 };
 
-// Colombian mobile numbers are always 10 digits. People type them with spaces,
-// dashes or parentheses ("300 123 4567", "(300) 123-4567"), so those are removed
-// before validating and sending; only the 10 digits reach the backend.
+// People type a phone with spaces, dashes or parentheses ("300 123 4567",
+// "(300) 123-4567"), so those are removed before validating and sending; only
+// the 10 digits reach the backend. The rule of the phone is in personRules.js.
 export const normalizePhone = (phone) => {
     return (phone ?? '').replace(/[\s\-().]/g, '');
-};
-
-export const isValidPhone = (phone) => {
-    return /^[0-9]{10}$/.test(normalizePhone(phone));
 };
 
 export const isNotEmpty = (value) => {
