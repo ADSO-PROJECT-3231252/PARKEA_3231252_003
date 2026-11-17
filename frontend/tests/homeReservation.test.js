@@ -201,4 +201,14 @@ describe('Reservation shown on the home (#306)', () => {
         // Assert
         expect(shown.id).toBe('confirmed');
     });
+
+    test('a stay that ends at this very moment is no longer running: it shows the next one', () => {
+        // Arrange
+        const ending = reservation('ending', 'Active', -2, 0);
+        const next = reservation('next', 'Active', 3, 5);
+        // Act
+        const shown = pickHomeReservation({ reservations: [next, ending] }, NOW);
+        // Assert
+        expect(shown.id).toBe('next');
+    });
 });
