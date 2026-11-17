@@ -135,4 +135,34 @@ describe('Reservation card of the home (#306)', () => {
         // Assert
         expect(await within(card).findByText('Aún no tienes reservas registradas.')).toBeInTheDocument();
     });
+
+    test('the card waits for the history before choosing, so it never shows another reservation first', async () => {
+        // Arrange: the list answers, the history does not answer yet
+        const all = [
+            reservation('finished', 'Zona Finalizada', 'Finished', -40, -38),
+            reservation('cancelled', 'Zona Cancelada', 'Cancelled', -5, -3),
+        ];
+        getReservations.mockImplementation(({ status } = {}) => (status
+            ? new Promise(() => {})
+            : Promise.resolve({ data: { reservations: [all[1], all[0]] } })));
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+        // Assert
+        expect(await within(card).findByRole('status')).toBeInTheDocument();
+        expect(within(card).queryByText('Zona Cancelada')).not.toBeInTheDocument();
+    });
+
+    test('if the reservations cannot be loaded, the card shows the error', async () => {
+        // Arrange
+        getReservations.mockImplementation(({ status } = {}) => (status
+            ? Promise.resolve({ data: { reservations: [] } })
+            : Promise.reject(new Error('Network Error'))));
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+        // Assert
+        expect(await within(card).findByRole('alert')).toBeInTheDocument();
+        expect(within(card).queryByText('Aún no tienes reservas registradas.')).not.toBeInTheDocument();
+    });
 });
