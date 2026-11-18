@@ -544,11 +544,11 @@ export default function ReserveSpot() {
                                 checked={form.openEnded}
                                 onChange={handleChange}
                                 aria-describedby="openEnded-help"
-                                className="mt-0.5 h-4 w-4 shrink-0 accent-parkea-600"
+                                className="h-6 w-6 shrink-0 accent-parkea-600"
                             />
                             <span className="text-label text-neutral-900">Tiempo indefinido</span>
                         </label>
-                        <p id="openEnded-help" className="mt-1 pl-6 text-caption text-neutral-600">
+                        <p id="openEnded-help" className="mt-1 pl-8 text-caption text-neutral-600">
                             Pagas la primera hora al confirmar y el resto cuando termines, por cada hora empezada
                             {openStayHelpEnd}
                         </p>

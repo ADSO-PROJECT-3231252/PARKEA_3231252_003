@@ -263,7 +263,7 @@ text-body text-neutral-600`}
                             aria-invalid={Boolean(errors.brand)}
                             aria-describedby={errors.brand ? 'brand-error' : undefined}
                             className={`mt-1 w-full rounded-md border px-3 py-2.5 text-body
-text-neutral-900 placeholder:text-neutral-400 focus:outline-none
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none
 focus:ring-2 focus:ring-parkea-600 ${errors.brand ? 'border-danger' : 'border-neutral-200'}`}
                         />
                         {errors.brand && (
@@ -287,7 +287,7 @@ focus:ring-2 focus:ring-parkea-600 ${errors.brand ? 'border-danger' : 'border-ne
                             aria-invalid={Boolean(errors.model)}
                             aria-describedby={errors.model ? 'model-error' : undefined}
                             className={`mt-1 w-full rounded-md border px-3 py-2.5 text-body
-text-neutral-900 placeholder:text-neutral-400 focus:outline-none
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none
 focus:ring-2 focus:ring-parkea-600 ${errors.model ? 'border-danger' : 'border-neutral-200'}`}
                         />
                         {errors.model && (
@@ -313,7 +313,7 @@ focus:ring-2 focus:ring-parkea-600 ${errors.model ? 'border-danger' : 'border-ne
                             }
                             className={`mt-1 w-full resize-none rounded-md border
 border-neutral-200 px-3 py-2.5 text-body text-neutral-900
-placeholder:text-neutral-400 focus:outline-none focus:ring-2
+placeholder:text-neutral-500 focus:outline-none focus:ring-2
 focus:ring-parkea-600`}
                         />
                         <p className="mt-1 text-caption text-neutral-600">
@@ -335,7 +335,7 @@ focus:ring-parkea-600`}
                             aria-invalid={Boolean(errors.color)}
                             aria-describedby={errors.color ? 'color-error' : undefined}
                             className={`mt-1 w-full rounded-md border px-3 py-2.5 text-body
-text-neutral-900 placeholder:text-neutral-400 focus:outline-none
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none
 focus:ring-2 focus:ring-parkea-600 ${errors.color ? 'border-danger' : 'border-neutral-200'}`}
                         />
                         {errors.color ? (

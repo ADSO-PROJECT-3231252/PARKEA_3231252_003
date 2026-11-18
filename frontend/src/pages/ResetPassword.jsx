@@ -142,6 +142,8 @@ p-8 text-center"
                                 id="newPassword"
                                 name="newPassword"
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                aria-required="true"
                                 maxLength={20}
                                 placeholder="Ingresa tu nueva contraseña"
                                 value={form.newPassword}
@@ -151,14 +153,14 @@ p-8 text-center"
                                     errors.newPassword ? 'newPassword-error' : 'newPassword-hint'
                                 }
                                 className={`w-full rounded-md border px-3 py-2.5 pr-9 font-sans text-body
-text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600
 ${errors.newPassword ? 'border-danger' : 'border-neutral-200'}`}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showPassword ? (
@@ -190,6 +192,8 @@ hover:text-neutral-700"
                                 id="confirmNewPassword"
                                 name="confirmNewPassword"
                                 type={showConfirm ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                aria-required="true"
                                 maxLength={20}
                                 placeholder="Confirma tu nueva contraseña"
                                 value={form.confirmNewPassword}
@@ -199,14 +203,14 @@ hover:text-neutral-700"
                                     errors.confirmNewPassword ? 'confirmNewPassword-error' : undefined
                                 }
                                 className={`w-full rounded-md border px-3 py-2.5 pr-9 font-sans text-body
-text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600
 ${errors.confirmNewPassword ? 'border-danger' : 'border-neutral-200'}`}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowConfirm((v) => !v)}
                                 aria-label={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showConfirm ? (

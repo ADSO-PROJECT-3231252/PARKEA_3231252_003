@@ -107,13 +107,15 @@ export default function AdminLogin() {
                                 id="email"
                                 name="email"
                                 type="email"
+                                autoComplete="username"
+                                aria-required="true"
                                 placeholder="Ej: administrador@parkea.gov.co"
                                 value={form.email}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.email)}
                                 aria-describedby={errors.email ? 'email-error' : undefined}
                                 className={`w-full rounded-md border px-3 py-2.5 font-sans text-body
-                                    text-neutral-900 placeholder:text-neutral-400 focus:outline-none
+                                    text-neutral-900 placeholder:text-neutral-500 focus:outline-none
                                     focus:ring-2 focus:ring-parkea-600 ${errors.email
                                         ? 'border-danger'
                                         : 'border-neutral-200'
@@ -135,13 +137,16 @@ export default function AdminLogin() {
                                     id="password"
                                     name="password"
                                     type={showPassword ? 'text' : 'password'}
+                                    autoComplete="current-password"
+                                    aria-required="true"
                                     placeholder="Ingresa tu contraseña"
                                     value={form.password}
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.password)}
                                     aria-describedby={errors.password ? 'password-error' : undefined}
                                     className={`w-full rounded-md border px-3 py-2.5 pr-9 font-sans text-body
-                                        text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600
+                                        text-neutral-900 placeholder:text-neutral-500 focus:outline-none
+                                        focus:ring-2 focus:ring-parkea-600
                                         ${errors.password
                                             ? 'border-danger'
                                             : 'border-neutral-200'
@@ -151,7 +156,7 @@ export default function AdminLogin() {
                                     type="button"
                                     onClick={() => setShowPassword((v) => !v)}
                                     aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showPassword ? (
@@ -181,7 +186,7 @@ export default function AdminLogin() {
                         <div className="text-center">
                             <Link
                                 to="/login"
-                                className="inline-flex items-center gap-1 text-caption text-parkea-600 underline
+                                className="inline-flex min-h-6 items-center gap-1 text-caption text-parkea-600 underline
                                     hover:text-parkea-700"
                             >
                                 <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />

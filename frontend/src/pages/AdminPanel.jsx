@@ -247,7 +247,7 @@ export default function AdminPanel() {
                             {alert.type === 'zone_full' && (
                                 <Link
                                     to="/admin/zones"
-                                    className="shrink-0 text-label text-warning underline hover:text-neutral-900"
+                                    className="inline-flex min-h-6 shrink-0 items-center text-label text-warning underline hover:text-neutral-900"
                                 >
                                     Ver zonas
                                 </Link>

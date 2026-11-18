@@ -731,7 +731,7 @@ export default function AdminUsers() {
                             type="button"
                             onClick={() => setLogsExpanded((v) => !v)}
                             aria-expanded={logsExpanded}
-                            className="text-label text-parkea-600 hover:underline"
+                            className="inline-flex min-h-6 items-center text-label text-parkea-600 hover:underline"
                         >
                             {logsExpanded ? 'Ver menos' : 'Ver historial'}
                         </button>
@@ -775,7 +775,7 @@ export default function AdminUsers() {
                                 <button
                                     type="button"
                                     onClick={() => setSelectedLog(log)}
-                                    className="shrink-0 self-start text-label text-parkea-600 hover:underline"
+                                    className="inline-flex min-h-6 shrink-0 items-center self-start text-label text-parkea-600 hover:underline"
                                 >
                                     Ver detalles
                                 </button>
