@@ -213,3 +213,19 @@ describe('"Pagos recientes" and "Estado de pagos" (#309)', () => {
         }
     });
 });
+
+describe('"Ocupación por zona" (#309)', () => {
+    test('a long name goes on to the next line instead of being cut', async () => {
+        // Arrange
+        answer();
+
+        // Act
+        renderPanel();
+        const box = await section('Ocupación por zona');
+
+        // Assert
+        const name = await within(box).findByText(LONG_NAME);
+        expect(name).toHaveClass('min-w-0', 'break-words');
+        expect(name).not.toHaveClass('truncate');
+    });
+});

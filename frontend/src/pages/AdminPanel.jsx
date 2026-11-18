@@ -449,8 +449,9 @@ export default function AdminPanel() {
                                     : 0;
                                 return (
                                     <li key={zona.zoneId}>
-                                        <div className="mb-1 flex items-center justify-between gap-2">
-                                            <span className="min-w-0 truncate text-label text-neutral-900">
+                                        {/* #309: a long name goes on to the next line instead of being cut */}
+                                        <div className="mb-1 flex items-start justify-between gap-2">
+                                            <span className="min-w-0 break-words text-label text-neutral-900">
                                                 {zona.zoneName}
                                             </span>
                                             <span
