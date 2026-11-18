@@ -28,7 +28,7 @@ import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
 import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime, keepTogether } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation } from '../utils/reservationStatus';
 import {
     MAX_OPEN_STAY_MS,
     canFinishStay,
@@ -373,7 +373,9 @@ export default function ReservationConfirmation() {
     const isPending = reservation.status === 'Pending';
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = remainingMs !== null && remainingMs <= 0;
-    const canPay = isPending && !isTimeUp;
+    // #347: at 00:00 "Ir al pago" and "Cancelar reserva" are hidden, with the
+    // same rule as "Mis reservas" and the backend
+    const canPay = canPayReservation(reservation, now);
     const canCancel = canCancelReservation(reservation, now);
     // HU-27: an open stay has no exit time until it ends (endTime is null).
     const isOpenStay = Boolean(reservation.openEnded);
@@ -779,7 +781,8 @@ export default function ReservationConfirmation() {
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         Hacer otra reserva
                     </Link>
-                    {/* HU-16 AC-01: Pending or Active reservations that have not started. */}
+                    {/* HU-16 AC-01: Pending reservations while their 15 minutes to pay
+                        last (#347), or Active ones that have not started. */}
                     {canCancel && (
                         <button
                             type="button"
