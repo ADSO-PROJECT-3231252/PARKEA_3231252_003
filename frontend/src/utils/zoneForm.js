@@ -147,6 +147,7 @@ export function validateZoneCoordinates(latitude, longitude) {
     if (latitudeError) errors.latitude = latitudeError;
     if (longitudeError) errors.longitude = longitudeError;
 
+    // #232: valid coordinates, but outside Colombia
     if (!latitudeError && !longitudeError && !insideColombia(Number(latitude), Number(longitude))) {
         const message = translateError('COORDINATES_OUTSIDE_COLOMBIA');
         errors.latitude = message;
