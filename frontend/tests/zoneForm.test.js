@@ -27,6 +27,27 @@ const apiError = (data) => ({ response: { data } });
 
 describe('coordinate errors after editing a zone (#308)', () => {
     test.each([
+        ['41, -3', '41', '-3', true],
+        ['4.8133, -75.6961', '4.8133', '-75.6961', false],
+    ])('updates both Colombia errors after pasting %s', (text, latitude, longitude, outside) => {
+        const form = { ...validForm(), latitude: '40' };
+        const { result } = renderHook(() => useZoneForm(form));
+        const message = 'La ubicación de la zona debe estar dentro de Colombia';
+        const colombiaErrors = { latitude: message, longitude: message };
+
+        act(() => result.current.showErrors(validateZoneForm(form)));
+        expect(result.current.errors).toEqual(colombiaErrors);
+
+        act(() => result.current.handleCoordinatePaste({
+            clipboardData: { getData: () => text },
+            preventDefault: jest.fn(),
+        }));
+
+        expect(result.current.form).toMatchObject({ latitude, longitude });
+        expect(result.current.errors).toEqual(outside ? colombiaErrors : {});
+    });
+
+    test.each([
         ['latitude', '40', '4.8133'],
         ['longitude', '-3', '-75.6961'],
     ])('correcting only %s clears the Colombia error from both fields', (field, outside, inside) => {
