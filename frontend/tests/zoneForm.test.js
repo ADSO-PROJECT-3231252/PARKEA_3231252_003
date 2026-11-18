@@ -1,3 +1,6 @@
+import { act, renderHook } from '@testing-library/react';
+import useZoneForm from '../src/hooks/useZoneForm';
+
 import {
     validateZoneForm,
     buildZonePayload,
@@ -21,6 +24,23 @@ const validForm = () => ({
 
 // What axios gives the screen when the API answers with an error
 const apiError = (data) => ({ response: { data } });
+
+describe('coordinate errors after editing a zone (#308)', () => {
+    test.each([
+        ['latitude', '40', '4.8133'],
+        ['longitude', '-3', '-75.6961'],
+    ])('correcting only %s clears the Colombia error from both fields', (field, outside, inside) => {
+        const form = { ...validForm(), [field]: outside };
+        const { result } = renderHook(() => useZoneForm(form));
+        const message = 'La ubicación de la zona debe estar dentro de Colombia';
+
+        act(() => result.current.showErrors(validateZoneForm(form)));
+        expect(result.current.errors).toEqual({ latitude: message, longitude: message });
+
+        act(() => result.current.setField(field, inside));
+        expect(result.current.errors).toEqual({});
+    });
+});
 
 describe('validateZoneForm', () => {
     test('a complete, valid form has no errors', () => {
