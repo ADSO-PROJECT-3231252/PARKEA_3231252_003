@@ -5,8 +5,14 @@ import { translateError } from '../utils/errorMessages';
 import { formatDateTime, formatReservationCode } from '../utils/format';
 
 // Codes that mean the screen behind the dialog is out of date (the reservation
-// started, changed status or no longer exists), so it should be loaded again.
-const STALE_CODES = ['RESERVATION_ALREADY_STARTED', 'RESERVATION_NOT_CANCELLABLE', 'RESERVATION_NOT_FOUND'];
+// started, changed status, its 15 minutes to pay ended (#347) or it no longer
+// exists), so it should be loaded again.
+const STALE_CODES = [
+    'RESERVATION_ALREADY_STARTED',
+    'RESERVATION_NOT_CANCELLABLE',
+    'RESERVATION_EXPIRED',
+    'RESERVATION_NOT_FOUND',
+];
 
 // Same date format as the booking history (HU-18): "10/06/2026, de 08:30 a 09:30"
 // or, across two days, "del 10/06/2026 23:00 al 11/06/2026 01:00". An open
