@@ -5,6 +5,7 @@ const ErrorCodes = require('../constants/errorCodes');
 const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
+const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -354,6 +355,14 @@ async function cancelar(req, res, next) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.RESERVATION_NOT_FOUND, message: 'Reservation not found' });
         }
+        // #347: once its 15 minutes to pay end, the reservation counts as
+        // expired, like in the payment, whether the job already marked it
+        // Expired or it still says Pending. Nothing changes here: the job
+        // releases its spot.
+        if (countsAsExpired(reserva)) {
+            await t.rollback();
+            return res.status(400).json(RESERVATION_EXPIRED);
+        }
         if (reserva.status !== 'Pending' && reserva.status !== 'Active') {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.RESERVATION_NOT_CANCELLABLE, message: `A reservation with status "${reserva.status}" cannot be cancelled` });
@@ -698,6 +707,9 @@ async function misReservas(req, res, next) {
                 spotNumber: r.spotNumber,
                 startTime: r.startTime,
                 endTime: sinSalidaAun ? null : r.endTime,
+                // #347: the end of the 15 minutes to pay a Pending reservation,
+                // so the list can hide "Pagar" and "Cancelar" when they end
+                holdExpiresAt: r.holdExpiresAt,
                 openEnded: r.openEnded,
                 latestEndTime: salidaMaxima(r),
                 openStay,
