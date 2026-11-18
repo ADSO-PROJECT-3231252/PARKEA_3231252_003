@@ -1,10 +1,13 @@
+import { holdHasEnded } from './reservationStatus';
+
 // #306: the "Reservas" card of the home shows the stay that is running now;
 // if there is none, the next one that starts; if there is none, the last one
 // that finished; and, as before, the latest one of any status.
 // A confirmed reservation (Active) can be running or next. One waiting for
 // payment (Pending) can only be next: it is held for a few minutes, so it is
 // the most urgent for the person, even if its start time has already passed.
-// A cancelled or expired one never counts.
+// A cancelled or expired one never counts, and neither does a Pending one
+// whose 15 minutes to pay ended (#347): it counts as expired.
 
 const time = (value) => new Date(value).getTime();
 
@@ -16,7 +19,8 @@ const isRunning = (reservation, now) =>
     (!reservation.endTime || time(reservation.endTime) > now);
 
 const isNext = (reservation, now) =>
-    (reservation.status === 'Active' && time(reservation.startTime) > now) || reservation.status === 'Pending';
+    (reservation.status === 'Active' && time(reservation.startTime) > now) ||
+    (reservation.status === 'Pending' && !holdHasEnded(reservation, now));
 
 // `reservations`: all of them, the latest first, as the list answers.
 // `lastFinished`: the most recent finished one.

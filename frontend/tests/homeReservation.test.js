@@ -212,3 +212,44 @@ describe('Reservation shown on the home (#306)', () => {
         expect(shown.id).toBe('next');
     });
 });
+
+describe('A pending reservation whose 15 minutes to pay ended (#347)', () => {
+    // A Pending reservation whose 15 minutes to pay end `holdHours` from now
+    const pending = (id, startHours, holdHours) => ({
+        ...reservation(id, 'Pending', startHours, startHours + 2),
+        holdExpiresAt: at(holdHours),
+    });
+
+    test.each([
+        ['at that very moment', 0],
+        ['a minute ago, before the job marks it Expired', -1 / 60],
+    ])('it is not next when they ended %s: it shows the confirmed one after it', (_label, holdHours) => {
+        // Arrange
+        const expiredHold = pending('pending', 2, holdHours);
+        const confirmed = reservation('confirmed', 'Active', 30, 32);
+        // Act
+        const shown = pickHomeReservation({ reservations: [confirmed, expiredHold] }, NOW);
+        // Assert
+        expect(shown.id).toBe('confirmed');
+    });
+
+    test('with nothing else coming, it shows the last finished one', () => {
+        // Arrange
+        const expiredHold = pending('pending', -0.1, -0.05);
+        const lastFinished = reservation('finished', 'Finished', -30, -28);
+        // Act
+        const shown = pickHomeReservation({ reservations: [expiredHold], lastFinished }, NOW);
+        // Assert
+        expect(shown.id).toBe('finished');
+    });
+
+    test('while they last it is still next, before a later confirmed one', () => {
+        // Arrange
+        const waiting = pending('pending', 2, 0.1);
+        const confirmed = reservation('confirmed', 'Active', 30, 32);
+        // Act
+        const shown = pickHomeReservation({ reservations: [confirmed, waiting] }, NOW);
+        // Assert
+        expect(shown.id).toBe('pending');
+    });
+});
