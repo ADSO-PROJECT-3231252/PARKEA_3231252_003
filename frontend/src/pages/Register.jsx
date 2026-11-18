@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { isValidEmail, isNotEmpty, isValidPhone, normalizePhone } from '../utils/validators';
+import { isValidEmail, isNotEmpty, normalizePhone } from '../utils/validators';
+import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { register } from '../services/authService';
 import logo from '../assets/logo.png';
 import carImage from '../assets/car_register.webp';
@@ -17,7 +18,6 @@ const DOCUMENT_TYPES = [
 // Length limits agreed with the team. The inputs enforce them with maxLength.
 const MAX_LENGTH = {
     documentNumber: 15,
-    fullName: 70,
     email: 100,
 };
 
@@ -27,11 +27,11 @@ const MAX_LENGTH = {
 // to fix instead of seeing only the general message.
 const SERVER_FIELD_MESSAGES = {
     documentNumber: 'El documento solo debe contener letras y números.',
-    fullName: 'Revisa el nombre completo.',
+    fullName: NAME_RULE_MESSAGE,
     email: 'Ingresa un correo válido.',
     password: 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.',
     confirmPassword: 'Las contraseñas no coinciden.',
-    phone: 'El teléfono debe tener 10 dígitos y solo números.',
+    phone: PHONE_RULE_MESSAGE,
 };
 
 const EMAIL_TAKEN = translateError('EMAIL_ALREADY_REGISTERED');
@@ -78,6 +78,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.fullName)) {
             newErrors.fullName = 'El nombre completo es obligatorio.';
+        } else if (!isValidName(form.fullName)) {
+            newErrors.fullName = NAME_RULE_MESSAGE;
         }
 
         if (!isNotEmpty(form.email)) {
@@ -106,8 +108,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.phone)) {
             newErrors.phone = 'El teléfono es obligatorio.';
-        } else if (!isValidPhone(form.phone)) {
-            newErrors.phone = 'El teléfono debe tener 10 dígitos y solo números.';
+        } else if (!isValidPhone(normalizePhone(form.phone))) {
+            newErrors.phone = PHONE_RULE_MESSAGE;
         }
 
         setErrors(newErrors);
@@ -234,7 +236,6 @@ export default function Register() {
                             <input
                                 id="fullName"
                                 name="fullName"
-                                maxLength={MAX_LENGTH.fullName}
                                 type="text"
                                 autoComplete="name"
                                 aria-required="true"

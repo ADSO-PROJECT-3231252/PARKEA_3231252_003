@@ -1,4 +1,4 @@
-import { isValidEmail, isValidPlate, isValidPhone, normalizePhone, isNotEmpty } from '../src/utils/validators';
+import { isValidEmail, isValidPlate, normalizePhone, isNotEmpty } from '../src/utils/validators';
 
 describe('isValidEmail', () => {
     test('accepts a normal email', () => {
@@ -54,18 +54,6 @@ describe('normalizePhone', () => {
     test('returns an empty text for null or undefined', () => {
         expect(normalizePhone(null)).toBe('');
         expect(normalizePhone(undefined)).toBe('');
-    });
-});
-
-describe('isValidPhone', () => {
-    test('accepts 10 digits, also written with spaces or dashes', () => {
-        expect(isValidPhone('3001234567')).toBe(true);
-        expect(isValidPhone('300 123 4567')).toBe(true);
-        expect(isValidPhone('300-123-4567')).toBe(true);
-    });
-
-    test.each(['', '300123456', '30012345678', '300123456a', '+573001234567'])('rejects "%s"', (phone) => {
-        expect(isValidPhone(phone)).toBe(false);
     });
 });
 
