@@ -4,6 +4,7 @@ import DecorativeImage from '../src/components/DecorativeImage';
 import Home from '../src/pages/Home';
 import Register from '../src/pages/Register';
 import { AuthProvider } from '../src/context/AuthContext';
+import { getReservations } from '../src/services/reservationService';
 import { getZones } from '../src/services/zoneService';
 
 // The screens do not call the real API
@@ -26,6 +27,11 @@ const renderAt = (page, path) => render(
 // The real image only goes in the <source>; the <img> keeps the blank pixel
 const sourceOf = (container) => container.querySelector('picture source');
 const imagesWithTheFile = (container) => [...container.querySelectorAll('img')].filter((img) => img.getAttribute('src') === IMAGE);
+
+// The download (media of the <source>) and the display (classes of the <img> or
+// of its container) must name the same breakpoint. The tests below check both,
+// so changing only one of them fails.
+const decorativePictures = (container) => [...container.querySelectorAll('picture')];
 
 describe('DecorativeImage (#337)', () => {
     test('the image is only offered from minWidth up; the <img> starts with a blank pixel', () => {
@@ -64,28 +70,47 @@ describe('DecorativeImage (#337)', () => {
     });
 });
 
+const HOMES = [
+    ['a visitor', null],
+    ['a user', { id: 'user-1', fullName: 'Laura Gomez', role: 'user' }],
+    ['an administrator', { id: 'admin-1', fullName: 'Administrador PARKEA', role: 'admin' }],
+];
+
 describe('Screens with a decorative image that phones do not download (#337)', () => {
     beforeEach(() => {
         localStorage.clear();
         getZones.mockReset().mockResolvedValue({ data: { zones: [] } });
+        getReservations.mockReset().mockResolvedValue({ data: { reservations: [] } });
     });
 
-    test('the home of a visitor offers the illustration only from lg (64rem) up', async () => {
+    test.each(HOMES)('the home of %s offers the illustration from lg (64rem) up and shows it from lg up', async (_who, user) => {
+        // Arrange
+        if (user) {
+            localStorage.setItem('token', 'test-token');
+            localStorage.setItem('user', JSON.stringify(user));
+        }
+
         // Act
         const { container } = renderAt(<Home />, '/');
         await screen.findByRole('heading', { level: 1 });
 
-        // Assert
+        // Assert: one illustration, downloaded from 64rem and shown from lg
+        const pictures = decorativePictures(container);
+        expect(pictures).toHaveLength(1);
         expect(sourceOf(container)).toHaveAttribute('media', '(min-width: 64rem)');
+        expect(pictures[0].querySelector('img')).toHaveClass('hidden', 'lg:block');
         expect(imagesWithTheFile(container)).toHaveLength(0);
     });
 
-    test('/register offers the car only from md (48rem) up', () => {
+    test('/register offers the car from md (48rem) up and shows its column from md up', () => {
         // Act
         const { container } = renderAt(<Register />, '/register');
 
-        // Assert
+        // Assert: the column of the car is the parent of the <picture>
+        const pictures = decorativePictures(container);
+        expect(pictures).toHaveLength(1);
         expect(sourceOf(container)).toHaveAttribute('media', '(min-width: 48rem)');
+        expect(pictures[0].parentElement).toHaveClass('hidden', 'md:flex');
         // The logo is the only <img> with an image file
         expect(imagesWithTheFile(container)).toHaveLength(1);
         expect(imagesWithTheFile(container)[0]).toHaveAttribute('alt', expect.stringMatching(/PARKEA/i));
