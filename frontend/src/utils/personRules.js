@@ -12,6 +12,10 @@ export const NAME_MAX_LENGTH = 70;
 // with marks above and below the line.
 const NAME_PATTERN = /^\p{L}\p{M}{0,2}(?:[ '’-]?\p{L}\p{M}{0,2})*$/u;
 
+// Characters that are drawn as nothing, like the Hangul filler "ㅤ". They
+// count as letters for NAME_PATTERN, but a name made of them looks empty.
+const INVISIBLE = /\p{Default_Ignorable_Code_Point}/u;
+
 // A Colombian mobile number: 10 digits, the first one is 3. \d is only 0-9.
 const PHONE_PATTERN = /^3\d{9}$/;
 
@@ -31,7 +35,7 @@ export function normalizeName(value) {
 export function isValidName(value) {
     if (typeof value !== 'string') return false;
     const name = normalizeName(value);
-    return name.length >= NAME_MIN_LENGTH && name.length <= NAME_MAX_LENGTH && NAME_PATTERN.test(name);
+    return name.length >= NAME_MIN_LENGTH && name.length <= NAME_MAX_LENGTH && NAME_PATTERN.test(name) && !INVISIBLE.test(name);
 }
 
 export function isValidPhone(value) {

@@ -16,6 +16,8 @@ describe('isValidName', () => {
         ['Ａｎａ', 'full width letters'],
         ['Ана Иванова', 'letters of another alphabet'],
         ['A'.repeat(70), 'the longest name, 70 letters'],
+        [`  ${'A'.repeat(70)}  `, '70 letters with spaces at the ends'],
+        ['A\u0332\u0332na', 'two marks written apart on the first letter'],
     ])('accepts "%s" (%s)', (name) => {
         // Act
         const result = isValidName(name);
@@ -46,6 +48,8 @@ describe('isValidName', () => {
         ['Ana\u0332\u0332\u0332', 'three marks on one letter that do not join it'],
         ['A\u0332\u0332\u0332na', 'three marks on the first letter'],
         ['A'.repeat(71), '71 letters'],
+        ['\u3164\u3164', 'only Hangul fillers, drawn as nothing'],
+        ['Ana\u3164', 'a Hangul filler after the name'],
     ])('rejects "%s" (%s)', (name) => {
         // Act
         const result = isValidName(name);
