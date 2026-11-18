@@ -96,12 +96,13 @@ describe('The list of reservations sends the deadline to pay (#347)', () => {
     });
 
     test('each reservation has holdExpiresAt: the deadline of a Pending one, null once it is paid', async () => {
-        // Arrange
+        // Arrange: an Expired one keeps the deadline it had, like in its detail
         jest.spyOn(Reserva, 'findAndCountAll').mockResolvedValue({
-            count: 2,
+            count: 3,
             rows: [
                 row({ id: 'pending', status: 'Pending', holdExpiresAt: colombia('08:10') }),
                 row({ id: 'paid', status: 'Active', holdExpiresAt: null, payments: [{ amount: '4000.00', paymentStatus: 'Paid', type: 'initial' }] }),
+                row({ id: 'expired', status: 'Expired', holdExpiresAt: colombia('07:45') }),
             ],
         });
 
@@ -110,8 +111,9 @@ describe('The list of reservations sends the deadline to pay (#347)', () => {
 
         // Assert
         expect(res.status).toBe(200);
-        const [pending, paid] = res.body.reservations;
+        const [pending, paid, expired] = res.body.reservations;
         expect(pending.holdExpiresAt).toBe(colombia('08:10').toISOString());
         expect(paid).toHaveProperty('holdExpiresAt', null);
+        expect(expired.holdExpiresAt).toBe(colombia('07:45').toISOString());
     });
 });
