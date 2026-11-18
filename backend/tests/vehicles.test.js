@@ -155,6 +155,51 @@ describe('Registering a vehicle (HU-10)', () => {
         expect(res.body.code).toBe('VALIDATION_ERROR');
         expect(createVehicle).not.toHaveBeenCalled();
     });
+
+    // #234: the brand, the model and the color only have letters, numbers,
+    // spaces, hyphens and periods
+    test.each([
+        ['brand', 'Mazda <b>', 'angle brackets'],
+        ['model', '3@', 'an @'],
+        ['color', 'Rojo #1', 'a #'],
+        ['brand', 'Mazda 🚗', 'an emoji'],
+        ['model', '...', 'only periods, without any letter or number'],
+    ])('the %s "%s" (%s) answers 400 VALIDATION_ERROR on that field and saves nothing', async (field, value) => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, [field]: value });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(res.body.errors.map((error) => error.path)).toEqual([field]);
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
+    test.each([
+        ['Chevrolet', 'Spark GT', 'Gris plata'],
+        ['Mazda', '3', 'Rojo'],
+        ['Mercedes-Benz', 'Clase A 2.0', 'Azul'],
+        ['Citroën', 'C4', 'Blanco'],
+    ])('real values are still accepted: %s, %s, %s', async (brand, model, color) => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, brand, model, color });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledWith(expect.objectContaining({ brand, model, color }), { transaction });
+    });
+
+    test('the text is saved without the spaces at the ends and with one space between the words', async () => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, brand: '  Land   Rover ', model: ' Defender  90', color: 'Gris   plata ' });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledWith(
+            expect.objectContaining({ brand: 'Land Rover', model: 'Defender 90', color: 'Gris plata' }),
+            { transaction }
+        );
+    });
 });
 
 describe('Choosing the default vehicle (HU-11, AC-06)', () => {
@@ -379,5 +424,39 @@ describe('Editing a vehicle (HU-12)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(actual.update).toHaveBeenCalledWith({ vehicleType: 'truck', brand: 'Chevrolet', model: 'NHR', color: 'Blanco', visualDescription: undefined });
+    });
+
+    // #234: the same rule as when registering
+    test.each([
+        ['brand', 'Yamaha <>'],
+        ['model', 'FZ@'],
+        ['color', 'Azul 🔵'],
+    ])('the %s "%s" has a symbol: it answers 400 VALIDATION_ERROR on that field and saves nothing', async (field, value) => {
+        // Arrange
+        const actual = vehicle();
+        const findVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Rojo', [field]: value });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(res.body.errors.map((error) => error.path)).toEqual([field]);
+        expect(findVehicle).not.toHaveBeenCalled();
+        expect(actual.update).not.toHaveBeenCalled();
+    });
+
+    test('real values are still saved', async () => {
+        // Arrange
+        const actual = vehicle();
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mercedes-Benz', model: 'Clase A 2.0', color: 'Gris plata' });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(actual.update).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Mercedes-Benz', model: 'Clase A 2.0', color: 'Gris plata' }));
     });
 });

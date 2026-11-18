@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const { verificarToken, verificarRol } = require('../middlewares/auth.middleware');
 const vehiculoController = require('../controllers/vehiculo.controller');
 const { isTextOrMissing } = require('../utils/validation');
+const { normalizeVehicleText, isValidVehicleText } = require('../utils/vehicleRules');
 
 // #316: vehicles belong to user accounts; an administrator gets 403 FORBIDDEN_ROLE
 const soloUsuarios = [verificarToken, verificarRol('user')];
@@ -14,19 +15,22 @@ const validarCamposVehiculo = [
         .isIn(['car', 'motorcycle', 'truck']).withMessage('Invalid vehicle type'),
     body('brand')
         .custom(isTextOrMissing).withMessage('Brand must be text').bail()
-        .trim()
-        .notEmpty().withMessage('Brand is required')
-        .isLength({ max: 50 }).withMessage('Brand must be at most 50 characters'),
+        .customSanitizer(normalizeVehicleText)
+        .notEmpty().withMessage('Brand is required').bail()
+        .isLength({ max: 50 }).withMessage('Brand must be at most 50 characters').bail()
+        .custom(isValidVehicleText).withMessage('Brand can only have letters, numbers, spaces, hyphens and periods'),
     body('model')
         .custom(isTextOrMissing).withMessage('Model must be text').bail()
-        .trim()
-        .notEmpty().withMessage('Model is required')
-        .isLength({ max: 50 }).withMessage('Model must be at most 50 characters'),
+        .customSanitizer(normalizeVehicleText)
+        .notEmpty().withMessage('Model is required').bail()
+        .isLength({ max: 50 }).withMessage('Model must be at most 50 characters').bail()
+        .custom(isValidVehicleText).withMessage('Model can only have letters, numbers, spaces, hyphens and periods'),
     body('color')
         .custom(isTextOrMissing).withMessage('Color must be text').bail()
-        .trim()
-        .notEmpty().withMessage('Color is required')
-        .isLength({ max: 30 }).withMessage('Color must be at most 30 characters'),
+        .customSanitizer(normalizeVehicleText)
+        .notEmpty().withMessage('Color is required').bail()
+        .isLength({ max: 30 }).withMessage('Color must be at most 30 characters').bail()
+        .custom(isValidVehicleText).withMessage('Color can only have letters, numbers, spaces, hyphens and periods'),
     body('visualDescription')
         .optional({ checkFalsy: true })
         .custom(isTextOrMissing).withMessage('Visual description must be text').bail()
