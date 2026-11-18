@@ -16,6 +16,7 @@ describe('isValidName', () => {
         ['Ａｎａ', 'full width letters'],
         ['Ана Иванова', 'letters of another alphabet'],
         ['A'.repeat(70), 'the longest name, 70 letters'],
+        ['A'.repeat(69) + '𠮷', '70 letters including one outside the basic Unicode range'],
         [`  ${'A'.repeat(70)}  `, '70 letters with spaces at the ends'],
         ['A\u0332\u0332na', 'two marks written apart on the first letter'],
     ])('accepts "%s" (%s)', (name) => {
@@ -37,6 +38,7 @@ describe('isValidName', () => {
         ['Ana\tMaría', 'a tab'],
         ['Ana\u200bMaría', 'an invisible space'],
         ['A', 'only 1 letter'],
+        ['𠮷', 'only one letter even though it uses two UTF-16 code units'],
         ['', 'an empty text'],
         ['   ', 'only spaces'],
         ['-Ana', 'it starts with a hyphen'],

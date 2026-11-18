@@ -30,12 +30,13 @@ function normalizeName(value) {
     return value.normalize('NFKC').trim().replace(/ {2,}/g, ' ');
 }
 
-// The length is checked before the pattern, so a very long text is rejected
-// without reading it all.
+// Count Unicode code points after normalization so a letter like 𠮷 counts once.
 function isValidName(value) {
     if (typeof value !== 'string') return false;
     const name = normalizeName(value);
-    return name.length >= NAME_MIN_LENGTH && name.length <= NAME_MAX_LENGTH && NAME_PATTERN.test(name) && !INVISIBLE.test(name);
+    const length = [...name].length;
+
+    return length >= NAME_MIN_LENGTH && length <= NAME_MAX_LENGTH && NAME_PATTERN.test(name) && !INVISIBLE.test(name);
 }
 
 function isValidPhone(value) {
