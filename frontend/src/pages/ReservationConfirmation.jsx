@@ -28,7 +28,7 @@ import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
 import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime, keepTogether } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation } from '../utils/reservationStatus';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation, shownStatus } from '../utils/reservationStatus';
 import {
     MAX_OPEN_STAY_MS,
     canFinishStay,
@@ -368,8 +368,11 @@ export default function ReservationConfirmation() {
     }
 
     // An unknown status shows its own name instead of pretending to be Pending.
-    const { label: statusLabel = reservation.status, Icon: StatusIcon, badge: statusBadge } =
-        RESERVATION_STATUS[reservation.status] ?? FALLBACK_STATUS;
+    // #347: from 00:00 a Pending reservation already shows as expired, like
+    // in "Mis reservas", while the screen waits for the job to mark it.
+    const displayStatus = shownStatus(reservation, now);
+    const { label: statusLabel = displayStatus, Icon: StatusIcon, badge: statusBadge } =
+        RESERVATION_STATUS[displayStatus] ?? FALLBACK_STATUS;
     const isPending = reservation.status === 'Pending';
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = remainingMs !== null && remainingMs <= 0;

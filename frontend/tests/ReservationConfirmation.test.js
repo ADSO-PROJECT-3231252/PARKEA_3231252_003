@@ -80,6 +80,7 @@ describe('The reservation screen when the 15 minutes to pay end (#347)', () => {
         await wait(10 * MINUTE - 1000);
         expect(payLink()).toBeInTheDocument();
         expect(cancelButton()).toBeInTheDocument();
+        expect(screen.getByText('Pendiente de pago')).toBeInTheDocument();
 
         // Act: the counter reaches 00:00
         await wait(1000);
@@ -89,6 +90,9 @@ describe('The reservation screen when the 15 minutes to pay end (#347)', () => {
         expect(payLink()).not.toBeInTheDocument();
         expect(cancelButton()).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Ver mis reservas' })).toBeInTheDocument();
+        // It already shows as expired, like in "Mis reservas"
+        expect(screen.getByText('Expirada')).toBeInTheDocument();
+        expect(screen.queryByText('Pendiente de pago')).not.toBeInTheDocument();
     });
 
     test('while the job has not marked it Expired, the buttons stay hidden', async () => {

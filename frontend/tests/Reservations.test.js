@@ -138,6 +138,23 @@ describe('"Mis reservas" when the 15 minutes to pay end (#347)', () => {
         expect(buttons(CANCEL_PENDING)).toHaveLength(0);
     });
 
+    test('an open stay waiting for payment shows like an expired one at 00:00, in the whole row', async () => {
+        // Arrange: no exit time, the first hour to pay
+        answer([{ ...pending, endTime: null, openEnded: true }]);
+        renderList();
+        expect(await screen.findAllByText('Tiempo indefinido')).toHaveLength(2);
+        expect(screen.getAllByText('Primera hora')).toHaveLength(2);
+
+        // Act: the 15 minutes end
+        await wait(10 * MINUTE + 100);
+
+        // Assert: like a reservation the job already marked Expired
+        expect(screen.getAllByText('Expirada')).toHaveLength(2);
+        expect(screen.queryAllByText('Tiempo indefinido')).toHaveLength(0);
+        expect(screen.queryAllByText('Primera hora')).toHaveLength(0);
+        expect(screen.getAllByText('Estimado')).toHaveLength(2);
+    });
+
     test('without holdExpiresAt (a backend before #347) the buttons stay: the backend decides', async () => {
         // Arrange
         answer([{ ...pending, holdExpiresAt: undefined }]);

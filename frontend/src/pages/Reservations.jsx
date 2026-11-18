@@ -73,7 +73,8 @@ function DateInfo({ reservation, now }) {
         duration = formatDuration(startTime, endTime);
     } else if (isRunningStay(reservation, now)) {
         duration = `${formatDuration(startTime, stayEndSoFar(startTime, now, reservation.latestEndTime))} hasta ahora`;
-    } else if (['Pending', 'Active'].includes(reservation.status)) {
+    } else if (['Pending', 'Active'].includes(shownStatus(reservation, now))) {
+        // #347: not for a Pending one whose 15 minutes to pay ended
         duration = 'Tiempo indefinido';
     }
     return (
@@ -99,18 +100,20 @@ function DateInfo({ reservation, now }) {
 }
 // AC-03: unpaid → estimated total; paid → amount paid. HU-27: a running open
 // stay shows the amount so far, and one that ended with a balance, its total.
-function amountLabel(reservation, pendingBalance) {
+// `status`: the one shown, so a Pending reservation whose 15 minutes to pay
+// ended is labeled like an expired one (#347).
+function amountLabel(reservation, pendingBalance, status) {
     if (reservation.amountType === 'so_far') return 'Hasta ahora';
     if (pendingBalance > 0) return 'Total';
-    if (reservation.openEnded && reservation.status === 'Pending') return 'Primera hora';
+    if (reservation.openEnded && status === 'Pending') return 'Primera hora';
     return reservation.amountType === 'paid' ? 'Pagado' : 'Estimado';
 }
-function AmountInfo({ reservation }) {
+function AmountInfo({ reservation, now }) {
     const { amount, appliedHourlyRate, extensions = 0 } = reservation;
     const pendingBalance = pendingBalanceOf(reservation);
     return (
         <div>
-            <p className="text-caption text-neutral-600">{amountLabel(reservation, pendingBalance)}</p>
+            <p className="text-caption text-neutral-600">{amountLabel(reservation, pendingBalance, shownStatus(reservation, now))}</p>
             <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(amount)}</p>
             {/* HU-28 AC-09: the amount paid includes the extensions */}
             {extensions > 0 && (
@@ -617,7 +620,7 @@ text-neutral-900"
                                                 <DateInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
-                                                <AmountInfo reservation={r} />
+                                                <AmountInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
                                                 <StatusInfo reservation={r} now={now} />
@@ -657,7 +660,7 @@ p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                         <ZoneInfo reservation={r} />
                                         <DateInfo reservation={r} now={now} />
                                         <VehicleInfo vehicle={r.vehicle} />
-                                        <AmountInfo reservation={r} />
+                                        <AmountInfo reservation={r} now={now} />
                                     </div>
                                     <div className="mt-4">
                                         <Actions
