@@ -19,6 +19,7 @@ import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { pickHomeReservation } from '../utils/homeReservation';
+import { shownStatus } from '../utils/reservationStatus';
 
 import heroVisitorIllustration from '../assets/hero-visitor.webp';
 import heroUserIllustration from '../assets/hero-user.webp';
@@ -168,6 +169,8 @@ function AuthenticatedHome({ user }) {
     const [reservations, setReservations] = useState([]);
     const [reservationsLoading, setReservationsLoading] = useState(true);
     const [reservationsError, setReservationsError] = useState(false);
+    // When the reservations arrived: the moment the card is decided for (#347)
+    const [loadedAt, setLoadedAt] = useState(null);
 
     const [zones, setZones] = useState([]);
     const [zonesLoading, setZonesLoading] = useState(true);
@@ -184,7 +187,9 @@ function AuthenticatedHome({ user }) {
         // the stay running now, the next ones and the latest of any status
         getReservations({ limit: 100 })
             .then((res) => {
-                if (active) setReservations(res.data.reservations);
+                if (!active) return;
+                setLoadedAt(Date.now());
+                setReservations(res.data.reservations);
             })
             .catch(() => {
                 if (active) setReservationsError(true);
@@ -226,6 +231,8 @@ function AuthenticatedHome({ user }) {
         () => pickHomeReservation({ reservations, lastFinished: history[0] ?? null }),
         [reservations, history],
     );
+    // #347: from 00:00 a Pending reservation shows as expired, like in "Mis reservas"
+    const currentStatus = currentReservation && shownStatus(currentReservation, loadedAt);
     const cardLoading = reservationsLoading || historyLoading;
 
     return (
@@ -272,10 +279,10 @@ function AuthenticatedHome({ user }) {
                                     <span className="truncate">{currentReservation.zone.name}</span>
                                 </p>
                                 <span
-                                    className={`shrink-0 text-label font-medium ${RESERVATION_STATUS_LABEL[currentReservation.status]?.color ?? 'text-neutral-600'
+                                    className={`shrink-0 text-label font-medium ${RESERVATION_STATUS_LABEL[currentStatus]?.color ?? 'text-neutral-600'
                                         }`}
                                 >
-                                    {RESERVATION_STATUS_LABEL[currentReservation.status]?.text ?? currentReservation.status}
+                                    {RESERVATION_STATUS_LABEL[currentStatus]?.text ?? currentStatus}
                                 </span>
                             </div>
 

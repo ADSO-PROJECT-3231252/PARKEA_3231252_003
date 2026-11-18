@@ -20,7 +20,7 @@ import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
 import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation } from '../utils/reservationStatus';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation, shownStatus } from '../utils/reservationStatus';
 import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
 import { paymentLabelOf } from '../utils/paymentStatus';
 import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
@@ -134,12 +134,14 @@ text-neutral-600"
         </div>
     );
 }
-function StatusInfo({ reservation }) {
+function StatusInfo({ reservation, now }) {
+    // #347: from 00:00 a Pending reservation shows as expired
+    const status = shownStatus(reservation, now);
     return (
         <div className="flex flex-col items-start gap-1 lg:items-center">
-            <StatusBadge status={reservation.status} />
+            <StatusBadge status={status} />
             {/* AC-02: payment status is required on every entry */}
-            <p className="text-caption text-neutral-600">Pago: {paymentLabelOf(reservation)}</p>
+            <p className="text-caption text-neutral-600">Pago: {paymentLabelOf({ ...reservation, status })}</p>
         </div>
     );
 }
@@ -597,7 +599,7 @@ bg-white lg:block"
                                         <tr
                                             key={r.id}
                                             className={`border-t border-l-4 border-t-neutral-200
-align-middle ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
+align-middle ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                         >
                                             <td
                                                 className="px-5 py-4 font-mono text-label
@@ -618,7 +620,7 @@ text-neutral-900"
                                                 <AmountInfo reservation={r} />
                                             </td>
                                             <td className="px-4 py-4">
-                                                <StatusInfo reservation={r} />
+                                                <StatusInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
                                                 <Actions
@@ -642,14 +644,14 @@ text-neutral-900"
                                 <li
                                     key={r.id}
                                     className={`rounded-lg border border-l-4 border-neutral-200 bg-white
-p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
+p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                 >
                                     <div className="flex flex-wrap items-start justify-between gap-2">
                                         <p className="font-mono text-label text-neutral-900">
                                             <span className="sr-only">Código </span>
                                             {shortCode(r.id)}
                                         </p>
-                                        <StatusInfo reservation={r} />
+                                        <StatusInfo reservation={r} now={now} />
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-4">
                                         <ZoneInfo reservation={r} />

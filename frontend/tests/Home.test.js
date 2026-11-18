@@ -207,4 +207,16 @@ describe('Reservation card of the home (#306)', () => {
         // Assert
         expect(await within(card).findByText('Zona En Curso')).toBeInTheDocument();
     });
+
+    test('a pending reservation whose 15 minutes to pay ended shows as expired (#347)', async () => {
+        // Arrange: the only one, and the job has not marked it Expired yet
+        answerLikeTheApi([{ ...reservation('pending', 'Zona Pendiente', 'Pending', 2, 4), holdExpiresAt: at(-0.01) }]);
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+        // Assert
+        expect(await within(card).findByText('Zona Pendiente')).toBeInTheDocument();
+        expect(within(card).getByText('Expirada')).toBeInTheDocument();
+        expect(within(card).queryByText('Pendiente de pago')).not.toBeInTheDocument();
+    });
 });

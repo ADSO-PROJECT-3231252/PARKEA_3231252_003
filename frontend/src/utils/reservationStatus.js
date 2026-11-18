@@ -52,6 +52,10 @@ export const holdHasEnded = (reservation, now) =>
     Boolean(reservation.holdExpiresAt) &&
     new Date(reservation.holdExpiresAt).getTime() <= now;
 
+// #347: the status a screen shows. From 00:00 a Pending reservation already
+// counts as expired, before the job marks it Expired.
+export const shownStatus = (reservation, now) => (holdHasEnded(reservation, now) ? 'Expired' : reservation.status);
+
 // HU-17 (#347): "Pagar" and "Ir al pago" are shown for a Pending reservation
 // while its 15 minutes to pay last.
 export const canPayReservation = (reservation, now) =>

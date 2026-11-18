@@ -91,6 +91,7 @@ describe('"Mis reservas" when the 15 minutes to pay end (#347)', () => {
         await wait(10 * MINUTE - 1000);
         expect(buttons(PAY_PENDING)).toHaveLength(2);
         expect(buttons(CANCEL_PENDING)).toHaveLength(2);
+        expect(screen.getAllByText('Pendiente de pago')).toHaveLength(2);
 
         // Act: the 15 minutes end
         await wait(1000 + 100);
@@ -99,6 +100,12 @@ describe('"Mis reservas" when the 15 minutes to pay end (#347)', () => {
         expect(buttons(PAY_PENDING)).toHaveLength(0);
         expect(buttons(CANCEL_PENDING)).toHaveLength(0);
         expect(buttons(DETAIL_PENDING)).toHaveLength(2);
+        // It shows as expired, in the table and in the card
+        const [inTable, inCard] = screen.getAllByText('Expirada');
+        expect(inTable.closest('tr')).toHaveClass('border-l-neutral-400');
+        expect(inCard.closest('li')).toHaveClass('border-l-neutral-400');
+        expect(screen.getAllByText('Pago: Sin pago')).toHaveLength(2);
+        expect(screen.queryAllByText('Pendiente de pago')).toHaveLength(0);
         // The paid reservation does not change: it starts at 10:00 a. m.
         expect(buttons(CANCEL_PAID)).toHaveLength(2);
         // The list was not asked again
