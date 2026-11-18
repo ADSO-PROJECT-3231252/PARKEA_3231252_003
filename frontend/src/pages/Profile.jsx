@@ -2,7 +2,7 @@ import { getInitials } from '../utils/format';
 import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, Info, Calendar, Save } from 'lucide-react';
 import { isNotEmpty, normalizePhone } from '../utils/validators';
-import { isValidName, isValidPhone, NAME_MAX_LENGTH, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
+import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { getProfile, updateProfile, changePassword } from '../services/userService';
 import { translateError } from '../utils/errorMessages';
 import { useAuth } from '../hooks/useAuth';
@@ -63,7 +63,7 @@ export default function Profile() {
     // that no longer matches it; editing just the name must not get blocked by,
     // or resend, a phone field nobody touched.
     const nameChanged = profile !== null && form.fullName !== (profile.fullName || '');
-    const phoneChanged = profile !== null && normalizePhone(form.phone) !== (profile.phone || '');
+    const phoneChanged = profile !== null && normalizePhone(form.phone) !== normalizePhone(profile.phone);
     const profileChanged = nameChanged || phoneChanged;
     const passwordTouched = Boolean(
         pwForm.currentPassword || pwForm.newPassword || pwForm.confirmNewPassword
@@ -269,7 +269,6 @@ export default function Profile() {
                                     id="fullName"
                                     name="fullName"
                                     type="text"
-                                    maxLength={NAME_MAX_LENGTH}
                                     autoComplete="name"
                                     aria-required="true"
                                     value={form.fullName}

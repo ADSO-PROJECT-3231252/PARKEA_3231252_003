@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty, normalizePhone } from '../utils/validators';
-import { isValidName, isValidPhone, NAME_MAX_LENGTH, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
+import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { register } from '../services/authService';
 import logo from '../assets/logo.png';
 import carImage from '../assets/car_register.webp';
@@ -18,7 +18,6 @@ const DOCUMENT_TYPES = [
 // Length limits agreed with the team. The inputs enforce them with maxLength.
 const MAX_LENGTH = {
     documentNumber: 15,
-    fullName: NAME_MAX_LENGTH,
     email: 100,
 };
 
@@ -237,7 +236,6 @@ export default function Register() {
                             <input
                                 id="fullName"
                                 name="fullName"
-                                maxLength={MAX_LENGTH.fullName}
                                 type="text"
                                 autoComplete="name"
                                 aria-required="true"

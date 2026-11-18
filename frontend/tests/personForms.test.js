@@ -76,13 +76,15 @@ describe('Registration: full name and phone (#312)', () => {
         expect(register).not.toHaveBeenCalled();
     });
 
-    test('the name field takes at most 70 characters', async () => {
-        // Arrange
+    test('the name field accepts 70 Unicode code points when pasted', async () => {
         const user = userEvent.setup();
+        const fullName = 'A'.repeat(69) + '𠮷';
         await fillForm(user);
 
-        // Assert
-        expect(field('fullName')).toHaveAttribute('maxLength', '70');
+        await user.clear(field('fullName'));
+        await user.paste(fullName);
+
+        expect(field('fullName')).toHaveValue(fullName);
     });
 
     test('marks the name and the phone when the backend rejects them', async () => {
@@ -134,12 +136,14 @@ describe('Mi perfil: full name and phone (#312)', () => {
         changePassword.mockReset();
     });
 
-    test('the name field takes at most 70 characters', async () => {
-        // Act
-        await openProfile(userEvent.setup());
+    test('the profile name field accepts 70 Unicode code points when pasted', async () => {
+        const user = await openProfile(userEvent.setup());
+        const fullName = 'A'.repeat(69) + '𠮷';
 
-        // Assert
-        expect(field('fullName')).toHaveAttribute('maxLength', '70');
+        await user.clear(field('fullName'));
+        await user.paste(fullName);
+
+        expect(field('fullName')).toHaveValue(fullName);
     });
 
     test('rejects the name "12345 @@@" without calling the API', async () => {
@@ -166,6 +170,15 @@ describe('Mi perfil: full name and phone (#312)', () => {
         // Assert
         expect(errorOf('phone')).toHaveTextContent(PHONE_RULE_MESSAGE);
         expect(updateProfile).not.toHaveBeenCalled();
+    });
+
+    test('an unchanged formatted phone does not block a name change', async () => {
+        const user = await openProfile(userEvent.setup(), { ...LAURA, phone: '200 123 4567' });
+
+        await replace(user, 'fullName', 'Laura Ríos');
+        await user.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+        expect(updateProfile).toHaveBeenCalledWith({ fullName: 'Laura Ríos' });
     });
 
     test('an old name that breaks the rules does not block a change of the phone', async () => {
