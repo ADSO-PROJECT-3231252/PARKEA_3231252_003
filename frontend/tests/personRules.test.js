@@ -1,4 +1,4 @@
-import { normalizeName, isValidName, isValidPhone } from '../src/utils/personRules';
+import { normalizeName, isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../src/utils/personRules';
 
 // The rules of the full name and the phone (#312). The backend has a copy of
 // this file with the same cases, because both sides must give the same answer.
@@ -130,5 +130,13 @@ describe('isValidPhone', () => {
 
         // Assert
         expect(result).toBe(false);
+    });
+});
+
+describe('the messages of the forms', () => {
+    test('say the same limits as the rules', () => {
+        // Assert
+        expect(NAME_RULE_MESSAGE).toBe("Usa solo letras, separadas por un espacio, un guion (-) o un apóstrofo ('), entre 2 y 70 caracteres.");
+        expect(PHONE_RULE_MESSAGE).toBe('Ingresa un celular de 10 dígitos que empiece por 3.');
     });
 });
