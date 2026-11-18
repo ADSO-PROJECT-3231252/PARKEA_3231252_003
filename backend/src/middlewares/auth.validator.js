@@ -1,13 +1,14 @@
 const { body, validationResult } = require('express-validator');
 const ErrorCodes = require('../constants/errorCodes');
 const { isTextOrMissing } = require('../utils/validation');
+const { normalizeName, isValidName, isValidPhone } = require('../utils/personRules');
 
 const validateRegister = [
     body('fullName')
         .custom(isTextOrMissing).withMessage('Full name must be text').bail()
-        .trim()
-        .notEmpty().withMessage('Full name is required')
-        .isLength({ max: 70 }).withMessage('Full name must be at most 70 characters'),
+        .customSanitizer(normalizeName)
+        .notEmpty().withMessage('Full name is required').bail()
+        .custom(isValidName).withMessage('Full name must have 2 to 70 characters: letters joined by one space, hyphen or apostrophe'),
     body('email')
         .custom(isTextOrMissing).withMessage('Email must be text').bail()
         .trim()
@@ -27,8 +28,8 @@ const validateRegister = [
     body('phone')
         .custom(isTextOrMissing).withMessage('Phone must be text').bail()
         .trim()
-        .notEmpty().withMessage('Phone is required')
-        .matches(/^[0-9]{10}$/).withMessage('Phone must be exactly 10 digits'),
+        .notEmpty().withMessage('Phone is required').bail()
+        .custom(isValidPhone).withMessage('Phone must be a Colombian mobile number: 10 digits starting with 3'),
     body('documentType')
         .custom(isTextOrMissing).withMessage('Document type must be text').bail()
         .notEmpty().withMessage('Document type is required')
