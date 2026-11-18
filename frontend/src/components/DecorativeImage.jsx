@@ -8,10 +8,12 @@ const BLANK_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABA
 // the Tailwind breakpoint that shows the image, written in rem (Tailwind 4:
 // md = 48rem, lg = 64rem), so the download and the layout change together.
 // The picture has display: contents so the img keeps its place in the layout.
+// The source is hidden too: inside a display: contents picture it would be
+// one more (empty) item of the flex parent and add one more gap.
 export default function DecorativeImage({ src, minWidth, className, style }) {
     return (
         <picture className="contents">
-            <source media={`(min-width: ${minWidth})`} srcSet={src} />
+            <source media={`(min-width: ${minWidth})`} srcSet={src} className="hidden" />
             <img src={BLANK_PIXEL} alt="" aria-hidden="true" className={className} style={style} />
         </picture>
     );
