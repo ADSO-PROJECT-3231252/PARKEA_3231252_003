@@ -66,10 +66,13 @@ describe('Cancelling a reservation whose 15 minutes to pay ended (#347)', () => 
         }
     );
 
-    test('a network error does not load the screen again', async () => {
+    test.each([
+        ['a network error', new Error('Network Error')],
+        ['an error of the server (INTERNAL_ERROR)', { response: { data: { code: 'INTERNAL_ERROR' } } }],
+    ])('%s does not load the screen again', async (_label, failure) => {
         // Arrange
         const user = userEvent.setup();
-        cancelReservation.mockRejectedValue(new Error('Network Error'));
+        cancelReservation.mockRejectedValue(failure);
         const { onClose } = openDialog();
 
         // Act
