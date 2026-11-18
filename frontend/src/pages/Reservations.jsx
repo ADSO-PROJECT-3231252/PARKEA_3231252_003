@@ -20,7 +20,7 @@ import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
 import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation } from '../utils/reservationStatus';
 import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
 import { paymentLabelOf } from '../utils/paymentStatus';
 import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
@@ -144,7 +144,7 @@ function StatusInfo({ reservation }) {
     );
 }
 function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, onExtend, inline = false }) {
-    const isPending = reservation.status === 'Pending';
+    const canPay = canPayReservation(reservation, now);
     const canCancel = canCancelReservation(reservation, now);
     const canFinish = canFinishStay(reservation, now);
     const canExtend = canExtendStay(reservation, now);
@@ -161,8 +161,9 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
         : 'flex w-full flex-col gap-1.5 sm:w-36';
     return (
         <div className={wrapper}>
-            {/* AC-06: only Pending reservations can be paid (HU-17). */}
-            {isPending && (
+            {/* AC-06: only Pending reservations can be paid (HU-17), while their
+                15 minutes to pay last (#347). */}
+            {canPay && (
                 <button
                     type="button"
                     onClick={() => onPay(reservation.id)}
@@ -209,7 +210,8 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                     Ampliar estadía
                 </button>
             )}
-            {/* HU-16 AC-01: Pending or Active (already paid) reservations that have not started. */}
+            {/* HU-16 AC-01: Pending reservations while their 15 minutes to pay last
+                (#347), or Active (already paid) ones that have not started. */}
             {canCancel && (
                 <button
                     type="button"
@@ -328,21 +330,25 @@ export default function Reservations() {
             active = false;
         };
     }, [statusFilter, page, reloadKey]);
-    // HU-28 AC-01: "Ampliar estadía" is offered until the exit time, so the
-    // list updates itself when the next exit time on screen is reached. A
+    // The list updates itself at the next moment a button on screen changes:
+    // HU-28 AC-01, "Ampliar estadía" is offered until the exit time; #347,
+    // "Pagar" and "Cancelar" are offered until the 15 minutes to pay end. A
     // timer cannot wait more than about 24 days, so a longer wait is done in
     // steps (each step updates `now`, which schedules the next one).
-    const nextExitMs = reservations
-        .filter((r) => r.status === 'Active' && !r.openEnded && r.endTime)
-        .map((r) => new Date(r.endTime).getTime())
-        .filter((ms) => now !== null && ms > now)
+    const nextChangeMs = reservations
+        .map((r) => {
+            if (r.status === 'Active' && !r.openEnded && r.endTime) return new Date(r.endTime).getTime();
+            if (r.status === 'Pending' && r.holdExpiresAt) return new Date(r.holdExpiresAt).getTime();
+            return null;
+        })
+        .filter((ms) => ms !== null && now !== null && ms > now)
         .reduce((min, ms) => Math.min(min, ms), Infinity);
     useEffect(() => {
-        if (nextExitMs === Infinity) return;
-        const delay = Math.max(0, nextExitMs - Date.now());
+        if (nextChangeMs === Infinity) return;
+        const delay = Math.max(0, nextChangeMs - Date.now());
         const timer = setTimeout(() => setNow(Date.now()), Math.min(delay + 100, MAX_TIMER_MS));
         return () => clearTimeout(timer);
-    }, [nextExitMs, now]);
+    }, [nextChangeMs, now]);
     // Every change that triggers a new fetch shows the loading state first; it's
     // set here, in the event, rather than inside the effect.
     const startLoading = () => {
