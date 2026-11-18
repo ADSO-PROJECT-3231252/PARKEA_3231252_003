@@ -373,7 +373,8 @@ export default function ReservationConfirmation() {
     const displayStatus = shownStatus(reservation, now);
     const { label: statusLabel = displayStatus, Icon: StatusIcon, badge: statusBadge } =
         RESERVATION_STATUS[displayStatus] ?? FALLBACK_STATUS;
-    const isPending = reservation.status === 'Pending';
+    // #347: the labels below follow the status shown
+    const isPending = displayStatus === 'Pending';
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = remainingMs !== null && remainingMs <= 0;
     // #347: at 00:00 "Ir al pago" and "Cancelar reserva" are hidden, with the
@@ -399,7 +400,7 @@ export default function ReservationConfirmation() {
         durationLabel = formatDuration(reservation.startTime, reservation.endTime);
     } else if (isRunning) {
         durationLabel = `${formatDuration(reservation.startTime, stayEndSoFar(reservation.startTime, now, reservation.latestEndTime))} hasta ahora`;
-    } else if (['Pending', 'Active'].includes(reservation.status)) {
+    } else if (['Pending', 'Active'].includes(displayStatus)) {
         durationLabel = 'Tiempo indefinido';
     }
     // The amount in the green box and its label.
@@ -606,7 +607,7 @@ export default function ReservationConfirmation() {
                                         <>
                                             <p className="text-body font-medium text-neutral-900">Sin hora de salida</p>
                                             {/* HU-29 AC-04: when it ends by itself at the latest */}
-                                            {['Pending', 'Active'].includes(reservation.status) &&
+                                            {['Pending', 'Active'].includes(displayStatus) &&
                                                 (reservation.latestEndTime ? (
                                                     <>
                                                         <p className="break-words text-caption text-neutral-600">
@@ -704,7 +705,7 @@ export default function ReservationConfirmation() {
                     </div>
 
                     {/* HU-27 AC-03/AC-07: how an open stay is charged, and what is left to pay */}
-                    {isOpenStay && ['Pending', 'Active'].includes(reservation.status) && (
+                    {isOpenStay && ['Pending', 'Active'].includes(displayStatus) && (
                         <p className="mt-3 text-caption text-neutral-600">
                             {openStayNote(
                                 isRunning,

@@ -81,6 +81,7 @@ describe('The reservation screen when the 15 minutes to pay end (#347)', () => {
         expect(payLink()).toBeInTheDocument();
         expect(cancelButton()).toBeInTheDocument();
         expect(screen.getByText('Pendiente de pago')).toBeInTheDocument();
+        expect(screen.getByText('Total a pagar')).toBeInTheDocument();
 
         // Act: the counter reaches 00:00
         await wait(1000);
@@ -93,6 +94,29 @@ describe('The reservation screen when the 15 minutes to pay end (#347)', () => {
         // It already shows as expired, like in "Mis reservas"
         expect(screen.getByText('Expirada')).toBeInTheDocument();
         expect(screen.queryByText('Pendiente de pago')).not.toBeInTheDocument();
+        expect(screen.getByText('Total de la reserva')).toBeInTheDocument();
+        expect(screen.queryByText('Total a pagar')).not.toBeInTheDocument();
+    });
+
+    test('an open stay waiting for payment shows like an expired one at 00:00', async () => {
+        // Arrange: no exit time, the first hour to pay, at the latest until midnight
+        answer({ endTime: null, openEnded: true, latestEndTime: at(16 * 60 * MINUTE) });
+        renderScreen();
+        expect(await screen.findByText('Primera hora a pagar')).toBeInTheDocument();
+        expect(screen.getAllByText('Tiempo indefinido')).toHaveLength(2);
+        expect(screen.getByText(/^Termina a más tardar/)).toBeInTheDocument();
+        expect(screen.getByText(/^Se cobra/)).toBeInTheDocument();
+
+        // Act: the counter reaches 00:00
+        await wait(10 * MINUTE);
+
+        // Assert: like a reservation the job already marked Expired
+        expect(screen.getByText('Expirada')).toBeInTheDocument();
+        expect(screen.getByText('Total de la reserva')).toBeInTheDocument();
+        expect(screen.queryByText('Primera hora a pagar')).not.toBeInTheDocument();
+        expect(screen.queryAllByText('Tiempo indefinido')).toHaveLength(0);
+        expect(screen.queryByText(/^Termina a más tardar/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/^Se cobra/)).not.toBeInTheDocument();
     });
 
     test('while the job has not marked it Expired, the buttons stay hidden', async () => {
