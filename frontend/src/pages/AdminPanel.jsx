@@ -11,7 +11,9 @@ import {
 } from '../services/adminService';
 import { formatCurrency, formatDate, formatTime } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { ZONE_AXIS_WIDTH, ZONE_TOOLTIP_STYLE, zoneChartHeight, zoneTooltipPosition } from '../utils/zoneChart';
 import MetricCard from '../components/MetricCard';
+import ZoneAxisTick from '../components/ZoneAxisTick';
 import {
     BarChart,
     Bar,
@@ -93,6 +95,8 @@ export default function AdminPanel() {
     const [metricsError, setMetricsError] = useState(false);
 
     const [reservationsByZone, setReservationsByZone] = useState(null);
+    // #309: the width of the chart decides where its tooltip goes
+    const [zoneChartWidth, setZoneChartWidth] = useState(0);
     const [reservationsByZoneLoading, setReservationsByZoneLoading] = useState(true);
     const [reservationsByZoneError, setReservationsByZoneError] = useState(false);
 
@@ -328,8 +332,9 @@ export default function AdminPanel() {
                         <SectionEmpty message="No hay reservas en este rango." />
                     ) : (
                         <>
-                            <div style={{ width: '100%', height: 260 }}>
-                                <ResponsiveContainer>
+                            {/* #309: one row per zone, so the names never overlap */}
+                            <div style={{ width: '100%', height: zoneChartHeight(reservationsByZone.length) }}>
+                                <ResponsiveContainer onResize={(width) => setZoneChartWidth(width)}>
                                     <BarChart
                                         data={reservationsByZone}
                                         layout="vertical"
@@ -337,8 +342,19 @@ export default function AdminPanel() {
                                     >
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                         <XAxis type="number" allowDecimals={false} />
-                                        <YAxis type="category" dataKey="zoneName" width={110} tick={{ fontSize: 12 }} />
-                                        <Tooltip formatter={(value) => [value, 'Reservas']} />
+                                        {/* #309: each name on one line; one that does not fit is cut
+                                            with "…", and the tooltip of its bar has it complete */}
+                                        <YAxis
+                                            type="category"
+                                            dataKey="zoneName"
+                                            width={ZONE_AXIS_WIDTH}
+                                            tick={<ZoneAxisTick />}
+                                        />
+                                        <Tooltip
+                                            formatter={(value) => [value, 'Reservas']}
+                                            contentStyle={ZONE_TOOLTIP_STYLE}
+                                            position={zoneTooltipPosition(zoneChartWidth)}
+                                        />
                                         <Bar dataKey="reservationCount" fill="var(--color-parkea-600)" radius={[0, 4, 4, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
