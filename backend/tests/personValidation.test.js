@@ -31,7 +31,7 @@ describe('Sign-up: full name and phone (#312)', () => {
 
     test('accepts the examples of the card and saves the name without extra spaces', async () => {
         // Act
-        const res = await request(app).post('/check').send({ ...VALID_SIGN_UP, fullName: "  Ana   María Pérez-O'Neil " });
+        const res = await request(app).post('/check').send({ ...VALID_SIGN_UP, fullName: "  Ana   María Pérez-O'Neil ", phone: ' 3001234567 ' });
 
         // Assert
         expect(res.status).toBe(200);
