@@ -61,6 +61,35 @@ describe('coordinate errors after editing a zone (#308)', () => {
         act(() => result.current.setField(field, inside));
         expect(result.current.errors).toEqual({});
     });
+
+    test('without a coordinate error on screen, typing a coordinate shows no error yet', () => {
+        // Arrange: a new form, nothing saved yet
+        const { result } = renderHook(() => useZoneForm({ ...validForm(), latitude: '', longitude: '' }));
+
+        // Act: the first coordinate, still without the other one
+        act(() => result.current.setField('latitude', '41'));
+
+        // Assert: the errors come out when saving
+        expect(result.current.errors).toEqual({});
+    });
+
+    test.each([
+        ['correcting the latitude keeps the error of the name', 'latitude', '4.8133', ['name']],
+        ['writing the name keeps the warning of the location', 'name', 'Centro', ['latitude', 'longitude']],
+    ])('%s', (_label, field, value, kept) => {
+        // Arrange: no name and a location outside Colombia, after saving
+        const form = { ...validForm(), name: '', latitude: '40' };
+        const { result } = renderHook(() => useZoneForm(form));
+        act(() => result.current.showErrors(validateZoneForm(form)));
+        const shown = result.current.errors;
+        expect(Object.keys(shown).sort()).toEqual(['latitude', 'longitude', 'name']);
+
+        // Act
+        act(() => result.current.setField(field, value));
+
+        // Assert
+        expect(result.current.errors).toEqual(Object.fromEntries(kept.map((name) => [name, shown[name]])));
+    });
 });
 
 describe('validateZoneForm', () => {
