@@ -19,7 +19,8 @@ import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { pickHomeReservation } from '../utils/homeReservation';
-import { shownStatus } from '../utils/reservationStatus';
+import { nextReservationChange, shownStatus } from '../utils/reservationStatus';
+import { MAX_TIMER_MS } from '../utils/extendStay';
 
 import heroVisitorIllustration from '../assets/hero-visitor.webp';
 import heroUserIllustration from '../assets/hero-user.webp';
@@ -169,8 +170,9 @@ function AuthenticatedHome({ user }) {
     const [reservations, setReservations] = useState([]);
     const [reservationsLoading, setReservationsLoading] = useState(true);
     const [reservationsError, setReservationsError] = useState(false);
-    // When the reservations arrived: the moment the card is decided for (#347)
-    const [loadedAt, setLoadedAt] = useState(null);
+    // The moment the card is decided for (#347): when the reservations arrived,
+    // and again at every moment the card can change by itself
+    const [now, setNow] = useState(null);
 
     const [zones, setZones] = useState([]);
     const [zonesLoading, setZonesLoading] = useState(true);
@@ -188,7 +190,7 @@ function AuthenticatedHome({ user }) {
         getReservations({ limit: 100 })
             .then((res) => {
                 if (!active) return;
-                setLoadedAt(Date.now());
+                setNow(Date.now());
                 setReservations(res.data.reservations);
             })
             .catch(() => {
@@ -228,11 +230,22 @@ function AuthenticatedHome({ user }) {
     // #306: the stay running now, else the next one, else the last finished.
     // The last finished one is the first of the history (the latest first).
     const currentReservation = useMemo(
-        () => pickHomeReservation({ reservations, lastFinished: history[0] ?? null }),
-        [reservations, history],
+        () => pickHomeReservation({ reservations, lastFinished: history[0] ?? null }, now ?? undefined),
+        [reservations, history, now],
     );
+    // #347: the card is decided again, without loading the page, at the next
+    // moment it can change: the 15 minutes to pay of a Pending one end, a
+    // confirmed one starts or one that runs ends. A timer cannot wait more
+    // than about 24 days, so a longer wait is done in steps.
+    const nextChangeMs = now === null ? Infinity : nextReservationChange(reservations, now);
+    useEffect(() => {
+        if (nextChangeMs === Infinity) return;
+        const delay = Math.max(0, nextChangeMs - Date.now());
+        const timer = setTimeout(() => setNow(Date.now()), Math.min(delay + 100, MAX_TIMER_MS));
+        return () => clearTimeout(timer);
+    }, [nextChangeMs, now]);
     // #347: from 00:00 a Pending reservation shows as expired, like in "Mis reservas"
-    const currentStatus = currentReservation && shownStatus(currentReservation, loadedAt);
+    const currentStatus = currentReservation && shownStatus(currentReservation, now);
     const cardLoading = reservationsLoading || historyLoading;
 
     return (

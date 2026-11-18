@@ -1,4 +1,4 @@
-import { canCancelReservation, canPayReservation, holdHasEnded } from '../src/utils/reservationStatus';
+import { canCancelReservation, canPayReservation, holdHasEnded, nextReservationChange } from '../src/utils/reservationStatus';
 
 // HU-16 (#316): when the "Cancelar reserva" button is shown. #347: when the
 // 15 minutes to pay a Pending reservation end. "now" is Monday 2026-11-16 at
@@ -98,5 +98,57 @@ describe('When the 15 minutes to pay end (#347)', () => {
 
     test('before the clock of the screen starts, "Pagar" is not shown', () => {
         expect(canPayReservation(waitingForPayment('10:00'), null)).toBe(false);
+    });
+});
+
+describe('nextReservationChange (#347)', () => {
+    const at = (time) => new Date(colombia(time)).getTime();
+
+    test('the end of the 15 minutes to pay of a Pending reservation', () => {
+        expect(nextReservationChange([waitingForPayment('10:00')], NOW)).toBe(at('08:10'));
+    });
+
+    test('the start of a confirmed reservation, from next to running', () => {
+        const paid = { status: 'Active', startTime: colombia('09:00'), endTime: colombia('11:00') };
+        expect(nextReservationChange([paid], NOW)).toBe(at('09:00'));
+    });
+
+    test('the end of a stay that runs', () => {
+        const running = { status: 'Active', startTime: colombia('07:00'), endTime: colombia('08:30') };
+        expect(nextReservationChange([running], NOW)).toBe(at('08:30'));
+    });
+
+    test('the nearest of all of them', () => {
+        const reservations = [
+            { status: 'Active', startTime: colombia('09:00'), endTime: colombia('11:00') },
+            waitingForPayment('12:00'),
+            { status: 'Active', startTime: colombia('07:00'), endTime: colombia('08:45') },
+        ];
+        expect(nextReservationChange(reservations, NOW)).toBe(at('08:10'));
+    });
+
+    test('a moment that is now or already passed does not count', () => {
+        const reservations = [
+            reservation('Pending', '10:00', colombia('08:00')),
+            { status: 'Active', startTime: colombia('07:00'), endTime: colombia('08:00') },
+        ];
+        expect(nextReservationChange(reservations, NOW)).toBe(Infinity);
+    });
+
+    test('an open stay without an end time and a Pending one without a deadline do not change by themselves', () => {
+        const reservations = [
+            { status: 'Active', startTime: colombia('07:00'), endTime: null },
+            reservation('Pending', '10:00', null),
+        ];
+        expect(nextReservationChange(reservations, NOW)).toBe(Infinity);
+    });
+
+    test.each(['Finished', 'Cancelled', 'Expired'])('a reservation with status %s never changes by itself', (status) => {
+        const closed = { status, startTime: colombia('09:00'), endTime: colombia('11:00'), holdExpiresAt: colombia('08:10') };
+        expect(nextReservationChange([closed], NOW)).toBe(Infinity);
+    });
+
+    test('with no reservations there is nothing to wait for', () => {
+        expect(nextReservationChange([], NOW)).toBe(Infinity);
     });
 });

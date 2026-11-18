@@ -71,3 +71,20 @@ export const canCancelReservation = (reservation, now) => {
     if (reservation.status === 'Pending') return !holdHasEnded(reservation, now);
     return reservation.status === 'Active' && new Date(reservation.startTime).getTime() > now;
 };
+
+// #347: the next moment a reservation of the list changes by itself, so a
+// screen can update without loading the page: the end of the 15 minutes to
+// pay of a Pending one, the start of a confirmed one (it goes from next to
+// running) and the end of one that runs (an open stay has no end time yet).
+// Infinity when none of them changes with time.
+export const nextReservationChange = (reservations, now) =>
+    reservations
+        .flatMap((r) => {
+            if (r.status === 'Pending') return [r.holdExpiresAt];
+            if (r.status === 'Active') return [r.startTime, r.endTime];
+            return [];
+        })
+        // A missing date gives 0 or NaN, which never counts
+        .map((value) => new Date(value).getTime())
+        .filter((ms) => ms > now)
+        .reduce((min, ms) => Math.min(min, ms), Infinity);
