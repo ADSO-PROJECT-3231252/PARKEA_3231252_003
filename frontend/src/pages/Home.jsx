@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     MapPin,
@@ -19,6 +19,7 @@ import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import DecorativeImage from '../components/DecorativeImage';
+import { pickHomeReservation } from '../utils/homeReservation';
 
 import heroVisitorIllustration from '../assets/hero-visitor.webp';
 import heroUserIllustration from '../assets/hero-user.webp';
@@ -165,7 +166,7 @@ function VisitorHome() {
 }
 
 function AuthenticatedHome({ user }) {
-    const [latestReservation, setLatestReservation] = useState(null);
+    const [reservations, setReservations] = useState([]);
     const [reservationsLoading, setReservationsLoading] = useState(true);
     const [reservationsError, setReservationsError] = useState(false);
 
@@ -180,9 +181,11 @@ function AuthenticatedHome({ user }) {
     useEffect(() => {
         let active = true;
 
-        getReservations({ limit: 1 })
+        // #306: all of them, the latest first (100 is the most the list gives):
+        // the stay running now, the next ones and the latest of any status
+        getReservations({ limit: 100 })
             .then((res) => {
-                if (active) setLatestReservation(res.data.reservations[0] ?? null);
+                if (active) setReservations(res.data.reservations);
             })
             .catch(() => {
                 if (active) setReservationsError(true);
@@ -218,6 +221,14 @@ function AuthenticatedHome({ user }) {
         };
     }, []);
 
+    // #306: the stay running now, else the next one, else the last finished.
+    // The last finished one is the first of the history (the latest first).
+    const currentReservation = useMemo(
+        () => pickHomeReservation({ reservations, lastFinished: history[0] ?? null }),
+        [reservations, history],
+    );
+    const cardLoading = reservationsLoading || historyLoading;
+
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <title>Inicio | PARKEA</title>
@@ -249,46 +260,46 @@ function AuthenticatedHome({ user }) {
                 >
                     <p className="mb-2 text-label text-neutral-600">Tus reservas</p>
 
-                    {reservationsLoading && <LoadingMessage />}
-                    {!reservationsLoading && reservationsError && <ErrorMessage />}
-                    {!reservationsLoading && !reservationsError && !latestReservation && (
+                    {cardLoading && <LoadingMessage />}
+                    {!cardLoading && reservationsError && <ErrorMessage />}
+                    {!cardLoading && !reservationsError && !currentReservation && (
                         <p className="text-body text-neutral-600">Aún no tienes reservas registradas.</p>
                     )}
-                    {!reservationsLoading && !reservationsError && latestReservation && (
+                    {!cardLoading && !reservationsError && currentReservation && (
                         <div className="rounded-md bg-parkea-50 p-3">
                             <div className="flex items-start justify-between gap-2">
                                 <p className="flex min-w-0 items-center gap-1 text-label font-medium text-neutral-900">
                                     <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
-                                    <span className="truncate">{latestReservation.zone.name}</span>
+                                    <span className="truncate">{currentReservation.zone.name}</span>
                                 </p>
                                 <span
-                                    className={`shrink-0 text-label font-medium ${RESERVATION_STATUS_LABEL[latestReservation.status]?.color ?? 'text-neutral-600'
+                                    className={`shrink-0 text-label font-medium ${RESERVATION_STATUS_LABEL[currentReservation.status]?.color ?? 'text-neutral-600'
                                         }`}
                                 >
-                                    {RESERVATION_STATUS_LABEL[latestReservation.status]?.text ?? latestReservation.status}
+                                    {RESERVATION_STATUS_LABEL[currentReservation.status]?.text ?? currentReservation.status}
                                 </span>
                             </div>
 
-                            {latestReservation.zone.address && (
+                            {currentReservation.zone.address && (
                                 <p className="mt-0.5 pl-[18px] text-body text-neutral-600">
-                                    {latestReservation.zone.address}
+                                    {currentReservation.zone.address}
                                 </p>
                             )}
 
                             <p className="mt-2 flex items-center gap-1 text-body font-medium text-neutral-900">
                                 <Calendar className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
-                                {formatDate(latestReservation.startTime)}
+                                {formatDate(currentReservation.startTime)}
                             </p>
 
                             <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pl-[18px]">
                                 <p className="text-body text-neutral-600">
                                     {/* An open stay (HU-27, or switched to it in HU-28) has no exit time yet */}
-                                    {latestReservation.endTime
-                                        ? `${formatTime(latestReservation.startTime)} – ${formatTime(latestReservation.endTime)}`
-                                        : `${formatTime(latestReservation.startTime)} · Sin hora de salida`}
+                                    {currentReservation.endTime
+                                        ? `${formatTime(currentReservation.startTime)} – ${formatTime(currentReservation.endTime)}`
+                                        : `${formatTime(currentReservation.startTime)} · Sin hora de salida`}
                                 </p>
                                 <p className="shrink-0 font-mono text-label text-neutral-600">
-                                    Cupo N.º {latestReservation.spotNumber}
+                                    Cupo N.º {currentReservation.spotNumber}
                                 </p>
                             </div>
                         </div>
