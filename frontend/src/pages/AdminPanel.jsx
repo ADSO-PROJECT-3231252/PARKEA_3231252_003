@@ -11,6 +11,7 @@ import {
 } from '../services/adminService';
 import { formatCurrency, formatDate, formatTime } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { PAYMENT_STATUS_LABELS } from '../utils/paymentStatus';
 import { ZONE_AXIS_WIDTH, ZONE_TOOLTIP_STYLE, zoneChartHeight, zoneTooltipPosition } from '../utils/zoneChart';
 import MetricCard from '../components/MetricCard';
 import ZoneAxisTick from '../components/ZoneAxisTick';
@@ -35,6 +36,8 @@ const RANGE_OPTIONS = [
 const rangeLabel = (range) => RANGE_OPTIONS.find((opt) => opt.value === range).label;
 
 // AC-06: semantic colours + a text label on every segment, never colour alone.
+// The labels count payments, so they are plural; each row of "Pagos recientes"
+// is one payment and says it in singular (PAYMENT_STATUS_LABELS, #309).
 const PAYMENT_STATUS_META = {
     Paid: { label: 'Pagados', color: 'var(--color-parkea-600)' },
     Pending: { label: 'Pendientes', color: 'var(--color-warning)' },
@@ -530,7 +533,7 @@ export default function AdminPanel() {
                                                         color: PAYMENT_STATUS_META[pago.paymentStatus]?.color,
                                                     }}
                                                 >
-                                                    {PAYMENT_STATUS_META[pago.paymentStatus]?.label ?? pago.paymentStatus}
+                                                    {PAYMENT_STATUS_LABELS[pago.paymentStatus] ?? pago.paymentStatus}
                                                 </span>
                                             </td>
                                         </tr>

@@ -1,7 +1,8 @@
 import { pendingBalanceOf } from './openStay';
 
-// HU-18 AC-02: the payment status of each reservation in "Mis reservas"
-const PAYMENT_STATUS_LABELS = {
+// HU-18 AC-02: the payment status of each reservation in "Mis reservas". The
+// admin panel uses the same words for each payment (#309).
+export const PAYMENT_STATUS_LABELS = {
     Pending: 'Pendiente',
     Paid: 'Pagado',
     Cancelled: 'Cancelado',

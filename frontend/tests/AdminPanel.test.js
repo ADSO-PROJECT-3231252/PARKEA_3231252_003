@@ -184,3 +184,32 @@ describe('The tooltip of a bar, with the complete name (#309)', () => {
         expect(JSON.parse(tooltip.dataset.style)).toEqual({ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' });
     });
 });
+
+describe('"Pagos recientes" and "Estado de pagos" (#309)', () => {
+    test('each payment says its status in singular', async () => {
+        // Arrange
+        answer();
+
+        // Act
+        renderPanel();
+        const table = await within(await section('Pagos recientes')).findByRole('table');
+
+        // Assert
+        const statuses = within(table).getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell').at(-1).textContent);
+        expect(statuses).toEqual(['Pagado', 'Pendiente', 'Cancelado', 'Reembolsado']);
+    });
+
+    test('the summary still counts them in plural', async () => {
+        // Arrange
+        answer();
+
+        // Act
+        renderPanel();
+        const box = await section('Estado de pagos');
+
+        // Assert
+        for (const label of ['Pagados', 'Pendientes', 'Cancelados', 'Reembolsados']) {
+            expect(await within(box).findByText(label)).toBeInTheDocument();
+        }
+    });
+});
