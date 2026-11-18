@@ -42,12 +42,28 @@ export const FALLBACK_STATUS = {
     border: 'border-l-neutral-400',
 };
 
+// #347: a Pending reservation has 15 minutes to be paid. When they end it
+// counts as expired for everything, even if it still says Pending: the
+// backend job only marks it Expired once a minute. The backend applies the
+// same rule (at that very moment included). Without holdExpiresAt the
+// screen cannot know, so the backend decides.
+export const holdHasEnded = (reservation, now) =>
+    reservation.status === 'Pending' &&
+    Boolean(reservation.holdExpiresAt) &&
+    new Date(reservation.holdExpiresAt).getTime() <= now;
+
+// HU-17 (#347): "Pagar" and "Ir al pago" are shown for a Pending reservation
+// while its 15 minutes to pay last.
+export const canPayReservation = (reservation, now) =>
+    now !== null && reservation.status === 'Pending' && !holdHasEnded(reservation, now);
+
 // HU-16 AC-01/AC-04/AC-05 (#316): a Pending reservation was not paid, so it
-// can be cancelled while it waits for its payment, even after its start time.
-// An Active one (already paid) only before its start time. The backend
-// applies the same rule; this only decides whether the button is shown.
+// can be cancelled while it waits for its payment, even after its start
+// time, but only while its 15 minutes to pay last (#347). An Active one
+// (already paid) only before its start time. The backend applies the same
+// rule; this only decides whether the button is shown.
 export const canCancelReservation = (reservation, now) => {
     if (now === null) return false;
-    if (reservation.status === 'Pending') return true;
+    if (reservation.status === 'Pending') return !holdHasEnded(reservation, now);
     return reservation.status === 'Active' && new Date(reservation.startTime).getTime() > now;
 };
