@@ -2,6 +2,7 @@ const { Pago, Reserva } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
+const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
 
 // POST /api/payments/:reservationId
 const crearPago = async (req, res) => {
@@ -25,18 +26,11 @@ const crearPago = async (req, res) => {
       await t.rollback();
       return res.status(403).json({ code: ErrorCodes.RESERVATION_NOT_OWNED, message: 'This reservation does not belong to you' });
     }
-    // The expiration job only runs every 60 s, so a reservation can still say
-    // Pending for up to a minute after its hold deadline. The deadline itself is
-    // what decides whether it can still be paid (HU-26, AC-06).
-    const holdVencido = reserva.status === 'Pending'
-      && reserva.holdExpiresAt
-      && new Date(reserva.holdExpiresAt) <= new Date();
-    if (reserva.status === 'Expired' || holdVencido) {
+    // The deadline decides whether it can still be paid, even if the job has
+    // not marked it Expired yet (HU-26, AC-06)
+    if (countsAsExpired(reserva)) {
       await t.rollback();
-      return res.status(400).json({
-        code: ErrorCodes.RESERVATION_EXPIRED,
-        message: 'This reservation expired because it was not paid in time. Please make a new reservation.',
-      });
+      return res.status(400).json(RESERVATION_EXPIRED);
     }
     if (reserva.status !== 'Pending') {
       await t.rollback();
