@@ -33,7 +33,7 @@ async function crear(req, res, next) {
     const userId = req.usuario.id;
     const { zoneId, vehicleId, startTime, endTime, openEnded } = req.body;
 
-    // HU-27: An open stay does not require an end time.
+    // HU-27: an open stay has no exit time; the route only lets a boolean through
     const isOpenStay = openEnded === true;
 
     // Validate required fields before opening a database transaction.
@@ -46,7 +46,6 @@ async function crear(req, res, next) {
 
     const t = await sequelize.transaction();
     try {
-
         const start = new Date(startTime);
         // An open stay keeps a provisional exit time, so the overlap check and
         // the jobs work as with any other reservation: entry + 24 h, or the

@@ -1,4 +1,3 @@
-
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 
@@ -44,24 +43,24 @@ afterEach(() => {
 // #300: Requests without a body must return 400, never 500.
 describe('Requests without a body (#300)', () => {
     const routes = [
-        ['put', '/api/users/me', 'user'],
-        ['post', '/api/reservations', 'user'],
-        ['post', `/api/payments/${RESERVATION_ID}`, 'user'],
-        ['post', `/api/payments/${RESERVATION_ID}/balance`, 'user'],
-        ['post', '/api/zones', 'admin'],
-        ['put', `/api/zones/${ZONE_ID}`, 'admin'],
+        ['put', '/api/users/me', 'user', 'MISSING_REQUIRED_FIELDS'],
+        ['post', '/api/reservations', 'user', 'MISSING_REQUIRED_FIELDS'],
+        ['post', `/api/payments/${RESERVATION_ID}`, 'user', 'INVALID_PAYMENT_METHOD'],
+        ['post', `/api/payments/${RESERVATION_ID}/balance`, 'user', 'INVALID_PAYMENT_METHOD'],
+        ['post', '/api/zones', 'admin', 'MISSING_REQUIRED_FIELDS'],
+        ['put', `/api/zones/${ZONE_ID}`, 'admin', 'MISSING_REQUIRED_FIELDS'],
     ];
 
     test.each(routes)(
-        '%s %s without a body returns 400',
-        async (method, path, role) => {
+        '%s %s without a body returns 400 %s',
+        async (method, path, role, code) => {
             mockUser.role.name = role;
 
             const res = await request(app)[method](path)
                 .set('Authorization', `Bearer ${userToken(role)}`);
 
             expect(res.status).toBe(400);
-            expect(res.status).not.toBe(500);
+            expect(res.body.code).toBe(code);
         }
     );
 });
@@ -77,6 +76,20 @@ describe('Empty profile update (#300)', () => {
         expect(res.status).toBe(400);
         expect(res.body.code).toBe('MISSING_REQUIRED_FIELDS');
         expect(mockUser.update).not.toHaveBeenCalled();
+    });
+
+    test.each([
+        ['only the full name', { fullName: 'Ana María Ruiz' }],
+        ['only the phone', { phone: '3109876543' }],
+    ])('PUT /api/users/me with %s still updates the profile', async (label, body) => {
+        // The profile screen only sends the field that changed (Profile.jsx)
+        const res = await request(app)
+            .put('/api/users/me')
+            .set('Authorization', `Bearer ${userToken()}`)
+            .send(body);
+
+        expect(res.status).toBe(200);
+        expect(mockUser.update).toHaveBeenCalledWith(expect.objectContaining(body));
     });
 
     test('PUT /api/users/me without a body does not update the user', async () => {
