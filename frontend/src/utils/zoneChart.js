@@ -21,15 +21,38 @@ export const ZONE_AXIS_LABEL_WIDTH = ZONE_AXIS_WIDTH - 8;
 // before, so the cut never splits a letter in half.
 export const ZONE_AXIS_MAX_CHARS = 16;
 
-// Intl.Segmenter is in every browser of 2024 on; an older one counts by
-// characters, which still never splits one in half.
+// Intl.Segmenter is in every browser of 2024 on and knows every way of
+// writing a letter.
 const letterSegmenter = typeof Intl.Segmenter === 'function'
     ? new Intl.Segmenter('es', { granularity: 'grapheme' })
     : null;
 
+// An older browser joins the characters itself: an accent or another mark, a
+// skin tone, a joiner (ZWJ) and what follows it, or the tags of a regional
+// flag go with the character before them, and the two halves of a flag
+// ("🇨" "🇴") go together.
+const JOINS_PREVIOUS = /^[\p{M}\p{Emoji_Modifier}\u200D\u{E0020}-\u{E007F}]$/u;
+const FLAG_HALF = /^\p{Regional_Indicator}$/u;
+
+function joinLetters(text) {
+    const letters = [];
+    let afterJoiner = false;
+    for (const char of text) {
+        const last = letters[letters.length - 1];
+        const secondFlagHalf = FLAG_HALF.test(char) && FLAG_HALF.test(last ?? '');
+        if (last !== undefined && (afterJoiner || secondFlagHalf || JOINS_PREVIOUS.test(char))) {
+            letters[letters.length - 1] = last + char;
+        } else {
+            letters.push(char);
+        }
+        afterJoiner = char === '\u200D';
+    }
+    return letters;
+}
+
 const lettersOf = (text) => (letterSegmenter
     ? Array.from(letterSegmenter.segment(text), ({ segment }) => segment)
-    : Array.from(text));
+    : joinLetters(text));
 
 export function shortZoneName(name, maxLetters = ZONE_AXIS_MAX_CHARS) {
     const letters = lettersOf(String(name ?? ''));

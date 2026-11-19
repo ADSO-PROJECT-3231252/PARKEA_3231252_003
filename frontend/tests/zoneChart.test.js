@@ -64,7 +64,7 @@ describe('shortZoneName', () => {
 
     test.each([
         ['a letter written with two code units', '𝓐'.repeat(20), `${'𝓐'.repeat(15)}…`],
-        ['an accent written as a second character', 'Pérez '.repeat(4), 'Pérez Pérez Pér…'],
+        ['an accent written as a second character', 'Pe\u0301rez '.repeat(4), 'Pe\u0301rez Pe\u0301rez Pe\u0301r…'],
         ['a flag (two characters)', '🇨🇴'.repeat(20), `${'🇨🇴'.repeat(15)}…`],
         ['an emoji joined from several', '👨‍👩‍👧'.repeat(20), `${'👨‍👩‍👧'.repeat(15)}…`],
     ])('%s is never split in half', (_label, name, shown) => {
@@ -75,24 +75,50 @@ describe('shortZoneName', () => {
         expect(shortZoneName(undefined)).toBe('');
         expect(shortZoneName(null)).toBe('');
     });
+});
 
-    test('a browser without Intl.Segmenter counts by characters, which never splits one in half', async () => {
-        // Arrange: the module is loaded again without Intl.Segmenter
+// #309: a letter that is more than one character, right at the cut of 16
+// letters (14 "A", the letter, and the rest of the name). An older browser has
+// no Intl.Segmenter, so the module is loaded again without it.
+describe('the cut never splits a letter, with and without Intl.Segmenter', () => {
+    const before = 'A'.repeat(14);
+    const CUT_CASES = [
+        ['an accent written as a second character', `${before}e\u0301 Centro`, `${before}e\u0301…`],
+        ['a flag (two characters)', `${before}🇨🇴 Centro`, `${before}🇨🇴…`],
+        ['two flags in a row, which are two letters', `${before}🇨🇴🇨🇴 Centro`, `${before}🇨🇴…`],
+        ['a flag written with tags', `${before}🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F} Centro`, `${before}🏴\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}…`],
+        ['an emoji joined from several', `${before}👨‍👩‍👧 Centro`, `${before}👨‍👩‍👧…`],
+        ['an emoji with a skin tone', `${before}👍🏽 Centro`, `${before}👍🏽…`],
+        ['a letter written with two code units', `${before}𝓐 Centro`, `${before}𝓐…`],
+    ];
+
+    let shortZoneNameWithoutSegmenter;
+
+    beforeAll(async () => {
         const { Segmenter } = Intl;
         delete Intl.Segmenter;
-        let oldShortZoneName;
         try {
             await jest.isolateModulesAsync(async () => {
-                ({ shortZoneName: oldShortZoneName } = await import('../src/utils/zoneChart'));
+                ({ shortZoneName: shortZoneNameWithoutSegmenter } = await import('../src/utils/zoneChart'));
             });
         } finally {
             Intl.Segmenter = Segmenter;
         }
+    });
 
-        // Act and assert: the accent written as a second character counts as
-        // one more character there
-        expect(oldShortZoneName('Pe\u0301rez '.repeat(4))).toBe('Pe\u0301rez Pe\u0301rez P…');
-        expect(oldShortZoneName('𝓐'.repeat(20))).toBe(`${'𝓐'.repeat(15)}…`);
+    test.each(CUT_CASES)('with Intl.Segmenter: %s', (_label, name, shown) => {
+        expect(shortZoneName(name)).toBe(shown);
+    });
+
+    test.each(CUT_CASES)('without Intl.Segmenter (an older browser): %s', (_label, name, shown) => {
+        expect(shortZoneNameWithoutSegmenter(name)).toBe(shown);
+    });
+
+    test('without Intl.Segmenter, a name that fits stays as it is', () => {
+        expect(shortZoneNameWithoutSegmenter('Pe\u0301rez 🇨🇴')).toBe('Pe\u0301rez 🇨🇴');
+        expect(shortZoneNameWithoutSegmenter('A'.repeat(16))).toBe('A'.repeat(16));
+        // A mark with no letter before it is a letter of its own
+        expect(shortZoneNameWithoutSegmenter('\u0301Centro')).toBe('\u0301Centro');
     });
 });
 
