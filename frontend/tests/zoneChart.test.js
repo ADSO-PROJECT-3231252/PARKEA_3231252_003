@@ -168,6 +168,7 @@ describe('The tooltip of a bar', () => {
 
     test.each([
         ['before the chart is measured', 0, undefined],
+        ['the narrowest chart once measured', 1, { x: 0 }],
         ['a chart of a 320 px screen', 220, { x: 0 }],
         ['the widest chart where it does not fit after the names', 343, { x: 0 }],
         ['the narrowest chart where it fits after the names', 344, undefined],

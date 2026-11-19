@@ -39,8 +39,13 @@ jest.mock('recharts', () => {
                 </div>
             );
         },
-        Tooltip: ({ position, contentStyle }) => (
-            <text data-testid="zone-tooltip" data-position={JSON.stringify(position ?? null)} data-style={JSON.stringify(contentStyle)} />
+        Tooltip: ({ position, contentStyle, formatter }) => (
+            <text
+                data-testid="zone-tooltip"
+                data-position={JSON.stringify(position ?? null)}
+                data-style={JSON.stringify(contentStyle)}
+                data-text={JSON.stringify(formatter?.(3))}
+            />
         ),
     };
 });
@@ -141,6 +146,22 @@ describe('"Reservas por zona" (#309)', () => {
         expect([...axis.querySelectorAll('title')].map((title) => title.textContent)).toEqual([LONG_NAME]);
     });
 
+    test('the names end where the 110 px of their axis end, so they are cut to fit that space', async () => {
+        // Arrange
+        answer();
+
+        // Act
+        renderPanel();
+        const box = await section('Reservas por zona');
+        await within(box).findByText('Parqueadero Púb…');
+
+        // Assert: 8 px of margin, plus the 110 of the axis, less its small
+        // line and gap (8 px)
+        const ticks = [...box.querySelectorAll('.recharts-yAxis-tick-labels text.recharts-cartesian-axis-tick-value')];
+        expect(ticks).toHaveLength(ZONE_NAMES.length);
+        expect(ticks.map((tick) => tick.getAttribute('x'))).toEqual(ZONE_NAMES.map(() => '110'));
+    });
+
     test('the table for screen readers keeps the complete names', async () => {
         // Arrange
         answer();
@@ -166,7 +187,8 @@ describe('The tooltip of a bar, with the complete name (#309)', () => {
         renderPanel();
         const tooltip = await screen.findByTestId('zone-tooltip');
 
-        // Assert
+        // Assert: it says how many reservations the zone has
+        expect(JSON.parse(tooltip.dataset.text)).toEqual([3, 'Reservas']);
         expect(JSON.parse(tooltip.dataset.position)).toEqual({ x: 0 });
         expect(JSON.parse(tooltip.dataset.style)).toEqual({ maxWidth: 200, whiteSpace: 'normal', overflowWrap: 'anywhere' });
     });

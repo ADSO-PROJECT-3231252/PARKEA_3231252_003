@@ -62,4 +62,20 @@ describe('Long zone names on the home (#309)', () => {
         expect(name).toHaveClass('break-words');
         expect(name).not.toHaveClass('truncate');
     });
+
+    test.each([
+        ['Tus reservas'],
+        ['Zonas disponibles'],
+    ])('in the card "%s" the pin stays on the first line of a long name', async (title) => {
+        // Act
+        renderHome();
+        const box = await card(title);
+
+        // Assert: the pin is in a box of one line high, at the top of the name
+        const name = await within(box).findByText(LONG_NAME);
+        expect(name.parentElement).toHaveClass('flex', 'items-start');
+        const pin = name.previousElementSibling;
+        expect(pin).toHaveClass('flex', 'h-[1lh]', 'shrink-0', 'items-center');
+        expect(pin.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    });
 });

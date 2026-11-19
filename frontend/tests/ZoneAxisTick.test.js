@@ -68,7 +68,8 @@ describe('In the tests (jsdom does not draw, so nothing is measured)', () => {
 
 describe('In a browser, the name is measured so it fits in the axis', () => {
     // Each letter as wide as the test says. Only a hidden copy is measured,
-    // never the name that is shown.
+    // never the name that is shown. Like in a browser, a text that is not in
+    // the page measures 0.
     let letterWidth;
     let measured;
 
@@ -76,6 +77,7 @@ describe('In a browser, the name is measured so it fits in the axis', () => {
         letterWidth = 8;
         measured = [];
         SVGElement.prototype.getComputedTextLength = function getComputedTextLength() {
+            if (!this.isConnected) return 0;
             measured.push({ text: this.textContent, hidden: this.getAttribute('visibility') === 'hidden' });
             return Array.from(this.textContent).length * letterWidth;
         };
