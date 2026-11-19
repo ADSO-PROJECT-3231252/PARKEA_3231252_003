@@ -152,6 +152,8 @@ describe('fitZoneName', () => {
 
     test('it never goes below two letters ("A…")', () => {
         expect(fitZoneName('Parqueadero', lettersOf(200))).toBe('P…');
+        // 3 letters of 34 px = 102 px: "Pa…" is the last cut that fits
+        expect(fitZoneName('Parqueadero', lettersOf(34))).toBe('Pa…');
     });
 
     test('the space can be another one', () => {
