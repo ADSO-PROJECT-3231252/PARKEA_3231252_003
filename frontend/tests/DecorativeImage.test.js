@@ -33,6 +33,11 @@ const imagesWithTheFile = (container) => [...container.querySelectorAll('img')].
 // so changing only one of them fails.
 const decorativePictures = (container) => [...container.querySelectorAll('picture')];
 
+// The classes that decide whether an element is shown, at any breakpoint. An
+// extra one (md:block) would show the blank pixel before the image is downloaded.
+const DISPLAY_CLASS = /^(?:[a-z0-9]+:)?(?:hidden|block|flex|grid|contents|inline|inline-block|inline-flex)$/;
+const displayClassesOf = (element) => [...element.classList].filter((name) => DISPLAY_CLASS.test(name));
+
 describe('DecorativeImage (#337)', () => {
     test('the image is only offered from minWidth up; the <img> starts with a blank pixel', () => {
         // Act
@@ -98,7 +103,7 @@ describe('Screens with a decorative image that phones do not download (#337)', (
         const pictures = decorativePictures(container);
         expect(pictures).toHaveLength(1);
         expect(sourceOf(container)).toHaveAttribute('media', '(min-width: 64rem)');
-        expect(pictures[0].querySelector('img')).toHaveClass('hidden', 'lg:block');
+        expect(displayClassesOf(pictures[0].querySelector('img'))).toEqual(['hidden', 'lg:block']);
         expect(imagesWithTheFile(container)).toHaveLength(0);
     });
 
@@ -110,7 +115,7 @@ describe('Screens with a decorative image that phones do not download (#337)', (
         const pictures = decorativePictures(container);
         expect(pictures).toHaveLength(1);
         expect(sourceOf(container)).toHaveAttribute('media', '(min-width: 48rem)');
-        expect(pictures[0].parentElement).toHaveClass('hidden', 'md:flex');
+        expect(displayClassesOf(pictures[0].parentElement)).toEqual(['hidden', 'md:flex']);
         // The logo is the only <img> with an image file
         expect(imagesWithTheFile(container)).toHaveLength(1);
         expect(imagesWithTheFile(container)[0]).toHaveAttribute('alt', expect.stringMatching(/PARKEA/i));
