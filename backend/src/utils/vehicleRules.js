@@ -11,8 +11,10 @@ const VEHICLE_TEXT_PATTERN = /^[\p{L}\p{N} .-]+$/u;
 // lets through the accent marks written apart ("e" and "¨") and the spaces of
 // other keyboards (no-break, full width). It must run before NFKC, because NFKC
 // turns some symbols into letters: "Ⓜ" becomes "M" and "™" becomes "TM", and
-// after that they would pass VEHICLE_TEXT_PATTERN.
-const TYPED_TEXT_PATTERN = /^[\p{L}\p{N}\p{M}\p{Zs}.-]+$/u;
+// after that they would pass VEHICLE_TEXT_PATTERN. Numbers are only digits
+// (\p{Nd}): \p{N} would also let through "①", "²" and "Ⅲ", which NFKC writes as
+// "1", "2" and "III".
+const TYPED_TEXT_PATTERN = /^[\p{L}\p{Nd}\p{M}\p{Zs}.-]+$/u;
 
 // At least one letter or number, so "...", "---" or ". -" are not a brand.
 const LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
