@@ -21,6 +21,8 @@ describe('translateError', () => {
         ['VERIFICATION_TOKEN_INVALID', 'Este enlace de confirmación ya no es válido. Pide uno nuevo'],
         ['OUTSIDE_ZONE_HOURS', 'La reserva debe estar dentro del horario de la zona, con la entrada al menos 30 minutos antes del cierre'],
         ['ZONE_CLOSED_THAT_DAY', 'Esta zona no abre ese día'],
+        ['TOO_MANY_PENDING_RESERVATIONS', 'Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra'],
+        ['VEHICLE_LIMIT_REACHED', 'Alcanzaste el máximo de 5 vehículos activos. Elimina uno antes de registrar otro'],
     ])('translates %s', (code, text) => {
         expect(translateError(code)).toBe(text);
     });

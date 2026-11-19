@@ -33,6 +33,7 @@ const errorMessages = {
     PLATE_ALREADY_REGISTERED: 'Esta placa ya está registrada',
     VEHICLE_HAS_ACTIVE_RESERVATION: 'Este vehículo tiene una reserva activa. Cancélala antes de eliminarlo',
     INVALID_PLATE_FORMAT: 'El formato de la placa no corresponde al tipo de vehículo seleccionado',
+    VEHICLE_LIMIT_REACHED: 'Alcanzaste el máximo de 5 vehículos activos. Elimina uno antes de registrar otro',
 
     // Zones
     ZONE_NOT_FOUND: 'Zona no encontrada',
@@ -56,6 +57,7 @@ const errorMessages = {
     OUTSIDE_ZONE_HOURS: 'La reserva debe estar dentro del horario de la zona, con la entrada al menos 30 minutos antes del cierre',
     ZONE_CLOSED_THAT_DAY: 'Esta zona no abre ese día',
     VEHICLE_RESERVATION_OVERLAP: 'Este vehículo ya tiene una reserva en ese horario',
+    TOO_MANY_PENDING_RESERVATIONS: 'Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra',
     NO_SPOTS_AVAILABLE: 'Este cupo ya no está disponible. Elige otra zona u horario',
     RESERVATION_NOT_FOUND: 'Reserva no encontrada',
     RESERVATION_ALREADY_STARTED: 'Esta reserva ya inició y no se puede cancelar',
