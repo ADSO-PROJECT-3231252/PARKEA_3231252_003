@@ -11,7 +11,10 @@ import {
 } from '../services/adminService';
 import { formatCurrency, formatDate, formatTime } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { PAYMENT_STATUS_LABELS } from '../utils/paymentStatus';
+import { ZONE_AXIS_WIDTH, ZONE_TOOLTIP_STYLE, zoneChartHeight, zoneTooltipPosition } from '../utils/zoneChart';
 import MetricCard from '../components/MetricCard';
+import ZoneAxisTick from '../components/ZoneAxisTick';
 import {
     BarChart,
     Bar,
@@ -33,6 +36,8 @@ const RANGE_OPTIONS = [
 const rangeLabel = (range) => RANGE_OPTIONS.find((opt) => opt.value === range).label;
 
 // AC-06: semantic colours + a text label on every segment, never colour alone.
+// The labels count payments, so they are plural; each row of "Pagos recientes"
+// is one payment and says it in singular (PAYMENT_STATUS_LABELS, #309).
 const PAYMENT_STATUS_META = {
     Paid: { label: 'Pagados', color: 'var(--color-parkea-600)' },
     Pending: { label: 'Pendientes', color: 'var(--color-warning)' },
@@ -93,6 +98,8 @@ export default function AdminPanel() {
     const [metricsError, setMetricsError] = useState(false);
 
     const [reservationsByZone, setReservationsByZone] = useState(null);
+    // #309: the width of the chart decides where its tooltip goes
+    const [zoneChartWidth, setZoneChartWidth] = useState(0);
     const [reservationsByZoneLoading, setReservationsByZoneLoading] = useState(true);
     const [reservationsByZoneError, setReservationsByZoneError] = useState(false);
 
@@ -328,8 +335,9 @@ export default function AdminPanel() {
                         <SectionEmpty message="No hay reservas en este rango." />
                     ) : (
                         <>
-                            <div style={{ width: '100%', height: 260 }}>
-                                <ResponsiveContainer>
+                            {/* #309: one row per zone, so the names never overlap */}
+                            <div style={{ width: '100%', height: zoneChartHeight(reservationsByZone.length) }}>
+                                <ResponsiveContainer onResize={(width) => setZoneChartWidth(width)}>
                                     <BarChart
                                         data={reservationsByZone}
                                         layout="vertical"
@@ -337,8 +345,19 @@ export default function AdminPanel() {
                                     >
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                         <XAxis type="number" allowDecimals={false} />
-                                        <YAxis type="category" dataKey="zoneName" width={110} tick={{ fontSize: 12 }} />
-                                        <Tooltip formatter={(value) => [value, 'Reservas']} />
+                                        {/* #309: each name on one line; one that does not fit is cut
+                                            with "…", and the tooltip of its bar has it complete */}
+                                        <YAxis
+                                            type="category"
+                                            dataKey="zoneName"
+                                            width={ZONE_AXIS_WIDTH}
+                                            tick={<ZoneAxisTick />}
+                                        />
+                                        <Tooltip
+                                            formatter={(value) => [value, 'Reservas']}
+                                            contentStyle={ZONE_TOOLTIP_STYLE}
+                                            position={zoneTooltipPosition(zoneChartWidth)}
+                                        />
                                         <Bar dataKey="reservationCount" fill="var(--color-parkea-600)" radius={[0, 4, 4, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
@@ -430,8 +449,9 @@ export default function AdminPanel() {
                                     : 0;
                                 return (
                                     <li key={zona.zoneId}>
-                                        <div className="mb-1 flex items-center justify-between gap-2">
-                                            <span className="min-w-0 truncate text-label text-neutral-900">
+                                        {/* #309: a long name goes on to the next line instead of being cut */}
+                                        <div className="mb-1 flex items-start justify-between gap-2">
+                                            <span className="min-w-0 break-words text-label text-neutral-900">
                                                 {zona.zoneName}
                                             </span>
                                             <span
@@ -514,7 +534,7 @@ export default function AdminPanel() {
                                                         color: PAYMENT_STATUS_META[pago.paymentStatus]?.color,
                                                     }}
                                                 >
-                                                    {PAYMENT_STATUS_META[pago.paymentStatus]?.label ?? pago.paymentStatus}
+                                                    {PAYMENT_STATUS_LABELS[pago.paymentStatus] ?? pago.paymentStatus}
                                                 </span>
                                             </td>
                                         </tr>

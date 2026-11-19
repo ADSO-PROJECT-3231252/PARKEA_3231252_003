@@ -45,6 +45,32 @@ describe('buildPinHtml: zone name escaping', () => {
         const pin = render(buildPinHtml('Zona Centro', 5, 10));
         expect(pin.querySelector('.truncate').textContent).toBe('Zona Centro');
     });
+
+    test('the title has the complete name, also escaped (#309)', () => {
+        // Act
+        const pin = render(buildPinHtml(MALICIOUS_NAME, 5, 10));
+
+        // Assert: the attribute keeps the text, and nothing escapes from it
+        const label = pin.querySelector('.truncate');
+        expect(label.getAttribute('title')).toBe(MALICIOUS_NAME);
+        expect(label.attributes).toHaveLength(2);
+        expect(pin.querySelector('img')).toBeNull();
+    });
+});
+
+describe('buildPinHtml: a long name (#309)', () => {
+    test('is cut on the map and its title shows it complete', () => {
+        // Arrange
+        const name = 'Parqueadero Público Municipal del Centro Comercial Gran Plaza';
+
+        // Act
+        const label = render(buildPinHtml(name, 5, 10)).querySelector('.truncate');
+
+        // Assert
+        expect(label).toHaveClass('max-w-[160px]', 'truncate');
+        expect(label).toHaveAttribute('title', name);
+        expect(label.textContent).toBe(name);
+    });
 });
 
 describe('buildPinHtml: state of the pin (AC-02, AC-03)', () => {

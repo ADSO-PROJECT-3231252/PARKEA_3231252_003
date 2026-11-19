@@ -43,7 +43,9 @@ export function buildPinHtml(name, availableSlots, totalSlots) {
         `<span class="zone-marker-pin absolute left-0 top-0 flex h-8 w-8 items-center justify-center border-2 border-white shadow-md ${PIN_CLASSES[availability.state]}">` +
         `<svg ${ICON_ATTRS} class="h-4 w-4 text-white">${iconPaths}</svg>` +
         '</span>' +
-        '<span class="absolute left-9 top-1 max-w-[160px] truncate whitespace-nowrap rounded-md border border-neutral-200 bg-white px-2 py-0.5 text-caption font-medium text-neutral-900 shadow-sm">' +
+        // #309: a long name is cut on the map; the title shows it complete on
+        // hover, and the summary of the pin shows it when it is opened
+        `<span title="${escapeHtml(name)}" class="absolute left-9 top-1 max-w-[160px] truncate whitespace-nowrap rounded-md border border-neutral-200 bg-white px-2 py-0.5 text-caption font-medium text-neutral-900 shadow-sm">` +
         escapeHtml(name) +
         '</span>' +
         '<span class="sr-only">' +
