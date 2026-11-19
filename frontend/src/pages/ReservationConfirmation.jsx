@@ -28,7 +28,7 @@ import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
 import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime, keepTogether } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation, shownStatus } from '../utils/reservationStatus';
 import {
     MAX_OPEN_STAY_MS,
     canFinishStay,
@@ -368,12 +368,18 @@ export default function ReservationConfirmation() {
     }
 
     // An unknown status shows its own name instead of pretending to be Pending.
-    const { label: statusLabel = reservation.status, Icon: StatusIcon, badge: statusBadge } =
-        RESERVATION_STATUS[reservation.status] ?? FALLBACK_STATUS;
-    const isPending = reservation.status === 'Pending';
+    // #347: from 00:00 a Pending reservation already shows as expired, like
+    // in "Mis reservas", while the screen waits for the job to mark it.
+    const displayStatus = shownStatus(reservation, now);
+    const { label: statusLabel = displayStatus, Icon: StatusIcon, badge: statusBadge } =
+        RESERVATION_STATUS[displayStatus] ?? FALLBACK_STATUS;
+    // #347: the labels below follow the status shown
+    const isPending = displayStatus === 'Pending';
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = remainingMs !== null && remainingMs <= 0;
-    const canPay = isPending && !isTimeUp;
+    // #347: at 00:00 "Ir al pago" and "Cancelar reserva" are hidden, with the
+    // same rule as "Mis reservas" and the backend
+    const canPay = canPayReservation(reservation, now);
     const canCancel = canCancelReservation(reservation, now);
     // HU-27: an open stay has no exit time until it ends (endTime is null).
     const isOpenStay = Boolean(reservation.openEnded);
@@ -394,7 +400,7 @@ export default function ReservationConfirmation() {
         durationLabel = formatDuration(reservation.startTime, reservation.endTime);
     } else if (isRunning) {
         durationLabel = `${formatDuration(reservation.startTime, stayEndSoFar(reservation.startTime, now, reservation.latestEndTime))} hasta ahora`;
-    } else if (['Pending', 'Active'].includes(reservation.status)) {
+    } else if (['Pending', 'Active'].includes(displayStatus)) {
         durationLabel = 'Tiempo indefinido';
     }
     // The amount in the green box and its label.
@@ -601,7 +607,7 @@ export default function ReservationConfirmation() {
                                         <>
                                             <p className="text-body font-medium text-neutral-900">Sin hora de salida</p>
                                             {/* HU-29 AC-04: when it ends by itself at the latest */}
-                                            {['Pending', 'Active'].includes(reservation.status) &&
+                                            {['Pending', 'Active'].includes(displayStatus) &&
                                                 (reservation.latestEndTime ? (
                                                     <>
                                                         <p className="break-words text-caption text-neutral-600">
@@ -699,7 +705,7 @@ export default function ReservationConfirmation() {
                     </div>
 
                     {/* HU-27 AC-03/AC-07: how an open stay is charged, and what is left to pay */}
-                    {isOpenStay && ['Pending', 'Active'].includes(reservation.status) && (
+                    {isOpenStay && ['Pending', 'Active'].includes(displayStatus) && (
                         <p className="mt-3 text-caption text-neutral-600">
                             {openStayNote(
                                 isRunning,
@@ -779,7 +785,8 @@ export default function ReservationConfirmation() {
                         <Plus className="h-4 w-4" aria-hidden="true" />
                         Hacer otra reserva
                     </Link>
-                    {/* HU-16 AC-01: Pending or Active reservations that have not started. */}
+                    {/* HU-16 AC-01: Pending reservations while their 15 minutes to pay
+                        last (#347), or Active ones that have not started. */}
                     {canCancel && (
                         <button
                             type="button"

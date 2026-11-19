@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Home from '../src/pages/Home';
 import { AuthProvider } from '../src/context/AuthContext';
@@ -206,5 +206,104 @@ describe('Reservation card of the home (#306)', () => {
         const card = await reservationsCard();
         // Assert
         expect(await within(card).findByText('Zona En Curso')).toBeInTheDocument();
+    });
+
+    test('a pending reservation whose 15 minutes to pay ended shows as expired (#347)', async () => {
+        // Arrange: the only one, and the job has not marked it Expired yet
+        answerLikeTheApi([{ ...reservation('pending', 'Zona Pendiente', 'Pending', 2, 4), holdExpiresAt: at(-0.01) }]);
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+        // Assert
+        expect(await within(card).findByText('Zona Pendiente')).toBeInTheDocument();
+        expect(within(card).getByText('Expirada')).toBeInTheDocument();
+        expect(within(card).queryByText('Pendiente de pago')).not.toBeInTheDocument();
+    });
+});
+
+describe('The card of the home updates itself while the page is open (#347)', () => {
+    // Moves the clock, runs the timers that were due and lets the screen update
+    const wait = (ms) => act(async () => {
+        jest.advanceTimersByTime(ms);
+    });
+    const MINUTE = 60 * 1000;
+    // Opens the home and lets every answer of the API arrive
+    const openHome = () => act(async () => {
+        renderHome();
+    });
+
+    beforeEach(() => {
+        jest.useFakeTimers({ now: new Date('2026-11-16T08:00:00-05:00') });
+        localStorage.clear();
+        localStorage.setItem('token', 'test-token');
+        localStorage.setItem('user', JSON.stringify({ id: 'user-1', fullName: 'Laura Gómez', role: 'user' }));
+        getReservations.mockReset();
+        getZones.mockReset().mockResolvedValue({ data: { zones: [] } });
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
+    // A Pending reservation in 2 hours whose 15 minutes to pay end in 10 minutes
+    const waitingForPayment = () => ({ ...reservation('pending', 'Zona Pendiente', 'Pending', 2, 4), holdExpiresAt: at(10 / 60) });
+
+    test('when the 15 minutes to pay end, the card shows it as expired without loading the page', async () => {
+        // Arrange: it is the only one
+        answerLikeTheApi([waitingForPayment()]);
+        await openHome();
+        const card = await reservationsCard();
+        expect(await within(card).findByText('Pendiente de pago')).toBeInTheDocument();
+        const requests = getReservations.mock.calls.length;
+
+        // Act: one second before the end it still waits for the payment
+        await wait(10 * MINUTE - 1000);
+        expect(within(card).getByText('Pendiente de pago')).toBeInTheDocument();
+
+        // Act: the 15 minutes end
+        await wait(1000 + 100);
+
+        // Assert
+        expect(within(card).getByText('Zona Pendiente')).toBeInTheDocument();
+        expect(within(card).getByText('Expirada')).toBeInTheDocument();
+        expect(within(card).queryByText('Pendiente de pago')).not.toBeInTheDocument();
+        expect(getReservations).toHaveBeenCalledTimes(requests);
+    });
+
+    test('when the 15 minutes to pay end and there is another reservation, the card shows that one', async () => {
+        // Arrange: a paid reservation for tomorrow
+        answerLikeTheApi([
+            reservation('tomorrow', 'Zona Pagada', 'Active', 24, 26),
+            waitingForPayment(),
+        ]);
+        await openHome();
+        const card = await reservationsCard();
+        expect(await within(card).findByText('Zona Pendiente')).toBeInTheDocument();
+
+        // Act: the 15 minutes end
+        await wait(10 * MINUTE + 100);
+
+        // Assert
+        expect(within(card).getByText('Zona Pagada')).toBeInTheDocument();
+        expect(within(card).getByText('Confirmada')).toBeInTheDocument();
+        expect(within(card).queryByText('Zona Pendiente')).not.toBeInTheDocument();
+    });
+
+    test('when the stay that runs ends, the card shows the next one', async () => {
+        // Arrange: a stay that ends in 30 minutes and another one tomorrow
+        answerLikeTheApi([
+            reservation('tomorrow', 'Zona Mañana', 'Active', 24, 26),
+            reservation('running', 'Zona Corriendo', 'Active', -1, 0.5),
+        ]);
+        await openHome();
+        const card = await reservationsCard();
+        expect(await within(card).findByText('Zona Corriendo')).toBeInTheDocument();
+
+        // Act
+        await wait(30 * MINUTE + 100);
+
+        // Assert
+        expect(within(card).getByText('Zona Mañana')).toBeInTheDocument();
+        expect(within(card).queryByText('Zona Corriendo')).not.toBeInTheDocument();
     });
 });
