@@ -60,10 +60,10 @@ counted only per network, so everyone on that network shares their count
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default |
+| POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default. Brand, model and color (up to 50, 50 and 30 characters) only accept letters, numbers, spaces, hyphens and periods, with at least one letter or number. The text is checked as it was typed, then saved normalized |
 | GET | `/vehicles` | User | List my vehicles (HU-11). Default vehicle always first |
 | GET | `/vehicles/:id` | User (owner) | Single vehicle detail, used to prefill the edit form |
-| PUT | `/vehicles/:id` | User (owner) | Edit a vehicle (HU-12). Plate is never editable |
+| PUT | `/vehicles/:id` | User (owner) | Edit a vehicle (HU-12). Plate is never editable. Brand, model and color follow the same rules as when registering, so a vehicle saved with other characters answers 400 until that field is corrected |
 | PATCH | `/vehicles/:id/default` | User (owner) | Set this vehicle as the default one |
 | DELETE | `/vehicles/:id` | User (owner) | Soft-delete a vehicle (HU-13). Blocked if it has a Pending/Active reservation |
 

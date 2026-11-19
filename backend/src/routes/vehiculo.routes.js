@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const { verificarToken, verificarRol } = require('../middlewares/auth.middleware');
 const vehiculoController = require('../controllers/vehiculo.controller');
 const { isTextOrMissing } = require('../utils/validation');
+const { normalizeVehicleText, isValidVehicleText } = require('../utils/vehicleRules');
 
 // #316: vehicles belong to user accounts; an administrator gets 403 FORBIDDEN_ROLE
 const soloUsuarios = [verificarToken, verificarRol('user')];
@@ -15,17 +16,23 @@ const validarCamposVehiculo = [
     body('brand')
         .custom(isTextOrMissing).withMessage('Brand must be text').bail()
         .trim()
-        .notEmpty().withMessage('Brand is required')
+        .notEmpty().withMessage('Brand is required').bail()
+        .custom(isValidVehicleText).withMessage('Brand can only have letters, numbers, spaces, hyphens and periods, with at least one letter or number').bail()
+        .customSanitizer(normalizeVehicleText)
         .isLength({ max: 50 }).withMessage('Brand must be at most 50 characters'),
     body('model')
         .custom(isTextOrMissing).withMessage('Model must be text').bail()
         .trim()
-        .notEmpty().withMessage('Model is required')
+        .notEmpty().withMessage('Model is required').bail()
+        .custom(isValidVehicleText).withMessage('Model can only have letters, numbers, spaces, hyphens and periods, with at least one letter or number').bail()
+        .customSanitizer(normalizeVehicleText)
         .isLength({ max: 50 }).withMessage('Model must be at most 50 characters'),
     body('color')
         .custom(isTextOrMissing).withMessage('Color must be text').bail()
         .trim()
-        .notEmpty().withMessage('Color is required')
+        .notEmpty().withMessage('Color is required').bail()
+        .custom(isValidVehicleText).withMessage('Color can only have letters, numbers, spaces, hyphens and periods, with at least one letter or number').bail()
+        .customSanitizer(normalizeVehicleText)
         .isLength({ max: 30 }).withMessage('Color must be at most 30 characters'),
     body('visualDescription')
         .optional({ checkFalsy: true })
