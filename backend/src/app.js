@@ -34,6 +34,14 @@ function readBody(parser) {
 app.use(readBody(express.json()));
 app.use(readBody(express.urlencoded({ extended: true })));
 
+// Ensure requests without a body have an empty object.
+app.use((req, res, next) => {
+    if (req.body === undefined) {
+        req.body = {};
+    }
+    next();
+});
+
 // Health check route, useful to confirm the server is running
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'PARKEA API' });

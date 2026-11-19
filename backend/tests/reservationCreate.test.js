@@ -94,7 +94,8 @@ describe('The data and the times of a new reservation (HU-14)', () => {
         expect(res.status).toBe(400);
         expect(res.body.code).toBe('MISSING_REQUIRED_FIELDS');
         expect(lockVehicle).not.toHaveBeenCalled();
-        expectNothingSaved();
+        expect(createReservation).not.toHaveBeenCalled();
+        expect(sequelize.transaction).not.toHaveBeenCalled();
     });
 
     test('a start time that is not a date answers 400 INVALID_DATE', async () => {
