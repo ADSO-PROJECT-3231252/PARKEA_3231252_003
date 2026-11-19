@@ -16,6 +16,11 @@ const VEHICLE_TEXT_PATTERN = /^[\p{L}\p{N} .-]+$/u;
 // "1", "2" and "III".
 const TYPED_TEXT_PATTERN = /^[\p{L}\p{Nd}\p{M}\p{Zs}.-]+$/u;
 
+// Small letters written above another ("ᵀᴹ", "ª") and letters that look like
+// a sign ("ʼ", "ˆ"). NFKC would turn the small ones into normal letters, like
+// "™" into "TM".
+const MODIFIER_LETTER = /[\p{Lm}ªº]/u;
+
 // At least one letter or number, so "...", "---" or ". -" are not a brand.
 const LETTER_OR_NUMBER = /[\p{L}\p{N}]/u;
 
@@ -39,7 +44,7 @@ function normalizeVehicleText(value) {
 // normalized one, which is the one that is saved.
 function isValidVehicleText(value) {
     if (typeof value !== 'string') return false;
-    if (INVISIBLE.test(value) || !TYPED_TEXT_PATTERN.test(value.trim())) return false;
+    if (INVISIBLE.test(value) || MODIFIER_LETTER.test(value) || !TYPED_TEXT_PATTERN.test(value.trim())) return false;
 
     const text = normalizeVehicleText(value);
     return !INVISIBLE.test(text) && VEHICLE_TEXT_PATTERN.test(text) && LETTER_OR_NUMBER.test(text);
