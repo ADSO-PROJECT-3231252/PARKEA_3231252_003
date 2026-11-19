@@ -193,6 +193,91 @@ describe('Registering a vehicle (HU-10)', () => {
         expect(createVehicle).toHaveBeenCalledWith(expect.objectContaining({ brand, model, color }), { transaction });
     });
 
+    // #234: a symbol that normalization would turn into a letter is rejected in
+    // the three fields, because the rule checks the text as it was typed
+    test.each([
+        ['brand', 'an enclosed letter', '\u24C2azda'],
+        ['brand', 'a trademark sign', 'Mazda\u2122'],
+        ['model', 'a trademark sign', 'Spark\u2122'],
+        ['color', 'an enclosed letter', 'Gris \u24C2'],
+    ])('the %s with %s answers 400 VALIDATION_ERROR on that field and saves nothing (typed text)', async (field, description, value) => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, [field]: value });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(res.body.errors.map((error) => error.path)).toEqual([field]);
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
+    // #234: the length is measured after the text is normalized
+    test.each([
+        ['brand', 50],
+        ['model', 50],
+        ['color', 30],
+    ])('the %s of exactly %i characters is accepted', async (field, max) => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, [field]: 'A'.repeat(max) });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledWith(expect.objectContaining({ [field]: 'A'.repeat(max) }), { transaction });
+    });
+
+    test.each([
+        ['brand', 51],
+        ['model', 51],
+        ['color', 31],
+    ])('the %s of %i characters answers 400 VALIDATION_ERROR on that field and saves nothing', async (field, length) => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, [field]: 'A'.repeat(length) });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(res.body.errors.map((error) => error.path)).toEqual([field]);
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
+    test('a brand of 50 letters with extra spaces at the ends is accepted and saved without them', async () => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, brand: `  ${'A'.repeat(50)}  ` });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledWith(expect.objectContaining({ brand: 'A'.repeat(50) }), { transaction });
+    });
+
+    test('several spaces between the words count as one: 50 characters after the text is normalized are accepted', async () => {
+        // Arrange: 24 + 4 spaces + 25 letters is 53 written, 50 once the spaces are joined
+        const brand = `${'A'.repeat(24)}    ${'A'.repeat(25)}`;
+
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, brand });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledWith(expect.objectContaining({ brand: `${'A'.repeat(24)} ${'A'.repeat(25)}` }), { transaction });
+    });
+
+    test('a letter that normalization makes longer counts with its normalized length', async () => {
+        // Arrange: the ligature \uFB03 is one character that NFKC turns into "ffi", three characters
+        const accepted = '\uFB03'.repeat(16);
+        const tooLong = '\uFB03'.repeat(17);
+
+        // Act
+        const okRes = await send('post', '/api/vehicles', { ...NEW_CAR, brand: accepted });
+        const longRes = await send('post', '/api/vehicles', { ...NEW_CAR, brand: tooLong });
+
+        // Assert: 16 become 48 characters (accepted, saved normalized), 17 become 51 (rejected)
+        expect(okRes.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledTimes(1);
+        expect(createVehicle).toHaveBeenCalledWith(expect.objectContaining({ brand: 'ffi'.repeat(16) }), { transaction });
+        expect(longRes.status).toBe(400);
+        expect(longRes.body.errors.map((error) => error.path)).toEqual(['brand']);
+    });
+
     test('the text is saved without the spaces at the ends and with one space between the words', async () => {
         // Act
         const res = await send('post', '/api/vehicles', { ...NEW_CAR, brand: '  Land   Rover ', model: ' Defender  90', color: 'Gris   plata ' });
@@ -457,6 +542,65 @@ describe('Editing a vehicle (HU-12)', () => {
 
         // Act
         const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Rojo', [field]: value });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(res.body.errors.map((error) => error.path)).toEqual([field]);
+        expect(findVehicle).not.toHaveBeenCalled();
+        expect(actual.update).not.toHaveBeenCalled();
+    });
+
+    test.each([
+        ['brand', 'an enclosed letter', '\u24C2azda'],
+        ['brand', 'a trademark sign', 'Yamaha\u2122'],
+        ['model', 'a trademark sign', 'FZ\u2122'],
+        ['color', 'an enclosed letter', 'Azul \u24C2'],
+    ])('the %s with %s answers 400 VALIDATION_ERROR on that field and saves nothing (typed text)', async (field, description, value) => {
+        // Arrange
+        const actual = vehicle();
+        const findVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Rojo', [field]: value });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('VALIDATION_ERROR');
+        expect(res.body.errors.map((error) => error.path)).toEqual([field]);
+        expect(findVehicle).not.toHaveBeenCalled();
+        expect(actual.update).not.toHaveBeenCalled();
+    });
+
+    // #234: the same length limits as when registering
+    test.each([
+        ['brand', 50],
+        ['model', 50],
+        ['color', 30],
+    ])('the %s of exactly %i characters is saved', async (field, max) => {
+        // Arrange
+        const actual = vehicle();
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Rojo', [field]: 'A'.repeat(max) });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(actual.update).toHaveBeenCalledWith(expect.objectContaining({ [field]: 'A'.repeat(max) }));
+    });
+
+    test.each([
+        ['brand', 51],
+        ['model', 51],
+        ['color', 31],
+    ])('the %s of %i characters answers 400 VALIDATION_ERROR on that field and saves nothing', async (field, length) => {
+        // Arrange
+        const actual = vehicle();
+        const findVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Rojo', [field]: 'A'.repeat(length) });
 
         // Assert
         expect(res.status).toBe(400);
