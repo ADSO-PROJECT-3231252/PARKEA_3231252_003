@@ -13,6 +13,7 @@ permissions:
 jobs:
   frontend:
     name: Frontend
+    if: github.base_ref != 'backend'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,6 +44,7 @@ jobs:
 
   backend:
     name: Backend
+    if: github.base_ref != 'frontend'
     runs-on: ubuntu-latest
     defaults:
       run:
