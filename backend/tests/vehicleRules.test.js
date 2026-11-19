@@ -56,6 +56,9 @@ describe('isValidVehicleText', () => {
         ['Mazda\u3164', 'a Hangul filler after the brand'],
         ['\u115F', 'the Hangul choseong filler'],
         ['\uFFA0', 'the half width Hangul filler'],
+        ['A\u20DD', 'a letter inside a combining circle, which looks like Ⓐ'],
+        ['Maz\u0334\u0322da', 'marks piled on a letter, which do not join it'],
+        ['Spark\u1680GT', 'the Ogham space mark, a space that is drawn as a line'],
     ])('rejects "%s" (%s)', (text) => {
         // Act
         const result = isValidVehicleText(text);
