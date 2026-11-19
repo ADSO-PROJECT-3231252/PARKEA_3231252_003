@@ -42,6 +42,13 @@ describe('isValidVehicleText', () => {
         ['', 'an empty text'],
         ['   ', 'only spaces'],
         ['\u200b', 'a zero width space'],
+        ['Ⓜ', 'a circled letter, which NFKC would write as M'],
+        ['Gris™', 'a trade mark sign, which NFKC would write as TM'],
+        ['㎏', 'a square symbol, which NFKC would write as kg'],
+        ['\u3164', 'only the Hangul filler, which is drawn as nothing'],
+        ['Mazda\u3164', 'a Hangul filler after the brand'],
+        ['\u115F', 'the Hangul choseong filler'],
+        ['\uFFA0', 'the half width Hangul filler'],
     ])('rejects "%s" (%s)', (text) => {
         // Act
         const result = isValidVehicleText(text);
