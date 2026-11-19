@@ -60,7 +60,7 @@ counted only per network, so everyone on that network shares their count
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default |
+| POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default. A user can have at most 5 active vehicles (a deleted one does not count): with 5, the next one answers 409 `VEHICLE_LIMIT_REACHED` (#299) |
 | GET | `/vehicles` | User | List my vehicles (HU-11). Default vehicle always first |
 | GET | `/vehicles/:id` | User (owner) | Single vehicle detail, used to prefill the edit form |
 | PUT | `/vehicles/:id` | User (owner) | Edit a vehicle (HU-12). Plate is never editable |
@@ -110,7 +110,7 @@ opens, in Colombia time; a day that is not in the list is closed:
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE` |
+| POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE`. A user can have at most 2 reservations in `Pending` at the same time: with 2, the next one answers 409 `TOO_MANY_PENDING_RESERVATIONS` until one is paid, cancelled or expires (#299) |
 | GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `openEnded`, `latestEndTime` (HU-29), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
 | GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
 | PATCH | `/reservations/:id/cancel` | User (owner) | Cancel a reservation (HU-16). A `Pending` one (not paid) at any moment while it waits for its payment, even after its start time; an `Active` one (paid) only before its start time, otherwise 409 `RESERVATION_ALREADY_STARTED` (#316). Any other status answers 409 `RESERVATION_NOT_CANCELLABLE`. What was paid is marked Refunded, extensions included |
@@ -214,6 +214,12 @@ Every range ends at the moment of the request and starts at midnight
   closes automatically, the hours up to that time are charged and what was
   not paid stays as a pending balance (HU-27).
 - Until a pending balance is paid, the user cannot make new reservations.
+- Every user has two limits, each answered with a 409 and its own code: at
+  most 2 reservations in `Pending` at the same time
+  (`TOO_MANY_PENDING_RESERVATIONS`) and at most 5 active vehicles
+  (`VEHICLE_LIMIT_REACHED`). Both are checked in the same transaction that
+  locks the row of the user, so two requests at the same moment cannot go
+  over either limit (#299).
 - Every role/status change made through the admin endpoints is recorded
   in an internal audit log (`GET /admin/users/logs`).
 - The primary administrator account can never be deactivated or have its
