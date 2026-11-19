@@ -3,8 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty, normalizePhone } from '../utils/validators';
 import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { register } from '../services/authService';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 import carImage from '../assets/car_register.webp';
+import DecorativeImage from '../components/DecorativeImage';
 import { Eye, EyeOff } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
 
@@ -418,7 +419,7 @@ export default function Register() {
                 </div>
                 {/* Columna decorativa — se oculta en móvil (AC-04) */}
                 <div className="hidden md:flex md:w-[380px] flex-col items-center justify-center gap-4 bg-parkea-50 p-6 text-center">
-                    <img src={carImage} alt="" className="w-full max-w-[280px] object-contain" />
+                    <DecorativeImage src={carImage} minWidth="48rem" className="w-full max-w-[280px] object-contain" />
                     <h2 className="font-display text-subtitle text-neutral-900">
                         Reserva tu espacio al instante
                     </h2>

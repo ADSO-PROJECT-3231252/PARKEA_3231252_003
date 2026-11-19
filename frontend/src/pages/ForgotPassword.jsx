@@ -4,7 +4,7 @@ import { Lock, ArrowLeft } from 'lucide-react';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { forgotPassword } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');
     const [errors, setErrors] = useState({});
