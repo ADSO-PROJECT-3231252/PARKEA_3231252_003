@@ -15,22 +15,25 @@ const validarCamposVehiculo = [
         .isIn(['car', 'motorcycle', 'truck']).withMessage('Invalid vehicle type'),
     body('brand')
         .custom(isTextOrMissing).withMessage('Brand must be text').bail()
-        .customSanitizer(normalizeVehicleText)
+        .trim()
         .notEmpty().withMessage('Brand is required').bail()
-        .isLength({ max: 50 }).withMessage('Brand must be at most 50 characters').bail()
-        .custom(isValidVehicleText).withMessage('Brand can only have letters, numbers, spaces, hyphens and periods'),
+        .custom(isValidVehicleText).withMessage('Brand can only have letters, numbers, spaces, hyphens and periods').bail()
+        .customSanitizer(normalizeVehicleText)
+        .isLength({ max: 50 }).withMessage('Brand must be at most 50 characters'),
     body('model')
         .custom(isTextOrMissing).withMessage('Model must be text').bail()
-        .customSanitizer(normalizeVehicleText)
+        .trim()
         .notEmpty().withMessage('Model is required').bail()
-        .isLength({ max: 50 }).withMessage('Model must be at most 50 characters').bail()
-        .custom(isValidVehicleText).withMessage('Model can only have letters, numbers, spaces, hyphens and periods'),
+        .custom(isValidVehicleText).withMessage('Model can only have letters, numbers, spaces, hyphens and periods').bail()
+        .customSanitizer(normalizeVehicleText)
+        .isLength({ max: 50 }).withMessage('Model must be at most 50 characters'),
     body('color')
         .custom(isTextOrMissing).withMessage('Color must be text').bail()
-        .customSanitizer(normalizeVehicleText)
+        .trim()
         .notEmpty().withMessage('Color is required').bail()
-        .isLength({ max: 30 }).withMessage('Color must be at most 30 characters').bail()
-        .custom(isValidVehicleText).withMessage('Color can only have letters, numbers, spaces, hyphens and periods'),
+        .custom(isValidVehicleText).withMessage('Color can only have letters, numbers, spaces, hyphens and periods').bail()
+        .customSanitizer(normalizeVehicleText)
+        .isLength({ max: 30 }).withMessage('Color must be at most 30 characters'),
     body('visualDescription')
         .optional({ checkFalsy: true })
         .custom(isTextOrMissing).withMessage('Visual description must be text').bail()

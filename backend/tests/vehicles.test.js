@@ -164,6 +164,10 @@ describe('Registering a vehicle (HU-10)', () => {
         ['color', 'Rojo #1', 'a #'],
         ['brand', 'Mazda 🚗', 'an emoji'],
         ['model', '...', 'only periods, without any letter or number'],
+        ['brand', '\u3164', 'only the Hangul filler, which is drawn as nothing'],
+        ['brand', 'Mazda\u3164', 'a Hangul filler after the brand'],
+        ['model', 'Ⓜ', 'a circled letter, which NFKC would write as M'],
+        ['color', 'Gris™', 'a trade mark sign, which NFKC would write as TM'],
     ])('the %s "%s" (%s) answers 400 VALIDATION_ERROR on that field and saves nothing', async (field, value) => {
         // Act
         const res = await send('post', '/api/vehicles', { ...NEW_CAR, [field]: value });
@@ -197,6 +201,18 @@ describe('Registering a vehicle (HU-10)', () => {
         expect(res.status).toBe(201);
         expect(createVehicle).toHaveBeenCalledWith(
             expect.objectContaining({ brand: 'Land Rover', model: 'Defender 90', color: 'Gris plata' }),
+            { transaction }
+        );
+    });
+
+    test('full width letters and an accent written apart are still accepted, and saved as normal text', async () => {
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, brand: 'Ｍａｚｄａ', model: 'Citroe\u0308n', color: 'Gris\u3000plata' });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledWith(
+            expect.objectContaining({ brand: 'Mazda', model: 'Citroën', color: 'Gris plata' }),
             { transaction }
         );
     });
@@ -431,7 +447,10 @@ describe('Editing a vehicle (HU-12)', () => {
         ['brand', 'Yamaha <>'],
         ['model', 'FZ@'],
         ['color', 'Azul 🔵'],
-    ])('the %s "%s" has a symbol: it answers 400 VALIDATION_ERROR on that field and saves nothing', async (field, value) => {
+        ['brand', '\u3164'],
+        ['model', 'Ⓜ'],
+        ['color', 'Gris™'],
+    ])('the %s "%s" is not allowed: it answers 400 VALIDATION_ERROR on that field and saves nothing', async (field, value) => {
         // Arrange
         const actual = vehicle();
         const findVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
@@ -458,5 +477,18 @@ describe('Editing a vehicle (HU-12)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(actual.update).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Mercedes-Benz', model: 'Clase A 2.0', color: 'Gris plata' }));
+    });
+
+    test('full width letters and an accent written apart are still saved, as normal text', async () => {
+        // Arrange
+        const actual = vehicle();
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Ｍａｚｄａ', model: 'Citroe\u0308n', color: 'Gris\u3000plata' });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(actual.update).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Mazda', model: 'Citroën', color: 'Gris plata' }));
     });
 });
