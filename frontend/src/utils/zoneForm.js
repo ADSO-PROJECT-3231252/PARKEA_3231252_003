@@ -139,6 +139,24 @@ export function getValidPosition(latitude, longitude) {
     return insideColombia(lat, lng) ? [lat, lng] : null;
 }
 
+export function validateZoneCoordinates(latitude, longitude) {
+    const errors = {};
+    const latitudeError = coordinateError(latitude, -90, 90, 'latitud');
+    const longitudeError = coordinateError(longitude, -180, 180, 'longitud');
+
+    if (latitudeError) errors.latitude = latitudeError;
+    if (longitudeError) errors.longitude = longitudeError;
+
+    // #232: valid coordinates, but outside Colombia
+    if (!latitudeError && !longitudeError && !insideColombia(Number(latitude), Number(longitude))) {
+        const message = translateError('COORDINATES_OUTSIDE_COLOMBIA');
+        errors.latitude = message;
+        errors.longitude = message;
+    }
+
+    return errors;
+}
+
 // HU-20 AC-01 to AC-06: one message per field, or none when the field is
 // valid. spotsInUse (HU-21 AC-03) is only known when editing.
 export function validateZoneForm(form, { spotsInUse = 0 } = {}) {
@@ -165,16 +183,7 @@ export function validateZoneForm(form, { spotsInUse = 0 } = {}) {
         errors.hourlyRate = 'La tarifa por hora debe ser mayor que $ 0.';
     }
 
-    const latitudeError = coordinateError(form.latitude, -90, 90, 'latitud');
-    if (latitudeError) errors.latitude = latitudeError;
-    const longitudeError = coordinateError(form.longitude, -180, 180, 'longitud');
-    if (longitudeError) errors.longitude = longitudeError;
-
-    // #232: valid coordinates, but outside Colombia
-    if (!latitudeError && !longitudeError && !insideColombia(Number(form.latitude), Number(form.longitude))) {
-        errors.latitude = translateError('COORDINATES_OUTSIDE_COLOMBIA');
-        errors.longitude = errors.latitude;
-    }
+    Object.assign(errors, validateZoneCoordinates(form.latitude, form.longitude));
 
     // HU-29 AC-01 / AC-02: the hours must be chosen; a custom schedule needs
     // at least one open day, and each open day valid times

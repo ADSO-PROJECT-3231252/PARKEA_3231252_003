@@ -5,6 +5,7 @@ import {
     parseCoordinatePair,
     formatCoordinate,
     getValidPosition,
+    validateZoneCoordinates,
     mapZoneApiError,
     dayField,
 } from '../utils/zoneForm';
@@ -45,9 +46,28 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
         });
     }, []);
 
+    const revalidateCoordinateErrors = (latitude, longitude) => {
+        setErrors((prev) => {
+            if (!prev.latitude && !prev.longitude) return prev;
+
+            const next = { ...prev };
+            delete next.latitude;
+            delete next.longitude;
+            return { ...next, ...validateZoneCoordinates(latitude, longitude) };
+        });
+    };
+
     const setField = (name, value) => {
         setForm((prev) => ({ ...prev, [name]: value }));
-        clearErrors(name);
+
+        if (name !== 'latitude' && name !== 'longitude') {
+            clearErrors(name);
+            return;
+        }
+
+        const latitude = name === 'latitude' ? value : form.latitude;
+        const longitude = name === 'longitude' ? value : form.longitude;
+        revalidateCoordinateErrors(latitude, longitude);
     };
 
     // HU-29 AC-01: "Abierta 24 horas" (true) or "Horario personalizado" (false)
@@ -93,7 +113,7 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
         if (!pair) return;
         e.preventDefault();
         setForm((prev) => ({ ...prev, ...pair }));
-        clearErrors('latitude', 'longitude');
+        revalidateCoordinateErrors(pair.latitude, pair.longitude);
         setFocusKey((k) => k + 1);
     };
 

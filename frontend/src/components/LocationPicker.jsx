@@ -55,7 +55,11 @@ function ClickToPlace({ onPick }) {
 function LimitToColombia() {
     const map = useMap();
     useEffect(() => {
-        const fit = () => map.setMinZoom(map.getBoundsZoom(COLOMBIA_BOUNDS, true));
+        const fit = () => {
+            // Let the minimum zoom decrease when the map becomes smaller.
+            map.setMinZoom(0);
+            map.setMinZoom(map.getBoundsZoom(COLOMBIA_BOUNDS, true));
+        };
         fit();
         map.on('resize', fit);
         return () => map.off('resize', fit);

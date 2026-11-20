@@ -288,9 +288,12 @@ function AuthenticatedHome({ user }) {
                     {!cardLoading && !reservationsError && currentReservation && (
                         <div className="rounded-md bg-parkea-50 p-3">
                             <div className="flex items-start justify-between gap-2">
-                                <p className="flex min-w-0 items-center gap-1 text-label font-medium text-neutral-900">
-                                    <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
-                                    <span className="truncate">{currentReservation.zone.name}</span>
+                                {/* #309: a long name goes on to more lines; the pin stays on the first one */}
+                                <p className="flex min-w-0 items-start gap-1 text-label font-medium text-neutral-900">
+                                    <span className="flex h-[1lh] shrink-0 items-center">
+                                        <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
+                                    </span>
+                                    <span className="min-w-0 break-words">{currentReservation.zone.name}</span>
                                 </p>
                                 <span
                                     className={`shrink-0 text-label font-medium ${RESERVATION_STATUS_LABEL[currentStatus]?.color ?? 'text-neutral-600'
@@ -348,9 +351,11 @@ function AuthenticatedHome({ user }) {
                                         key={zone.id}
                                         className="flex flex-col gap-1 rounded-md bg-parkea-50 p-3 xl:flex-row xl:items-center xl:justify-between xl:gap-2"
                                     >
-                                        <p className="flex min-w-0 items-center gap-1 text-body text-neutral-900">
-                                            <MapPin className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
-                                            <span className="truncate">{zone.name}</span>
+                                        <p className="flex min-w-0 items-start gap-1 text-body text-neutral-900">
+                                            <span className="flex h-[1lh] shrink-0 items-center">
+                                                <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
+                                            </span>
+                                            <span className="min-w-0 break-words">{zone.name}</span>
                                         </p>
                                         <div className="flex items-center justify-between gap-3 pl-[18px] xl:shrink-0 xl:justify-end xl:pl-0">
                                             <span className="flex items-baseline gap-1 font-mono text-caption text-neutral-600">
@@ -389,7 +394,7 @@ function AuthenticatedHome({ user }) {
                                     <div className="flex min-w-0 items-center gap-1.5">
                                         <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-parkea-600" aria-hidden="true" />
                                         <div className="min-w-0">
-                                            <p className="truncate text-body leading-tight text-neutral-900">{item.zone.name}</p>
+                                            <p className="break-words text-body leading-tight text-neutral-900">{item.zone.name}</p>
                                             <p className="text-caption leading-tight text-neutral-600">
                                                 {formatDate(item.startTime)} · {formatTime(item.startTime)} –{' '}
                                                 {formatTime(item.endTime)}
