@@ -234,7 +234,6 @@ export default function RegisterVehicle() {
                             id="brand"
                             name="brand"
                             type="text"
-                            maxLength={MAX_LENGTH.brand}
                             value={form.brand}
                             onChange={handleChange}
                             placeholder="Ejemplo: Mazda"
@@ -258,7 +257,6 @@ export default function RegisterVehicle() {
                             id="model"
                             name="model"
                             type="text"
-                            maxLength={MAX_LENGTH.model}
                             value={form.model}
                             onChange={handleChange}
                             placeholder="Ejemplo: CX-30 2.0"
@@ -301,7 +299,6 @@ export default function RegisterVehicle() {
                             id="color"
                             name="color"
                             type="text"
-                            maxLength={MAX_LENGTH.color}
                             value={form.color}
                             onChange={handleChange}
                             placeholder="Ejemplo: Gris Platino"

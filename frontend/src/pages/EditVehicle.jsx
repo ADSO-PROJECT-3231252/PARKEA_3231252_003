@@ -275,7 +275,6 @@ text-body text-neutral-600`}
                             id="brand"
                             name="brand"
                             type="text"
-                            maxLength={MAX_LENGTH.brand}
                             value={form.brand}
                             onChange={handleChange}
                             placeholder="Ejemplo: Mazda"
@@ -299,7 +298,6 @@ focus:ring-2 focus:ring-parkea-600 ${errors.brand ? 'border-danger' : 'border-ne
                             id="model"
                             name="model"
                             type="text"
-                            maxLength={MAX_LENGTH.model}
                             value={form.model}
                             onChange={handleChange}
                             placeholder="Ejemplo: CX-30 2.0"
@@ -347,7 +345,6 @@ focus:ring-parkea-600`}
                             id="color"
                             name="color"
                             type="text"
-                            maxLength={MAX_LENGTH.color}
                             value={form.color}
                             onChange={handleChange}
                             placeholder="Ejemplo: Gris Platino"
