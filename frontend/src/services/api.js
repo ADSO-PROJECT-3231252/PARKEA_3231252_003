@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../config';
+import { saveExpiredSessionReturn } from '../utils/expiredSessionReturn';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -27,6 +28,9 @@ export function endSession(reason) {
     localStorage.removeItem('user');
     if (redirecting || window.location.pathname === '/login') return;
     redirecting = true;
+    if (reason === 'expired') {
+        saveExpiredSessionReturn();
+    }
     window.location.href = `/login?${reason}=1`;
 }
 

@@ -6,6 +6,7 @@ import { login } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
+import { takeExpiredSessionReturn } from '../utils/expiredSessionReturn';
 import ResendEmailButton from '../components/ResendEmailButton';
 
 // Confirmation messages handed over by other screens through router state.
@@ -78,10 +79,11 @@ export default function Login() {
         try {
             const { data } = await login(form);
             loginUser(data.token, data.user);
+            const savedReturn = takeExpiredSessionReturn();
             // An admin returning from a regular-user route would land on a screen that
             // isn't theirs, so admins always go to their dashboard unless they were
             // actually headed somewhere under /admin.
-            const from = location.state?.from;
+            const from = location.state?.from || (sessionExpired ? savedReturn : null);
             const isAdmin = data.user.role === 'admin';
             navigate(isAdmin && !from?.startsWith('/admin') ? '/admin/dashboard' : from || '/');
         } catch (err) {
