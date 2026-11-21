@@ -212,7 +212,7 @@ Open the pull request and select the **Checks** tab. The **CI** workflow has two
 - **Frontend** installs dependencies, runs ESLint and Jest, and builds the frontend.
 - **Backend** installs dependencies and runs Jest.
 
-A green check next to each job means all its steps passed. If a job shows a red X, open it and expand the failed step to read the error. For a Jest failure, look for `FAIL` in the **Run tests** log to find the test file and the failing assertion.
+A green check means all steps in that job passed. Pull requests to `develop` run both jobs. On pull requests to `frontend` or `backend`, only the matching job runs, so the other job appears as `skipped`. If a job shows a red X, open it and expand the failed step to read the error. For a Jest failure, look for `FAIL` in the **Run tests** log to find the test file and the failing assertion.
 
 To check the five-minute target, open the workflow run summary and read the duration of each job.
 
