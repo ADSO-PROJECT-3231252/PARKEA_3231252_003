@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
+import GuestRoute from './GuestRoute';
 import ProtectedRoute from './ProtectedRoute';
 import NotForAdminRoute from './NotForAdminRoute';
 import Layout from '../components/Layout';
@@ -73,10 +74,12 @@ export default function AppRoutes() {
         <Suspense fallback={<PageFallback />}>
             <Routes>
                 {/* Standalone auth screens — no shared Header */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/admin/login" element={<AdminLogin />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route element={<GuestRoute />}>
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                </Route>
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/verify-email" element={<VerifyEmail />} />
                 <Route path="/verify-email/sent" element={<CheckEmail />} />

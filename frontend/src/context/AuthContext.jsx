@@ -14,6 +14,19 @@ export function AuthProvider({ children }) {
             setUser(savedSession);
         }
         setLoading(false);
+
+        function handleStorage(event) {
+            if (event.storageArea !== localStorage) return;
+            if (event.key !== 'token' && event.key !== 'user' && event.key !== null) return;
+
+            // Read the current values in case a new session has already started.
+            if (!localStorage.getItem('token') || !localStorage.getItem('user')) {
+                setUser(null);
+            }
+        }
+
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
     }, []);
 
     const loginUser = (token, userData) => {

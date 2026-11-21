@@ -209,7 +209,11 @@ export default function VehicleList() {
         setDefaultVehicle(id)
             .then(() => fetchVehicles())
             .catch((err) => {
-                setSetDefaultError(translateError(err.response?.data?.code));
+                const code = err.response?.data?.code;
+                setSetDefaultError(translateError(code));
+                if (code === 'VEHICLE_NOT_FOUND') {
+                    fetchVehicles();
+                }
             })
             .finally(() => setSettingDefaultId(null));
     };
@@ -251,7 +255,11 @@ export default function VehicleList() {
                 // the action they just took. VEHICLE_HAS_ACTIVE_RESERVATION
                 // already has its own message in errorMessages.js; anything
                 // else falls back to translateError's generic message.
-                setDeleteError(translateError(err.response?.data?.code));
+                const code = err.response?.data?.code;
+                setDeleteError(translateError(code));
+                if (code === 'VEHICLE_NOT_FOUND') {
+                    fetchVehicles();
+                }
             })
             .finally(() => setDeleting(false));
     };
