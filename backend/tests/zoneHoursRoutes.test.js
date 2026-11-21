@@ -57,6 +57,27 @@ describe('Creating a zone with its opening hours (HU-29, AC-01 and AC-02)', () =
         createZone = jest.spyOn(Zona, 'create').mockImplementation(async (values) => zoneInstance(values));
     });
 
+      test('two requests for the same zone name return 201 and 409', async () => {
+        // Both requests pass the initial name check. The unique index rejects one insert.
+        const duplicateName = Object.assign(new Error('Duplicate zone name'), {
+            name: 'SequelizeUniqueConstraintError',
+            fields: { zones_name_unique: ZONE.name },
+        });
+        createZone.mockRejectedValueOnce(duplicateName);
+
+        const body = { ...ZONE, open24h: true };
+        const responses = await Promise.all([
+            send('post', '/api/zones', body),
+            send('post', '/api/zones', body),
+        ]);
+
+        expect(createZone).toHaveBeenCalledTimes(2);
+        expect(responses.map((res) => res.status).sort()).toEqual([201, 409]);
+
+        const conflict = responses.find((res) => res.status === 409);
+        expect(conflict.body.code).toBe('ZONE_NAME_TAKEN');
+    });
+
     test('without choosing the hours it answers 400 on open24h and creates nothing', async () => {
         // Act
         const res = await send('post', '/api/zones', ZONE);
@@ -167,5 +188,53 @@ describe('Editing the opening hours of a zone (HU-29, AC-02 and AC-07)', () => {
         expect(res.status).toBe(200);
         expect(deleteHours).toHaveBeenCalledWith(expect.objectContaining({ where: { zoneId: ZONE_ID } }));
         expect(saveHours).toHaveBeenCalledWith([], expect.anything());
+    });
+});
+
+describe('Setting the active state of a zone (#304)', () => {
+    let zona;
+    const path = `/api/zones/${ZONE_ID}/toggle`;
+
+    beforeEach(() => {
+        zona = zoneInstance();
+        jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
+        zona.update.mockImplementation(async (values) => {
+            zona.set(values);
+            return zona;
+        });
+    });
+
+    test('two deactivate requests both succeed and leave the zone inactive', async () => {
+        const responses = await Promise.all([
+            send('patch', path, { isActive: false }),
+            send('patch', path, { isActive: false }),
+        ]);
+
+        for (const response of responses) {
+            expect(response.status).toBe(200);
+            expect(response.body.zone.isActive).toBe(false);
+        }
+        expect(zona.isActive).toBe(false);
+    });
+
+    test('an inactive zone can be activated', async () => {
+        zona.set({ isActive: false });
+
+        const response = await send('patch', path, { isActive: true });
+
+        expect(response.status).toBe(200);
+        expect(response.body.zone.isActive).toBe(true);
+        expect(zona.isActive).toBe(true);
+    });
+
+    test.each([
+        ['missing', {}],
+        ['a string', { isActive: 'false' }],
+    ])('rejects the request when isActive is %s', async (_description, body) => {
+        const response = await send('patch', path, body);
+
+        expect(response.status).toBe(400);
+        expect(response.body.code).toBe('VALIDATION_ERROR');
+        expect(zona.update).not.toHaveBeenCalled();
     });
 });
