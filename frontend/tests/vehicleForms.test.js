@@ -37,7 +37,8 @@ const longRealValues = (limit) => [
     ['letters written with two code units each', '\u{20BB7}'.repeat(limit), '\u{20BB7}'.repeat(limit)],
     ['letters, 10 of them with the accent written apart', `${'e\u0301'.repeat(10)}${'a'.repeat(limit - 10)}`, `${'\u00E9'.repeat(10)}${'a'.repeat(limit - 10)}`],
 ];
-const LONG_REAL_VALUES = [['brand', 50], ['model', 50], ['color', 30]]
+const FIELD_LIMITS = [['brand', 50], ['model', 50], ['color', 30]];
+const LONG_REAL_VALUES = FIELD_LIMITS
     .flatMap(([id, limit]) => longRealValues(limit).map(([label, pasted, sent]) => [id, limit, label, pasted, sent]));
 
 // The values the rules reject in the tests: a symbol, two symbols that NFKC
@@ -91,6 +92,15 @@ describe('Register a vehicle: brand, model and color (#234)', () => {
 
         // Assert
         expect(errorOf('brand')).toHaveTextContent(REQUIRED);
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
+    test.each(FIELD_LIMITS)('a %s of one letter more than its limit (%i) is marked with that limit and nothing is sent', async (id, limit) => {
+        // Act
+        await submitWith({ [id]: 'a'.repeat(limit + 1) });
+
+        // Assert
+        expect(errorOf(id)).toHaveTextContent(`Usa máximo ${limit} caracteres.`);
         expect(createVehicle).not.toHaveBeenCalled();
     });
 
@@ -247,6 +257,32 @@ describe('Edit a vehicle: brand, model and color (#234)', () => {
         // Assert
         expect(updateVehicle).toHaveBeenCalledTimes(1);
         expect(updateVehicle.mock.calls[0][1]).toMatchObject({ [id]: sent });
+    });
+
+    test.each(['brand', 'model', 'color'])('a %s left empty says that the field is required and nothing is saved', async (id) => {
+        // Arrange
+        await openEdit();
+        fill(id, '   ');
+
+        // Act
+        await save();
+
+        // Assert
+        expect(errorOf(id)).toHaveTextContent(REQUIRED);
+        expect(updateVehicle).not.toHaveBeenCalled();
+    });
+
+    test.each(FIELD_LIMITS)('a %s of one letter more than its limit (%i) is marked with that limit and nothing is saved', async (id, limit) => {
+        // Arrange
+        await openEdit();
+        fill(id, 'a'.repeat(limit + 1));
+
+        // Act
+        await save();
+
+        // Assert
+        expect(errorOf(id)).toHaveTextContent(`Usa máximo ${limit} caracteres.`);
+        expect(updateVehicle).not.toHaveBeenCalled();
     });
 
     test('a text that normalization makes longer than the limit is marked', async () => {

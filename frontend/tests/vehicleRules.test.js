@@ -91,6 +91,14 @@ describe('normalizeVehicleText', () => {
         expect(result).toBe('Land Rover');
     });
 
+    test('two spaces between the words also become one', () => {
+        // Act
+        const result = normalizeVehicleText('Gris  plata');
+
+        // Assert
+        expect(result).toBe('Gris plata');
+    });
+
     test('it joins an accent written apart with its letter', () => {
         // Act
         const result = normalizeVehicleText('Citroe\u0308n');
