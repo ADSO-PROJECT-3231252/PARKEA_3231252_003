@@ -127,6 +127,22 @@ describe('Registering a vehicle (HU-10)', () => {
         expect(lockUser.mock.invocationCallOrder[userLockCall()]).toBeLessThan(countVehicles.mock.invocationCallOrder[0]);
     });
 
+    test('a user that no longer exists answers 404 USER_NOT_FOUND and registers nothing', async () => {
+        // Arrange: the session is valid, but the user is gone when the row is locked
+        lockUser.mockImplementation(async (id, options) => (options && options.lock
+            ? null
+            : { id: USER_ID, isActive: true, passwordVersion: 0, role: { name: 'user' } }));
+
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, plate: 'XYZ987' });
+
+        // Assert
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('USER_NOT_FOUND');
+        expect(countVehicles).not.toHaveBeenCalled();
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
     test('the plate is saved in capital letters', async () => {
         // Act
         await send('post', '/api/vehicles', { ...NEW_CAR, plate: 'abc123' });

@@ -211,7 +211,17 @@ describe('What a new reservation needs (HU-14)', () => {
         // the request stops before the zone is read
         expect(res.status).toBe(409);
         expect(res.body.code).toBe('TOO_MANY_PENDING_RESERVATIONS');
-        expect(countPending).toHaveBeenCalledWith({ where: { userId: USER_ID, status: 'Pending' }, transaction });
+        expect(countPending).toHaveBeenCalledWith({
+            where: {
+                userId: USER_ID,
+                status: 'Pending',
+                [Op.or]: [
+                    { holdExpiresAt: null },
+                    { holdExpiresAt: { [Op.gt]: expect.any(Date) } },
+                ],
+            },
+            transaction,
+        });
         expect(readZone).not.toHaveBeenCalled();
         expectNothingSaved();
     });

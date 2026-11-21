@@ -112,7 +112,14 @@ async function crear(req, res, next) {
         // time cannot both see room for one more: the second one waits at the
         // lock and then counts the reservation the first one created.
         const pendientes = await Reserva.count({
-            where: { userId, status: 'Pending' },
+            where: {
+                userId,
+                status: 'Pending',
+                [Op.or]: [
+                    { holdExpiresAt: null },
+                    { holdExpiresAt: { [Op.gt]: now } },
+                ],
+            },
             transaction: t,
         });
         if (pendientes >= MAX_PENDING_RESERVATIONS) {
