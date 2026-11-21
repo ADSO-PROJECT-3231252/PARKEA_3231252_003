@@ -187,3 +187,24 @@ describe('The reserve screen and the hours of the zone (HU-29)', () => {
         expect(await screen.findByText('El martes esta zona abre de 7:00 a. m. a 6:00 p. m. La reserva debe quedar dentro de ese horario, con la entrada al menos 30 minutos antes del cierre.')).toBeInTheDocument();
     });
 });
+
+describe('The limit of reservations waiting for payment (#299)', () => {
+    test('a third reservation shows the limit message and the link to my reservations', async () => {
+        // Arrange
+        const user = userEvent.setup();
+        createReservation.mockRejectedValue({
+            response: { status: 409, data: { code: 'TOO_MANY_PENDING_RESERVATIONS' } },
+        });
+        await renderScreen(zoneWith([], true));
+
+        // Act
+        typeEntry('10:00');
+        typeExit('12:00');
+        await user.click(screen.getByRole('button', { name: 'Reservar cupo' }));
+
+        // Assert
+        const message = await screen.findByText('Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra');
+        const link = within(message.closest('[role="alert"]')).getByRole('link', { name: 'Ver mis reservas' });
+        expect(link).toHaveAttribute('href', '/reservations');
+    });
+});
