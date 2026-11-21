@@ -30,16 +30,18 @@ async function pasteInto(user, id, value) {
     await user.paste(value);
 }
 
-// Real texts of 50 letters once normalized, with more code units than that:
-// a letter written with two code units, and accents written apart (as some
-// phones and computers paste them)
-const LONG_REAL_VALUES = [
-    ['50 letters written with two code units each', '\u{20BB7}'.repeat(50), '\u{20BB7}'.repeat(50)],
-    ['50 letters, 10 of them with the accent written apart', `${'e\u0301'.repeat(10)}${'a'.repeat(40)}`, `${'\u00E9'.repeat(10)}${'a'.repeat(40)}`],
+// Real texts as long as the limit of each field once normalized, with more
+// code units than that: a letter written with two code units, and accents
+// written apart (as some phones and computers paste them)
+const longRealValues = (limit) => [
+    ['letters written with two code units each', '\u{20BB7}'.repeat(limit), '\u{20BB7}'.repeat(limit)],
+    ['letters, 10 of them with the accent written apart', `${'e\u0301'.repeat(10)}${'a'.repeat(limit - 10)}`, `${'\u00E9'.repeat(10)}${'a'.repeat(limit - 10)}`],
 ];
+const LONG_REAL_VALUES = [['brand', 50], ['model', 50], ['color', 30]]
+    .flatMap(([id, limit]) => longRealValues(limit).map(([label, pasted, sent]) => [id, limit, label, pasted, sent]));
 
-// The four values the rules reject in the tests: a symbol, a symbol that NFKC
-// would write as a letter, a letter drawn as nothing and a text without a letter
+// The values the rules reject in the tests: a symbol, two symbols that NFKC
+// would write as letters, a letter drawn as nothing and a text without a letter
 const REJECTED = [
     ['brand', 'Mazda <b>', 'angle brackets'],
     ['model', '\u24C2', 'a circled letter, which NFKC would write as M'],
@@ -121,13 +123,13 @@ describe('Register a vehicle: brand, model and color (#234)', () => {
 
     // The limit is counted in letters after normalizing, like the backend. The
     // field has no maxLength: it counts code units and would cut these texts.
-    test.each(LONG_REAL_VALUES)('a brand of %s can be pasted whole and is sent', async (_label, pasted, sent) => {
+    test.each(LONG_REAL_VALUES)('a %s of %i %s can be pasted whole and is sent', async (id, _limit, _label, pasted, sent) => {
         // Act
-        await submitWith({}, { brand: pasted });
+        await submitWith({}, { [id]: pasted });
 
         // Assert
         expect(createVehicle).toHaveBeenCalledTimes(1);
-        expect(createVehicle.mock.calls[0][0]).toMatchObject({ brand: sent });
+        expect(createVehicle.mock.calls[0][0]).toMatchObject({ [id]: sent });
     });
 
     test('if the server rejects the brand, that field is marked and the banner says to check the marked fields', async () => {
@@ -234,17 +236,17 @@ describe('Edit a vehicle: brand, model and color (#234)', () => {
         expect(updateVehicle.mock.calls[0][1]).toMatchObject({ brand: 'Mazda', model: 'Spark GT', color: 'Citro\u00EBn' });
     });
 
-    test.each(LONG_REAL_VALUES)('a model of %s can be pasted whole and is saved', async (_label, pasted, sent) => {
+    test.each(LONG_REAL_VALUES)('a %s of %i %s can be pasted whole and is saved', async (id, _limit, _label, pasted, sent) => {
         // Arrange
         await openEdit();
-        await pasteInto(userEvent.setup(), 'model', pasted);
+        await pasteInto(userEvent.setup(), id, pasted);
 
         // Act
         await save();
 
         // Assert
         expect(updateVehicle).toHaveBeenCalledTimes(1);
-        expect(updateVehicle.mock.calls[0][1]).toMatchObject({ model: sent });
+        expect(updateVehicle.mock.calls[0][1]).toMatchObject({ [id]: sent });
     });
 
     test('a text that normalization makes longer than the limit is marked', async () => {
