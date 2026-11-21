@@ -28,6 +28,7 @@ let lockVehicle;
 let readZone;
 let findBalance;
 let findOverlap;
+let countPending;
 let claimSpot;
 let createReservation;
 let zona;
@@ -43,14 +44,16 @@ function openZone(values = {}) {
     return built;
 }
 
-// Everything goes well unless a test changes one of these answers
-function arrange({ vehiculo = { id: VEHICLE_ID }, zone = openZone(), balance = null, overlap = null, freeSpot = true } = {}) {
+// Everything goes well unless a test changes one of these answers. `pending`
+// is how many reservations in Pending the user already has.
+function arrange({ vehiculo = { id: VEHICLE_ID }, zone = openZone(), balance = null, overlap = null, freeSpot = true, pending = 0 } = {}) {
     zona = zone;
     spot = freeSpot ? { id: SPOT_ID, spotNumber: 7, update: jest.fn() } : null;
     lockVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(vehiculo);
     readZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
     findBalance = jest.spyOn(Pago, 'findOne').mockResolvedValue(balance);
     findOverlap = jest.spyOn(Reserva, 'findOne').mockResolvedValue(overlap);
+    countPending = jest.spyOn(Reserva, 'count').mockResolvedValue(pending);
     claimSpot = jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue(spot);
     createReservation = jest.spyOn(Reserva, 'create').mockResolvedValue({ id: RESERVATION_ID });
     jest.spyOn(Reserva, 'findByPk').mockResolvedValue({ id: RESERVATION_ID });
@@ -195,6 +198,58 @@ describe('What a new reservation needs (HU-14)', () => {
         expect(res.body.code).toBe('VEHICLE_NOT_FOUND');
         expect(lockVehicle).toHaveBeenCalledWith(expect.objectContaining({ where: { id: VEHICLE_ID, userId: USER_ID } }));
         expectNothingSaved();
+    });
+
+    test('a user with 2 reservations in Pending answers 409 TOO_MANY_PENDING_RESERVATIONS', async () => {
+        // Arrange
+        arrange({ pending: 2 });
+
+        // Act
+        const res = await book();
+
+        // Assert: only the Pending reservations of this user are counted, and
+        // the request stops before the zone is read
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('TOO_MANY_PENDING_RESERVATIONS');
+        expect(countPending).toHaveBeenCalledWith({
+            where: {
+                userId: USER_ID,
+                status: 'Pending',
+                [Op.or]: [
+                    { holdExpiresAt: null },
+                    { holdExpiresAt: { [Op.gt]: expect.any(Date) } },
+                ],
+            },
+            transaction,
+        });
+        expect(readZone).not.toHaveBeenCalled();
+        expectNothingSaved();
+    });
+
+    test('a user with 1 reservation in Pending can still book', async () => {
+        // Arrange
+        arrange({ pending: 1 });
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(transaction.commit).toHaveBeenCalled();
+    });
+
+    test('the Pending reservations are counted after the lock of the user and the vehicle, so two requests at once cannot skip the limit', async () => {
+        // Act
+        await book();
+
+        // Assert
+        const userCall = lockUser.mock.calls.findIndex(([, options]) => options && options.lock === 'UPDATE');
+        const userLocked = lockUser.mock.invocationCallOrder[userCall];
+        const vehicleLocked = lockVehicle.mock.invocationCallOrder[0];
+        const counted = countPending.mock.invocationCallOrder[0];
+        expect(vehicleLocked).toBeLessThan(counted);
+        expect(userLocked).toBeLessThan(counted);
+        expect(counted).toBeLessThan(readZone.mock.invocationCallOrder[0]);
     });
 
     test('a zone that does not exist answers 404 ZONE_NOT_FOUND', async () => {

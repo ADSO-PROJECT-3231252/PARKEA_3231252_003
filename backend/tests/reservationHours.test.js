@@ -58,6 +58,8 @@ describe('Creating a reservation inside the hours of the zone (HU-29, AC-03 and 
 
     function arrange(zona) {
         jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID });
+        // The user has no reservations in Pending, so the limit does not apply
+        jest.spyOn(Reserva, 'count').mockResolvedValue(0);
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
         jest.spyOn(Pago, 'findOne').mockResolvedValue(null);
         jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);
