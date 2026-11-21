@@ -159,7 +159,22 @@ async function createZona(req, res, next) {
     return res.status(201).json({ message: 'Zone created successfully', zone: zona });
   } catch (err) {
     await t.rollback();
-    next(err);
+
+    if (err.name === 'SequelizeUniqueConstraintError') {
+      const duplicateZoneName = Object.keys(err.fields ?? {}).some((field) => {
+        const key = field.split('.').pop();
+        return key === 'name' || key === 'zones_name_unique';
+      });
+
+      if (duplicateZoneName) {
+        return res.status(409).json({
+          code: ErrorCodes.ZONE_NAME_TAKEN,
+          message: 'A zone with this name already exists',
+        });
+      }
+    }
+
+    return next(err);
   }
 }
 
@@ -288,7 +303,15 @@ async function toggleZona(req, res, next) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
 
-    await zona.update({ isActive: !zona.isActive });
+    const isActive = req.body?.isActive;
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({
+        code: ErrorCodes.VALIDATION_ERROR,
+        message: 'isActive must be a boolean',
+      });
+    }
+
+    await zona.update({ isActive });
 
     return res.status(200).json({
       message: `Zone ${zona.isActive ? 'activated' : 'deactivated'} successfully`,
