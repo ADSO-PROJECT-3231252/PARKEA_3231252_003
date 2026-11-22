@@ -5,11 +5,13 @@ import { AuthProvider } from '../src/context/AuthContext';
 import GuestRoute from '../src/routes/GuestRoute';
 import ProtectedRoute from '../src/routes/ProtectedRoute';
 import Login from '../src/pages/Login';
-import { login } from '../src/services/authService';
+import AdminLogin from '../src/pages/AdminLogin';
+import { login, loginAdmin } from '../src/services/authService';
 import { saveExpiredSessionReturn, takeExpiredSessionReturn } from '../src/utils/expiredSessionReturn';
 
 jest.mock('../src/services/authService', () => ({
     login: jest.fn(),
+    loginAdmin: jest.fn(),
     resendVerification: jest.fn(),
 }));
 jest.mock('../src/services/userService', () => ({
@@ -33,6 +35,7 @@ function renderAt(path) {
                 <Routes>
                     <Route element={<GuestRoute />}>
                         <Route path="/login" element={<Login />} />
+                        <Route path="/admin/login" element={<AdminLogin />} />
                     </Route>
                     <Route path="/" element={<h1>Inicio</h1>} />
                     <Route path="/vehicles" element={<ProtectedRoute role="user"><h1>Mis vehículos</h1></ProtectedRoute>} />
@@ -46,9 +49,9 @@ function renderAt(path) {
     );
 }
 
-async function signInAs(account) {
+async function signInAs(account, service = login) {
     const user = userEvent.setup();
-    login.mockResolvedValue({ data: { token: 'new-token', user: account } });
+    service.mockResolvedValue({ data: { token: 'new-token', user: account } });
     await user.type(await screen.findByLabelText(/correo/i), 'cuenta@example.com');
     await user.type(screen.getByLabelText(/contraseña/i, { selector: 'input' }), 'Clave#123');
     await user.click(screen.getByRole('button', { name: /iniciar sesión/i }));
@@ -100,6 +103,19 @@ describe('After signing in, the person goes back to the screen it was on (#307)'
 
         // Assert
         expect(await screen.findByRole('heading', { name: 'Gestión de zonas' })).toBeInTheDocument();
+    });
+
+    test.each([
+        [ADMIN.id, '/admin/zones', 'Gestión de zonas'],
+        ['other-admin', '/admin/zones', 'Panel'],
+        [ADMIN.id, '/vehicles', 'Panel'],
+    ])('uses the admin form after expiry for %s returning from %s', async (owner, path, heading) => {
+        saveReturn(path, owner);
+        renderAt('/login?expired=1');
+        await userEvent.click(await screen.findByRole('link', { name: /iniciar sesión como administrador/i }));
+        await signInAs(ADMIN, loginAdmin);
+        expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+        expect(sessionStorage.getItem('expiredSessionReturnTo')).toBeNull();
     });
 
     test('another account that signs in on that tab starts on its home', async () => {

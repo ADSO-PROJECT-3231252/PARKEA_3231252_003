@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { startTransition, useState } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, ShieldCheck, UserRound, ArrowLeft } from 'lucide-react';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { loginAdmin } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
 import { useAuth } from '../hooks/useAuth';
+import { takeExpiredSessionReturn } from '../utils/expiredSessionReturn';
 import logo from '../assets/logo.webp';
 
 export default function AdminLogin() {
@@ -16,6 +17,7 @@ export default function AdminLogin() {
 
     const { loginUser } = useAuth();
     const navigate = useNavigate();
+    const sessionExpired = useLocation().state?.sessionExpired === true;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -47,8 +49,14 @@ export default function AdminLogin() {
         setLoading(true);
         try {
             const { data } = await loginAdmin(form);
-            loginUser(data.token, data.user);
-            navigate('/admin/dashboard');
+            const savedReturn = takeExpiredSessionReturn(data.user.id);
+            const destination = sessionExpired && savedReturn?.startsWith('/admin/')
+                ? savedReturn
+                : '/admin/dashboard';
+            startTransition(() => {
+                navigate(destination);
+                loginUser(data.token, data.user);
+            });
         } catch (err) {
             // AC-06: NOT_ADMIN_ACCOUNT revela el motivo a propósito,
             // a diferencia de las credenciales inválidas
@@ -185,7 +193,7 @@ export default function AdminLogin() {
 
                         <div className="text-center">
                             <Link
-                                to="/login"
+                                to={sessionExpired ? '/login?expired=1' : '/login'}
                                 className="inline-flex min-h-6 items-center gap-1 text-caption text-parkea-600 underline
                                     hover:text-parkea-700"
                             >
