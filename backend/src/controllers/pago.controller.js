@@ -3,6 +3,7 @@ const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
+const { firstPaymentAmount } = require('../utils/stayPricing');
 const { safeRollback } = require('../utils/transaction');
 
 // POST /api/payments/:reservationId
@@ -51,10 +52,8 @@ const crearPago = async (req, res) => {
     }
 
     // HU-27 AC-03: an open stay is confirmed by paying its first hour
-    const horas = reserva.openEnded
-      ? 1
-      : (new Date(reserva.endTime) - new Date(reserva.startTime)) / (1000 * 60 * 60);
-    const amount = Number((horas * Number(reserva.appliedHourlyRate)).toFixed(2));
+    // (#373: the same amount the confirmation and the list show)
+    const amount = firstPaymentAmount(reserva);
 
     const pago = await Pago.create({
       reservationId: reserva.id,
