@@ -1,5 +1,5 @@
-import { act, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import Reservations from '../src/pages/Reservations';
 import { getReservations } from '../src/services/reservationService';
 
@@ -166,4 +166,28 @@ describe('"Mis reservas" when the 15 minutes to pay end (#347)', () => {
         expect(await screen.findAllByRole('button', { name: PAY_PENDING })).toHaveLength(2);
         expect(buttons(CANCEL_PENDING)).toHaveLength(2);
     });
+});
+
+function CurrentSearch() {
+    return <output aria-label="Query">{useLocation().search}</output>;
+}
+
+test('loads the status from the URL and keeps the controls, request and URL in sync', async () => {
+    answer([]);
+    render(
+        <MemoryRouter initialEntries={['/reservations?source=home&status=Pending']}>
+            <Reservations />
+            <CurrentSearch />
+        </MemoryRouter>,
+    );
+    await act(async () => {});
+    expect(screen.getByRole('button', { name: 'Pendientes' })).toHaveAttribute('aria-pressed', 'true');
+    const select = screen.getByLabelText('Filtrar por estado');
+    expect(select).toHaveValue('Pending');
+    expect(getReservations).toHaveBeenLastCalledWith({ status: 'Pending', page: 1, limit: 10 });
+    await act(async () => { fireEvent.change(select, { target: { value: 'Active' } }); });
+    expect(screen.getByLabelText('Query')).toHaveTextContent('?source=home&status=Active');
+    expect(getReservations).toHaveBeenLastCalledWith({ status: 'Active', page: 1, limit: 10 });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Todas' })); });
+    expect(screen.getByLabelText('Query')).toHaveTextContent(/^\?source=home$/);
 });

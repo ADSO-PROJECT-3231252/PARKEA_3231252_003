@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Car,
     CalendarDays,
@@ -286,7 +286,9 @@ function pageItems(current, total) {
 }
 export default function Reservations() {
     const navigate = useNavigate();
-    const [statusFilter, setStatusFilter] = useState('All');
+    const { search, hash } = useLocation();
+    const requestedStatus = new URLSearchParams(search).get('status');
+    const statusFilter = STATUS_FILTERS.find(({ value }) => value === requestedStatus)?.value ?? 'All';
     const [page, setPage] = useState(1);
     const [reservations, setReservations] = useState([]);
     const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
@@ -364,7 +366,10 @@ export default function Reservations() {
         if (value === statusFilter) return;
         setResultMessage('');
         startLoading();
-        setStatusFilter(value);
+        const params = new URLSearchParams(search);
+        if (value === 'All') params.delete('status');
+        else params.set('status', value);
+        navigate({ search: params.toString(), hash }, { replace: true });
         setPage(1);
     };
     const goToPage = (target) => {
