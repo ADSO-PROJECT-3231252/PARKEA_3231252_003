@@ -6,6 +6,7 @@ const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge }
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
+const { safeRollback } = require('../utils/transaction');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -28,9 +29,30 @@ function fueraDeHorario(res, hours) {
     });
 }
 
+// #371: the answer to a reservation that is already saved (after the
+// commit). Reading it again with its zone and vehicle is only for the answer:
+// if that read fails, the answer still says it was created, with the saved
+// reservation, and the error goes to the log, instead of a 500 for a
+// reservation that exists.
+async function responderReservaCreada(res, reserva) {
+    let reservaCompleta = null;
+    try {
+        reservaCompleta = await Reserva.findByPk(reserva.id, {
+            include: [
+                { model: Zona, as: 'zone' },
+                { model: Vehiculo, as: 'vehicle' },
+            ],
+        });
+    } catch (error) {
+        console.error(`The reservation ${reserva.id} was saved, but reading it again failed:`, error);
+    }
+    return res.status(201).json({ message: 'Reservation created successfully', reservation: reservaCompleta ?? reserva });
+}
+
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
     const t = await sequelize.transaction();
+    let reserva;
     try {
         const userId = req.usuario.id;
         const { zoneId, vehicleId, startTime, endTime, openEnded } = req.body;
@@ -104,7 +126,11 @@ async function crear(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
-        const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t });
+        // #371: the zone is locked before the spot, in the same order as
+        // updateZona (the zone, then its spots): with the spot first, a
+        // capacity edit that held the zone and waited for that spot was a
+        // deadlock. Being a locked read, it also gets the zone as it is now.
+        const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t, lock: t.LOCK.UPDATE });
         if (!zona) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
@@ -167,7 +193,7 @@ async function crear(req, res, next) {
 
         const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
 
-        const reserva = await Reserva.create({
+        reserva = await Reserva.create({
             userId,
             zoneId,
             vehicleId,
@@ -185,19 +211,14 @@ async function crear(req, res, next) {
         await zona.decrement('availableSlots', { by: 1, transaction: t });
 
         await t.commit();
-
-        const reservaCompleta = await Reserva.findByPk(reserva.id, {
-            include: [
-                { model: Zona, as: 'zone' },
-                { model: Vehiculo, as: 'vehicle' },
-            ],
-        });
-
-        return res.status(201).json({ message: 'Reservation created successfully', reservation: reservaCompleta });
     } catch (error) {
-        await t.rollback();
-        next(error);
+        await safeRollback(t);
+        return next(error);
     }
+
+    // #371: out of the try, so an error after the commit never tries to undo
+    // a reservation that is already saved
+    return responderReservaCreada(res, reserva);
 }
 
 // HU-27: the amounts of an open stay, as the screens show them. Before the
@@ -376,6 +397,11 @@ async function cancelar(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.RESERVATION_ALREADY_STARTED, message: 'This reservation has already started and cannot be cancelled' });
         }
 
+        // #371: the zone is locked before the spot, in the same order as
+        // updateZona and crear, so a capacity edit at the same time waits
+        // instead of a deadlock
+        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+
         // Release the physical spot, not just the zone counter
         if (reserva.parkingSpotId) {
             const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
@@ -384,7 +410,6 @@ async function cancelar(req, res, next) {
             }
         }
 
-        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ status: 'Cancelled' }, { transaction: t });
         // Before the entry, what was paid is refunded: the initial payment and
@@ -397,7 +422,7 @@ async function cancelar(req, res, next) {
         await t.commit();
         return res.status(200).json({ message: 'Reservation cancelled successfully' });
     } catch (error) {
-        await t.rollback();
+        await safeRollback(t);
         next(error);
     }
 }
@@ -451,14 +476,15 @@ async function terminar(req, res, next) {
             });
         }
 
-        // AC-09: real exit time, Finished and the spot released, in one transaction
+        // AC-09: real exit time, Finished and the spot released, in one
+        // transaction. #371: the zone is locked before the spot, as in cancelar.
+        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         if (reserva.parkingSpotId) {
             const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
             if (cupo && cupo.status === 'Occupied') {
                 await cupo.update({ status: 'Available' }, { transaction: t });
             }
         }
-        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ endTime: cobro.endTime, status: 'Finished' }, { transaction: t });
 
@@ -485,7 +511,7 @@ async function terminar(req, res, next) {
             },
         });
     } catch (error) {
-        await t.rollback();
+        await safeRollback(t);
         next(error);
     }
 }
@@ -631,7 +657,7 @@ async function ampliar(req, res, next) {
             charge: cobro,
         });
     } catch (error) {
-        await t.rollback();
+        await safeRollback(t);
         next(error);
     }
 }

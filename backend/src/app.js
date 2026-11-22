@@ -82,7 +82,13 @@ app.use((err, req, res, next) => {
     // Unexpected errors keep their details in the server log only: the
     // message can include database or file system details.
     if (status >= 500) {
-        console.error(err.stack);
+        // #371: the stack of an error of the database (Sequelize) is the one of
+        // the query and starts with a bare "Error". Without its message (a
+        // deadlock, for example) the log would not say what failed. The first
+        // line is built as Node builds it, so it is not written twice.
+        const stack = String(err.stack);
+        const header = err.message ? `${err.name}: ${err.message}` : String(err.name);
+        console.error(stack.startsWith(header) ? stack : `${header}\n${stack}`);
         return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Internal server error' });
     }
 

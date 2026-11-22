@@ -192,6 +192,19 @@ describe('Finishing an open stay (HU-27, AC-07 to AC-09)', () => {
         expect(transaction.commit).toHaveBeenCalled();
     });
 
+    test('the zone is locked before the spot, as in a capacity edit, so both at the same time wait instead of a deadlock (#371)', async () => {
+        // Arrange
+        arrange();
+
+        // Act
+        await finish();
+
+        // Assert
+        expect(Zona.findByPk).toHaveBeenCalledWith(ZONE_ID, { transaction, lock: 'UPDATE' });
+        expect(ParkingSpot.findByPk).toHaveBeenCalledWith(SPOT_ID, { transaction, lock: 'UPDATE' });
+        expect(Zona.findByPk.mock.invocationCallOrder[0]).toBeLessThan(ParkingSpot.findByPk.mock.invocationCallOrder[0]);
+    });
+
     test('every started hour is charged and what was already paid becomes a pending balance for the rest', async () => {
         // Arrange: 2 hours and 1 minute are 3 hours; the first one was paid
         jest.setSystemTime(colombia('08:01'));

@@ -2,6 +2,7 @@ const { Usuario, Rol, Zona, Reserva, Pago, AdminActionLog, sequelize } = require
 const { Op } = require('sequelize');
 const ErrorCodes = require('../constants/errorCodes');
 const { colombiaDay } = require('../utils/zoneHours');
+const { safeRollback } = require('../utils/transaction');
 
 const RANGOS_VALIDOS = ['today', 'week', 'month'];
 
@@ -350,7 +351,7 @@ async function cambiarRol(req, res, next) {
 
     return res.status(200).json({ message: 'Role updated successfully' });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     next(error);
   }
 }
@@ -403,7 +404,7 @@ async function cambiarEstado(req, res, next) {
 
     return res.status(200).json({ message: 'Status updated successfully' });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     next(error);
   }
 }

@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { sequelize, Reserva, Zona, ParkingSpot } = require('../models');
+const { safeRollback } = require('../utils/transaction');
 
 const INTERVALO_MS = 60 * 1000; // corre cada minuto
 
@@ -28,6 +29,14 @@ async function expirarReservasVencidas() {
                 continue;
             }
 
+            // #371: the zone is locked before the spot, in the same order as
+            // updateZona, crear and cancelar, so a capacity edit at the same
+            // time waits instead of a deadlock
+            const zona = await Zona.findByPk(reservaActual.zoneId, {
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+
             // Release the physical spot, not just the zone counter
             if (reservaActual.parkingSpotId) {
                 const cupo = await ParkingSpot.findByPk(reservaActual.parkingSpotId, {
@@ -40,17 +49,12 @@ async function expirarReservasVencidas() {
             }
 
             await reservaActual.update({ status: 'Expired' }, { transaction: t });
-
-            const zona = await Zona.findByPk(reservaActual.zoneId, {
-                transaction: t,
-                lock: t.LOCK.UPDATE,
-            });
             await zona.increment('availableSlots', { by: 1, transaction: t });
 
             await t.commit();
             console.log(`[expirar-reservas] Reserva ${reservaActual.id} expirada, cupo liberado en "${zona.name}"`);
         } catch (error) {
-            await t.rollback();
+            await safeRollback(t);
             console.error(`[expirar-reservas] Error procesando reserva ${reserva.id}:`, error);
         }
     }

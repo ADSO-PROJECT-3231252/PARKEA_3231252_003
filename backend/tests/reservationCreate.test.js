@@ -316,6 +316,20 @@ describe('Saving a new reservation (HU-14)', () => {
         expect(transaction.commit).toHaveBeenCalled();
     });
 
+    test('the answer brings the saved reservation, read again with its zone and its vehicle', async () => {
+        // Arrange
+        const withDetails = { id: RESERVATION_ID, zone: { id: ZONE_ID }, vehicle: { id: VEHICLE_ID } };
+        const readAgain = jest.spyOn(Reserva, 'findByPk').mockResolvedValue(withDetails);
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(readAgain).toHaveBeenCalledWith(RESERVATION_ID, { include: [{ model: Zona, as: 'zone' }, { model: Vehiculo, as: 'vehicle' }] });
+        expect(res.body.reservation).toEqual(withDetails);
+    });
+
     test('the spot becomes Occupied and the zone has one available slot less, in the same transaction', async () => {
         // Act
         await book();
@@ -325,7 +339,7 @@ describe('Saving a new reservation (HU-14)', () => {
         expect(zona.decrement).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
     });
 
-    test('the user is locked first, then the vehicle, and the zone is read after both locks (#288)', async () => {
+    test('the user is locked first, then the vehicle, then the zone, and the spot last (#288, #371)', async () => {
         // Act
         await book();
 
@@ -334,10 +348,15 @@ describe('Saving a new reservation (HU-14)', () => {
         const userCall = lockUser.mock.calls.findIndex(([, options]) => options && options.lock === 'UPDATE');
         expect(lockUser.mock.calls[userCall]).toEqual([USER_ID, expect.objectContaining({ transaction, lock: 'UPDATE' })]);
         expect(lockVehicle).toHaveBeenCalledWith(expect.objectContaining({ transaction, lock: 'UPDATE' }));
+        expect(readZone).toHaveBeenCalledWith(ZONE_ID, expect.objectContaining({ transaction, lock: 'UPDATE' }));
         const userLocked = lockUser.mock.invocationCallOrder[userCall];
         const vehicleLocked = lockVehicle.mock.invocationCallOrder[0];
+        const zoneLocked = readZone.mock.invocationCallOrder[0];
         expect(userLocked).toBeLessThan(vehicleLocked);
-        expect(vehicleLocked).toBeLessThan(readZone.mock.invocationCallOrder[0]);
+        expect(vehicleLocked).toBeLessThan(zoneLocked);
+        // The same order as a capacity edit (zone, then its spots), so both
+        // at the same time wait instead of a deadlock
+        expect(zoneLocked).toBeLessThan(claimSpot.mock.invocationCallOrder[0]);
     });
 
     test('if the database fails, it answers 500 and nothing is kept', async () => {

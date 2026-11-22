@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { sequelize, Reserva, Zona, ParkingSpot, Pago } = require('../models');
 const { openStayCharge, paidBeforeBalance } = require('../utils/stayPricing');
+const { safeRollback } = require('../utils/transaction');
 
 const INTERVALO_MS = 60 * 1000; // runs every minute, just like the expiration job
 
@@ -28,6 +29,14 @@ async function finalizarReservasVencidas() {
                 await t.rollback();
                 continue;
             }
+
+            // #371: the zone is locked before the spot, in the same order as
+            // updateZona, crear and cancelar, so a capacity edit at the same
+            // time waits instead of a deadlock
+            const zona = await Zona.findByPk(reservaActual.zoneId, {
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
 
             // Release the physical spot — this is the whole point of this job:
             // without it, a finished (but never re-checked) reservation would
@@ -63,16 +72,12 @@ async function finalizarReservasVencidas() {
                 }
             }
 
-            const zona = await Zona.findByPk(reservaActual.zoneId, {
-                transaction: t,
-                lock: t.LOCK.UPDATE,
-            });
             await zona.increment('availableSlots', { by: 1, transaction: t });
 
             await t.commit();
             console.log(`[finalizar-reservas] Reserva ${reservaActual.id} finalizada, cupo liberado en "${zona.name}"`);
         } catch (error) {
-            await t.rollback();
+            await safeRollback(t);
             console.error(`[finalizar-reservas] Error procesando reserva ${reserva.id}:`, error);
         }
     }
