@@ -177,7 +177,9 @@ async function updateZona(req, res, next) {
 
   const t = await sequelize.transaction();
   try {
-    // Locked so a reservation can't take a spot while the capacity changes
+    // Locked so a reservation can't take a spot while the capacity changes.
+    // #371: the zone first and then its spots; crear, cancelar, terminar and
+    // the two jobs lock in the same order, so they wait instead of a deadlock.
     const zona = await Zona.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!zona) {
       await t.rollback();
