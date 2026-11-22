@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const { Reserva, Zona, Vehiculo, Pago, ParkingSpot, Usuario, ZoneSchedule } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
-const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../utils/stayPricing');
+const { provisionalEndTime, openStayCharge, paidBeforeBalance, firstPaymentAmount, extensionCharge } = require('../utils/stayPricing');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
@@ -307,9 +307,8 @@ async function obtenerConfirmacion(req, res, next) {
 
         const durationMs = new Date(reserva.endTime) - new Date(reserva.startTime);
         const durationHours = durationMs / (1000 * 60 * 60);
-        const estimatedTotal = reserva.openEnded
-            ? Number(Number(reserva.appliedHourlyRate).toFixed(2))
-            : Number((durationHours * Number(reserva.appliedHourlyRate)).toFixed(2));
+        // #373: the amount of the first payment, as the payment charges it
+        const estimatedTotal = firstPaymentAmount(reserva);
         const duracionMostrada = sinSalidaAun ? null : Number(durationHours.toFixed(2));
         const pagos = resumenPagos(reserva.payments);
 
@@ -721,8 +720,8 @@ async function misReservas(req, res, next) {
                 amount = pagos.paidTotal;
                 amountType = 'paid';
             } else {
-                const horas = (new Date(r.endTime) - new Date(r.startTime)) / (1000 * 60 * 60);
-                amount = Number((horas * Number(r.appliedHourlyRate)).toFixed(2));
+                // #373: what the first payment will charge
+                amount = firstPaymentAmount(r);
                 amountType = 'estimated';
             }
 
