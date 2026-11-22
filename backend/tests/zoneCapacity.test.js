@@ -132,9 +132,10 @@ describe('The free spots of a saved zone (#373)', () => {
         // Act
         const res = await edit({ totalSlots: 8 });
 
-        // Assert
+        // Assert: it is not stored
         expect(res.status).toBe(200);
         expect(res.body.zone.availableSlots).toBe(6);
+        expect(zona.update.mock.calls[0][0]).not.toHaveProperty('availableSlots');
         const options = ParkingSpot.count.mock.calls[0][0];
         expect(options.transaction).toBe(transaction);
         expect(options.where[Op.and][0].val).toContain("r.start_time < '2026-11-16 13:40:00'");
@@ -155,8 +156,9 @@ describe('The free spots of a saved zone (#373)', () => {
         // Act
         const res = await request(app).post('/api/zones').set('Authorization', `Bearer ${adminToken}`).send({ ...ZONE, totalSlots: 12 });
 
-        // Assert
+        // Assert: they are not stored
         expect(res.status).toBe(201);
         expect(res.body.zone).toMatchObject({ totalSlots: 12, availableSlots: 12 });
+        expect(Zona.create.mock.calls[0][0]).not.toHaveProperty('availableSlots');
     });
 });

@@ -163,7 +163,6 @@ async function createZona(req, res, next) {
       latitude,
       longitude,
       totalSlots,
-      availableSlots: totalSlots,
       hourlyRate,
       open24h: req.body.open24h,
     }, { transaction: t });
@@ -204,8 +203,9 @@ async function updateZona(req, res, next) {
   let disponibles;
   try {
     // Locked so a reservation can't take a spot while the capacity changes.
-    // #371: the zone first and then its spots; crear, cancelar, terminar and
-    // the two jobs lock in the same order, so they wait instead of a deadlock.
+    // #371: the zone first and then its spots; crear and ampliar lock the
+    // zone first too, so they wait instead of a deadlock (#373: cancelar,
+    // terminar and the two jobs no longer lock the zone or a spot).
     zona = await Zona.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!zona) {
       await t.rollback();
@@ -293,7 +293,6 @@ async function updateZona(req, res, next) {
       longitude,
       totalSlots,
       hourlyRate,
-      availableSlots: disponibles,
       open24h: req.body.open24h,
     }, { transaction: t });
 
