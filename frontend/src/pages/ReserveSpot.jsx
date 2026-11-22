@@ -302,8 +302,8 @@ export default function ReserveSpot() {
                 }));
             } else {
                 // NO_SPOTS_AVAILABLE (AC-14), ZONE_NOT_FOUND, ZONE_INACTIVE,
-                // MISSING_REQUIRED_FIELDS, PENDING_BALANCE (HU-27 AC-11), or
-                // anything else generic banner.
+                // MISSING_REQUIRED_FIELDS, PENDING_BALANCE (HU-27 AC-11),
+                // TOO_MANY_PENDING_RESERVATIONS (#299), or any other error shown in the banner.
                 setServerErrorCode(code ?? 'INTERNAL_ERROR');
             }
         } finally {
@@ -661,8 +661,8 @@ export default function ReserveSpot() {
                     {serverErrorCode && (
                         <div role="alert" className="flex flex-col items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-center">
                             <p className="text-caption text-danger">{translateError(serverErrorCode)}</p>
-                            {/* HU-27 AC-11: the balance is paid from the reservation that owes it */}
-                            {serverErrorCode === 'PENDING_BALANCE' && (
+                            {/* HU-27 AC-11 and #299: the balance and the reservations waiting for payment are paid from the list of reservations */}
+                            {(serverErrorCode === 'PENDING_BALANCE' || serverErrorCode === 'TOO_MANY_PENDING_RESERVATIONS') && (
                                 <Link
                                     to="/reservations"
                                     className="rounded-md border border-danger px-3 py-1 text-caption text-danger transition-colors hover:bg-white"
