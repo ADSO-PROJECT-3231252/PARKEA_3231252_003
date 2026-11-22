@@ -360,6 +360,7 @@ VITE_API_URL=http://localhost:3000/api
 | Production | `npm start` | Plain Node |
 | Lint | `npm run lint` | ESLint |
 | Tests | `npm test` | Jest + Supertest, no MySQL needed |
+| Integration tests | `npm run test:integration` | Jest + Supertest against MySQL, on the database of `TEST_DATABASE_URL` (it is deleted and built again) |
 
 ### Database (run inside `backend/`)
 | Task | Command |
