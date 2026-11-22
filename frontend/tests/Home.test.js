@@ -396,6 +396,37 @@ describe('The motion of the three homes (#330)', () => {
     });
 
     test.each([
+        ['visitor', null, false],
+        ['user', 'user', true],
+        ['admin', 'admin', true],
+    ])('on the %s home the main button rises on hover, and so do the cards with an action', async (home, role, cardsAct) => {
+        // Arrange
+        signIn(role);
+
+        // Act
+        renderHome();
+        await act(async () => {});
+
+        // Assert: a card without an action (visitor) does not rise, so it does
+        // not look like a link; only its icon grows a little
+        const hero = screen.getByRole('heading', { level: 1 }).closest('section');
+        const button = within(hero).getByRole('link');
+        expect(button).toHaveClass('group', 'hover:shadow-md', 'motion-safe:hover:-translate-y-0.5');
+        expect(button.querySelector('svg')).toHaveClass('motion-safe:group-hover:scale-110');
+        for (const card of cards(home)) {
+            expect(card).toHaveClass('group');
+            if (cardsAct) {
+                expect(card).toHaveClass('hover:shadow-lg', 'motion-safe:hover:-translate-y-1');
+                expect(within(card).getByRole('link').querySelector('svg')).toHaveClass('motion-safe:group-hover:translate-x-0.5');
+            } else {
+                expect(card).not.toHaveClass('hover:shadow-lg');
+                expect(card).not.toHaveClass('motion-safe:hover:-translate-y-1');
+                expect(card.querySelector('span')).toHaveClass('motion-safe:group-hover:scale-110');
+            }
+        }
+    });
+
+    test.each([
         ['visitor', null],
         ['user', 'user'],
         ['admin', 'admin'],

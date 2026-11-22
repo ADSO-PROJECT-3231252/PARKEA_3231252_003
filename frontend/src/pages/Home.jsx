@@ -49,6 +49,19 @@ function HeroIllustration({ src, height = 132, right = 32, top }) {
     );
 }
 
+// #330: the main button of the hero of the three homes. It appears after the
+// title and the text, and on hover it rises a little, with a shadow.
+const HERO_BUTTON =
+    'group mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-[background-color,translate,box-shadow] duration-200 hover:bg-parkea-700 hover:shadow-md hover:shadow-parkea-900/20 motion-safe:hover:-translate-y-0.5 motion-safe:animate-fade-up-3 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle';
+// #330: a card with an action (user and admin homes) rises a little on hover,
+// with a shadow, and its arrow moves. The icon of a card without an action
+// (visitor home) only grows a little, so the card does not look like a link.
+// Only the motion-safe: parts move, so with reduced motion only the shadow shows.
+const RISE_ON_HOVER =
+    'transition-[translate,box-shadow] duration-200 hover:shadow-lg hover:shadow-parkea-900/10 motion-safe:hover:-translate-y-1';
+const ARROW_ON_HOVER = 'transition-transform duration-200 motion-safe:group-hover:translate-x-0.5';
+const ICON_ON_HOVER = 'transition-transform duration-200 motion-safe:group-hover:scale-110';
+
 const RESERVATION_STATUS_LABEL = {
     Pending: { text: 'Pendiente de pago', color: 'text-warning' },
     Active: { text: 'Confirmada', color: 'text-parkea-600' },
@@ -81,7 +94,7 @@ function ErrorMessage() {
 
 function CardShell({ title, icon: Icon, children, footerTo, footerLabel, step }) {
     return (
-        <Reveal step={step} className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
+        <Reveal step={step} className={`group flex flex-col rounded-lg border border-neutral-200 bg-white p-5 ${RISE_ON_HOVER}`}>
             <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-title font-display uppercase text-neutral-900">{title}</h2>
                 <Icon className="h-6 w-6 text-parkea-600" aria-hidden="true" />
@@ -92,7 +105,7 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel, step })
                 className="mt-4 flex items-center justify-center gap-1.5 rounded-md border border-parkea-600 px-4 py-2 text-label text-parkea-600 transition-colors hover:bg-parkea-50"
             >
                 {footerLabel}
-                <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                <ChevronRight className={`h-3.5 w-3.5 ${ARROW_ON_HOVER}`} aria-hidden="true" />
             </Link>
         </Reveal>
     );
@@ -114,9 +127,9 @@ function VisitorHome() {
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle motion-safe:animate-fade-up-3"
+                        className={HERO_BUTTON}
                     >
-                        <MapPin className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
+                        <MapPin className={`h-5 w-5 shrink-0 sm:h-6 sm:w-6 ${ICON_ON_HOVER}`} aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
@@ -130,8 +143,8 @@ function VisitorHome() {
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-                <Reveal step={0} className="rounded-lg bg-parkea-50 p-6 text-center">
-                    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                <Reveal step={0} className="group rounded-lg bg-parkea-50 p-6 text-center">
+                    <span className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600 ${ICON_ON_HOVER}`}>
                         <CalendarCheck className="h-7 w-7" aria-hidden="true" />
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Reservas</h2>
@@ -141,8 +154,8 @@ function VisitorHome() {
                         anticipación y asegura tu espacio.
                     </p>
                 </Reveal>
-                <Reveal step={1} className="rounded-lg bg-parkea-50 p-6 text-center">
-                    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                <Reveal step={1} className="group rounded-lg bg-parkea-50 p-6 text-center">
+                    <span className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600 ${ICON_ON_HOVER}`}>
                         <Map className="h-7 w-7" aria-hidden="true" />
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Zonas</h2>
@@ -152,8 +165,8 @@ function VisitorHome() {
                         con información clara y actualizada.
                     </p>
                 </Reveal>
-                <Reveal step={2} className="rounded-lg bg-parkea-50 p-6 text-center">
-                    <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
+                <Reveal step={2} className="group rounded-lg bg-parkea-50 p-6 text-center">
+                    <span className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600 ${ICON_ON_HOVER}`}>
                         <History className="h-7 w-7" aria-hidden="true" />
                     </span>
                     <h2 className="mt-4 text-display font-display uppercase text-parkea-700">Historial</h2>
@@ -263,9 +276,9 @@ function AuthenticatedHome({ user }) {
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle motion-safe:animate-fade-up-3"
+                        className={HERO_BUTTON}
                     >
-                        <MapPin className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
+                        <MapPin className={`h-5 w-5 shrink-0 sm:h-6 sm:w-6 ${ICON_ON_HOVER}`} aria-hidden="true" />
                         Ver zonas disponibles
                     </Link>
                 </div>
@@ -441,9 +454,9 @@ function AdminHome() {
                         <Link
                             to="/admin/panel"
                             aria-label="Ir al panel de administración"
-                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle motion-safe:animate-fade-up-3"
+                            className={HERO_BUTTON}
                         >
-                            <LayoutGrid className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
+                            <LayoutGrid className={`h-5 w-5 shrink-0 sm:h-6 sm:w-6 ${ICON_ON_HOVER}`} aria-hidden="true" />
                             {/* The full label doesn't fit in one line on phones */}
                             <span className="sm:hidden">Ir al panel</span>
                             <span className="hidden sm:inline">Ir al panel de administración</span>
@@ -466,7 +479,7 @@ function AdminHome() {
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <Reveal step={0} className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                    <Reveal step={0} className={`group rounded-lg border border-neutral-200 bg-white p-6 text-center ${RISE_ON_HOVER}`}>
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <BarChart3 className="h-5 w-5" aria-hidden="true" />
                         </span>
@@ -481,11 +494,11 @@ function AdminHome() {
                             className="mt-3 inline-flex items-center justify-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
                         >
                             Ir al panel de control
-                            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                            <ChevronRight className={`h-3.5 w-3.5 ${ARROW_ON_HOVER}`} aria-hidden="true" />
                         </Link>
                     </Reveal>
 
-                    <Reveal step={1} className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                    <Reveal step={1} className={`group rounded-lg border border-neutral-200 bg-white p-6 text-center ${RISE_ON_HOVER}`}>
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <MapPin className="h-5 w-5" aria-hidden="true" />
                         </span>
@@ -500,11 +513,11 @@ function AdminHome() {
                             className="mt-3 inline-flex items-center justify-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
                         >
                             Ir a gestión de zonas
-                            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                            <ChevronRight className={`h-3.5 w-3.5 ${ARROW_ON_HOVER}`} aria-hidden="true" />
                         </Link>
                     </Reveal>
 
-                    <Reveal step={2} className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                    <Reveal step={2} className={`group rounded-lg border border-neutral-200 bg-white p-6 text-center ${RISE_ON_HOVER}`}>
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <Users className="h-5 w-5" aria-hidden="true" />
                         </span>
@@ -519,7 +532,7 @@ function AdminHome() {
                             className="mt-3 inline-flex items-center justify-center gap-1 text-label text-parkea-600 hover:text-parkea-700"
                         >
                             Ir a gestión de usuarios
-                            <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                            <ChevronRight className={`h-3.5 w-3.5 ${ARROW_ON_HOVER}`} aria-hidden="true" />
                         </Link>
                     </Reveal>
                 </div>
