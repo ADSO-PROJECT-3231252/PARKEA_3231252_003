@@ -308,6 +308,18 @@ export default function Reservations() {
     const [extendTarget, setExtendTarget] = useState(null);
     const [resultMessage, setResultMessage] = useState('');
     const resultMessageRef = useRef(null);
+    // #307: the filter lives in the URL, so a link can change it too ("Mis
+    // reservas" in the header shows all of them again). Like a click on a
+    // filter, a new filter starts on its first page, shows the loading state
+    // and drops the message of the last action.
+    const [listedStatus, setListedStatus] = useState(statusFilter);
+    if (listedStatus !== statusFilter) {
+        setListedStatus(statusFilter);
+        setPage(1);
+        setLoading(true);
+        setError(false);
+        setResultMessage('');
+    }
     useEffect(() => {
         // Guards against out-of-order responses: if the user switches filter or
         // page while a request is still in flight, the older response must not
@@ -364,13 +376,10 @@ export default function Reservations() {
     };
     const handleFilterChange = (value) => {
         if (value === statusFilter) return;
-        setResultMessage('');
-        startLoading();
         const params = new URLSearchParams(search);
         if (value === 'All') params.delete('status');
         else params.set('status', value);
         navigate({ search: params.toString(), hash }, { replace: true });
-        setPage(1);
     };
     const goToPage = (target) => {
         setResultMessage('');
