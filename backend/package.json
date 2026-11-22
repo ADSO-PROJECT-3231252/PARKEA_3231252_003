@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js --runInBand",
     "lint": "eslint .",
     "db:create": "sequelize-cli db:create",
     "db:migrate": "sequelize-cli db:migrate",
@@ -38,6 +39,10 @@
   },
   "jest": {
     "verbose": true,
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/tests/integration/"
+    ],
     "globalSetup": "<rootDir>/tests/timezone.js",
     "setupFiles": [
       "<rootDir>/tests/setup.js"
