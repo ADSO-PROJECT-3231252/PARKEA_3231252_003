@@ -151,15 +151,15 @@ describe('Register a vehicle: brand, model and color (#234)', () => {
         expect(createVehicle.mock.calls[0][0]).toMatchObject({ [id]: sent });
     });
 
-    test('if the server rejects the brand, that field is marked and the banner says to check the marked fields', async () => {
+    test.each(['brand', 'model', 'color'])('if the server rejects the %s, that field is marked and the banner says to check the marked fields', async (name) => {
         // Arrange
-        createVehicle.mockRejectedValue(serverRejects('brand'));
+        createVehicle.mockRejectedValue(serverRejects(name));
 
         // Act
         await submitWith();
 
         // Assert
-        expect(errorOf('brand')).toHaveTextContent(VEHICLE_TEXT_RULE_MESSAGE.brand);
+        expect(errorOf(name)).toHaveTextContent(VEHICLE_TEXT_RULE_MESSAGE[name]);
         expect(screen.getByText('Revisa los campos marcados')).toBeInTheDocument();
     });
 
@@ -320,16 +320,16 @@ describe('Edit a vehicle: brand, model and color (#234)', () => {
         expect(updateVehicle).not.toHaveBeenCalled();
     });
 
-    test('if the server rejects the color, that field is marked and the banner says to check the marked fields', async () => {
+    test.each(['brand', 'model', 'color'])('if the server rejects the %s, that field is marked and the banner says to check the marked fields', async (name) => {
         // Arrange
         await openEdit();
-        updateVehicle.mockRejectedValue(serverRejects('color'));
+        updateVehicle.mockRejectedValue(serverRejects(name));
 
         // Act
         await save();
 
         // Assert
-        expect(errorOf('color')).toHaveTextContent(VEHICLE_TEXT_RULE_MESSAGE.color);
+        expect(errorOf(name)).toHaveTextContent(VEHICLE_TEXT_RULE_MESSAGE[name]);
         expect(screen.getByText('Revisa los campos marcados')).toBeInTheDocument();
     });
 

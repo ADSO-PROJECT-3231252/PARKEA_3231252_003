@@ -125,11 +125,13 @@ describe('normalizeVehicleText', () => {
 });
 
 describe('VEHICLE_TEXT_RULE_MESSAGE', () => {
-    test('there is one message for the brand, the model and the color, each one names its field', () => {
+    test('there is one message for the brand, the model and the color, each one names its field and says what is accepted', () => {
         // Assert
-        expect(Object.keys(VEHICLE_TEXT_RULE_MESSAGE)).toEqual(['brand', 'model', 'color']);
-        expect(VEHICLE_TEXT_RULE_MESSAGE.brand).toMatch(/^La marca/);
-        expect(VEHICLE_TEXT_RULE_MESSAGE.model).toMatch(/^El modelo/);
-        expect(VEHICLE_TEXT_RULE_MESSAGE.color).toMatch(/^El color/);
+        const rule = 'solo puede tener letras, números, espacios, guiones (-) y puntos (.), con al menos una letra o un número.';
+        expect(VEHICLE_TEXT_RULE_MESSAGE).toEqual({
+            brand: `La marca ${rule}`,
+            model: `El modelo ${rule}`,
+            color: `El color ${rule}`,
+        });
     });
 });
