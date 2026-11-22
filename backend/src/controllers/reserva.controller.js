@@ -7,6 +7,7 @@ const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulate
 const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
 const { safeRollback } = require('../utils/transaction');
+const availability = require('../services/availability');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -130,6 +131,8 @@ async function crear(req, res, next) {
         // updateZona (the zone, then its spots): with the spot first, a
         // capacity edit that held the zone and waited for that spot was a
         // deadlock. Being a locked read, it also gets the zone as it is now.
+        // #373: every reservation and extension of the zone waits here, so
+        // the free spot found below is still free when this one is saved.
         const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t, lock: t.LOCK.UPDATE });
         if (!zona) {
             await t.rollback();
@@ -176,15 +179,12 @@ async function crear(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
         }
 
-        // Lock and claim one available physical spot, skipping locked rows so two
-        // concurrent requests never grab the same spot
-        const cupo = await ParkingSpot.findOne({
-            where: { zoneId, status: 'Available' },
-            order: [['spotNumber', 'ASC']],
-            transaction: t,
-            lock: t.LOCK.UPDATE,
-            skipLocked: true,
-        });
+        // #373: the spot with the lowest number that no other reservation
+        // holds in these hours, with 10 minutes before and after. A spot is
+        // taken only for the hours of its reservations, so a reservation for
+        // tomorrow leaves its spot free for today. An open stay holds it
+        // until its provisional exit time.
+        const cupo = await availability.firstFreeSpot(zoneId, start, end, { transaction: t, now });
 
         if (!cupo) {
             await t.rollback();
@@ -206,9 +206,6 @@ async function crear(req, res, next) {
             appliedHourlyRate: zona.hourlyRate,
             openEnded: isOpenStay,
         }, { transaction: t });
-
-        await cupo.update({ status: 'Occupied' }, { transaction: t });
-        await zona.decrement('availableSlots', { by: 1, transaction: t });
 
         await t.commit();
     } catch (error) {

@@ -278,18 +278,29 @@ describe('What a new reservation needs (HU-14)', () => {
         expectNothingSaved();
     });
 
-    test('the spot is claimed with a lock that skips the spots another request is taking', async () => {
+    test('the spot is the enabled one with the lowest number free for these hours, read in the transaction (#373)', async () => {
         // Act
         await book();
 
-        // Assert
-        expect(claimSpot).toHaveBeenCalledWith(expect.objectContaining({
-            where: { zoneId: ZONE_ID, status: 'Available' },
-            order: [['spotNumber', 'ASC']],
-            transaction,
-            lock: 'UPDATE',
-            skipLocked: true,
-        }));
+        // Assert: free from 9:50 a. m. to 12:10 p. m. (15:10 and 17:10 UTC),
+        // the hours with 10 minutes before and after
+        const options = claimSpot.mock.calls[0][0];
+        expect(options).toMatchObject({ order: [['spotNumber', 'ASC']], transaction });
+        expect(options.where).toMatchObject({ zoneId: ZONE_ID, status: { [Op.ne]: 'Disabled' } });
+        const sql = options.where[Op.and][0].val;
+        expect(sql).toContain("r.start_time < '2026-11-16 17:10:00'");
+        expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
+        expect(sql).toContain("r.hold_expires_at > '2026-11-16 13:00:00'");
+    });
+
+    test('an open stay needs a spot free until its provisional exit time, 24 hours after the entry (HU-27, #373)', async () => {
+        // Act
+        await book({ endTime: undefined, openEnded: true });
+
+        // Assert: from 9:50 a. m. until 10:10 a. m. of the next day
+        const sql = claimSpot.mock.calls[0][0].where[Op.and][0].val;
+        expect(sql).toContain("r.start_time < '2026-11-17 15:10:00'");
+        expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
     });
 });
 
@@ -330,13 +341,14 @@ describe('Saving a new reservation (HU-14)', () => {
         expect(res.body.reservation).toEqual(withDetails);
     });
 
-    test('the spot becomes Occupied and the zone has one available slot less, in the same transaction', async () => {
+    test('the reservation keeps its spot, and neither the spot nor the zone change (#373)', async () => {
         // Act
         await book();
 
-        // Assert
-        expect(spot.update).toHaveBeenCalledWith({ status: 'Occupied' }, { transaction });
-        expect(zona.decrement).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
+        // Assert: the spot is taken only for the hours of the reservation
+        expect(createReservation).toHaveBeenCalledWith(expect.objectContaining({ parkingSpotId: SPOT_ID, spotNumber: 7 }), { transaction });
+        expect(spot.update).not.toHaveBeenCalled();
+        expect(zona.decrement).not.toHaveBeenCalled();
     });
 
     test('the user is locked first, then the vehicle, then the zone, and the spot last (#288, #371)', async () => {
