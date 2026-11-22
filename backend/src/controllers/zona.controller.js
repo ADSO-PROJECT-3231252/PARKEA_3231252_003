@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const { Zona, Reserva, ParkingSpot, ZoneSchedule, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { scheduleErrors } = require('../utils/zoneHours');
+const { safeRollback } = require('../utils/transaction');
 
 // HU-29: every zone is sent with its opening hours (Zona.toJSON)
 const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
@@ -158,7 +159,7 @@ async function createZona(req, res, next) {
     await zona.reload({ include: [CON_HORARIO] });
     return res.status(201).json({ message: 'Zone created successfully', zone: zona });
   } catch (err) {
-    await t.rollback();
+    await safeRollback(t);
     next(err);
   }
 }
@@ -276,7 +277,7 @@ async function updateZona(req, res, next) {
     await zona.reload({ include: [CON_HORARIO] });
     return res.status(200).json({ message: 'Zone updated successfully', zone: zona });
   } catch (err) {
-    await t.rollback();
+    await safeRollback(t);
     next(err);
   }
 }

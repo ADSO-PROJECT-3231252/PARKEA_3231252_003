@@ -3,7 +3,7 @@ const request = require('supertest');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Reserva, sequelize } = require('../src/models');
+const { Usuario, Zona, Reserva, sequelize } = require('../src/models');
 const app = require('../src/app');
 const { safeRollback } = require('../src/utils/transaction');
 
@@ -114,6 +114,7 @@ describe('safeRollback', () => {
 
 const inTwoHours = () => new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 const inThreeHours = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+const ZONE = { name: 'Centro', address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961, totalSlots: 10, hourlyRate: 2000, open24h: true };
 
 // Every route with a transaction opened by hand, and the read where it fails.
 // `arrange` receives `fail` (deadlockOn, or the same with the transaction open)
@@ -136,6 +137,10 @@ const ROUTES = [
         () => request(app).patch(`/api/admin/users/${TARGET_ID}/role`).set('Authorization', `Bearer ${adminToken}`).send({ role: 'admin' })],
     ['changing the status of an account', (fail) => fail(Usuario, 'findByPk', session),
         () => request(app).patch(`/api/admin/users/${TARGET_ID}/status`).set('Authorization', `Bearer ${adminToken}`).send({ isActive: false })],
+    ['creating a zone', (fail) => fail(Zona, 'findOne'),
+        () => request(app).post('/api/zones').set('Authorization', `Bearer ${adminToken}`).send(ZONE)],
+    ['editing a zone', (fail) => fail(Zona, 'findByPk'),
+        () => request(app).put(`/api/zones/${ZONE_ID}`).set('Authorization', `Bearer ${adminToken}`).send(ZONE)],
 ];
 
 describe('A deadlock inside a transaction (#371)', () => {
