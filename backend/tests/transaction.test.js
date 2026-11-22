@@ -126,6 +126,10 @@ const ROUTES = [
     ['extending a stay', (fail) => fail(Reserva, 'findOne'),
         () => request(app).patch(`/api/reservations/${RESERVATION_ID}/extend`).set('Authorization', `Bearer ${userToken}`)
             .send({ fromEndTime: inTwoHours(), newEndTime: inThreeHours(), paymentMethod: 'pse' })],
+    ['paying a reservation', (fail) => fail(Reserva, 'findByPk'),
+        () => request(app).post(`/api/payments/${RESERVATION_ID}`).set('Authorization', `Bearer ${userToken}`).send({ paymentMethod: 'pse' })],
+    ['paying a balance', (fail) => fail(Reserva, 'findByPk'),
+        () => request(app).post(`/api/payments/${RESERVATION_ID}/balance`).set('Authorization', `Bearer ${userToken}`).send({ paymentMethod: 'pse' })],
 ];
 
 describe('A deadlock inside a transaction (#371)', () => {

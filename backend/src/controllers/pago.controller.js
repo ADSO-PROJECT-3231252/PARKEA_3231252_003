@@ -3,6 +3,7 @@ const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
+const { safeRollback } = require('../utils/transaction');
 
 // POST /api/payments/:reservationId
 const crearPago = async (req, res) => {
@@ -73,7 +74,7 @@ const crearPago = async (req, res) => {
 
     return res.status(201).json({ message: 'Payment approved', payment: pago });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     console.error('Error creating payment:', error);
     return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Internal error processing the payment' });
   }
@@ -129,7 +130,7 @@ const pagarSaldo = async (req, res) => {
 
     return res.status(200).json({ message: 'Balance paid', payment: saldo });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     console.error('Error paying the balance:', error);
     return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Internal error processing the payment' });
   }
