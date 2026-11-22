@@ -14,6 +14,20 @@ export function AuthProvider({ children }) {
             setUser(savedSession);
         }
         setLoading(false);
+
+        // #307: this tab follows the session of the other tabs. Signing out
+        // there signs out here, and signing in there (maybe with another
+        // account) signs in here, so a tab never shows one account while its
+        // requests use the token of another.
+        function handleStorage(event) {
+            if (event.storageArea !== localStorage) return;
+            if (event.key !== 'token' && event.key !== 'user' && event.key !== null) return;
+
+            setUser(readSavedSession({ clearBroken: false }));
+        }
+
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
     }, []);
 
     const loginUser = (token, userData) => {

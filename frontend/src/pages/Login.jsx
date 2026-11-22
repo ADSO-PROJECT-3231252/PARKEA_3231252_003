@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { startTransition, useState, useEffect } from 'react';
 import logo from '../assets/logo.webp';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
@@ -6,6 +6,7 @@ import { login } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
+import { takeExpiredSessionReturn } from '../utils/expiredSessionReturn';
 import ResendEmailButton from '../components/ResendEmailButton';
 
 // Confirmation messages handed over by other screens through router state.
@@ -77,13 +78,22 @@ export default function Login() {
         setLoading(true);
         try {
             const { data } = await login(form);
-            loginUser(data.token, data.user);
+            // #307: the screen where the session of this same account expired
+            const savedReturn = takeExpiredSessionReturn(data.user.id);
             // An admin returning from a regular-user route would land on a screen that
             // isn't theirs, so admins always go to their dashboard unless they were
             // actually headed somewhere under /admin.
-            const from = location.state?.from;
+            const from = location.state?.from || (sessionExpired ? savedReturn : null);
             const isAdmin = data.user.role === 'admin';
-            navigate(isAdmin && !from?.startsWith('/admin') ? '/admin/dashboard' : from || '/');
+            // #307: GuestRoute sends a signed-in account away from /login. navigate()
+            // runs as a low-priority transition, so with loginUser() done apart React
+            // would first render /login with the user, and GuestRoute would send it to
+            // the home before the navigate to `from` takes effect. In the same
+            // transition both apply in one render, as in handleLogout of Header.jsx.
+            startTransition(() => {
+                navigate(isAdmin && !from?.startsWith('/admin') ? '/admin/dashboard' : from || '/');
+                loginUser(data.token, data.user);
+            });
         } catch (err) {
             const code = err.response?.data?.code;
             setServerError(translateError(code));
@@ -223,6 +233,7 @@ export default function Login() {
 
                     <Link
                         to="/admin/login"
+                        state={{ sessionExpired, from: location.state?.from }}
                         className="flex items-center justify-center gap-2 text-label text-parkea-700 hover:text-parkea-800"
                     >
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-parkea-50">

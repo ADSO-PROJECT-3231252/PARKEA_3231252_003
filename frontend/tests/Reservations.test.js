@@ -1,7 +1,7 @@
-import { act, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { Link, MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
 import Reservations from '../src/pages/Reservations';
-import { getReservations } from '../src/services/reservationService';
+import { cancelReservation, getReservations } from '../src/services/reservationService';
 
 // The screen does not call the real API
 jest.mock('../src/services/reservationService', () => ({ getReservations: jest.fn(), cancelReservation: jest.fn() }));
@@ -165,5 +165,109 @@ describe('"Mis reservas" when the 15 minutes to pay end (#347)', () => {
         // Assert
         expect(await screen.findAllByRole('button', { name: PAY_PENDING })).toHaveLength(2);
         expect(buttons(CANCEL_PENDING)).toHaveLength(2);
+    });
+});
+
+// #307: the status filter lives in the URL. The address of the screen, and
+// whether the last change replaced it (a filter is not a new page to go back to).
+function CurrentAddress() {
+    const { search, hash } = useLocation();
+    const type = useNavigationType();
+    return <output aria-label="Dirección">{`${type} ${search}${hash}`}</output>;
+}
+
+// The screen with a link like "Mis reservas" of the header, which opens the
+// list without a filter
+const renderAt = (path) => render(
+    <MemoryRouter initialEntries={[path]}>
+        <Link to="/reservations">Mis reservas</Link>
+        <Reservations />
+        <CurrentAddress />
+    </MemoryRouter>,
+);
+
+const pressed = (name) => screen.getByRole('button', { name }).getAttribute('aria-pressed');
+
+describe('The status filter in the URL (#307)', () => {
+    test('loads the status from the URL and keeps the controls, the request and the URL in sync', async () => {
+        // Arrange
+        answer([]);
+        renderAt('/reservations?source=home&status=Pending#lista');
+        await act(async () => {});
+        expect(pressed('Pendientes')).toBe('true');
+        const select = screen.getByLabelText('Filtrar por estado');
+        expect(select).toHaveValue('Pending');
+        expect(getReservations).toHaveBeenLastCalledWith({ status: 'Pending', page: 1, limit: 10 });
+
+        // Act
+        await act(async () => { fireEvent.change(select, { target: { value: 'Active' } }); });
+
+        // Assert: the other values of the address stay
+        expect(screen.getByLabelText('Dirección')).toHaveTextContent(/^REPLACE \?source=home&status=Active#lista$/);
+        expect(getReservations).toHaveBeenLastCalledWith({ status: 'Active', page: 1, limit: 10 });
+
+        // Act: "Todas" takes the status out of the URL
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Todas' })); });
+
+        // Assert
+        expect(screen.getByLabelText('Dirección')).toHaveTextContent(/^REPLACE \?source=home#lista$/);
+        expect(getReservations).toHaveBeenLastCalledWith({ status: 'All', page: 1, limit: 10 });
+    });
+
+    test('an unknown status in the URL shows all of them', async () => {
+        // Arrange
+        answer([]);
+
+        // Act
+        renderAt('/reservations?status=Foo');
+        await act(async () => {});
+
+        // Assert
+        expect(pressed('Todas')).toBe('true');
+        expect(getReservations).toHaveBeenLastCalledWith({ status: 'All', page: 1, limit: 10 });
+    });
+
+    test('after a list that could not load, another filter shows its list without the error', async () => {
+        // Arrange
+        getReservations.mockRejectedValueOnce(new Error('Network Error'));
+        answer([pending]);
+        renderAt('/reservations');
+        await act(async () => {});
+        expect(screen.getByText(/No pudimos cargar tu historial/)).toBeInTheDocument();
+
+        // Act
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pendientes' })); });
+
+        // Assert
+        expect(screen.queryByText(/No pudimos cargar tu historial/)).not.toBeInTheDocument();
+        expect(buttons(PAY_PENDING)).toHaveLength(2);
+    });
+
+    test('a link that changes the filter starts again on page 1, with the loading state and without the last message', async () => {
+        // Arrange: page 2 of the Pending ones, after cancelling one
+        getReservations.mockResolvedValue({
+            data: { reservations: [pending], pagination: { page: 1, limit: 10, total: 11, totalPages: 2 } },
+        });
+        cancelReservation.mockResolvedValue({});
+        renderAt('/reservations?status=Pending');
+        await act(async () => {});
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Siguiente' })); });
+        expect(getReservations).toHaveBeenLastCalledWith({ status: 'Pending', page: 2, limit: 10 });
+        fireEvent.click(buttons(CANCEL_PENDING)[0]);
+        await act(async () => {
+            fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancelar reserva' }));
+        });
+        expect(screen.getByText(/^Reserva AAAAAAAA cancelada/)).toBeInTheDocument();
+        // The next answer takes its time, so the screen shows what it does meanwhile
+        getReservations.mockReturnValue(new Promise(() => {}));
+
+        // Act
+        await act(async () => { fireEvent.click(screen.getByRole('link', { name: 'Mis reservas' })); });
+
+        // Assert
+        expect(pressed('Todas')).toBe('true');
+        expect(getReservations).toHaveBeenLastCalledWith({ status: 'All', page: 1, limit: 10 });
+        expect(screen.getByText('Cargando reservas…')).toBeInTheDocument();
+        expect(screen.queryByText(/^Reserva AAAAAAAA cancelada/)).not.toBeInTheDocument();
     });
 });

@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { API_URL } from '../config';
+import { saveExpiredSessionReturn } from '../utils/expiredSessionReturn';
+import { readSavedSession } from '../utils/session';
 
 const api = axios.create({
     baseURL: API_URL,
@@ -23,10 +25,15 @@ api.interceptors.request.use((config) => {
 // again while the first redirect is in progress can cancel it.
 let redirecting = false;
 export function endSession(reason) {
+    // #307: the account whose session ends, read before it is cleared
+    const userId = readSavedSession()?.id;
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     if (redirecting || window.location.pathname === '/login') return;
     redirecting = true;
+    if (reason === 'expired') {
+        saveExpiredSessionReturn(userId);
+    }
     window.location.href = `/login?${reason}=1`;
 }
 
