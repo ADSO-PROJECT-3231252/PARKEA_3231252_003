@@ -29,9 +29,30 @@ function fueraDeHorario(res, hours) {
     });
 }
 
+// #371: the answer to a reservation that is already saved (after the
+// commit). Reading it again with its zone and vehicle is only for the answer:
+// if that read fails, the answer still says it was created, with the saved
+// reservation, and the error goes to the log, instead of a 500 for a
+// reservation that exists.
+async function responderReservaCreada(res, reserva) {
+    let reservaCompleta = null;
+    try {
+        reservaCompleta = await Reserva.findByPk(reserva.id, {
+            include: [
+                { model: Zona, as: 'zone' },
+                { model: Vehiculo, as: 'vehicle' },
+            ],
+        });
+    } catch (error) {
+        console.error(`The reservation ${reserva.id} was saved, but reading it again failed:`, error);
+    }
+    return res.status(201).json({ message: 'Reservation created successfully', reservation: reservaCompleta ?? reserva });
+}
+
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
     const t = await sequelize.transaction();
+    let reserva;
     try {
         const userId = req.usuario.id;
         const { zoneId, vehicleId, startTime, endTime, openEnded } = req.body;
@@ -172,7 +193,7 @@ async function crear(req, res, next) {
 
         const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
 
-        const reserva = await Reserva.create({
+        reserva = await Reserva.create({
             userId,
             zoneId,
             vehicleId,
@@ -190,19 +211,14 @@ async function crear(req, res, next) {
         await zona.decrement('availableSlots', { by: 1, transaction: t });
 
         await t.commit();
-
-        const reservaCompleta = await Reserva.findByPk(reserva.id, {
-            include: [
-                { model: Zona, as: 'zone' },
-                { model: Vehiculo, as: 'vehicle' },
-            ],
-        });
-
-        return res.status(201).json({ message: 'Reservation created successfully', reservation: reservaCompleta });
     } catch (error) {
         await safeRollback(t);
-        next(error);
+        return next(error);
     }
+
+    // #371: out of the try, so an error after the commit never tries to undo
+    // a reservation that is already saved
+    return responderReservaCreada(res, reserva);
 }
 
 // HU-27: the amounts of an open stay, as the screens show them. Before the

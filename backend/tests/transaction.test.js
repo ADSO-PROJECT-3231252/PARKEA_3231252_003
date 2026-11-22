@@ -3,7 +3,7 @@ const request = require('supertest');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Zona, Reserva, ParkingSpot, Pago, sequelize } = require('../src/models');
+const { Usuario, Vehiculo, Zona, ZoneSchedule, Reserva, ParkingSpot, Pago, sequelize } = require('../src/models');
 const app = require('../src/app');
 const { safeRollback } = require('../src/utils/transaction');
 const { expirarReservasVencidas } = require('../src/jobs/expirar-reservas.job');
@@ -223,5 +223,44 @@ describe.each([
         expect(transaction.rollback).toHaveBeenCalledTimes(1);
         expect(transaction.commit).not.toHaveBeenCalled();
         expect(logged.join('\n')).toContain(CONNECTION_LOST);
+    });
+});
+
+// A zone as the model gives it, without a database behind it: reading it
+// again (after the commit) fails
+function zoneThatCannotBeReadAgain(values = {}) {
+    const zona = Zona.build(
+        { id: ZONE_ID, ...ZONE, availableSlots: 10, isActive: true, schedules: [], ...values },
+        { include: [{ model: ZoneSchedule, as: 'schedules' }] },
+    );
+    jest.spyOn(zona, 'reload').mockRejectedValue(new Error('Connection lost'));
+    jest.spyOn(zona, 'update').mockResolvedValue(zona);
+    jest.spyOn(zona, 'decrement').mockResolvedValue(zona);
+    return zona;
+}
+
+describe('An error after the commit (#371)', () => {
+    test('creating a reservation: it answers 201 with the saved reservation, and nothing is undone', async () => {
+        // Arrange: everything is saved, but reading the reservation again fails
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID });
+        jest.spyOn(Zona, 'findByPk').mockResolvedValue(zoneThatCannotBeReadAgain());
+        jest.spyOn(Pago, 'findOne').mockResolvedValue(null);
+        jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);
+        // No reservations waiting for payment, for the limit of #299
+        jest.spyOn(Reserva, 'count').mockResolvedValue(0);
+        jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue({ id: 'spot-7', spotNumber: 7, update: jest.fn() });
+        jest.spyOn(Reserva, 'create').mockResolvedValue({ id: RESERVATION_ID, status: 'Pending' });
+        jest.spyOn(Reserva, 'findByPk').mockRejectedValue(new Error('Connection lost'));
+
+        // Act
+        const res = await request(app).post('/api/reservations').set('Authorization', `Bearer ${userToken}`)
+            .send({ zoneId: ZONE_ID, vehicleId: VEHICLE_ID, startTime: inTwoHours(), endTime: inThreeHours() });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(res.body.reservation).toEqual({ id: RESERVATION_ID, status: 'Pending' });
+        expect(transaction.commit).toHaveBeenCalled();
+        expect(transaction.rollback).not.toHaveBeenCalled();
+        expect(logged.join('\n')).toContain(`The reservation ${RESERVATION_ID} was saved, but reading it again failed`);
     });
 });
