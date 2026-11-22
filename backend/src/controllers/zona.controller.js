@@ -115,6 +115,19 @@ function filasHorario(zoneId, { open24h, schedule }) {
   return schedule.map(({ day, opensAt, closesAt }) => ({ zoneId, dayOfWeek: day, opensAt, closesAt }));
 }
 
+// #371: the answer to a zone that is already saved (after the commit).
+// Reading it again with its hours is only for the answer: if that read fails,
+// the answer keeps the saved zone and the error goes to the log, instead of a
+// 500 for a change that was saved.
+async function responderZonaGuardada(res, status, message, zona) {
+  try {
+    await zona.reload({ include: [CON_HORARIO] });
+  } catch (err) {
+    console.error(`The zone ${zona.id} was saved, but reading it again failed:`, err);
+  }
+  return res.status(status).json({ message, zone: zona });
+}
+
 // POST /api/zones — admin only
 async function createZona(req, res, next) {
   const error = validarZona(req.body) || validarHorario(req.body);
@@ -129,6 +142,7 @@ async function createZona(req, res, next) {
   // The zone and its spots are created together: if the spots fail, the zone
   // must not stay behind without them
   const t = await sequelize.transaction();
+  let zona;
   try {
     const existente = await Zona.findOne({ where: { name }, transaction: t });
     if (existente) {
@@ -136,7 +150,7 @@ async function createZona(req, res, next) {
       return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
     }
 
-    const zona = await Zona.create({
+    zona = await Zona.create({
       name,
       address,
       latitude,
@@ -156,12 +170,13 @@ async function createZona(req, res, next) {
     await ParkingSpot.bulkCreate(spots, { transaction: t });
 
     await t.commit();
-    await zona.reload({ include: [CON_HORARIO] });
-    return res.status(201).json({ message: 'Zone created successfully', zone: zona });
   } catch (err) {
     await safeRollback(t);
-    next(err);
+    return next(err);
   }
+
+  // #371: out of the try, so an error after the commit never tries to undo it
+  return responderZonaGuardada(res, 201, 'Zone created successfully', zona);
 }
 
 // PUT /api/zones/:id — admin only
@@ -177,11 +192,12 @@ async function updateZona(req, res, next) {
   const { latitude, longitude, totalSlots, hourlyRate } = req.body;
 
   const t = await sequelize.transaction();
+  let zona;
   try {
     // Locked so a reservation can't take a spot while the capacity changes.
     // #371: the zone first and then its spots; crear, cancelar, terminar and
     // the two jobs lock in the same order, so they wait instead of a deadlock.
-    const zona = await Zona.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
+    zona = await Zona.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!zona) {
       await t.rollback();
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
@@ -274,12 +290,13 @@ async function updateZona(req, res, next) {
     await ZoneSchedule.bulkCreate(filasHorario(id, req.body), { transaction: t });
 
     await t.commit();
-    await zona.reload({ include: [CON_HORARIO] });
-    return res.status(200).json({ message: 'Zone updated successfully', zone: zona });
   } catch (err) {
     await safeRollback(t);
-    next(err);
+    return next(err);
   }
+
+  // #371: out of the try, so an error after the commit never tries to undo it
+  return responderZonaGuardada(res, 200, 'Zone updated successfully', zona);
 }
 
 // PATCH /api/zones/:id/toggle — admin only, activate/deactivate instead of deleting

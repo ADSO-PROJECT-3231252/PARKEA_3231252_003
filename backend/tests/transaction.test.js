@@ -263,4 +263,41 @@ describe('An error after the commit (#371)', () => {
         expect(transaction.rollback).not.toHaveBeenCalled();
         expect(logged.join('\n')).toContain(`The reservation ${RESERVATION_ID} was saved, but reading it again failed`);
     });
+
+    test('creating a zone: it answers 201 with the saved zone, and nothing is undone', async () => {
+        // Arrange
+        jest.spyOn(Zona, 'findOne').mockResolvedValue(null);
+        jest.spyOn(Zona, 'create').mockImplementation(async (values) => zoneThatCannotBeReadAgain(values));
+        jest.spyOn(ZoneSchedule, 'bulkCreate').mockResolvedValue([]);
+        jest.spyOn(ParkingSpot, 'bulkCreate').mockResolvedValue([]);
+
+        // Act
+        const res = await request(app).post('/api/zones').set('Authorization', `Bearer ${adminToken}`).send(ZONE);
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(res.body.zone).toMatchObject({ id: ZONE_ID, name: 'Centro' });
+        expect(transaction.commit).toHaveBeenCalled();
+        expect(transaction.rollback).not.toHaveBeenCalled();
+        expect(logged.join('\n')).toContain(`The zone ${ZONE_ID} was saved, but reading it again failed`);
+    });
+
+    test('editing a zone: it answers 200 with the saved zone, and nothing is undone', async () => {
+        // Arrange: the capacity stays the same, so no spot changes
+        jest.spyOn(Zona, 'findByPk').mockResolvedValue(zoneThatCannotBeReadAgain());
+        jest.spyOn(Zona, 'findOne').mockResolvedValue(null);
+        jest.spyOn(ParkingSpot, 'count').mockResolvedValue(10);
+        jest.spyOn(ZoneSchedule, 'destroy').mockResolvedValue(0);
+        jest.spyOn(ZoneSchedule, 'bulkCreate').mockResolvedValue([]);
+
+        // Act
+        const res = await request(app).put(`/api/zones/${ZONE_ID}`).set('Authorization', `Bearer ${adminToken}`).send({ ...ZONE, name: 'Centro Norte' });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body.zone).toMatchObject({ id: ZONE_ID });
+        expect(transaction.commit).toHaveBeenCalled();
+        expect(transaction.rollback).not.toHaveBeenCalled();
+        expect(logged.join('\n')).toContain(`The zone ${ZONE_ID} was saved, but reading it again failed`);
+    });
 });
