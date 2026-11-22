@@ -140,16 +140,19 @@ PARKEA_3231252_003/
 │   │   ├── 📁 controllers/   # Business logic (one per module)
 │   │   ├── 📁 jobs/          # Background jobs (reservation expiration and finalization)
 │   │   ├── 📁 middlewares/   # Auth, attempt limits (rateLimit.js) and express-validator rules (*.validator.js)
-│   │   ├── 📁 migrations/    # 26 Sequelize migrations: they create the database
+│   │   ├── 📁 migrations/    # 29 Sequelize migrations: they create the database
 │   │   ├── 📁 models/        # Sequelize models (11 tables)
 │   │   ├── 📁 routes/        # API route definitions
 │   │   ├── 📁 seeders/       # Demo data: roles, zones and the primary administrator
+│   │   ├── 📁 services/      # Rules shared by controllers (availability.js: the free spots of a zone for some hours)
 │   │   └── 📁 utils/         # Helpers (mailer and email layout, link and session tokens, simulated payment, stay pricing, zone hours, validation)
 │   ├── 📁 tests/             # Jest + Supertest tests (npm test)
+│   │   └── 📁 integration/   # Tests against a MySQL database (npm run test:integration)
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
 │   ├── API_REFERENCE.md      # Every endpoint with its rules and error codes
 │   ├── eslint.config.js
+│   ├── jest.integration.config.js  # Jest config of the integration tests
 │   └── package.json
 │
 ├── 📁 frontend/
