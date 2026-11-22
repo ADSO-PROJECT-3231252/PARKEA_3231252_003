@@ -22,8 +22,9 @@ function reservation(id, values = {}) {
 function arrange(found) {
     jest.spyOn(Reserva, 'findAll').mockResolvedValue(found.map(({ id }) => ({ id })));
     lockReservation = jest.spyOn(Reserva, 'findOne').mockImplementation(async ({ where }) => found.find((r) => r.id === where.id) ?? null);
-    lockZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue({ id: ZONE_ID, name: 'Centro', increment: jest.fn() });
-    lockSpot = jest.spyOn(ParkingSpot, 'findByPk').mockResolvedValue({ id: SPOT_ID, status: 'Occupied', update: jest.fn() });
+    // Spied on only to check that the zone and the spot do not change (#373)
+    lockZone = jest.spyOn(Zona, 'findByPk');
+    lockSpot = jest.spyOn(ParkingSpot, 'findByPk');
     jest.spyOn(Pago, 'findAll').mockResolvedValue([]);
 }
 
@@ -37,54 +38,36 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
-describe('The expiration job (#373)', () => {
-    test('marks the reservation Expired, with no change to its spot or its zone', async () => {
+describe.each([
+    ['expiration', expirarReservasVencidas, 'Expired', 'Pending'],
+    ['finish', finalizarReservasVencidas, 'Finished', 'Active'],
+])('The %s job (#373)', (_name, runJob, status, before) => {
+    test(`marks the reservation ${status}, with no change to its spot or its zone`, async () => {
         // Arrange
         const reserva = reservation('r1');
         arrange([reserva]);
 
         // Act
-        await expirarReservasVencidas();
+        await runJob();
 
-        // Assert: it stopped holding its spot when its 15 minutes ended
-        expect(reserva.update).toHaveBeenCalledWith({ status: 'Expired' }, { transaction });
-        expect(lockReservation).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'r1', status: 'Pending' }, transaction, lock: 'UPDATE' }));
+        // Assert: the reservation was read again, locked, with its status
+        expect(lockReservation).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'r1', status: before }, transaction, lock: 'UPDATE' }));
+        expect(reserva.update).toHaveBeenCalledWith({ status }, { transaction });
         expect(lockZone).not.toHaveBeenCalled();
         expect(lockSpot).not.toHaveBeenCalled();
         expect(transaction.commit).toHaveBeenCalled();
     });
-});
 
-describe.each([
-    ['finish', finalizarReservasVencidas, 'Finished'],
-])('The %s job', (_name, runJob, status) => {
-    test(`marks the reservation ${status} and gives the spot and the slot back`, async () => {
-        // Arrange
-        const reserva = reservation('r1');
-        arrange([reserva]);
+    test('a reservation another run already changed is left as it is', async () => {
+        // Arrange: it is found, but read again it no longer has its status
+        arrange([]);
+        jest.spyOn(Reserva, 'findAll').mockResolvedValue([{ id: 'r1' }]);
 
         // Act
         await runJob();
 
         // Assert
-        expect(reserva.update).toHaveBeenCalledWith({ status }, { transaction });
-        expect((await lockSpot.mock.results[0].value).update).toHaveBeenCalledWith({ status: 'Available' }, { transaction });
-        expect((await lockZone.mock.results[0].value).increment).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
-        expect(transaction.commit).toHaveBeenCalled();
-    });
-
-    test('locks the reservation, then the zone and then the spot, as a capacity edit does (zone, then spots) (#371)', async () => {
-        // Arrange
-        arrange([reservation('r1')]);
-
-        // Act
-        await runJob();
-
-        // Assert
-        expect(lockReservation).toHaveBeenCalledWith(expect.objectContaining({ transaction, lock: 'UPDATE' }));
-        expect(lockZone).toHaveBeenCalledWith(ZONE_ID, { transaction, lock: 'UPDATE' });
-        expect(lockSpot).toHaveBeenCalledWith(SPOT_ID, { transaction, lock: 'UPDATE' });
-        expect(lockReservation.mock.invocationCallOrder[0]).toBeLessThan(lockZone.mock.invocationCallOrder[0]);
-        expect(lockZone.mock.invocationCallOrder[0]).toBeLessThan(lockSpot.mock.invocationCallOrder[0]);
+        expect(transaction.rollback).toHaveBeenCalled();
+        expect(transaction.commit).not.toHaveBeenCalled();
     });
 });
