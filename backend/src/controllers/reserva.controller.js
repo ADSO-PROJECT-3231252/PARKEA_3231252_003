@@ -111,6 +111,8 @@ async function crear(req, res, next) {
         // count goes after the lock of the user, so two requests at the same
         // time cannot both see room for one more: the second one waits at the
         // lock and then counts the reservation the first one created.
+        // A Pending one whose 15 minutes ended counts as expired, even if the
+        // job has not marked it yet (#347), so it does not take a place either.
         const pendientes = await Reserva.count({
             where: {
                 userId,
