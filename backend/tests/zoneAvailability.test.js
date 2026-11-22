@@ -164,3 +164,19 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         expect(res.body.zone).toMatchObject({ id: CENTRO, isActive: false, availableSlots: 9 });
     });
 });
+
+describe('GET /api/zones/:id/spots (#373)', () => {
+    test('no longer exists: its Occupied would not be true with spots by time range', async () => {
+        // Arrange: the session of the administrator (auth middleware)
+        jest.spyOn(Usuario, 'findByPk').mockResolvedValue({ id: ADMIN_ID, isActive: true, passwordVersion: 0, role: { name: 'admin' } });
+        jest.spyOn(Zona, 'findByPk');
+
+        // Act
+        const res = await asAdmin(request(app).get(`/api/zones/${CENTRO}/spots`));
+
+        // Assert
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('ROUTE_NOT_FOUND');
+        expect(Zona.findByPk).not.toHaveBeenCalled();
+    });
+});
