@@ -104,7 +104,11 @@ async function crear(req, res, next) {
             return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
         }
 
-        const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t });
+        // #371: the zone is locked before the spot, in the same order as
+        // updateZona (the zone, then its spots): with the spot first, a
+        // capacity edit that held the zone and waited for that spot was a
+        // deadlock. Being a locked read, it also gets the zone as it is now.
+        const zona = await Zona.findByPk(zoneId, { include: [CON_HORARIO], transaction: t, lock: t.LOCK.UPDATE });
         if (!zona) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
