@@ -600,7 +600,10 @@ async function ampliar(req, res, next) {
         // closing time. The zone is read after the lock of the vehicle, so the
         // overlap check below still sees a reservation another request has
         // just created for it.
-        const zona = await Zona.findByPk(reserva.zoneId, { include: [CON_HORARIO], transaction: t });
+        // #373: the zone is locked like in crear, so a new reservation for the
+        // same spot and these hours waits until this extension ends (or the
+        // other way around), and the spot check below stays true.
+        const zona = await Zona.findByPk(reserva.zoneId, { include: [CON_HORARIO], transaction: t, lock: t.LOCK.UPDATE });
         if (!zona.open24h) {
             const cierre = latestExit(zona, inicio);
             if (aTiempoIndefinido && cierre) salidaNueva = cierre;
@@ -625,6 +628,21 @@ async function ampliar(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.VEHICLE_RESERVATION_OVERLAP, message: 'This vehicle already has a reservation for that time range' });
         }
 
+        // #373 (AC-05): a stay never changes spot, so its spot must be free
+        // for the added time, with 10 minutes after it, also for an open stay
+        // until its provisional exit time. If another reservation holds it,
+        // nothing is charged and the answer says until when it is free.
+        const siguiente = await availability.nextHolderOfSpot(reserva, salidaActual, salidaNueva, { transaction: t, now: ahora });
+        if (siguiente) {
+            await t.rollback();
+            const libreHasta = availability.freeUntil(siguiente);
+            return res.status(409).json({
+                code: ErrorCodes.SPOT_RESERVED_LATER,
+                message: `The spot of this stay has another reservation later. It is free until ${libreHasta.toISOString()}`,
+                freeUntil: libreHasta,
+            });
+        }
+
         if (!aTiempoIndefinido) {
             // AC-06: the new exit time is saved only if the payment is approved
             if (esRechazado(req.body)) {
@@ -643,7 +661,7 @@ async function ampliar(req, res, next) {
             }, { transaction: t });
         }
 
-        // AC-05: the same spot; it stays Occupied until the stay ends
+        // AC-05: the same spot, which the stay now holds until its new exit time
         await reserva.update({ endTime: salidaNueva, openEnded: aTiempoIndefinido }, { transaction: t });
         await t.commit();
 
