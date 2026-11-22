@@ -188,23 +188,38 @@ describe('The reserve screen and the hours of the zone (HU-29)', () => {
     });
 });
 
-describe('The limit of reservations waiting for payment (#299)', () => {
-    test('a third reservation shows the limit message and the link to my reservations', async () => {
-        // Arrange
+// HU-27 AC-11 and #299: a balance to pay and the reservations waiting for
+// payment are both paid from the list of reservations, so their banner links
+// there. Any other error shows only its message.
+describe('The link of the banner to my reservations (HU-27 AC-11, #299)', () => {
+    async function reserveAndGet(code) {
         const user = userEvent.setup();
-        createReservation.mockRejectedValue({
-            response: { status: 409, data: { code: 'TOO_MANY_PENDING_RESERVATIONS' } },
-        });
+        createReservation.mockRejectedValue({ response: { status: 409, data: { code } } });
         await renderScreen(zoneWith([], true));
-
-        // Act
         typeEntry('10:00');
         typeExit('12:00');
         await user.click(screen.getByRole('button', { name: 'Reservar cupo' }));
+    }
+
+    test.each([
+        ['TOO_MANY_PENDING_RESERVATIONS', 'Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra'],
+        ['PENDING_BALANCE', 'Tienes un saldo pendiente de una estadía anterior. Págalo antes de hacer una nueva reserva'],
+    ])('%s shows its message and the link to my reservations', async (code, shown) => {
+        // Act
+        await reserveAndGet(code);
 
         // Assert
-        const message = await screen.findByText('Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra');
+        const message = await screen.findByText(shown);
         const link = within(message.closest('[role="alert"]')).getByRole('link', { name: 'Ver mis reservas' });
         expect(link).toHaveAttribute('href', '/reservations');
+    });
+
+    test('another error shows its message without the link', async () => {
+        // Act
+        await reserveAndGet('NO_SPOTS_AVAILABLE');
+
+        // Assert
+        expect(await screen.findByText('Este cupo ya no está disponible. Elige otra zona u horario')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Ver mis reservas' })).not.toBeInTheDocument();
     });
 });
