@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Zona, Reserva, ParkingSpot, ZoneSchedule, sequelize } = require('../models');
+const { Zona, ParkingSpot, ZoneSchedule, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { scheduleErrors } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
@@ -123,13 +123,15 @@ function filasHorario(zoneId, { open24h, schedule }) {
 // #371: the answer to a zone that is already saved (after the commit).
 // Reading it again with its hours is only for the answer: if that read fails,
 // the answer keeps the saved zone and the error goes to the log, instead of a
-// 500 for a change that was saved.
-async function responderZonaGuardada(res, status, message, zona) {
+// 500 for a change that was saved. #373: `availableSlots` was counted in the
+// transaction, and the zone is sent with it like everywhere else.
+async function responderZonaGuardada(res, status, message, zona, availableSlots) {
   try {
     await zona.reload({ include: [CON_HORARIO] });
   } catch (err) {
     console.error(`The zone ${zona.id} was saved, but reading it again failed:`, err);
   }
+  zona.setDataValue('availableSlots', availableSlots);
   return res.status(status).json({ message, zone: zona });
 }
 
@@ -180,8 +182,9 @@ async function createZona(req, res, next) {
     return next(err);
   }
 
-  // #371: out of the try, so an error after the commit never tries to undo it
-  return responderZonaGuardada(res, 201, 'Zone created successfully', zona);
+  // #371: out of the try, so an error after the commit never tries to undo it.
+  // A new zone has no reservations, so all its spots are free.
+  return responderZonaGuardada(res, 201, 'Zone created successfully', zona, totalSlots);
 }
 
 // PUT /api/zones/:id — admin only
@@ -198,6 +201,7 @@ async function updateZona(req, res, next) {
 
   const t = await sequelize.transaction();
   let zona;
+  let disponibles;
   try {
     // Locked so a reservation can't take a spot while the capacity changes.
     // #371: the zone first and then its spots; crear, cancelar, terminar and
@@ -215,12 +219,13 @@ async function updateZona(req, res, next) {
       return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
     }
 
+    const ahora = new Date();
     if (totalSlots < zona.totalSlots) {
-      const ocupados = await Reserva.count({
-        where: { zoneId: id, status: ['Pending', 'Active'] },
-        transaction: t,
-      });
-      // HU-21 AC-03: spotsInUse lets the screen say how many spots are taken
+      // HU-21 AC-03, #373: a spot is in use while a Pending or Active
+      // reservation holds it from now on (several reservations of one spot
+      // count once), and only the other spots can be disabled. spotsInUse
+      // lets the screen say how many spots are taken.
+      const ocupados = await availability.spotsInUse(id, { transaction: t, now: ahora });
       if (totalSlots < ocupados) {
         await t.rollback();
         return res.status(400).json({
@@ -230,9 +235,11 @@ async function updateZona(req, res, next) {
         });
       }
 
+      // The enabled spots with no reservation from now on, the highest
+      // numbers first
       const delta = zona.totalSlots - totalSlots;
       const candidatos = await ParkingSpot.findAll({
-        where: { zoneId: id, status: 'Available' },
+        where: { zoneId: id, status: availability.ENABLED, [Op.and]: [availability.freeFromNow(ahora)] },
         order: [['spotNumber', 'DESC']],
         limit: delta,
         transaction: t,
@@ -277,7 +284,8 @@ async function updateZona(req, res, next) {
       }
     }
 
-    const disponibles = await ParkingSpot.count({ where: { zoneId: id, status: 'Available' }, transaction: t });
+    // #373: the spots free now, with the new capacity
+    disponibles = await availability.availableNow(id, { transaction: t, now: ahora });
     await zona.update({
       name,
       address,
@@ -301,7 +309,7 @@ async function updateZona(req, res, next) {
   }
 
   // #371: out of the try, so an error after the commit never tries to undo it
-  return responderZonaGuardada(res, 200, 'Zone updated successfully', zona);
+  return responderZonaGuardada(res, 200, 'Zone updated successfully', zona, disponibles);
 }
 
 // PATCH /api/zones/:id/toggle — admin only, activate/deactivate instead of deleting
