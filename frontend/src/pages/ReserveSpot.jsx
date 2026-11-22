@@ -661,7 +661,7 @@ export default function ReserveSpot() {
                     {serverErrorCode && (
                         <div role="alert" className="flex flex-col items-center gap-2 rounded-md bg-danger-soft px-3 py-2 text-center">
                             <p className="text-caption text-danger">{translateError(serverErrorCode)}</p>
-                            {/* HU-27 / #299: open reservations to pay a balance or manage pending reservations */}
+                            {/* HU-27 AC-11 and #299: the balance and the reservations waiting for payment are paid from the list of reservations */}
                             {(serverErrorCode === 'PENDING_BALANCE' || serverErrorCode === 'TOO_MANY_PENDING_RESERVATIONS') && (
                                 <Link
                                     to="/reservations"
