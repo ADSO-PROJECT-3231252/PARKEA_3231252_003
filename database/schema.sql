@@ -135,6 +135,10 @@ CREATE TABLE parking_spots (
 -- applied_hourly_rate freezes the zone rate at booking time, so later rate
 -- changes never alter the price of an existing reservation
 -- hold_expires_at: an unpaid reservation expires and releases its spot (HU-26)
+-- A reservation holds its spot only for its hours, while it is Active or
+-- Pending with its 15 minutes still running; the index finds the
+-- reservations of a spot by status and time, and it is also the index of
+-- the foreign key of parking_spot_id (#373)
 -- open_ended: a stay without a chosen exit time (HU-27). Its end_time keeps a
 -- provisional value until the stay ends: entry + 24 h, or the closing time of
 -- that day when the zone is not open 24 hours (HU-29). This flag is what
@@ -162,7 +166,8 @@ CREATE TABLE reservations (
     CONSTRAINT reservations_vehicle_id_fk FOREIGN KEY (vehicle_id)
         REFERENCES vehicles(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT reservations_parking_spot_id_fk FOREIGN KEY (parking_spot_id)
-        REFERENCES parking_spots(id) ON DELETE RESTRICT
+        REFERENCES parking_spots(id) ON DELETE RESTRICT,
+    KEY reservations_spot_status_times_idx (parking_spot_id, status, start_time, end_time)
 );
 
 -- 8. Table: payments
