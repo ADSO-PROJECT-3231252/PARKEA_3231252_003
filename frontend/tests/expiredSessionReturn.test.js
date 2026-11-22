@@ -105,17 +105,79 @@ describe('After signing in, the person goes back to the screen it was on (#307)'
         expect(await screen.findByRole('heading', { name: 'Gestión de zonas' })).toBeInTheDocument();
     });
 
+    // '/' is a screen without ProtectedRoute: only the rule of the form keeps
+    // an administrator out of it
     test.each([
         [ADMIN.id, '/admin/zones', 'Gestión de zonas'],
         ['other-admin', '/admin/zones', 'Panel'],
-        [ADMIN.id, '/vehicles', 'Panel'],
+        [ADMIN.id, '/', 'Panel'],
     ])('uses the admin form after expiry for %s returning from %s', async (owner, path, heading) => {
+        // Arrange
         saveReturn(path, owner);
         renderAt('/login?expired=1');
+
+        // Act
         await userEvent.click(await screen.findByRole('link', { name: /iniciar sesión como administrador/i }));
         await signInAs(ADMIN, loginAdmin);
+
+        // Assert
         expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
         expect(sessionStorage.getItem('expiredSessionReturnTo')).toBeNull();
+    });
+
+    test('the admin form that does not come from an expired session ignores an old saved screen', async () => {
+        // Arrange
+        saveReturn('/admin/zones', ADMIN.id);
+        renderAt('/admin/login');
+
+        // Act
+        await signInAs(ADMIN, loginAdmin);
+
+        // Assert
+        expect(await screen.findByRole('heading', { name: 'Panel' })).toBeInTheDocument();
+        expect(sessionStorage.getItem('expiredSessionReturnTo')).toBeNull();
+    });
+
+    test.each([
+        ['/admin/zones', 'Gestión de zonas'],
+        ['/vehicles', 'Panel'],
+    ])('an administrator sent to the login from %s and signed in on the admin form opens %s', async (path, heading) => {
+        // Arrange
+        renderAt(path);
+
+        // Act
+        await userEvent.click(await screen.findByRole('link', { name: /iniciar sesión como administrador/i }));
+        await signInAs(ADMIN, loginAdmin);
+
+        // Assert
+        expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+    });
+
+    test('going back from the admin form keeps the expired session', async () => {
+        // Arrange
+        renderAt('/login?expired=1');
+        await userEvent.click(await screen.findByRole('link', { name: /iniciar sesión como administrador/i }));
+
+        // Act
+        await userEvent.click(await screen.findByRole('link', { name: /volver al inicio de sesión de usuario/i }));
+
+        // Assert
+        expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Ruta actual')).toHaveTextContent(/^\/login\?expired=1$/);
+        expect(screen.getByText(/tu sesión expiró/i)).toBeInTheDocument();
+    });
+
+    test('going back from the admin form keeps the screen the person was sent away from', async () => {
+        // Arrange
+        renderAt('/admin/zones');
+        await userEvent.click(await screen.findByRole('link', { name: /iniciar sesión como administrador/i }));
+        await userEvent.click(await screen.findByRole('link', { name: /volver al inicio de sesión de usuario/i }));
+
+        // Act: the administrator signs in on the user form
+        await signInAs(ADMIN);
+
+        // Assert
+        expect(await screen.findByRole('heading', { name: 'Gestión de zonas' })).toBeInTheDocument();
     });
 
     test('another account that signs in on that tab starts on its home', async () => {
