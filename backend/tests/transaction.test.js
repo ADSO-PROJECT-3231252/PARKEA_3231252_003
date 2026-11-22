@@ -1,5 +1,7 @@
+const util = require('util');
 const jwt = require('jsonwebtoken');
 const request = require('supertest');
+const { DatabaseError } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
@@ -45,6 +47,13 @@ let logged;
 // Another error of the database, which leaves the transaction open
 const CONNECTION_LOST = 'Connection lost: The server closed the connection';
 
+// An error of MySQL as Sequelize gives it: its stack is the one of the query
+// and starts with a bare "Error", without the message
+// (sequelize/lib/dialects/mysql/query.js)
+function mysqlError(message) {
+    return new DatabaseError(new Error(message), { stack: 'Error\n    at Query.run (query.js:1:1)' });
+}
+
 // The first read of the method inside a transaction fails: with a deadlock,
 // MySQL already undid the transaction; with another error it is still open.
 // The reads outside a transaction (the session check) answer `otherwise`.
@@ -52,9 +61,9 @@ function failOn(Model, method, otherwise = () => null, { deadlock = true } = {})
     return jest.spyOn(Model, method).mockImplementation(async (...args) => {
         const options = args.find((arg) => arg && typeof arg === 'object' && 'transaction' in arg);
         if (options?.transaction) {
-            if (!deadlock) throw new Error(CONNECTION_LOST);
+            if (!deadlock) throw mysqlError(CONNECTION_LOST);
             options.transaction.finished = 'rollback';
-            throw new Error(DEADLOCK);
+            throw mysqlError(DEADLOCK);
         }
         return otherwise(...args);
     });
@@ -70,7 +79,8 @@ beforeEach(() => {
     jest.spyOn(Usuario, 'findByPk').mockImplementation(async (id) => session(id));
     logged = [];
     jest.spyOn(console, 'error').mockImplementation((...args) => {
-        logged.push(args.map((arg) => (arg instanceof Error ? arg.stack : String(arg))).join(' '));
+        // What console.error writes: the text, or the error as Node prints it
+        logged.push(args.map((arg) => (typeof arg === 'string' ? arg : util.inspect(arg))).join(' '));
     });
     jest.spyOn(console, 'log').mockImplementation(() => {});
 });
@@ -159,6 +169,36 @@ describe('A deadlock inside a transaction (#371)', () => {
         expect(transaction.rollback).not.toHaveBeenCalled();
         expect(logged.join('\n')).toContain(DEADLOCK);
         expect(logged.join('\n')).not.toContain(ROLLBACK_OF_ENDED);
+    });
+});
+
+describe('The log of an unexpected error (#371)', () => {
+    test('an error that is not of the database is written once, with its stack', async () => {
+        // Arrange
+        jest.spyOn(Zona, 'findOne').mockRejectedValue(new Error('Something else failed'));
+
+        // Act
+        const res = await request(app).post('/api/zones').set('Authorization', `Bearer ${adminToken}`).send(ZONE);
+
+        // Assert
+        expect(res.status).toBe(500);
+        expect(logged.join('\n').match(/Error: Something else failed/g)).toHaveLength(1);
+        expect(logged.join('\n')).toMatch(/Error: Something else failed\n {4}at /);
+    });
+
+    test('an error without a message keeps the stack as Node writes it, without an extra first line', async () => {
+        // Arrange: Node starts the stack of an error without a message with a
+        // bare "Error" (Jest adds ": ", so the stack is written by hand)
+        const error = new Error();
+        error.stack = 'Error\n    at fakeQuery (query.js:1:1)';
+        jest.spyOn(Zona, 'findOne').mockRejectedValue(error);
+
+        // Act
+        const res = await request(app).post('/api/zones').set('Authorization', `Bearer ${adminToken}`).send(ZONE);
+
+        // Assert
+        expect(res.status).toBe(500);
+        expect(logged).toEqual(['Error\n    at fakeQuery (query.js:1:1)']);
     });
 });
 
