@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const ErrorCodes = require('../constants/errorCodes');
 const { colombiaDay } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
+const availability = require('../services/availability');
 
 const RANGOS_VALIDOS = ['today', 'week', 'month'];
 
@@ -115,17 +116,20 @@ async function getReservasPorZona(req, res, next) {
 }
 
 // GET /api/admin/dashboard/occupancy
+// #373: the occupied spots of each zone are the ones not free now, the same
+// number the list of zones shows (availableSlots), in one query for all
 async function getOcupacionPorZona(req, res, next) {
   try {
     const zonas = await Zona.findAll({
       where: { isActive: true },
-      attributes: ['id', 'name', 'totalSlots', 'availableSlots'],
+      attributes: ['id', 'name', 'totalSlots'],
     });
+    const libres = await availability.availableNowByZone(zonas.map((z) => z.id));
     const ocupacion = zonas.map((z) => ({
       zoneId: z.id,
       zoneName: z.name,
       totalSlots: z.totalSlots,
-      occupiedSlots: z.totalSlots - z.availableSlots,
+      occupiedSlots: z.totalSlots - libres.get(z.id),
     }));
     return res.status(200).json({ occupancy: ocupacion });
   } catch (error) {
@@ -182,10 +186,13 @@ async function getPagosRecientes(req, res, next) {
 // GET /api/admin/dashboard/alerts
 async function getAlertas(req, res, next) {
   try {
-    const zonasLlenas = await Zona.findAll({
-      where: { isActive: true, availableSlots: 0 },
+    // #373: a zone is full when none of its spots is free now
+    const zonas = await Zona.findAll({
+      where: { isActive: true },
       attributes: ['id', 'name'],
     });
+    const libres = await availability.availableNowByZone(zonas.map((z) => z.id));
+    const zonasLlenas = zonas.filter((z) => libres.get(z.id) === 0);
 
     const alerts = zonasLlenas.map((z) => ({
       type: 'zone_full',
