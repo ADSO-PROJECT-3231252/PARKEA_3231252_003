@@ -259,6 +259,19 @@ describe('Cancelling a reservation (HU-16)', () => {
         expect(transaction.rollback).not.toHaveBeenCalled();
     });
 
+    test('the zone is locked before the spot, as in a capacity edit, so both at the same time wait instead of a deadlock (#371)', async () => {
+        // Arrange
+        arrange();
+
+        // Act
+        await cancel();
+
+        // Assert
+        expect(Zona.findByPk).toHaveBeenCalledWith(ZONE_ID, { transaction, lock: 'UPDATE' });
+        expect(ParkingSpot.findByPk).toHaveBeenCalledWith(SPOT_ID, { transaction, lock: 'UPDATE' });
+        expect(Zona.findByPk.mock.invocationCallOrder[0]).toBeLessThan(ParkingSpot.findByPk.mock.invocationCallOrder[0]);
+    });
+
     test('a spot that is no longer Occupied is left as it is', async () => {
         // Arrange
         arrange();

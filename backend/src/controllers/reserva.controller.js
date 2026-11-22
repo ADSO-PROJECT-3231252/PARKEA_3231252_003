@@ -380,6 +380,11 @@ async function cancelar(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.RESERVATION_ALREADY_STARTED, message: 'This reservation has already started and cannot be cancelled' });
         }
 
+        // #371: the zone is locked before the spot, in the same order as
+        // updateZona and crear, so a capacity edit at the same time waits
+        // instead of a deadlock
+        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+
         // Release the physical spot, not just the zone counter
         if (reserva.parkingSpotId) {
             const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
@@ -388,7 +393,6 @@ async function cancelar(req, res, next) {
             }
         }
 
-        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ status: 'Cancelled' }, { transaction: t });
         // Before the entry, what was paid is refunded: the initial payment and
