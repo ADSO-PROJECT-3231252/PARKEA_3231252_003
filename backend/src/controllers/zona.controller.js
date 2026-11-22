@@ -3,9 +3,13 @@ const { Zona, Reserva, ParkingSpot, ZoneSchedule, sequelize } = require('../mode
 const ErrorCodes = require('../constants/errorCodes');
 const { scheduleErrors } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
+const availability = require('../services/availability');
 
 // HU-29: every zone is sent with its opening hours (Zona.toJSON)
 const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
+
+// The share of the spots of a zone that is free now (#373)
+const shareFree = (zona) => zona.get('availableSlots') / zona.totalSlots;
 
 // GET /api/zones — public, list only active zones, ordered by highest availability first
 async function getZonas(req, res, next) {
@@ -13,10 +17,11 @@ async function getZonas(req, res, next) {
     const zonas = await Zona.findAll({
       where: { isActive: true },
       include: [CON_HORARIO],
-      order: [
-        [Zona.sequelize.literal('available_slots / total_slots'), 'DESC'],
-      ],
     });
+    // #373: availableSlots is calculated from the reservations, for all the
+    // zones in one query, and they are ordered by it (then by name)
+    await availability.withAvailableSlots(zonas);
+    zonas.sort((a, b) => shareFree(b) - shareFree(a) || a.name.localeCompare(b.name, 'es'));
     return res.status(200).json({ zones: zonas });
   } catch (error) {
     next(error);
