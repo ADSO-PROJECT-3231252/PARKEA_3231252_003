@@ -36,10 +36,11 @@ let spot;
 // A zone open 24 hours, read with its (empty) schedule
 function openZone(values = {}) {
     const built = Zona.build(
-        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, availableSlots: 4, hourlyRate: '2500.00', isActive: true, open24h: true, schedules: [], ...values },
+        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, hourlyRate: '2500.00', isActive: true, open24h: true, schedules: [], ...values },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
-    jest.spyOn(built, 'decrement').mockResolvedValue(built);
+    // Spied on only to check that the zone does not change (#373)
+    jest.spyOn(built, 'decrement');
     return built;
 }
 
