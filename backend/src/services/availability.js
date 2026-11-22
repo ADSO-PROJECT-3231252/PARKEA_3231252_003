@@ -1,0 +1,176 @@
+// #373: a spot is taken only for the hours of its reservations, so whether a
+// spot is free is calculated from them, for the hours asked, instead of being
+// stored. parking_spots.status only says whether a spot is enabled
+// (Available) or Disabled.
+const { Op, fn, col, literal } = require('sequelize');
+const { ParkingSpot, Reserva, sequelize } = require('../models');
+
+const MINUTE_MS = 60 * 1000;
+
+// Two reservations of the same spot keep this time between them, so one car
+// can leave before the next one comes in
+const MARGIN_MS = 10 * MINUTE_MS;
+
+// The shortest stay (HU-14). `availableSlots` in the API is the number of
+// spots free for it from now.
+const MIN_STAY_MS = 30 * MINUTE_MS;
+
+const plus = (date, ms) => new Date(new Date(date).getTime() + ms);
+
+// A spot that is not Disabled can be reserved
+const ENABLED = { [Op.ne]: 'Disabled' };
+
+// A reservation holds its spot while it is Active, or Pending with its 15
+// minutes to pay still running. One whose 15 minutes ended no longer holds
+// it, even if the job has not marked it Expired yet (#347, countsAsExpired);
+// a Pending one without a deadline never expires, so it holds it.
+function holdsItsSpot(now) {
+    return {
+        [Op.or]: [
+            { status: 'Active' },
+            { status: 'Pending', [Op.or]: [{ holdExpiresAt: null }, { holdExpiresAt: { [Op.gt]: now } }] },
+        ],
+    };
+}
+
+// The same rule in SQL, for a reservation `r`
+function holdsItsSpotSql(now) {
+    return `r.status IN ('Pending', 'Active')
+        AND (r.status = 'Active' OR r.hold_expires_at IS NULL OR r.hold_expires_at > ${sequelize.escape(now)})`;
+}
+
+// For a query of ParkingSpot: the spots that no reservation holds between
+// `from` and `to`, with the margin before and after
+function freeBetween(from, to, now) {
+    return literal(`NOT EXISTS (
+        SELECT 1 FROM reservations AS r
+        WHERE r.parking_spot_id = \`ParkingSpot\`.\`id\`
+            AND ${holdsItsSpotSql(now)}
+            AND r.start_time < ${sequelize.escape(plus(to, MARGIN_MS))}
+            AND r.end_time > ${sequelize.escape(plus(from, -MARGIN_MS))}
+    )`);
+}
+
+// For a query of ParkingSpot: the spots with no reservation that holds them
+// from now on (HU-21: only these can be disabled)
+function freeFromNow(now) {
+    return literal(`NOT EXISTS (
+        SELECT 1 FROM reservations AS r
+        WHERE r.parking_spot_id = \`ParkingSpot\`.\`id\`
+            AND ${holdsItsSpotSql(now)}
+            AND r.end_time > ${sequelize.escape(now)}
+    )`);
+}
+
+// HU-14: the free spot with the lowest number for a stay from `start` to
+// `end`, or null when none is free. The caller holds the lock of the zone, so
+// no other reservation of the zone can be saved meanwhile.
+function firstFreeSpot(zoneId, start, end, { transaction, now = new Date() } = {}) {
+    return ParkingSpot.findOne({
+        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(start, end, now)] },
+        order: [['spotNumber', 'ASC']],
+        transaction,
+    });
+}
+
+// How many spots of each zone are free from `from` to `to`, in one query for
+// all of them: a Map from the id of each zone to its number (0 when none)
+async function freeSpotsByZone(zoneIds, from, to, { transaction, now = new Date() } = {}) {
+    const free = new Map(zoneIds.map((id) => [id, 0]));
+    if (zoneIds.length === 0) return free;
+    const rows = await ParkingSpot.findAll({
+        attributes: ['zoneId', [fn('COUNT', col('ParkingSpot.id')), 'free']],
+        where: { zoneId: zoneIds, status: ENABLED, [Op.and]: [freeBetween(from, to, now)] },
+        group: ['zoneId'],
+        raw: true,
+        transaction,
+    });
+    for (const row of rows) free.set(row.zoneId, Number(row.free));
+    return free;
+}
+
+// `availableSlots` of each zone: the spots free for the shortest stay from now
+function availableNowByZone(zoneIds, { transaction, now = new Date() } = {}) {
+    return freeSpotsByZone(zoneIds, now, plus(now, MIN_STAY_MS), { transaction, now });
+}
+
+// `availableSlots` of one zone
+function availableNow(zoneId, { transaction, now = new Date() } = {}) {
+    return ParkingSpot.count({
+        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(now, plus(now, MIN_STAY_MS), now)] },
+        transaction,
+    });
+}
+
+// Adds `availableSlots` to each zone, as the API sends it (Zona.toJSON keeps
+// it), with one query for all of them
+async function withAvailableSlots(zonas, { transaction, now = new Date() } = {}) {
+    const free = await availableNowByZone(zonas.map((zona) => zona.id), { transaction, now });
+    for (const zona of zonas) zona.setDataValue('availableSlots', free.get(zona.id));
+    return zonas;
+}
+
+// HU-28: the first other reservation that holds the spot of `reserva` from
+// `from` to `to` (with the margin), or null when the spot is free for that
+// time. A stay never changes spot, so an extension needs its own spot free.
+function nextHolderOfSpot(reserva, from, to, { transaction, now = new Date() } = {}) {
+    if (!reserva.parkingSpotId) return null;
+    return Reserva.findOne({
+        where: {
+            id: { [Op.ne]: reserva.id },
+            parkingSpotId: reserva.parkingSpotId,
+            startTime: { [Op.lt]: plus(to, MARGIN_MS) },
+            endTime: { [Op.gt]: plus(from, -MARGIN_MS) },
+            [Op.and]: [holdsItsSpot(now)],
+        },
+        attributes: ['id', 'startTime'],
+        order: [['startTime', 'ASC']],
+        transaction,
+    });
+}
+
+// Until when a spot is free before the reservation that holds it next
+const freeUntil = (holder) => plus(holder.startTime, -MARGIN_MS);
+
+// HU-21: how many spots of the zone hold a reservation from now on
+function spotsInUse(zoneId, { transaction, now = new Date() } = {}) {
+    return Reserva.count({
+        where: { zoneId, parkingSpotId: { [Op.ne]: null }, endTime: { [Op.gt]: now }, [Op.and]: [holdsItsSpot(now)] },
+        distinct: true,
+        col: 'parkingSpotId',
+        transaction,
+    });
+}
+
+// The same for several zones, in one query: a Map from the id of each zone to
+// its number (0 when none)
+async function spotsInUseByZone(zoneIds, { transaction, now = new Date() } = {}) {
+    const inUse = new Map(zoneIds.map((id) => [id, 0]));
+    if (zoneIds.length === 0) return inUse;
+    const rows = await Reserva.findAll({
+        attributes: ['zoneId', [fn('COUNT', fn('DISTINCT', col('parking_spot_id'))), 'spots']],
+        where: { zoneId: zoneIds, parkingSpotId: { [Op.ne]: null }, endTime: { [Op.gt]: now }, [Op.and]: [holdsItsSpot(now)] },
+        group: ['zoneId'],
+        raw: true,
+        transaction,
+    });
+    for (const row of rows) inUse.set(row.zoneId, Number(row.spots));
+    return inUse;
+}
+
+module.exports = {
+    MARGIN_MS,
+    MIN_STAY_MS,
+    ENABLED,
+    holdsItsSpot,
+    freeFromNow,
+    firstFreeSpot,
+    freeSpotsByZone,
+    availableNowByZone,
+    availableNow,
+    withAvailableSlots,
+    nextHolderOfSpot,
+    freeUntil,
+    spotsInUse,
+    spotsInUseByZone,
+};
