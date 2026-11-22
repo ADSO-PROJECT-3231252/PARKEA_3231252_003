@@ -79,13 +79,16 @@ export default function EditVehicle() {
         } else if (plate && !isValidPlate(plate, form.vehicleType)) {
             newErrors.vehicleType = translateError('INVALID_PLATE_FORMAT');
         }
-        // #234: the same rules as the backend (utils/vehicleRules.js)
+        // #234: the same rules as the backend (utils/vehicleRules.js). Like the
+        // backend, the spaces at the ends go first, also the invisible U+FEFF
+        // that some pasted texts bring.
         for (const field of ['brand', 'model', 'color']) {
-            if (!isNotEmpty(form[field])) {
+            const value = form[field].trim();
+            if (!isNotEmpty(value)) {
                 newErrors[field] = REQUIRED_MESSAGE;
-            } else if (!isValidVehicleText(form[field])) {
+            } else if (!isValidVehicleText(value)) {
                 newErrors[field] = VEHICLE_TEXT_RULE_MESSAGE[field];
-            } else if ([...normalizeVehicleText(form[field])].length > MAX_LENGTH[field]) {
+            } else if ([...normalizeVehicleText(value)].length > MAX_LENGTH[field]) {
                 // Normalizing can make a text longer: "ﬃ" is written as "ffi"
                 newErrors[field] = `Usa máximo ${MAX_LENGTH[field]} caracteres.`;
             }

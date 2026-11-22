@@ -113,6 +113,15 @@ describe('Register a vehicle: brand, model and color (#234)', () => {
         expect(createVehicle.mock.calls[0][0]).toMatchObject({ brand: 'Mazda', model: 'Spark GT', color: 'Citro\u00EBn' });
     });
 
+    test('a brand pasted with the invisible U+FEFF at its ends is sent without it, as the backend takes it', async () => {
+        // Act
+        await submitWith({ brand: '\uFEFFMazda\uFEFF' });
+
+        // Assert
+        expect(errorOf('brand')).toBeNull();
+        expect(createVehicle.mock.calls[0][0]).toMatchObject({ brand: 'Mazda' });
+    });
+
     test('a text that normalization makes longer than the limit is marked, and one that fits is sent', async () => {
         // Arrange: the ligature \uFB03 is one character that NFKC writes as "ffi" (three)
         // Act
@@ -244,6 +253,19 @@ describe('Edit a vehicle: brand, model and color (#234)', () => {
 
         // Assert
         expect(updateVehicle.mock.calls[0][1]).toMatchObject({ brand: 'Mazda', model: 'Spark GT', color: 'Citro\u00EBn' });
+    });
+
+    test('a brand pasted with the invisible U+FEFF at its ends is saved without it, as the backend takes it', async () => {
+        // Arrange
+        await openEdit();
+        fill('brand', '\uFEFFMazda\uFEFF');
+
+        // Act
+        await save();
+
+        // Assert
+        expect(errorOf('brand')).toBeNull();
+        expect(updateVehicle.mock.calls[0][1]).toMatchObject({ brand: 'Mazda' });
     });
 
     test.each(LONG_REAL_VALUES)('a %s of %i %s can be pasted whole and is saved', async (id, _limit, _label, pasted, sent) => {
