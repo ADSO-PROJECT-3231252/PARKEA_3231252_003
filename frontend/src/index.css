@@ -98,6 +98,7 @@
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 12px;
+
     /* #330: motion of the home. The texts and the cards rise and appear one
     after the other (fade-up, then -2 and -3). The hero illustration slides
     in and floats twice, so it stops before 5 seconds (WCAG 2.2.2). They move
