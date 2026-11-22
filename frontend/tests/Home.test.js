@@ -307,3 +307,39 @@ describe('The card of the home updates itself while the page is open (#347)', ()
         expect(within(card).queryByText('Zona Corriendo')).not.toBeInTheDocument();
     });
 });
+
+describe('The motion of the three homes (#330)', () => {
+    // Signs in with the role, or leaves the visitor signed out
+    const signIn = (role) => {
+        localStorage.clear();
+        if (!role) return;
+        localStorage.setItem('token', 'test-token');
+        localStorage.setItem('user', JSON.stringify({ id: `${role}-1`, fullName: 'Laura Gómez', role }));
+    };
+
+    beforeEach(() => {
+        getReservations.mockReset().mockResolvedValue({ data: { reservations: [] } });
+        getZones.mockReset().mockResolvedValue({ data: { zones: [] } });
+    });
+
+    test.each([
+        ['visitor', null],
+        ['user', 'user'],
+        ['admin', 'admin'],
+    ])('the hero of the %s home appears in steps, and its illustration slides in', async (_, role) => {
+        // Arrange
+        signIn(role);
+
+        // Act
+        renderHome();
+        await act(async () => {});
+
+        // Assert: the title, then the text, then the button
+        const title = screen.getByRole('heading', { level: 1 });
+        const hero = title.closest('section');
+        expect(title).toHaveClass('motion-safe:animate-fade-up');
+        expect(within(hero).getByText(/^(Encuentra|Desde aquí)/)).toHaveClass('motion-safe:animate-fade-up-2');
+        expect(within(hero).getByRole('link')).toHaveClass('motion-safe:animate-fade-up-3');
+        expect(hero.querySelector('img')).toHaveClass('motion-safe:animate-hero-illustration');
+    });
+});

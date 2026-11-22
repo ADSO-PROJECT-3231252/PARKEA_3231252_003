@@ -43,7 +43,7 @@ function HeroIllustration({ src, height = 132, right = 32, top }) {
                     ? { height: toCssLength(height), right: toCssLength(right), top: `${top}px` }
                     : { height: toCssLength(height), right: toCssLength(right), top: '50%', transform: 'translateY(-50%)' }
             }
-            className="hidden absolute w-auto lg:block"
+            className="hidden absolute w-auto lg:block motion-safe:animate-hero-illustration"
         />
     );
 }
@@ -103,17 +103,17 @@ function VisitorHome() {
             <title>Inicio | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="text-hero-sm font-display uppercase text-parkea-700 sm:text-hero lg:text-hero-sm xl:text-hero">
+                    <h1 className="text-hero-sm font-display uppercase text-parkea-700 sm:text-hero lg:text-hero-sm xl:text-hero motion-safe:animate-fade-up">
                         Reserva tu parqueo
                         <br />
                         fácil, rápido y seguro
                     </h1>
-                    <p className="mt-3 text-subtitle text-neutral-900">
+                    <p className="mt-3 text-subtitle text-neutral-900 motion-safe:animate-fade-up-2">
                         Encuentra, reserva y paga tu parqueo en las mejores zonas.
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle motion-safe:animate-fade-up-3"
                     >
                         <MapPin className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
                         Ver zonas disponibles
@@ -254,15 +254,15 @@ function AuthenticatedHome({ user }) {
             <title>Inicio | PARKEA</title>
             <section className="relative flex flex-col items-start justify-between gap-6 rounded-lg bg-parkea-50 p-6 sm:p-8 lg:flex-row lg:items-center">
                 <div className="max-w-xl">
-                    <h1 className="break-words text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
+                    <h1 className="break-words text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm motion-safe:animate-fade-up">
                         ¡Bienvenido, {user.fullName?.split(' ')[0]}!
                     </h1>
-                    <p className="mt-3 text-subtitle-sm text-neutral-900">
+                    <p className="mt-3 text-subtitle-sm text-neutral-900 motion-safe:animate-fade-up-2">
                         Encuentra y reserva tu espacio de parqueo de forma rápida, segura y confiable.
                     </p>
                     <Link
                         to="/zones"
-                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle"
+                        className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle motion-safe:animate-fade-up-3"
                     >
                         <MapPin className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
                         Ver zonas disponibles
@@ -422,14 +422,14 @@ function AdminHome() {
                 {/* HU-04 AC-08: on phones the shield goes above the headline so the
                     text and the button get the full width of the card. */}
                 <div className="flex flex-col items-start gap-4 sm:flex-row sm:gap-5">
-                    <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-800 text-white">
+                    <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-800 text-white motion-safe:animate-fade-up">
                         <ShieldCheck className="h-8 w-8" aria-hidden="true" />
                     </span>
                     <div className="min-w-0 max-w-xl">
-                        <h1 className="text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm">
+                        <h1 className="text-display font-display uppercase text-neutral-900 min-[400px]:text-hero-sm motion-safe:animate-fade-up">
                             Bienvenido, Administrador
                         </h1>
-                        <p className="mt-2 text-subtitle-sm text-neutral-900">
+                        <p className="mt-2 text-subtitle-sm text-neutral-900 motion-safe:animate-fade-up-2">
                             Desde aquí puedes administrar el sistema PARKEA, gestionar zonas,{' '}
                             <br className="hidden xl:block" />
                             usuarios y consultar el rendimiento del servicio.
@@ -437,7 +437,7 @@ function AdminHome() {
                         <Link
                             to="/admin/panel"
                             aria-label="Ir al panel de administración"
-                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle"
+                            className="mt-6 flex w-full items-center justify-center gap-2 rounded-md bg-parkea-600 px-4 py-3 text-center text-subtitle-sm text-white transition-colors hover:bg-parkea-700 sm:inline-flex sm:w-auto sm:px-12 sm:text-subtitle motion-safe:animate-fade-up-3"
                         >
                             <LayoutGrid className="h-5 w-5 shrink-0 sm:h-6 sm:w-6" aria-hidden="true" />
                             {/* The full label doesn't fit in one line on phones */}
