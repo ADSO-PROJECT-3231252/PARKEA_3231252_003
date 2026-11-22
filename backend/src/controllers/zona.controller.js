@@ -334,41 +334,6 @@ async function toggleZona(req, res, next) {
   }
 }
 
-// GET /api/zones/:id/spots — admin only, detailed view of every physical spot
-async function getSpotsDeZona(req, res, next) {
-  try {
-    const { id } = req.params;
-
-    const zona = await Zona.findByPk(id);
-    if (!zona) {
-      return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
-    }
-
-    const spots = await ParkingSpot.findAll({
-      where: { zoneId: id },
-      order: [['spotNumber', 'ASC']],
-      attributes: ['id', 'spotNumber', 'status'],
-    });
-
-    const summary = spots.reduce(
-      (acc, s) => {
-        acc[s.status] = (acc[s.status] || 0) + 1;
-        return acc;
-      },
-      { Available: 0, Occupied: 0, Disabled: 0 }
-    );
-
-    return res.status(200).json({
-      zoneId: zona.id,
-      zoneName: zona.name,
-      summary,
-      spots,
-    });
-  } catch (error) {
-    next(error);
-  }
-}
-
 // GET /api/zones/:id — single zone detail (used for reservations AND admin editing,
 // so it must NOT filter by isActive — an admin needs to reach a deactivated zone
 // to reactivate it)
@@ -420,4 +385,4 @@ async function getTodasLasZonas(req, res, next) {
 }
 
 // validarZona and validarHorario are exported only so the tests can call them without a database
-module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getSpotsDeZona, getZonaPorId, validarZona, validarHorario };
+module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getZonaPorId, validarZona, validarHorario };
