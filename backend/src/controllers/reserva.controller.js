@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Reserva, Zona, Vehiculo, Pago, ParkingSpot, Usuario, ZoneSchedule } = require('../models');
+const { Reserva, Zona, Vehiculo, Pago, Usuario, ZoneSchedule } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { provisionalEndTime, openStayCharge, paidBeforeBalance, firstPaymentAmount, extensionCharge } = require('../utils/stayPricing');
@@ -421,7 +421,7 @@ async function terminar(req, res, next) {
         const expectedHours = req.body?.expectedHours;
 
         // Locked like in cancelar: two finish requests at the same time would
-        // otherwise both release the spot and both create a balance
+        // otherwise both finish it and both create a balance
         const reserva = await Reserva.findOne({
             where: { id, userId },
             transaction: t,
@@ -461,16 +461,8 @@ async function terminar(req, res, next) {
             });
         }
 
-        // AC-09: real exit time, Finished and the spot released, in one
-        // transaction. #371: the zone is locked before the spot, as in cancelar.
-        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
-        if (reserva.parkingSpotId) {
-            const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
-            if (cupo && cupo.status === 'Occupied') {
-                await cupo.update({ status: 'Available' }, { transaction: t });
-            }
-        }
-        await zona.increment('availableSlots', { by: 1, transaction: t });
+        // AC-09: real exit time and Finished, in one transaction. #373: from
+        // that exit time the spot is free again, with no other change.
         await reserva.update({ endTime: cobro.endTime, status: 'Finished' }, { transaction: t });
 
         // AC-07/AC-08: what was paid is subtracted; under one hour nothing is owed
