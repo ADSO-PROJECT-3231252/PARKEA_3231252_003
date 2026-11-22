@@ -15,10 +15,12 @@ const ROLLBACK_OF_ENDED = 'Transaction cannot be rolled back because it has been
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const ADMIN_ID = '66666666-6666-4666-8666-666666666666';
+const TARGET_ID = '77777777-7777-4777-8777-777777777777';
 const ZONE_ID = '22222222-2222-4222-8222-222222222222';
 const VEHICLE_ID = '33333333-3333-4333-8333-333333333333';
 const RESERVATION_ID = '44444444-4444-4444-8444-444444444444';
 const userToken = jwt.sign({ id: USER_ID, email: 'laura@correo.test', rol: 'user' }, process.env.JWT_SECRET);
+const adminToken = jwt.sign({ id: ADMIN_ID, email: 'admin@parkea.com', rol: 'admin' }, process.env.JWT_SECRET);
 
 // Like a Sequelize transaction: rolling back one that already ended throws
 function fakeTransaction(finished) {
@@ -130,6 +132,10 @@ const ROUTES = [
         () => request(app).post(`/api/payments/${RESERVATION_ID}`).set('Authorization', `Bearer ${userToken}`).send({ paymentMethod: 'pse' })],
     ['paying a balance', (fail) => fail(Reserva, 'findByPk'),
         () => request(app).post(`/api/payments/${RESERVATION_ID}/balance`).set('Authorization', `Bearer ${userToken}`).send({ paymentMethod: 'pse' })],
+    ['changing the role of an account', (fail) => fail(Usuario, 'findByPk', session),
+        () => request(app).patch(`/api/admin/users/${TARGET_ID}/role`).set('Authorization', `Bearer ${adminToken}`).send({ role: 'admin' })],
+    ['changing the status of an account', (fail) => fail(Usuario, 'findByPk', session),
+        () => request(app).patch(`/api/admin/users/${TARGET_ID}/status`).set('Authorization', `Bearer ${adminToken}`).send({ isActive: false })],
 ];
 
 describe('A deadlock inside a transaction (#371)', () => {
