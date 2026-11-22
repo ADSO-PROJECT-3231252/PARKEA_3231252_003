@@ -316,6 +316,20 @@ describe('Saving a new reservation (HU-14)', () => {
         expect(transaction.commit).toHaveBeenCalled();
     });
 
+    test('the answer brings the saved reservation, read again with its zone and its vehicle', async () => {
+        // Arrange
+        const withDetails = { id: RESERVATION_ID, zone: { id: ZONE_ID }, vehicle: { id: VEHICLE_ID } };
+        const readAgain = jest.spyOn(Reserva, 'findByPk').mockResolvedValue(withDetails);
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(readAgain).toHaveBeenCalledWith(RESERVATION_ID, { include: [{ model: Zona, as: 'zone' }, { model: Vehiculo, as: 'vehicle' }] });
+        expect(res.body.reservation).toEqual(withDetails);
+    });
+
     test('the spot becomes Occupied and the zone has one available slot less, in the same transaction', async () => {
         // Act
         await book();
