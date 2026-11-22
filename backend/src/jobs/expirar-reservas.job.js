@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const { sequelize, Reserva, Zona, ParkingSpot } = require('../models');
+const { safeRollback } = require('../utils/transaction');
 
 const INTERVALO_MS = 60 * 1000; // corre cada minuto
 
@@ -53,7 +54,7 @@ async function expirarReservasVencidas() {
             await t.commit();
             console.log(`[expirar-reservas] Reserva ${reservaActual.id} expirada, cupo liberado en "${zona.name}"`);
         } catch (error) {
-            await t.rollback();
+            await safeRollback(t);
             console.error(`[expirar-reservas] Error procesando reserva ${reserva.id}:`, error);
         }
     }

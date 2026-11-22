@@ -3,9 +3,10 @@ const request = require('supertest');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Zona, Reserva, sequelize } = require('../src/models');
+const { Usuario, Zona, Reserva, ParkingSpot, Pago, sequelize } = require('../src/models');
 const app = require('../src/app');
 const { safeRollback } = require('../src/utils/transaction');
+const { expirarReservasVencidas } = require('../src/jobs/expirar-reservas.job');
 
 // #371: what happens when a transaction opened by hand fails. When MySQL finds
 // a deadlock it undoes the transaction itself, and Sequelize marks it as
@@ -170,6 +171,53 @@ describe('Another database error inside a transaction', () => {
 
         // Assert
         expect(res.status).toBe(500);
+        expect(transaction.rollback).toHaveBeenCalledTimes(1);
+        expect(transaction.commit).not.toHaveBeenCalled();
+        expect(logged.join('\n')).toContain(CONNECTION_LOST);
+    });
+});
+
+describe.each([
+    ['expiration', expirarReservasVencidas, 'Expired'],
+])('The %s job, when one reservation fails (#371)', (_name, runJob, status) => {
+    test('logs the real error and still processes the next reservations', async () => {
+        // Arrange: two reservations, each one in its own transaction
+        const first = fakeTransaction();
+        const second = fakeTransaction();
+        jest.spyOn(sequelize, 'transaction').mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+        jest.spyOn(Reserva, 'findAll').mockResolvedValue([{ id: 'r1' }, { id: 'r2' }]);
+        const next = { id: 'r2', zoneId: ZONE_ID, parkingSpotId: null, openEnded: false, update: jest.fn() };
+        jest.spyOn(Reserva, 'findOne').mockImplementation(async ({ where, transaction: t }) => {
+            if (where.id === 'r1') {
+                t.finished = 'rollback';
+                throw new Error(DEADLOCK);
+            }
+            return next;
+        });
+        jest.spyOn(Zona, 'findByPk').mockResolvedValue({ id: ZONE_ID, name: 'Centro', increment: jest.fn() });
+        jest.spyOn(ParkingSpot, 'findByPk').mockResolvedValue(null);
+        jest.spyOn(Pago, 'findAll').mockResolvedValue([]);
+
+        // Act
+        await runJob();
+
+        // Assert
+        expect(first.rollback).not.toHaveBeenCalled();
+        expect(logged.join('\n')).toContain(DEADLOCK);
+        expect(logged.join('\n')).not.toContain(ROLLBACK_OF_ENDED);
+        expect(next.update).toHaveBeenCalledWith({ status }, { transaction: second });
+        expect(second.commit).toHaveBeenCalled();
+    });
+
+    test('another database error rolls back the transaction of that reservation, and the log keeps it', async () => {
+        // Arrange
+        jest.spyOn(Reserva, 'findAll').mockResolvedValue([{ id: 'r1' }]);
+        jest.spyOn(Reserva, 'findOne').mockRejectedValue(new Error(CONNECTION_LOST));
+
+        // Act
+        await runJob();
+
+        // Assert
         expect(transaction.rollback).toHaveBeenCalledTimes(1);
         expect(transaction.commit).not.toHaveBeenCalled();
         expect(logged.join('\n')).toContain(CONNECTION_LOST);
