@@ -6,6 +6,7 @@ const { provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge }
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
+const { safeRollback } = require('../utils/transaction');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -199,7 +200,7 @@ async function crear(req, res, next) {
 
         return res.status(201).json({ message: 'Reservation created successfully', reservation: reservaCompleta });
     } catch (error) {
-        await t.rollback();
+        await safeRollback(t);
         next(error);
     }
 }
@@ -405,7 +406,7 @@ async function cancelar(req, res, next) {
         await t.commit();
         return res.status(200).json({ message: 'Reservation cancelled successfully' });
     } catch (error) {
-        await t.rollback();
+        await safeRollback(t);
         next(error);
     }
 }
@@ -494,7 +495,7 @@ async function terminar(req, res, next) {
             },
         });
     } catch (error) {
-        await t.rollback();
+        await safeRollback(t);
         next(error);
     }
 }
@@ -640,7 +641,7 @@ async function ampliar(req, res, next) {
             charge: cobro,
         });
     } catch (error) {
-        await t.rollback();
+        await safeRollback(t);
         next(error);
     }
 }
