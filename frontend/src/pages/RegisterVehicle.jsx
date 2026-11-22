@@ -5,6 +5,7 @@ import { isNotEmpty, isValidPlate, REQUIRED_MESSAGE } from '../utils/validators'
 import { createVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
 import { MAX_LENGTH } from '../utils/vehicleFieldLimits';
+import { isValidVehicleText, normalizeVehicleText, VEHICLE_TEXT_RULE_MESSAGE } from '../utils/vehicleRules';
 import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
 import FieldRow from '../components/FieldRow';
 
@@ -77,9 +78,20 @@ export default function RegisterVehicle() {
             newErrors.plate = translateError('INVALID_PLATE_FORMAT');
         }
 
-        if (!isNotEmpty(form.brand)) newErrors.brand = REQUIRED_MESSAGE;
-        if (!isNotEmpty(form.model)) newErrors.model = REQUIRED_MESSAGE;
-        if (!isNotEmpty(form.color)) newErrors.color = REQUIRED_MESSAGE;
+        // #234: the same rules as the backend (utils/vehicleRules.js). Like the
+        // backend, the spaces at the ends go first, also the invisible U+FEFF
+        // that some pasted texts bring.
+        for (const field of ['brand', 'model', 'color']) {
+            const value = form[field].trim();
+            if (!isNotEmpty(value)) {
+                newErrors[field] = REQUIRED_MESSAGE;
+            } else if (!isValidVehicleText(value)) {
+                newErrors[field] = VEHICLE_TEXT_RULE_MESSAGE[field];
+            } else if ([...normalizeVehicleText(value)].length > MAX_LENGTH[field]) {
+                // Normalizing can make a text longer: "ﬃ" is written as "ffi"
+                newErrors[field] = `Usa máximo ${MAX_LENGTH[field]} caracteres.`;
+            }
+        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -95,9 +107,9 @@ export default function RegisterVehicle() {
             const payload = {
                 plate: form.plate,
                 vehicleType: form.vehicleType,
-                brand: form.brand.trim(),
-                model: form.model.trim(),
-                color: form.color.trim(),
+                brand: normalizeVehicleText(form.brand),
+                model: normalizeVehicleText(form.model),
+                color: normalizeVehicleText(form.color),
             };
             // AC-02: optional field, omit entirely rather than send an empty string.
             if (isNotEmpty(form.visualDescription)) {
@@ -115,6 +127,16 @@ export default function RegisterVehicle() {
             // not as a generic banner.
             if (code === 'INVALID_PLATE_FORMAT' || code === 'PLATE_ALREADY_REGISTERED') {
                 setErrors((prev) => ({ ...prev, plate: translateError(code) }));
+            } else if (code === 'VALIDATION_ERROR') {
+                // #234: mark the brand, the model or the color that the server rejects
+                const fieldErrors = {};
+                for (const { path } of err.response.data.errors ?? []) {
+                    if (VEHICLE_TEXT_RULE_MESSAGE[path]) fieldErrors[path] = VEHICLE_TEXT_RULE_MESSAGE[path];
+                }
+                const markedAny = Object.keys(fieldErrors).length > 0;
+                setErrors((prev) => ({ ...prev, ...fieldErrors }));
+                // "Revisa los campos marcados" only makes sense if a field was marked.
+                setServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
             } else {
                 setServerError(translateError(code));
             }
@@ -215,7 +237,6 @@ export default function RegisterVehicle() {
                             id="brand"
                             name="brand"
                             type="text"
-                            maxLength={MAX_LENGTH.brand}
                             value={form.brand}
                             onChange={handleChange}
                             placeholder="Ejemplo: Mazda"
@@ -239,7 +260,6 @@ export default function RegisterVehicle() {
                             id="model"
                             name="model"
                             type="text"
-                            maxLength={MAX_LENGTH.model}
                             value={form.model}
                             onChange={handleChange}
                             placeholder="Ejemplo: CX-30 2.0"
@@ -282,7 +302,6 @@ export default function RegisterVehicle() {
                             id="color"
                             name="color"
                             type="text"
-                            maxLength={MAX_LENGTH.color}
                             value={form.color}
                             onChange={handleChange}
                             placeholder="Ejemplo: Gris Platino"
