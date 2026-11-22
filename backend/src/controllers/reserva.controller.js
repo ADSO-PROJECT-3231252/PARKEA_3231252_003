@@ -459,14 +459,15 @@ async function terminar(req, res, next) {
             });
         }
 
-        // AC-09: real exit time, Finished and the spot released, in one transaction
+        // AC-09: real exit time, Finished and the spot released, in one
+        // transaction. #371: the zone is locked before the spot, as in cancelar.
+        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         if (reserva.parkingSpotId) {
             const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
             if (cupo && cupo.status === 'Occupied') {
                 await cupo.update({ status: 'Available' }, { transaction: t });
             }
         }
-        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
         await zona.increment('availableSlots', { by: 1, transaction: t });
         await reserva.update({ endTime: cobro.endTime, status: 'Finished' }, { transaction: t });
 
