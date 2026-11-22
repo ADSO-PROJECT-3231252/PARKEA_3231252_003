@@ -7,6 +7,7 @@ const { Usuario, Zona, Reserva, ParkingSpot, Pago, sequelize } = require('../src
 const app = require('../src/app');
 const { safeRollback } = require('../src/utils/transaction');
 const { expirarReservasVencidas } = require('../src/jobs/expirar-reservas.job');
+const { finalizarReservasVencidas } = require('../src/jobs/finalizar-reservas.job');
 
 // #371: what happens when a transaction opened by hand fails. When MySQL finds
 // a deadlock it undoes the transaction itself, and Sequelize marks it as
@@ -179,6 +180,7 @@ describe('Another database error inside a transaction', () => {
 
 describe.each([
     ['expiration', expirarReservasVencidas, 'Expired'],
+    ['finish', finalizarReservasVencidas, 'Finished'],
 ])('The %s job, when one reservation fails (#371)', (_name, runJob, status) => {
     test('logs the real error and still processes the next reservations', async () => {
         // Arrange: two reservations, each one in its own transaction

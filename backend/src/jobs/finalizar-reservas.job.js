@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { sequelize, Reserva, Zona, ParkingSpot, Pago } = require('../models');
 const { openStayCharge, paidBeforeBalance } = require('../utils/stayPricing');
+const { safeRollback } = require('../utils/transaction');
 
 const INTERVALO_MS = 60 * 1000; // runs every minute, just like the expiration job
 
@@ -76,7 +77,7 @@ async function finalizarReservasVencidas() {
             await t.commit();
             console.log(`[finalizar-reservas] Reserva ${reservaActual.id} finalizada, cupo liberado en "${zona.name}"`);
         } catch (error) {
-            await t.rollback();
+            await safeRollback(t);
             console.error(`[finalizar-reservas] Error procesando reserva ${reserva.id}:`, error);
         }
     }
