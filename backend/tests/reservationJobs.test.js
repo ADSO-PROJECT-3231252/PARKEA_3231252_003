@@ -37,8 +37,25 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
+describe('The expiration job (#373)', () => {
+    test('marks the reservation Expired, with no change to its spot or its zone', async () => {
+        // Arrange
+        const reserva = reservation('r1');
+        arrange([reserva]);
+
+        // Act
+        await expirarReservasVencidas();
+
+        // Assert: it stopped holding its spot when its 15 minutes ended
+        expect(reserva.update).toHaveBeenCalledWith({ status: 'Expired' }, { transaction });
+        expect(lockReservation).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'r1', status: 'Pending' }, transaction, lock: 'UPDATE' }));
+        expect(lockZone).not.toHaveBeenCalled();
+        expect(lockSpot).not.toHaveBeenCalled();
+        expect(transaction.commit).toHaveBeenCalled();
+    });
+});
+
 describe.each([
-    ['expiration', expirarReservasVencidas, 'Expired'],
     ['finish', finalizarReservasVencidas, 'Finished'],
 ])('The %s job', (_name, runJob, status) => {
     test(`marks the reservation ${status} and gives the spot and the slot back`, async () => {
