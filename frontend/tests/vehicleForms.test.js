@@ -151,7 +151,7 @@ describe('Register a vehicle: brand, model and color (#234)', () => {
         expect(createVehicle.mock.calls[0][0]).toMatchObject({ [id]: sent });
     });
 
-    test.each(['brand', 'model', 'color'])('if the server rejects the %s, that field is marked and the banner says to check the marked fields', async (name) => {
+    test.each(['brand', 'model', 'color'])('if the server rejects the %s, only that field is marked and the banner says to check the marked fields', async (name) => {
         // Arrange
         createVehicle.mockRejectedValue(serverRejects(name));
 
@@ -160,6 +160,10 @@ describe('Register a vehicle: brand, model and color (#234)', () => {
 
         // Assert
         expect(errorOf(name)).toHaveTextContent(VEHICLE_TEXT_RULE_MESSAGE[name]);
+        expect(field(name)).toHaveAttribute('aria-invalid', 'true');
+        for (const other of ['brand', 'model', 'color'].filter((id) => id !== name)) {
+            expect(errorOf(other)).toBeNull();
+        }
         expect(screen.getByText('Revisa los campos marcados')).toBeInTheDocument();
     });
 
@@ -320,7 +324,7 @@ describe('Edit a vehicle: brand, model and color (#234)', () => {
         expect(updateVehicle).not.toHaveBeenCalled();
     });
 
-    test.each(['brand', 'model', 'color'])('if the server rejects the %s, that field is marked and the banner says to check the marked fields', async (name) => {
+    test.each(['brand', 'model', 'color'])('if the server rejects the %s, only that field is marked and the banner says to check the marked fields', async (name) => {
         // Arrange
         await openEdit();
         updateVehicle.mockRejectedValue(serverRejects(name));
@@ -330,6 +334,10 @@ describe('Edit a vehicle: brand, model and color (#234)', () => {
 
         // Assert
         expect(errorOf(name)).toHaveTextContent(VEHICLE_TEXT_RULE_MESSAGE[name]);
+        expect(field(name)).toHaveAttribute('aria-invalid', 'true');
+        for (const other of ['brand', 'model', 'color'].filter((id) => id !== name)) {
+            expect(errorOf(other)).toBeNull();
+        }
         expect(screen.getByText('Revisa los campos marcados')).toBeInTheDocument();
     });
 
