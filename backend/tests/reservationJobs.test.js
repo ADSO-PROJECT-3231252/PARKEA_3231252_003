@@ -2,6 +2,7 @@
 // never reach MySQL)
 const { Zona, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
 const { expirarReservasVencidas } = require('../src/jobs/expirar-reservas.job');
+const { finalizarReservasVencidas } = require('../src/jobs/finalizar-reservas.job');
 
 // The two jobs that run every minute: the expiration of the reservations not
 // paid in 15 minutes (HU-26) and the end of the stays whose exit time passed
@@ -38,6 +39,7 @@ afterEach(() => {
 
 describe.each([
     ['expiration', expirarReservasVencidas, 'Expired'],
+    ['finish', finalizarReservasVencidas, 'Finished'],
 ])('The %s job', (_name, runJob, status) => {
     test(`marks the reservation ${status} and gives the spot and the slot back`, async () => {
         // Arrange

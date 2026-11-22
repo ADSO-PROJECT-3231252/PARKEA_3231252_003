@@ -29,6 +29,14 @@ async function finalizarReservasVencidas() {
                 continue;
             }
 
+            // #371: the zone is locked before the spot, in the same order as
+            // updateZona, crear and cancelar, so a capacity edit at the same
+            // time waits instead of a deadlock
+            const zona = await Zona.findByPk(reservaActual.zoneId, {
+                transaction: t,
+                lock: t.LOCK.UPDATE,
+            });
+
             // Release the physical spot — this is the whole point of this job:
             // without it, a finished (but never re-checked) reservation would
             // keep its spot Occupied forever
@@ -63,10 +71,6 @@ async function finalizarReservasVencidas() {
                 }
             }
 
-            const zona = await Zona.findByPk(reservaActual.zoneId, {
-                transaction: t,
-                lock: t.LOCK.UPDATE,
-            });
             await zona.increment('availableSlots', { by: 1, transaction: t });
 
             await t.commit();
