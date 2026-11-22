@@ -205,6 +205,17 @@ PARKEA_3231252_003/
 
 **Workflow:** Simplified Git Flow. Each member works on their personal branch and opens a PR to their area branch (`backend` or `frontend`), which needs one approval from another member. The area branches are integrated into `develop` at the end of each sprint. Files not tied to one area (README, `database/schema.sql`) go to `develop` through their own PR. `develop` merges to `main` only for stable releases.
 
+### Pull request checks
+
+Open the pull request and select the **Checks** tab. The **CI** workflow has two jobs:
+
+- **Frontend** installs dependencies, runs ESLint and Jest, and builds the frontend.
+- **Backend** installs dependencies, runs ESLint when the branch has the `lint` script (`backend` has it, and `develop` gets it with the next integration), and runs Jest.
+
+A green check means all steps in that job passed. Pull requests to `develop` run both jobs. On pull requests to `frontend` or `backend`, only the matching job runs, so the other job appears as `skipped`. If a job shows a red X, open it and expand the failed step to read the error. For a Jest failure, look for `FAIL` in the **Run tests** log to find the test file and the failing assertion.
+
+To check the five-minute target, open the workflow run summary and read the duration of each job. A job that runs for more than 10 minutes is stopped and shows a red X.
+
 ---
 
 ## Installation and Setup
