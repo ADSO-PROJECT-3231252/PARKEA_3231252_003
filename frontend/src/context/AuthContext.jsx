@@ -15,14 +15,15 @@ export function AuthProvider({ children }) {
         }
         setLoading(false);
 
+        // #307: this tab follows the session of the other tabs. Signing out
+        // there signs out here, and signing in there (maybe with another
+        // account) signs in here, so a tab never shows one account while its
+        // requests use the token of another.
         function handleStorage(event) {
             if (event.storageArea !== localStorage) return;
             if (event.key !== 'token' && event.key !== 'user' && event.key !== null) return;
 
-            // Read the current values in case a new session has already started.
-            if (!localStorage.getItem('token') || !localStorage.getItem('user')) {
-                setUser(null);
-            }
+            setUser(readSavedSession({ clearBroken: false }));
         }
 
         window.addEventListener('storage', handleStorage);
