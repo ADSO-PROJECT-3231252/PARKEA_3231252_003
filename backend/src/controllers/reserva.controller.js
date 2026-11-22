@@ -360,8 +360,8 @@ async function cancelar(req, res, next) {
         const { id } = req.params;
         const userId = req.usuario.id;
         // Lock the row: two cancel requests at the same time would otherwise
-        // both see it as Pending/Active and add the spot back to the zone twice.
-        // The second one waits here and then finds it already Cancelled.
+        // both see it as Pending/Active and both cancel it. The second one
+        // waits here and then finds it already Cancelled.
         const reserva = await Reserva.findOne({
             where: { id, userId },
             include: [{ model: Pago, as: 'payments' }],
@@ -374,8 +374,8 @@ async function cancelar(req, res, next) {
         }
         // #347: once its 15 minutes to pay end, the reservation counts as
         // expired, like in the payment, whether the job already marked it
-        // Expired or it still says Pending. Nothing changes here: the job
-        // releases its spot.
+        // Expired or it still says Pending. Nothing changes here: it no
+        // longer holds its spot (#373) and the job marks it Expired.
         if (countsAsExpired(reserva)) {
             await t.rollback();
             return res.status(400).json(RESERVATION_EXPIRED);
@@ -393,20 +393,9 @@ async function cancelar(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.RESERVATION_ALREADY_STARTED, message: 'This reservation has already started and cannot be cancelled' });
         }
 
-        // #371: the zone is locked before the spot, in the same order as
-        // updateZona and crear, so a capacity edit at the same time waits
-        // instead of a deadlock
-        const zona = await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
-
-        // Release the physical spot, not just the zone counter
-        if (reserva.parkingSpotId) {
-            const cupo = await ParkingSpot.findByPk(reserva.parkingSpotId, { transaction: t, lock: t.LOCK.UPDATE });
-            if (cupo && cupo.status === 'Occupied') {
-                await cupo.update({ status: 'Available' }, { transaction: t });
-            }
-        }
-
-        await zona.increment('availableSlots', { by: 1, transaction: t });
+        // #373: a Cancelled reservation no longer holds its spot, so its
+        // hours are free again with this change alone: no spot or counter of
+        // the zone is changed
         await reserva.update({ status: 'Cancelled' }, { transaction: t });
         // Before the entry, what was paid is refunded: the initial payment and
         // any extension paid in advance (HU-27 AC-14, HU-28). A balance only
