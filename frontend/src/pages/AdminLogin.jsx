@@ -17,7 +17,9 @@ export default function AdminLogin() {
 
     const { loginUser } = useAuth();
     const navigate = useNavigate();
-    const sessionExpired = useLocation().state?.sessionExpired === true;
+    // #307: sent by "Iniciar sesión como administrador" of the user login
+    const { state } = useLocation();
+    const sessionExpired = state?.sessionExpired === true;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -50,9 +52,11 @@ export default function AdminLogin() {
         try {
             const { data } = await loginAdmin(form);
             const savedReturn = takeExpiredSessionReturn(data.user.id);
-            const destination = sessionExpired && savedReturn?.startsWith('/admin/')
-                ? savedReturn
-                : '/admin/dashboard';
+            // #307: the admin screen it was sent away from, or the one where its
+            // session expired, like Login.jsx. Any other screen is not of an
+            // administrator, so it starts on its dashboard.
+            const from = state?.from || (sessionExpired ? savedReturn : null);
+            const destination = from?.startsWith('/admin/') ? from : '/admin/dashboard';
             startTransition(() => {
                 navigate(destination);
                 loginUser(data.token, data.user);
@@ -194,6 +198,7 @@ export default function AdminLogin() {
                         <div className="text-center">
                             <Link
                                 to={sessionExpired ? '/login?expired=1' : '/login'}
+                                state={{ from: state?.from }}
                                 className="inline-flex min-h-6 items-center gap-1 text-caption text-parkea-600 underline
                                     hover:text-parkea-700"
                             >

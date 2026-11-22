@@ -233,7 +233,7 @@ export default function Login() {
 
                     <Link
                         to="/admin/login"
-                        state={{ sessionExpired }}
+                        state={{ sessionExpired, from: location.state?.from }}
                         className="flex items-center justify-center gap-2 text-label text-parkea-700 hover:text-parkea-800"
                     >
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-parkea-50">
