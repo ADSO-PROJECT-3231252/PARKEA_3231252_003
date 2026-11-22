@@ -391,7 +391,7 @@ Base URL: `http://localhost:3000/api`. **Public**: no token. **Authenticated**: 
 | Vehicles | `PUT /vehicles/:id`, `PATCH /vehicles/:id/default` | User | HU-11, HU-12 |
 | Vehicles | `DELETE /vehicles/:id` (soft delete) | User | HU-13 |
 | Zones | `GET /zones`, `GET /zones/:id` (with the opening hours) | Public | HU-09, HU-29 |
-| Zones | `GET /zones/all`, `GET /zones/:id/spots` | Admin | HU-19 |
+| Zones | `GET /zones/all` | Admin | HU-19 |
 | Zones | `POST /zones`, `PUT /zones/:id` (with the opening hours) | Admin | HU-20, HU-21, HU-29 |
 | Zones | `PATCH /zones/:id/toggle` | Admin | HU-19 |
 | Reservations | `POST /reservations` (inside the opening hours; with `openEnded: true` for a stay without an exit time) | User | HU-14, HU-27, HU-29 |
