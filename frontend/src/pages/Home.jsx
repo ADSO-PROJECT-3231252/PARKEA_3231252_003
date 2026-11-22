@@ -19,6 +19,7 @@ import { getReservations } from '../services/reservationService';
 import { formatDate, formatTime, formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import DecorativeImage from '../components/DecorativeImage';
+import Reveal from '../components/Reveal';
 import { pickHomeReservation } from '../utils/homeReservation';
 import { nextReservationChange, shownStatus } from '../utils/reservationStatus';
 import { MAX_TIMER_MS } from '../utils/extendStay';
@@ -78,9 +79,9 @@ function ErrorMessage() {
     );
 }
 
-function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
+function CardShell({ title, icon: Icon, children, footerTo, footerLabel, step }) {
     return (
-        <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
+        <Reveal step={step} className="flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
             <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-title font-display uppercase text-neutral-900">{title}</h2>
                 <Icon className="h-6 w-6 text-parkea-600" aria-hidden="true" />
@@ -93,7 +94,7 @@ function CardShell({ title, icon: Icon, children, footerTo, footerLabel }) {
                 {footerLabel}
                 <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
             </Link>
-        </div>
+        </Reveal>
     );
 }
 
@@ -129,7 +130,7 @@ function VisitorHome() {
             </section>
 
             <section className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-                <div className="rounded-lg bg-parkea-50 p-6 text-center">
+                <Reveal step={0} className="rounded-lg bg-parkea-50 p-6 text-center">
                     <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                         <CalendarCheck className="h-7 w-7" aria-hidden="true" />
                     </span>
@@ -139,8 +140,8 @@ function VisitorHome() {
                         <br className="hidden xl:block" />
                         anticipación y asegura tu espacio.
                     </p>
-                </div>
-                <div className="rounded-lg bg-parkea-50 p-6 text-center">
+                </Reveal>
+                <Reveal step={1} className="rounded-lg bg-parkea-50 p-6 text-center">
                     <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                         <Map className="h-7 w-7" aria-hidden="true" />
                     </span>
@@ -150,8 +151,8 @@ function VisitorHome() {
                         <br className="hidden xl:block" />
                         con información clara y actualizada.
                     </p>
-                </div>
-                <div className="rounded-lg bg-parkea-50 p-6 text-center">
+                </Reveal>
+                <Reveal step={2} className="rounded-lg bg-parkea-50 p-6 text-center">
                     <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                         <History className="h-7 w-7" aria-hidden="true" />
                     </span>
@@ -161,7 +162,7 @@ function VisitorHome() {
                         <br className="hidden xl:block" />
                         y próximas en un solo lugar.
                     </p>
-                </div>
+                </Reveal>
             </section>
         </div>
     );
@@ -277,6 +278,7 @@ function AuthenticatedHome({ user }) {
                     icon={CalendarCheck}
                     footerTo="/reservations"
                     footerLabel="Ver mis reservas"
+                    step={0}
                 >
                     <p className="mb-2 text-label text-neutral-600">Tus reservas</p>
 
@@ -334,6 +336,7 @@ function AuthenticatedHome({ user }) {
                     icon={Map}
                     footerTo="/zones"
                     footerLabel="Explorar zonas"
+                    step={1}
                 >
                     <p className="mb-2 text-label text-neutral-600">Zonas disponibles</p>
 
@@ -379,6 +382,7 @@ function AuthenticatedHome({ user }) {
                     icon={History}
                     footerTo="/reservations"
                     footerLabel="Ver historial completo"
+                    step={2}
                 >
                     <p className="mb-2 text-label text-neutral-600">Últimas reservas</p>
 
@@ -462,7 +466,7 @@ function AdminHome() {
                 </p>
 
                 <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                    <Reveal step={0} className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <BarChart3 className="h-5 w-5" aria-hidden="true" />
                         </span>
@@ -479,9 +483,9 @@ function AdminHome() {
                             Ir al panel de control
                             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </Link>
-                    </div>
+                    </Reveal>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                    <Reveal step={1} className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <MapPin className="h-5 w-5" aria-hidden="true" />
                         </span>
@@ -498,9 +502,9 @@ function AdminHome() {
                             Ir a gestión de zonas
                             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </Link>
-                    </div>
+                    </Reveal>
 
-                    <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
+                    <Reveal step={2} className="rounded-lg border border-neutral-200 bg-white p-6 text-center">
                         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-parkea-100 text-parkea-600">
                             <Users className="h-5 w-5" aria-hidden="true" />
                         </span>
@@ -517,7 +521,7 @@ function AdminHome() {
                             Ir a gestión de usuarios
                             <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                         </Link>
-                    </div>
+                    </Reveal>
                 </div>
             </section>
         </div>

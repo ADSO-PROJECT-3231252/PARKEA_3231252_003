@@ -342,4 +342,75 @@ describe('The motion of the three homes (#330)', () => {
         expect(within(hero).getByRole('link')).toHaveClass('motion-safe:animate-fade-up-3');
         expect(hero.querySelector('img')).toHaveClass('motion-safe:animate-hero-illustration');
     });
+
+    // The headings of the three cards of each home
+    const CARDS = {
+        visitor: ['Reservas', 'Zonas', 'Historial'],
+        user: ['Reservas', 'Zonas', 'Historial'],
+        admin: ['Panel de control', 'Gestión de zonas', 'Gestión de usuarios'],
+    };
+    const cards = (home) => CARDS[home].map((name) => screen.getByRole('heading', { name }).closest('.rounded-lg'));
+    const STEPS = ['motion-safe:animate-fade-up', 'motion-safe:animate-fade-up-2', 'motion-safe:animate-fade-up-3'];
+
+    describe('with IntersectionObserver', () => {
+        let observers;
+
+        beforeEach(() => {
+            // A fake one: the test says when each card scrolls into view
+            observers = [];
+            globalThis.IntersectionObserver = class {
+                constructor(callback) {
+                    const observer = { callback, observe: (element) => { observer.element = element; }, disconnect: jest.fn() };
+                    observers.push(observer);
+                    return observer;
+                }
+            };
+        });
+
+        afterEach(() => {
+            delete globalThis.IntersectionObserver;
+        });
+
+        test.each([
+            ['visitor', null],
+            ['user', 'user'],
+            ['admin', 'admin'],
+        ])('the cards of the %s home wait to scroll into view, and then appear one after the other', async (home, role) => {
+            // Arrange
+            signIn(role);
+            renderHome();
+            await act(async () => {});
+            for (const card of cards(home)) expect(card).toHaveClass('motion-safe:opacity-0');
+
+            // Act: the three of a row scroll into view together
+            for (const card of cards(home)) {
+                act(() => observers.find((observer) => observer.element === card).callback([{ isIntersecting: true }]));
+            }
+
+            // Assert
+            cards(home).forEach((card, i) => {
+                expect(card).not.toHaveClass('motion-safe:opacity-0');
+                expect(card).toHaveClass(STEPS[i]);
+            });
+        });
+    });
+
+    test.each([
+        ['visitor', null],
+        ['user', 'user'],
+        ['admin', 'admin'],
+    ])('without IntersectionObserver the cards of the %s home show at once', async (home, role) => {
+        // Arrange
+        signIn(role);
+
+        // Act
+        renderHome();
+        await act(async () => {});
+
+        // Assert
+        cards(home).forEach((card, i) => {
+            expect(card).not.toHaveClass('motion-safe:opacity-0');
+            expect(card).toHaveClass(STEPS[i]);
+        });
+    });
 });
