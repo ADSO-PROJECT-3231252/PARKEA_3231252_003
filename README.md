@@ -308,8 +308,12 @@ Never commit a `.env` file: only `.env.example` goes to the repository.
 PORT=3000
 NODE_ENV=development
 
-# Database (the only database setting the code reads)
+# Database (the only database setting the API reads)
 DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/parkea_db
+
+# Only for the integration tests (npm run test:integration): a database
+# whose name ends in _test, because the tests delete it and build it again
+TEST_DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/parkea_test
 
 # JWT
 JWT_SECRET=change_this_to_a_long_random_secret
@@ -331,6 +335,7 @@ MAILTRAP_PASS=your_mailtrap_password
 | `PORT` | Port of the API (default 3000) |
 | `NODE_ENV` | Sequelize environment (default `development`) |
 | `DATABASE_URL` | MySQL connection, used by the server and by sequelize-cli |
+| `TEST_DATABASE_URL` | MySQL database of the integration tests only. Its name must end in `_test`: the tests delete it and build it again with the migrations and the seeders. Not needed to run the project or `npm test` |
 | `JWT_SECRET` / `JWT_EXPIRES_IN` | Signing and lifetime of the session token (default 1h) |
 | `FRONTEND_URL` | Origin allowed by CORS, and address of the links in the emails (default `http://localhost:5173`) |
 | `MAILTRAP_*` | SMTP account for the verification and password recovery emails. On your computer, the Mailtrap sandbox: without it a new account cannot be confirmed. The published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
