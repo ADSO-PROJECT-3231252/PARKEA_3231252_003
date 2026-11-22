@@ -314,6 +314,8 @@ async function toggleZona(req, res, next) {
     }
 
     await zona.update({ isActive: !zona.isActive });
+    // #373: the zone is sent as everywhere else, with its free spots
+    zona.setDataValue('availableSlots', await availability.availableNow(zona.id));
 
     return res.status(200).json({
       message: `Zone ${zona.isActive ? 'activated' : 'deactivated'} successfully`,
@@ -370,6 +372,8 @@ async function getZonaPorId(req, res, next) {
     if (!zona) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
+    // #373: the spots free now, calculated from the reservations
+    zona.setDataValue('availableSlots', await availability.availableNow(zona.id));
 
     return res.status(200).json({ zone: zona });
   } catch (error) {
@@ -395,6 +399,12 @@ async function getTodasLasZonas(req, res, next) {
       include: [CON_HORARIO],
       order: [['name', 'ASC']],
     });
+    // #373: availableSlots, and spotsInUse: the spots with a Pending or Active
+    // reservation from now on, the least capacity the zone can have (HU-21,
+    // AC-03). Each one is one query for all the zones.
+    await availability.withAvailableSlots(zonas);
+    const enUso = await availability.spotsInUseByZone(zonas.map((zona) => zona.id));
+    for (const zona of zonas) zona.setDataValue('spotsInUse', enUso.get(zona.id));
     return res.status(200).json({ zones: zonas });
   } catch (error) {
     next(error);
