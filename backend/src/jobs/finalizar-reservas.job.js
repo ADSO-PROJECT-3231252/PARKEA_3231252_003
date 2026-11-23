@@ -18,9 +18,11 @@ async function finalizarReservasVencidas() {
     for (const reserva of vencidas) {
         const t = await sequelize.transaction();
         try {
-            // Read it again using lock, in case another thread has already processed it in the meantime
+            // Read it again using lock, in case another thread has already processed it in the meantime.
+            // #373: an extension saved meanwhile moved its exit time, so the
+            // exit time is checked again too: then it is not finished yet
             const reservaActual = await Reserva.findOne({
-                where: { id: reserva.id, status: 'Active' },
+                where: { id: reserva.id, status: 'Active', endTime: { [Op.lt]: ahora } },
                 transaction: t,
                 lock: t.LOCK.UPDATE,
             });
