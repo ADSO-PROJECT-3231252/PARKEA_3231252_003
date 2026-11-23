@@ -11,6 +11,21 @@ module.exports = {
     // As before #373: each Pending or Active reservation took one slot of its
     // zone, whatever its hours
     async down(queryInterface, Sequelize) {
+        // The stored counter can only say that a spot is taken or free, so two
+        // live reservations of one spot (at different hours) cannot go back to
+        // it. Checked first, before the schema changes: MySQL does not undo
+        // them if a later step fails.
+        const [[{ compartidos }]] = await queryInterface.sequelize.query(`
+            SELECT COUNT(*) AS compartidos FROM (
+                SELECT parking_spot_id FROM reservations
+                WHERE status IN ('Pending', 'Active') AND parking_spot_id IS NOT NULL
+                GROUP BY parking_spot_id HAVING COUNT(*) > 1
+            ) AS s
+        `);
+        if (Number(compartidos) > 0) {
+            throw new Error(`${compartidos} spot(s) have more than one Pending or Active reservation: cancel or move them before undoing this migration`);
+        }
+
         await queryInterface.addColumn('zones', 'available_slots', {
             type: Sequelize.INTEGER,
             allowNull: false,
