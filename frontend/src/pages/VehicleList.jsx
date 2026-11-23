@@ -159,6 +159,7 @@ export default function VehicleList() {
     // on a phone the message is above. Each action clears it first, so the
     // same message shown again also gets the focus.
     const [pageError, setPageError] = useState('');
+    const headingRef = useRef(null);
     const pageErrorRef = useRef(null);
     useEffect(() => {
         if (pageError) pageErrorRef.current?.focus();
@@ -255,6 +256,8 @@ export default function VehicleList() {
                 // AC-05: no full page reload -- closing the dialog and
                 // re-fetching updates the list and the reassigned default
                 // (if any) in place.
+                // Remove the confirmed deletion before the dialog restores focus.
+                setVehicles((list) => list.filter((vehicle) => vehicle.id !== deleteTarget.id));
                 setDeleteTarget(null);
                 setFlash(FLASH_MESSAGES.vehicleDeleted);
                 fetchVehicles();
@@ -289,7 +292,9 @@ export default function VehicleList() {
             <title>Mis vehículos | PARKEA</title>
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-title font-display uppercase text-neutral-900">Mis vehículos</h1>
+                    <h1 ref={headingRef} tabIndex={-1} className="text-title font-display uppercase text-neutral-900">
+                        Mis vehículos
+                    </h1>
                     <p className="mt-1 text-body text-neutral-600">
                         Administra los vehículos que tienes registrados para tus reservas.
                     </p>
@@ -408,6 +413,7 @@ export default function VehicleList() {
 
             <ConfirmDialog
                 open={Boolean(deleteTarget)}
+                fallbackFocusRef={headingRef}
                 variant="danger"
                 title="Eliminar vehículo"
                 message={

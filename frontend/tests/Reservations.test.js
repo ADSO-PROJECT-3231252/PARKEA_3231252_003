@@ -168,6 +168,34 @@ describe('"Mis reservas" when the 15 minutes to pay end (#347)', () => {
     });
 });
 
+describe('Keyboard focus when a pending reservation expires (#361)', () => {
+    test.each([
+        ['table', 'tr', PAY_PENDING],
+        ['table', 'tr', CANCEL_PENDING],
+        ['card', 'li', PAY_PENDING],
+        ['card', 'li', CANCEL_PENDING],
+    ])('keeps focus in the same %s (%s) when "%s" disappears', async (
+        _view, containerSelector, actionName,
+    ) => {
+        // Arrange
+        answer([paid, pending]);
+        renderList();
+        const actions = await screen.findAllByRole('button', { name: actionName });
+        const action = actions.find((button) => button.closest(containerSelector));
+        const container = action.closest(containerSelector);
+        const detail = within(container).getByRole('button', { name: DETAIL_PENDING });
+        action.focus();
+        expect(action).toHaveFocus();
+
+        // Act
+        await wait(10 * MINUTE + 100);
+
+        // Assert
+        expect(action).not.toBeInTheDocument();
+        expect(detail).toHaveFocus();
+    });
+});
+
 // #307: the status filter lives in the URL. The address of the screen, and
 // whether the last change replaced it (a filter is not a new page to go back to).
 function CurrentAddress() {
@@ -270,4 +298,177 @@ describe('The status filter in the URL (#307)', () => {
         expect(screen.getByText('Cargando reservas…')).toBeInTheDocument();
         expect(screen.queryByText(/^Reserva AAAAAAAA cancelada/)).not.toBeInTheDocument();
     });
+});
+
+describe('Keyboard focus when a paid stay reaches its exit time (#361)', () => {
+    const endingStay = { ...paid, startTime: at(-30 * MINUTE), endTime: at(MINUTE) };
+    const extendName = 'Ampliar la estadía de la reserva BBBBBBBB en Zona Pagada';
+    const detailName = 'Ver detalle de la reserva BBBBBBBB en Zona Pagada';
+
+    test.each(['tr', 'li'])('moves focus to the detail button in the same %s', async (selector) => {
+        // Arrange
+        answer([pending, endingStay]);
+        renderList();
+        const actions = await screen.findAllByRole('button', { name: extendName });
+        const action = actions.find((button) => button.closest(selector));
+        const container = action.closest(selector);
+        action.focus();
+        expect(action).toHaveFocus();
+
+        // Act
+        await wait(MINUTE + 100);
+
+        // Assert
+        expect(action).not.toBeInTheDocument();
+        expect(within(container).getByRole('button', { name: detailName })).toHaveFocus();
+    });
+
+    test.each([
+        ['tr', 'Volver'],
+        ['li', 'Escape'],
+    ])('returns to the detail button in the same %s when the extend dialog closes with %s after the exit time', async (selector, way) => {
+        // Arrange: the dialog opens before the exit time
+        answer([pending, endingStay]);
+        renderList();
+        const actions = await screen.findAllByRole('button', { name: extendName });
+        const opener = actions.find((button) => button.closest(selector));
+        const container = opener.closest(selector);
+        opener.focus();
+        fireEvent.click(opener);
+        const back = within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Volver' });
+        expect(back).toHaveFocus();
+
+        // Act: the exit time passes while it is open, and then it closes
+        await wait(MINUTE + 100);
+        expect(opener).not.toBeInTheDocument();
+        if (way === 'Escape') fireEvent.keyDown(document, { key: 'Escape' });
+        else fireEvent.click(back);
+
+        // Assert
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(within(container).getByRole('button', { name: detailName })).toHaveFocus();
+    });
+
+    test('keeps focus on another reservation when the extend button disappears', async () => {
+        // Arrange
+        answer([pending, endingStay]);
+        renderList();
+        expect(await screen.findAllByRole('button', { name: extendName })).toHaveLength(2);
+        const otherAction = buttons(PAY_PENDING)[0];
+        otherAction.focus();
+        expect(otherAction).toHaveFocus();
+
+        // Act
+        await wait(MINUTE + 100);
+
+        // Assert
+        expect(buttons(extendName)).toHaveLength(0);
+        expect(otherAction).toHaveFocus();
+    });
+});
+
+test('keeps focus on the cancellation message after the refreshed list removes the opener (#361)', async () => {
+    // Arrange
+    answer([pending]);
+    cancelReservation.mockResolvedValueOnce({});
+    renderList();
+    const [opener] = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('alertdialog');
+
+    // Keep the refresh pending until the dialog has closed.
+    let resolveRefresh;
+    getReservations.mockReturnValueOnce(new Promise((resolve) => {
+        resolveRefresh = resolve;
+    }));
+
+    // Act
+    await act(async () => {
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar reserva' }));
+    });
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    const message = screen.getByText(/^Reserva AAAAAAAA cancelada/);
+    expect(message).toHaveFocus();
+
+    await act(async () => {
+        resolveRefresh({
+            data: {
+                reservations: [{ ...pending, status: 'Cancelled' }],
+                pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+            },
+        });
+    });
+
+    // Assert: the row of the table and the card of a phone both show it
+    expect(buttons(CANCEL_PENDING)).toHaveLength(0);
+    expect(screen.getByRole('row', { name: /AAAAAAAA/ })).toHaveTextContent('Cancelada');
+    expect(screen.getAllByRole('listitem').find((item) => item.textContent.includes('AAAAAAAA'))).toHaveTextContent('Cancelada');
+    expect(message).toHaveFocus();
+});
+
+test('focuses the same reservation details when its cancel action expires while the dialog is open (#361)', async () => {
+    // Arrange
+    answer([paid, pending]);
+    renderList();
+    const actions = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    const opener = actions.find((button) => button.closest('tr'));
+    const row = opener.closest('tr');
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('alertdialog');
+    const keep = within(dialog).getByRole('button', { name: 'Conservar reserva' });
+    expect(keep).toHaveFocus();
+
+    // Act
+    await wait(10 * MINUTE + 100);
+    expect(opener).not.toBeInTheDocument();
+    expect(keep).toHaveFocus();
+    fireEvent.click(keep);
+
+    // Assert
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: DETAIL_PENDING })).toHaveFocus();
+});
+
+test.each(['tr', 'li'])('focuses the list heading when a refresh removes the reservation of the %s after a cancellation error (#361)', async (selector) => {
+    // Arrange
+    answer([paid, pending]);
+    cancelReservation.mockRejectedValueOnce({
+        response: { status: 404, data: { code: 'RESERVATION_NOT_FOUND' } },
+    });
+    renderList();
+    const actions = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    const opener = actions.find((button) => button.closest(selector));
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = screen.getByRole('alertdialog');
+    const confirm = within(dialog).getByRole('button', { name: 'Cancelar reserva' });
+    await act(async () => { fireEvent.click(confirm); });
+    expect(within(dialog).getByRole('alert')).toBeInTheDocument();
+
+    // The refresh finishes after the dialog closes.
+    let resolveRefresh;
+    getReservations.mockReturnValueOnce(new Promise((resolve) => {
+        resolveRefresh = resolve;
+    }));
+
+    // Act
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Conservar reserva' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(getReservations).toHaveBeenCalledTimes(2);
+    await act(async () => {
+        resolveRefresh({
+            data: {
+                reservations: [paid],
+                pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+            },
+        });
+    });
+
+    // Assert
+    expect(buttons(DETAIL_PENDING)).toHaveLength(0);
+    expect(buttons(CANCEL_PAID)).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Mis reservas' })).toHaveFocus();
 });
