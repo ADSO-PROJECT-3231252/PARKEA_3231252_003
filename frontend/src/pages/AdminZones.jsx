@@ -101,6 +101,8 @@ export default function AdminZones() {
 
     // AC-03: search by name or address and filter by status
     const [search, setSearch] = useState('');
+    // #311: the clear button disappears with the text, so the focus goes back to the search box
+    const searchRef = useRef(null);
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
 
@@ -304,6 +306,7 @@ export default function AdminZones() {
                         aria-hidden="true"
                     />
                     <input
+                        ref={searchRef}
                         type="text"
                         value={search}
                         onChange={(e) => handleSearchChange(e.target.value)}
@@ -314,9 +317,12 @@ export default function AdminZones() {
                     {search && (
                         <button
                             type="button"
-                            onClick={() => handleSearchChange('')}
+                            onClick={() => {
+                                handleSearchChange('');
+                                searchRef.current?.focus();
+                            }}
                             aria-label="Limpiar búsqueda"
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
+                            className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-neutral-600 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
                         </button>

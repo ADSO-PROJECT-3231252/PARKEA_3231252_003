@@ -135,6 +135,8 @@ export default function AdminUsers() {
 
     // ----- Filters and pagination (AC-04, AC-15) -----
     const [search, setSearch] = useState('');
+    // #311: the clear button disappears with the text, so the focus goes back to the search box
+    const searchRef = useRef(null);
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [role, setRole] = useState('');
     const [status, setStatus] = useState('');
@@ -452,6 +454,7 @@ export default function AdminUsers() {
                             aria-hidden="true"
                         />
                         <input
+                            ref={searchRef}
                             id="user-search"
                             type="text"
                             value={search}
@@ -462,9 +465,12 @@ export default function AdminUsers() {
                         {search && (
                             <button
                                 type="button"
-                                onClick={() => setSearch('')}
+                                onClick={() => {
+                                    setSearch('');
+                                    searchRef.current?.focus();
+                                }}
                                 aria-label="Limpiar búsqueda"
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
+                                className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-neutral-600 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
                             >
                                 <X className="h-4 w-4" aria-hidden="true" />
                             </button>
@@ -503,9 +509,12 @@ export default function AdminUsers() {
                 </div>
                 <button
                     type="button"
-                    onClick={handleClearFilters}
-                    disabled={!hasActiveFilters}
-                    className="flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => {
+                        // #311: aria-disabled instead of disabled, so the focus stays on it once the filters are clear
+                        if (hasActiveFilters) handleClearFilters();
+                    }}
+                    aria-disabled={!hasActiveFilters || undefined}
+                    className="flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-300"
                 >
                     <Filter className="h-4 w-4 text-parkea-600" aria-hidden="true" />
                     Limpiar filtros

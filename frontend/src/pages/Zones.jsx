@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -97,6 +97,8 @@ export default function Zones() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [search, setSearch] = useState('');
+    // #311: the clear button disappears with the text, so the focus goes back to the search box
+    const searchRef = useRef(null);
     const [page, setPage] = useState(1);
 
     // HU-25: list and map share this screen, so the search is kept when the
@@ -161,6 +163,7 @@ export default function Zones() {
     const handleClearSearch = () => {
         setSearch('');
         setPage(1);
+        searchRef.current?.focus();
     };
 
     // AC-08: if the map can't load, explain it and fall back to the list.
@@ -227,6 +230,7 @@ export default function Zones() {
                     Buscar zonas por nombre
                 </label>
                 <input
+                    ref={searchRef}
                     id="zone-search"
                     type="text"
                     value={search}
@@ -239,7 +243,7 @@ export default function Zones() {
                         type="button"
                         onClick={handleClearSearch}
                         aria-label="Limpiar búsqueda"
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                        className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-neutral-600 hover:text-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
                     >
                         <X className="h-4 w-4" aria-hidden="true" />
                     </button>
