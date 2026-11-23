@@ -1,8 +1,15 @@
 // #373: extending a stay (HU-28) against a real MySQL database. A stay never
 // changes spot, so its spot must be free for the added time.
 const request = require('supertest');
-const { Reserva } = require('../../src/models');
+const { Pago, Reserva } = require('../../src/models');
+const { finalizarReservasVencidas } = require('../../src/jobs/finalizar-reservas.job');
 const { app, inMinutes, createUser, createZone, reserve } = require('./helpers');
+
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+afterEach(() => {
+    jest.restoreAllMocks();
+});
 
 // A reservation from `start` to `end` minutes from now, paid with PSE
 async function paidStay(cuenta, zona, start, end) {
@@ -80,4 +87,37 @@ describe('Extending a stay (HU-28, #373)', () => {
             if (created.status === 409) expect(created.body.code).toBe('NO_SPOTS_AVAILABLE');
         }
     });
+
+    test('an extension that ends after the old exit time passed keeps the stay Active, even if the finish job ran meanwhile', async () => {
+        // Arrange: a stay that started 30 minutes ago and ends in 2 or 3
+        // seconds (a whole second, as MySQL keeps it). Its extension stops
+        // before saving its payment, like a slow payment, until 2.5 seconds
+        // after that exit time, so the exit time passes while it runs.
+        const zona = await createZone(1);
+        const ana = await createUser();
+        const stay = await paidStay(ana, zona, 5, 60);
+        const exit = new Date(Math.ceil((Date.now() + 2000) / 1000) * 1000);
+        await stay.update({ startTime: inMinutes(-30), endTime: exit });
+        const create = Pago.create.bind(Pago);
+        jest.spyOn(Pago, 'create').mockImplementation(async (values, options) => {
+            if (values.type === 'extension') await sleep(exit.getTime() + 2500 - Date.now());
+            return create(values, options);
+        });
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+
+        // Act: the extension starts, and the finish job runs once the old
+        // exit time passed, while the extension is still running. Sequelize
+        // sends the time of the job without its milliseconds, so it runs a
+        // second and a bit after the exit time.
+        const extending = extend(ana, stay, { newEndTime: inMinutes(60).toISOString(), paymentMethod: 'pse' }).then((res) => res);
+        await sleep(exit.getTime() + 1300 - Date.now());
+        await finalizarReservasVencidas();
+        const extended = await extending;
+
+        // Assert: the stay was extended and is still Active, with its new exit
+        const saved = await Reserva.findByPk(stay.id);
+        expect(extended.status).toBe(200);
+        expect(saved.status).toBe('Active');
+        expect(saved.endTime.getTime()).toBeGreaterThan(Date.now());
+    }, 15000);
 });
