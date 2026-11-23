@@ -302,6 +302,17 @@ function salidaMaxima(reserva) {
     return limite;
 }
 
+// #375: until when the spot of a stay that can still be extended (Active,
+// with an exit time that has not passed) is free after that exit time, so the
+// extend dialog offers only the exit times the extension accepts. Null for
+// the other reservations, and when no reservation holds the spot up to the
+// furthest exit the stay can have (entry + 24 hours, or the closing time of
+// its zone, HU-29).
+function cupoLibreHasta(reserva, ahora = new Date()) {
+    if (reserva.status !== 'Active' || reserva.openEnded || new Date(reserva.endTime) <= ahora) return null;
+    return availability.spotFreeUntil(reserva, latestExit(reserva.zone, reserva.startTime), { now: ahora });
+}
+
 // HU-15: View Reservation Confirmation
 async function obtenerConfirmacion(req, res, next) {
     try {
@@ -344,6 +355,7 @@ async function obtenerConfirmacion(req, res, next) {
                 holdExpiresAt: reserva.holdExpiresAt,
                 openEnded: reserva.openEnded,
                 latestEndTime: salidaMaxima(reserva),
+                spotFreeUntil: await cupoLibreHasta(reserva),
                 openStay: estadiaAbierta,
                 zone: {
                     id: reserva.zone.id,
@@ -715,7 +727,9 @@ async function misReservas(req, res, next) {
         });
 
         const ahora = new Date();
-        const reservations = rows.map((r) => {
+        // #375: one search for each stay that can still be extended
+        const libresHasta = await Promise.all(rows.map((r) => cupoLibreHasta(r, ahora)));
+        const reservations = rows.map((r, i) => {
             const pagoInicial = r.payments.find((p) => p.type === 'initial');
             const yaTienePago = pagoInicial && ['Paid', 'Refunded'].includes(pagoInicial.paymentStatus);
             // HU-28 AC-09: the initial payment plus its extensions
@@ -759,6 +773,7 @@ async function misReservas(req, res, next) {
                 holdExpiresAt: r.holdExpiresAt,
                 openEnded: r.openEnded,
                 latestEndTime: salidaMaxima(r),
+                spotFreeUntil: libresHasta[i],
                 openStay,
                 zone: r.zone,
                 vehicle: r.vehicle,
