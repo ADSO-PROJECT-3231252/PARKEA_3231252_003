@@ -221,12 +221,16 @@ async function getUsuarios(req, res, next) {
     const where = {};
 
     if (search) {
+      const escapedSearch = String(search).replace(/[\\%_]/g, '\\$&');
+      const pattern = `%${escapedSearch}%`;
+
       where[Op.or] = [
-        { fullName: { [Op.like]: `%${search}%` } },
-        { email: { [Op.like]: `%${search}%` } },
-        { documentNumber: { [Op.like]: `%${search}%` } },
+        { fullName: { [Op.like]: pattern } },
+        { email: { [Op.like]: pattern } },
+        { documentNumber: { [Op.like]: pattern } },
       ];
     }
+
     if (status === 'active') where.isActive = true;
     if (status === 'inactive') where.isActive = false;
 
@@ -318,7 +322,12 @@ async function cambiarRol(req, res, next) {
       return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot change your own role' });
     }
 
-    const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }], transaction: t });
+    const usuario = await Usuario.findByPk(id, {
+      include: [{ model: Rol, as: 'role' }],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
     if (!usuario) {
       await t.rollback();
       return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
@@ -329,6 +338,11 @@ async function cambiarRol(req, res, next) {
     }
 
     const rolAnterior = usuario.role.name;
+
+    if (rolAnterior === role) {
+      await t.commit();
+      return res.status(200).json({ message: 'Role updated successfully' });
+    }
 
     if (usuario.role.name === 'admin' && role === 'user') {
       const admins = await Usuario.count({
@@ -379,7 +393,12 @@ async function cambiarEstado(req, res, next) {
       return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot deactivate your own account' });
     }
 
-    const usuario = await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }], transaction: t });
+    const usuario = await Usuario.findByPk(id, {
+      include: [{ model: Rol, as: 'role' }],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+
     if (!usuario) {
       await t.rollback();
       return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
@@ -387,6 +406,11 @@ async function cambiarEstado(req, res, next) {
     if (usuario.isPrimaryAdmin) {
       await t.rollback();
       return res.status(403).json({ code: ErrorCodes.PRIMARY_ADMIN_PROTECTED, message: 'The primary administrator cannot be deactivated' });
+    }
+
+    if (usuario.isActive === isActive) {
+      await t.commit();
+      return res.status(200).json({ message: 'Status updated successfully' });
     }
 
     if (usuario.role.name === 'admin' && isActive === false) {

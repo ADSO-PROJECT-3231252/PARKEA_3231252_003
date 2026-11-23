@@ -171,7 +171,7 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         jest.spyOn(ParkingSpot, 'count').mockResolvedValue(9);
 
         // Act
-        const res = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`));
+        const res = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`).send({ isActive: false }));
 
         // Assert
         expect(res.status).toBe(200);
@@ -188,8 +188,8 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         jest.spyOn(ParkingSpot, 'count').mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValue(9);
 
         // Act
-        const failed = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`));
-        const again = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`));
+        const failed = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`).send({ isActive: false }));
+        const again = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`).send({ isActive: false }));
 
         // Assert: the first one saved nothing, so the second one deactivates it
         expect(failed.status).toBe(500);

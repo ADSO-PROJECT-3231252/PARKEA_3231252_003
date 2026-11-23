@@ -60,7 +60,7 @@ counted only per network, so everyone on that network shares their count
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default. Brand, model and color (up to 50, 50 and 30 characters) only accept letters, numbers, spaces, hyphens and periods, with at least one letter or number. The text is checked as it was typed, then saved normalized |
+| POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default. Brand, model and color (up to 50, 50 and 30 characters) only accept letters, numbers, spaces, hyphens and periods, with at least one letter or number. The text is checked as it was typed, then saved normalized. A user can have at most 5 active vehicles (a deleted one does not count): with 5, the next one answers 409 `VEHICLE_LIMIT_REACHED` (#299) |
 | GET | `/vehicles` | User | List my vehicles (HU-11). Default vehicle always first |
 | GET | `/vehicles/:id` | User (owner) | Single vehicle detail, used to prefill the edit form |
 | PUT | `/vehicles/:id` | User (owner) | Edit a vehicle (HU-12). Plate is never editable. Brand, model and color follow the same rules as when registering, so a vehicle saved with other characters answers 400 until that field is corrected |
@@ -74,9 +74,9 @@ counted only per network, so everyone on that network shares their count
 | GET | `/zones` | Public | List active zones only (HU-09), the ones with the largest share of free spots first. Every zone has `open24h` and its `schedule` (HU-29, see below), and `availableSlots`: the spots free now (#373, see below) |
 | GET | `/zones/all` | Admin | List every zone, active and inactive (HU-19). Each one also has `activeReservations` (its `Pending` and `Active` reservations) and `spotsInUse` (#373: the spots with a `Pending` or `Active` reservation from now on, the least capacity it can have) |
 | GET | `/zones/:id` | Public | Single zone detail. Not filtered by active status, so admins can reach a deactivated zone to edit/reactivate it |
-| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate greater than 0 with at most 2 decimals (#316: a rate of 0 answers 400 `VALIDATION_ERROR` on `hourlyRate`, a negative one `NEGATIVE_VALUE`), and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule` |
+| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate greater than 0 with at most 2 decimals (#316: a rate of 0 answers 400 `VALIDATION_ERROR` on `hourlyRate`, a negative one `NEGATIVE_VALUE`), and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule`. The name must not belong to another zone, without telling capitals or accents apart: 409 `ZONE_NAME_TAKEN`, also when two admins save the same name at the same time (#304, unique index `zones_name_unique`) |
 | PUT | `/zones/:id` | Admin | Edit a zone; adjusts spots if capacity changes (HU-21). Same rules as creation, opening hours included. New hours apply to new reservations and extensions; existing reservations keep their times (HU-29). Lowering the capacity disables only spots with no `Pending` or `Active` reservation from now on, the highest numbers first; below the spots in use it answers 400 `CAPACITY_BELOW_IN_USE` with `spotsInUse` (#373) |
-| PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19) |
+| PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19). The body says the state wanted, `{ "isActive": true }` or `false` (#304): repeating it changes nothing, so two admins who deactivate it at the same time both leave it inactive. Without a real boolean it answers 400 `VALIDATION_ERROR` |
 
 ### Opening hours (HU-29)
 
@@ -123,7 +123,7 @@ zone depend on the hours asked and are not stored.
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE` |
+| POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE`. A user can have at most 2 reservations in `Pending` at the same time: with 2, the next one answers 409 `TOO_MANY_PENDING_RESERVATIONS` until one is paid, cancelled or expires (#299) |
 | GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `holdExpiresAt` (until when a `Pending` one can be paid or cancelled, #347; `null` once it is paid), `openEnded`, `latestEndTime` (HU-29), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
 | GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
 | PATCH | `/reservations/:id/cancel` | User (owner) | Cancel a reservation (HU-16). A `Pending` one (not paid) while its 15 minutes to pay last, even after its start time (#316); once they end it answers 400 `RESERVATION_EXPIRED` and changes nothing, like the payment, even if the job has not marked it `Expired` yet (#347). An `Expired` one answers the same. An `Active` one (paid) only before its start time, otherwise 409 `RESERVATION_ALREADY_STARTED` (#316). A `Cancelled` or `Finished` one answers 409 `RESERVATION_NOT_CANCELLABLE`. What was paid is marked Refunded, extensions included |
@@ -197,7 +197,7 @@ zone depend on the hours asked and are not stored.
 | Method | Route | Access | Description |
 |---|---|---|---|
 | GET | `/users/me` | Authenticated | Load my profile (HU-08) |
-| PUT | `/users/me` | Authenticated | Edit full name and phone (HU-08). Email and document are never editable |
+| PUT | `/users/me` | Authenticated | Edit full name and phone (HU-08). Email and document are never editable. At least one of the two must come: without both it answers 400 `MISSING_REQUIRED_FIELDS` (#300) |
 | PUT | `/users/me/password` | Authenticated | Change password (HU-08). The other sessions of the account and its recovery links stop working; the answer brings a new `token` so this session goes on. Attempt limit, see [Attempt limits](#attempt-limits) |
 
 ## Admin
@@ -210,10 +210,10 @@ zone depend on the hours asked and are not stored.
 | GET | `/admin/dashboard/payments-status?range=today\|week\|month` | Admin | Payment count by status (HU-22) |
 | GET | `/admin/dashboard/recent-payments` | Admin | Last 5 payments (HU-22) |
 | GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: an active zone with no spot free now (HU-22, #373) |
-| GET | `/admin/users?search=&role=&status=&page=&limit=` | Admin | List users with filters, pagination (at most 100 per page), and reservation count per user (HU-23) |
+| GET | `/admin/users?search=&role=&status=&page=&limit=` | Admin | List users with filters, pagination (at most 100 per page), and reservation count per user (HU-23). `search` looks for `%`, `_` and `\` as written (#304) |
 | GET | `/admin/users/logs` | Admin | Last 10 role/status changes made by admins (HU-23) |
-| PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin |
-| PATCH | `/admin/users/:id/status` | Admin | Activate/deactivate an account (HU-23). Same protections as above |
+| PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin. The role it already has answers 200 and writes no line in the log (#304) |
+| PATCH | `/admin/users/:id/status` | Admin | Activate/deactivate an account (HU-23). Same protections as above. The status it already has answers 200 and writes no line in the log (#304) |
 
 ### Dashboard ranges (HU-22)
 
@@ -268,6 +268,12 @@ Every range ends at the moment of the request and starts at midnight
   closes automatically, the hours up to that time are charged and what was
   not paid stays as a pending balance (HU-27).
 - Until a pending balance is paid, the user cannot make new reservations.
+- Every user has two limits, each answered with a 409 and its own code: at
+  most 2 reservations in `Pending` at the same time
+  (`TOO_MANY_PENDING_RESERVATIONS`) and at most 5 active vehicles
+  (`VEHICLE_LIMIT_REACHED`). Both are checked in the same transaction that
+  locks the row of the user, so two requests at the same moment cannot go
+  over either limit (#299).
 - Every role/status change made through the admin endpoints is recorded
   in an internal audit log (`GET /admin/users/logs`).
 - The primary administrator account can never be deactivated or have its
