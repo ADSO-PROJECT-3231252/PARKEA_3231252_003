@@ -9,7 +9,7 @@ const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
 const SALT_ROUNDS = 10;
 
 // PHASE 1 — POST /api/auth/forgot-password
-// HU-07, AC-01 a AC-06
+// HU-07, AC-01 to AC-06
 async function solicitarRecuperacion(req, res, next) {
     try {
         const { email } = req.body;
@@ -70,7 +70,7 @@ async function crearYEnviarEnlace(usuario) {
 }
 
 // PHASE 2 — POST /api/auth/reset-password
-// HU-07, AC-07 a AC-10
+// HU-07, AC-07 to AC-10
 async function restablecerPassword(req, res, next) {
     try {
         const { token, newPassword } = req.body;
