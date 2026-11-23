@@ -98,6 +98,37 @@
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 12px;
+
+    /* #330: motion of the home. The texts and the cards rise and appear one
+    after the other (fade-up, then -2 and -3). The hero illustration slides
+    in and floats twice, so it stops before 5 seconds (WCAG 2.2.2). They move
+    with translate, not transform, so the transform that centers the
+    illustration stays. motion-safe: leaves all of it out for a person who
+    asked the system to reduce motion. */
+    --animate-fade-up: fade-up 500ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    --animate-fade-up-2: fade-up 500ms cubic-bezier(0.22, 1, 0.36, 1) 120ms backwards;
+    --animate-fade-up-3: fade-up 500ms cubic-bezier(0.22, 1, 0.36, 1) 240ms backwards;
+    --animate-hero-illustration: slide-in 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards, float 2s ease-in-out 700ms 2;
+
+    @keyframes fade-up {
+        from {
+            opacity: 0;
+            translate: 0 0.75rem;
+        }
+    }
+
+    @keyframes slide-in {
+        from {
+            opacity: 0;
+            translate: 2rem 0;
+        }
+    }
+
+    @keyframes float {
+        50% {
+            translate: 0 -0.5rem;
+        }
+    }
 }
 
 @layer base {
