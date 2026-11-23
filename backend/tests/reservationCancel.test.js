@@ -21,8 +21,6 @@ const token = jwt.sign({ id: USER_ID, email: 'laura@correo.test', rol: 'user' },
 
 let transaction;
 let findReservation;
-let spot;
-let zona;
 
 // A payment of the reservation, with its own update spy
 const payment = (type, paymentStatus) => ({ type, paymentStatus, update: jest.fn() });
@@ -43,12 +41,11 @@ function reservation(values = {}) {
     };
 }
 
+// The spot and the zone are spied on only to check that they do not change
 function arrange(reserva = reservation()) {
     findReservation = jest.spyOn(Reserva, 'findOne').mockResolvedValue(reserva);
-    spot = { id: SPOT_ID, status: 'Occupied', update: jest.fn() };
-    jest.spyOn(ParkingSpot, 'findByPk').mockResolvedValue(spot);
-    zona = { id: ZONE_ID, increment: jest.fn() };
-    jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
+    jest.spyOn(ParkingSpot, 'findByPk');
+    jest.spyOn(Zona, 'findByPk');
     return reserva;
 }
 
@@ -82,7 +79,7 @@ describe('When a reservation can be cancelled (HU-16)', () => {
         expect(transaction.rollback).toHaveBeenCalled();
     });
 
-    test('the reservation is read with a lock, so two cancellations at once cannot both give the spot back', async () => {
+    test('the reservation is read with a lock, so two cancellations at once cannot both cancel it', async () => {
         // Arrange
         arrange();
 
@@ -125,7 +122,6 @@ describe('When a reservation can be cancelled (HU-16)', () => {
         expect(res.status).toBe(409);
         expect(res.body.code).toBe('RESERVATION_NOT_CANCELLABLE');
         expect(reserva.update).not.toHaveBeenCalled();
-        expect(zona.increment).not.toHaveBeenCalled();
     });
 
     test('a reservation that is not paid yet (Pending) can be cancelled', async () => {
@@ -153,19 +149,15 @@ describe('When a reservation can be cancelled (HU-16)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(reserva.update).toHaveBeenCalledWith({ status: 'Cancelled' }, { transaction });
-        expect(spot.update).toHaveBeenCalledWith({ status: 'Available' }, { transaction });
-        expect(zona.increment).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
         expect(transaction.commit).toHaveBeenCalled();
     });
 });
 
 describe('When the 15 minutes to pay end (#347)', () => {
-    // Nothing is saved and nothing is released: the expiration job marks the
-    // reservation Expired and gives its spot back
+    // Nothing is saved: the reservation no longer holds its spot (#373), and
+    // the expiration job marks it Expired
     function expectNothingChanged(reserva) {
         expect(reserva.update).not.toHaveBeenCalled();
-        expect(ParkingSpot.findByPk).not.toHaveBeenCalled();
-        expect(Zona.findByPk).not.toHaveBeenCalled();
         expect(transaction.commit).not.toHaveBeenCalled();
         expect(transaction.rollback).toHaveBeenCalled();
     }
@@ -243,33 +235,20 @@ describe('When the 15 minutes to pay end (#347)', () => {
 });
 
 describe('Cancelling a reservation (HU-16)', () => {
-    test('it is Cancelled, its spot is Available again and the zone gets the slot back, in one transaction', async () => {
+    test('it is Cancelled in one transaction, and that alone frees its spot for its hours (#373)', async () => {
         // Arrange
         const reserva = arrange();
 
         // Act
         const res = await cancel();
 
-        // Assert
+        // Assert: no spot and no zone change, and none is locked
         expect(res.status).toBe(200);
         expect(reserva.update).toHaveBeenCalledWith({ status: 'Cancelled' }, { transaction });
-        expect(spot.update).toHaveBeenCalledWith({ status: 'Available' }, { transaction });
-        expect(zona.increment).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
+        expect(ParkingSpot.findByPk).not.toHaveBeenCalled();
+        expect(Zona.findByPk).not.toHaveBeenCalled();
         expect(transaction.commit).toHaveBeenCalled();
         expect(transaction.rollback).not.toHaveBeenCalled();
-    });
-
-    test('a spot that is no longer Occupied is left as it is', async () => {
-        // Arrange
-        arrange();
-        spot.status = 'Available';
-
-        // Act
-        const res = await cancel();
-
-        // Assert
-        expect(res.status).toBe(200);
-        expect(spot.update).not.toHaveBeenCalled();
     });
 
     test('the initial payment and the paid extensions are refunded (HU-27 AC-14, HU-28)', async () => {
