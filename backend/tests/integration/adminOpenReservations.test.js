@@ -5,7 +5,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const request = require('supertest');
-const { Usuario, Rol, Reserva, Pago, ParkingSpot, sequelize } = require('../../src/models');
+const { Usuario, Rol, Reserva, Pago, ParkingSpot, AdminActionLog, sequelize } = require('../../src/models');
 const { app, inMinutes, createUser, adminToken, createZone, reserve } = require('./helpers');
 
 const changeRole = async (id, role, token) => request(app)
@@ -37,6 +37,12 @@ async function createAdmin() {
 
 const roleOf = async (id) => (await Usuario.findByPk(id, { include: [{ model: Rol, as: 'role' }] })).role.name;
 const isActive = async (id) => (await Usuario.findByPk(id)).isActive;
+const payReservation = (cuenta, reservationId) => request(app)
+    .post(`/api/payments/${reservationId}`)
+    .set('Authorization', `Bearer ${cuenta.token}`)
+    .send({ paymentMethod: 'pse' });
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
 const statuses = (responses) => responses.map((res) => `${res.status}${res.body.code ? ` ${res.body.code}` : ''}`).sort();
 
 // Locks the row of the account in a transaction and runs `whileLocked` once
@@ -232,6 +238,98 @@ describe('A reservation at the same moment as the change (#348)', () => {
                 expect(saved).toBe(0);
             }
         }
+    });
+});
+
+describe('A payment at the same moment as the change (#348)', () => {
+    let zona;
+
+    beforeAll(async () => {
+        zona = await createZone(5);
+    });
+
+    // A Pending reservation whose 15 minutes end in a moment
+    async function pendingReservation(cuenta, minutes) {
+        const reserved = await reserve(cuenta, zona, inMinutes(minutes), inMinutes(minutes + 60));
+        expect(reserved.status).toBe(201);
+        return reserved.body.reservation.id;
+    }
+
+    test.each([
+        ['deactivated', (id) => changeStatus(id, false)],
+        ['made administrator', (id) => changeRole(id, 'admin')],
+    ])('a payment that passes the deadline and ends after it: the account is not %s (409) and the reservation is paid', async (_case, sendChange) => {
+        // Arrange
+        const cuenta = await createUser();
+        const reservationId = await pendingReservation(cuenta, 60);
+        // A whole second, so MySQL's precision cannot move it before the payment starts
+        const expiresAt = new Date(Math.ceil(Date.now() / 1000) * 1000 + 1500);
+        await Reserva.update({ holdExpiresAt: expiresAt }, { where: { id: reservationId } });
+
+        // The payment stops after the check of the deadline, before saving
+        let notifyChecked;
+        const checked = new Promise((resolve) => { notifyChecked = resolve; });
+        let release;
+        const released = new Promise((resolve) => { release = resolve; });
+        const hookName = 'holdPaymentAfterDeadline';
+        Pago.addHook('beforeFind', hookName, async (options) => {
+            if (options.where?.reservationId === reservationId) {
+                notifyChecked();
+                await released;
+            }
+        });
+
+        let paid;
+        let changed;
+        try {
+            // Act: the payment passes the deadline, the 15 minutes end, and
+            // then an admin changes the account while the payment is not saved yet
+            paid = payReservation(cuenta, reservationId);
+            await Promise.race([
+                checked,
+                paid.then((res) => {
+                    throw new Error(`The payment finished before its check: HTTP ${res.status}`);
+                }),
+            ]);
+            await sleep(Math.max(0, expiresAt.getTime() - Date.now() + 100));
+            changed = sendChange(cuenta.usuario.id);
+            // Without the lock of the account the change ends here, while the payment waits
+            await Promise.race([changed, sleep(1000)]);
+        } finally {
+            release();
+            Pago.removeHook('beforeFind', hookName);
+        }
+        const [payment, change] = await Promise.all([paid, changed]);
+
+        // Assert: the change waited for the payment and then saw the reservation Active
+        expect(payment.status).toBe(201);
+        expect(change.status).toBe(409);
+        expect(change.body.code).toBe('USER_HAS_OPEN_RESERVATIONS');
+        expect((await Reserva.findByPk(reservationId)).status).toBe('Active');
+        expect(await isActive(cuenta.usuario.id)).toBe(true);
+        expect(await roleOf(cuenta.usuario.id)).toBe('user');
+        expect(await AdminActionLog.count({ where: { targetUserId: cuenta.usuario.id } })).toBe(0);
+    });
+
+    test.each([
+        ['made administrator', { roleId: 'admin' }, 'FORBIDDEN_ROLE'],
+        ['deactivated', { isActive: false }, 'ACCOUNT_DEACTIVATED'],
+    ])('a payment that waits while the account is %s answers 403 %s and pays nothing', async (_case, change, code) => {
+        // Arrange
+        const cuenta = await createUser();
+        const reservationId = await pendingReservation(cuenta, 180);
+        const values = change.roleId ? { roleId: (await Rol.findOne({ where: { name: 'admin' } })).id } : change;
+
+        // Act: the change is saved while the payment waits at the lock of the account
+        const res = await whileAccountIsLocked(cuenta.usuario.id, () => payReservation(cuenta, reservationId), async (blocker) => {
+            await Usuario.update(values, { where: { id: cuenta.usuario.id }, transaction: blocker });
+        });
+
+        // Assert
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe(code);
+        expect((await Reserva.findByPk(reservationId)).status).toBe('Pending');
+        expect(await Pago.count({ where: { reservationId } })).toBe(0);
     });
 });
 
