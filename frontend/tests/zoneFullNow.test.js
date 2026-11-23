@@ -2,11 +2,15 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Zones from '../src/pages/Zones';
+import ReserveSpot from '../src/pages/ReserveSpot';
 import { AuthProvider } from '../src/context/AuthContext';
-import { getZones } from '../src/services/zoneService';
+import { getZone, getZones } from '../src/services/zoneService';
+import { getVehicles } from '../src/services/vehicleService';
 
 // The screens do not call the real API
-jest.mock('../src/services/zoneService', () => ({ getZones: jest.fn() }));
+jest.mock('../src/services/zoneService', () => ({ getZone: jest.fn(), getZones: jest.fn() }));
+jest.mock('../src/services/vehicleService', () => ({ getVehicles: jest.fn() }));
+jest.mock('../src/services/reservationService', () => ({ createReservation: jest.fn() }));
 
 // jsdom cannot draw the map: its pieces only render what they hold, so the
 // summary of every pin is in the page, as if it were open
@@ -56,6 +60,7 @@ function renderList(search = '') {
 
 beforeEach(() => {
     localStorage.clear();
+    getZone.mockReset();
     getZones.mockReset();
 });
 
@@ -146,5 +151,38 @@ describe('A zone with no room now can still be reserved from the map (#375)', ()
 
         // Assert
         expect(screen.getByText('Pantalla de inicio de sesión')).toBeInTheDocument();
+    });
+});
+
+describe('The reserve screen of a zone with no room now (#375)', () => {
+    async function renderReserve(zoneValues) {
+        getZone.mockResolvedValue({ data: { zone: zoneValues } });
+        getVehicles.mockResolvedValue({ data: { vehicles: [{ id: 'v1', plate: 'ABC123', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true }] } });
+        render(
+            <MemoryRouter initialEntries={[`/reserve/${zoneValues.id}`]}>
+                <Routes>
+                    <Route path="/reserve/:zoneId" element={<ReserveSpot />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        await screen.findByRole('heading', { name: 'Reservar cupo' });
+    }
+
+    test('says that there is no room now and keeps the form to choose other hours', async () => {
+        // Arrange + Act
+        await renderReserve(FULL);
+
+        // Assert
+        expect(screen.getByText('Llena')).toBeInTheDocument();
+        expect(screen.getByText('cupos libres ahora')).toBeInTheDocument();
+        expect(screen.getByText(NOTE)).toBeInTheDocument();
+        expect(document.getElementById('startDate')).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Reservar cupo' })).toBeEnabled();
+    });
+
+    test('a zone with room has no note', async () => {
+        await renderReserve(FREE);
+        expect(screen.getByText('cupos libres ahora')).toBeInTheDocument();
+        expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
     });
 });

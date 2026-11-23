@@ -404,9 +404,15 @@ export default function ReserveSpot() {
                                 <span className="font-mono tabular-nums">{zone.availableSlots}</span>
                                 <span>de</span>
                                 <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                                <span>cupos disponibles</span>
+                                <span>cupos libres ahora</span>
                             </span>
                         </div>
+                        {/* #373: the count is the room now; other hours may have room */}
+                        {availability.state === 'full' && (
+                            <p className="mt-1.5 text-caption text-neutral-600">
+                                No hay cupos en este momento, pero puedes reservar para otro horario.
+                            </p>
+                        )}
                     </div>
                 </div>
 
