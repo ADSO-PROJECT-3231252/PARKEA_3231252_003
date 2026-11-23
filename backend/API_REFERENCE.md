@@ -77,6 +77,7 @@ counted only per network, so everyone on that network shares their count
 | GET | `/zones` | Public | List active zones only (HU-09), the ones with the largest share of free spots first. Every zone has `open24h` and its `schedule` (HU-29, see below), and `availableSlots`: the spots free now (#373, see below) |
 | GET | `/zones/all` | Admin | List every zone, active and inactive (HU-19). Each one also has `activeReservations` (its `Pending` and `Active` reservations) and `spotsInUse` (#373: the spots with a `Pending` or `Active` reservation from now on, the least capacity it can have) |
 | GET | `/zones/:id` | Public | Single zone detail. Not filtered by active status, so admins can reach a deactivated zone to edit/reactivate it |
+| GET | `/zones/:id/availability` | Public | How many spots of the zone are free for some hours (#375): `?startTime=&endTime=`, or `?startTime=&openEnded=true` for an open stay. Same checks and rules as `POST /reservations` (see below) |
 | POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate greater than 0 with at most 2 decimals (#316: a rate of 0 answers 400 `VALIDATION_ERROR` on `hourlyRate`, a negative one `NEGATIVE_VALUE`), and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule`. The name must not belong to another zone, without telling capitals or accents apart: 409 `ZONE_NAME_TAKEN`, also when two admins save the same name at the same time (#304, unique index `zones_name_unique`) |
 | PUT | `/zones/:id` | Admin | Edit a zone; adjusts spots if capacity changes (HU-21). Same rules as creation, opening hours included. New hours apply to new reservations and extensions; existing reservations keep their times (HU-29). Lowering the capacity disables only spots with no `Pending` or `Active` reservation from now on, the highest numbers first; below the spots in use it answers 400 `CAPACITY_BELOW_IN_USE` with `spotsInUse` (#373) |
 | PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19). The body says the state wanted, `{ "isActive": true }` or `false` (#304): repeating it changes nothing, so two admins who deactivate it at the same time both leave it inactive. Without a real boolean it answers 400 `VALIDATION_ERROR` |
@@ -122,13 +123,46 @@ zone depend on the hours asked and are not stored.
 - The status of a spot only says whether it can be reserved: `Available`
   or `Disabled` (a spot left out by a lower capacity).
 
+`GET /zones/:id/availability` gives the free spots for other hours (#375),
+so the reserve screen can say whether there is room before sending. It
+takes the same `startTime`, `endTime` and `openEnded` as `POST
+/reservations`, as text in the query, and checks them the same way and in
+the same order: `MISSING_REQUIRED_FIELDS`, `INVALID_DATE`,
+`START_TIME_IN_PAST`, `RESERVATION_TOO_FAR_AHEAD`, `END_BEFORE_START`,
+`INVALID_DURATION` (400), then 404 `ZONE_NOT_FOUND`, 409 `ZONE_INACTIVE`
+and the hours of the zone (400 `OUTSIDE_ZONE_HOURS` or
+`ZONE_CLOSED_THAT_DAY`, with `hours`). Each of these errors has the same
+body as in `POST /reservations`. A repeated value, or an `openEnded` that
+is not `true` or `false`, answers 400 `VALIDATION_ERROR`. With
+`openEnded=true`, `endTime` is not needed and is ignored, as in the
+reservation. It needs no session.
+
+```json
+{
+  "zoneId": "…",
+  "startTime": "2026-11-23T15:00:00.000Z",
+  "endTime": "2026-11-23T17:00:00.000Z",
+  "openEnded": false,
+  "availableSlots": 3,
+  "totalSlots": 10
+}
+```
+
+- `availableSlots` counts the enabled spots that no reservation holds in
+  those hours, with the 10 minutes before and after: the spots `POST
+  /reservations` could give for that stay. An open stay counts them until
+  its provisional exit, which is the `endTime` of the answer: 24 hours
+  later, or the closing time of the zone that day.
+- It only informs. It holds nothing, so the reservation still decides when
+  it is sent (409 `NO_SPOTS_AVAILABLE` if the room was taken meanwhile).
+
 ## Reservations
 
 | Method | Route | Access | Description |
 |---|---|---|---|
 | POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE`. A user can have at most 2 reservations in `Pending` at the same time: with 2, the next one answers 409 `TOO_MANY_PENDING_RESERVATIONS` until one is paid, cancelled or expires (#299) |
-| GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `holdExpiresAt` (until when a `Pending` one can be paid or cancelled, #347; `null` once it is paid), `openEnded`, `latestEndTime` (HU-29), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
-| GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
+| GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `holdExpiresAt` (until when a `Pending` one can be paid or cancelled, #347; `null` once it is paid), `openEnded`, `latestEndTime` (HU-29), `spotFreeUntil` (#375, see below), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
+| GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29), `spotFreeUntil` (#375, see below) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
 | PATCH | `/reservations/:id/cancel` | User (owner) | Cancel a reservation (HU-16). A `Pending` one (not paid) while its 15 minutes to pay last, even after its start time (#316); once they end it answers 400 `RESERVATION_EXPIRED` and changes nothing, like the payment, even if the job has not marked it `Expired` yet (#347). An `Expired` one answers the same. An `Active` one (paid) only before its start time, otherwise 409 `RESERVATION_ALREADY_STARTED` (#316). A `Cancelled` or `Finished` one answers 409 `RESERVATION_NOT_CANCELLABLE`. What was paid is marked Refunded, extensions included |
 | PATCH | `/reservations/:id/finish` | User (owner) | Finish an open stay when the user leaves (HU-27). Charges every started hour, subtracts what was paid and creates a pending balance if something is still owed. Optional `expectedHours` (the hours shown to the user): if another hour started meanwhile it answers 409 `STAY_AMOUNT_CHANGED` with the new amount |
 | PATCH | `/reservations/:id/extend` | User (owner) | Extend a paid stay that has not ended (HU-28). `{ fromEndTime, newEndTime, paymentMethod, cardLastFour }` pays the added time now; `{ fromEndTime, openEnded: true }` turns it into an open stay, paid when it ends. Never more than 24 hours from the entry, nor past the closing time of the zone (HU-29). If the exit time changed in another tab it answers 409 `RESERVATION_CHANGED`. A stay never changes spot: if another reservation holds it in the added time, it answers 409 `SPOT_RESERVED_LATER` with `freeUntil` (#373) |
@@ -178,6 +212,17 @@ zone depend on the hours asked and are not stored.
 ```json
 { "code": "SPOT_RESERVED_LATER", "message": "…", "freeUntil": "2026-11-23T15:50:00.000Z" }
 ```
+
+- `spotFreeUntil`, in the list and the detail of the reservations (#375):
+  for a stay that can still be extended (`Active`, with an exit time that
+  has not passed), until when its spot is free after that exit time, 10
+  minutes before the next reservation that holds it. It is looked for up to
+  the furthest exit the stay can have (24 hours after the entry, or the
+  closing time of the zone), with the same rule as the extension, so the
+  extension accepts every exit time up to it and answers
+  `SPOT_RESERVED_LATER` with that same `freeUntil` after it. When it equals
+  the exit time, the stay cannot be extended. It is `null` when no
+  reservation holds the spot until then, and for the other reservations.
 
 - Cancelling, expiring or finishing a reservation changes only its status:
   from then its hours are free again (for a finished one, 10 minutes after
