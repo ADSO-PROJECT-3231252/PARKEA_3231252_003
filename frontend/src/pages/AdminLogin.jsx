@@ -45,6 +45,8 @@ export default function AdminLogin() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
 
@@ -187,10 +189,10 @@ export default function AdminLogin() {
 
                         <button
                             type="submit"
-                            disabled={loading}
+                            aria-disabled={loading || undefined}
                             className="w-full rounded-md bg-parkea-700 text-white font-sans font-medium py-2.5
                                 hover:bg-parkea-800 focus:outline-none focus:ring-2 focus:ring-offset-2
-                                focus:ring-parkea-700 transition disabled:opacity-60"
+                                focus:ring-parkea-700 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-700"
                         >
                             {loading ? 'Ingresando...' : 'Iniciar sesión'}
                         </button>

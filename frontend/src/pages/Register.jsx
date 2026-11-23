@@ -119,6 +119,8 @@ export default function Register() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
 
@@ -403,8 +405,8 @@ export default function Register() {
 
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+                            aria-disabled={loading || undefined}
+                            className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                         >
                             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
                         </button>
