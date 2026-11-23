@@ -378,7 +378,6 @@ export default function AdminUsers() {
     const visibleLogs = logsExpanded ? logs : logs.slice(0, VISIBLE_LOGS);
     const pageButton =
         'flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 ' +
-        'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ' +
         'aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent';
 
     return (
@@ -649,7 +648,7 @@ export default function AdminUsers() {
                                 <button
                                     type="button"
                                     onClick={() => goToPage(1)}
-                                    disabled={page === 1}
+                                    aria-disabled={page === 1 || undefined}
                                     aria-label="Primera página"
                                     className={`${pageButton} max-sm:hidden`}
                                 >
@@ -657,8 +656,10 @@ export default function AdminUsers() {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => goToPage(page - 1)}
-                                    disabled={page === 1}
+                                    onClick={() => {
+                                        if (page > 1) goToPage(page - 1);
+                                    }}
+                                    aria-disabled={page === 1 || undefined}
                                     aria-label="Página anterior"
                                     className={pageButton}
                                 >
@@ -696,7 +697,7 @@ export default function AdminUsers() {
                                 <button
                                     type="button"
                                     onClick={() => goToPage(pagination.totalPages)}
-                                    disabled={page === pagination.totalPages}
+                                    aria-disabled={page === pagination.totalPages || undefined}
                                     aria-label="Última página"
                                     className={`${pageButton} max-sm:hidden`}
                                 >

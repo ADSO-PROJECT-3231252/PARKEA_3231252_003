@@ -263,7 +263,6 @@ export default function AdminZones() {
 
     const pageButton =
         'flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
-        'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ' +
         'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent sm:px-2.5';
 
     return (
@@ -463,8 +462,10 @@ export default function AdminZones() {
                             <nav aria-label="Paginación de zonas" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage - 1)}
-                                    disabled={currentPage === 1}
+                                    onClick={() => {
+                                        if (currentPage > 1) setPage(currentPage - 1);
+                                    }}
+                                    aria-disabled={currentPage === 1 || undefined}
                                     className={pageButton}
                                 >
                                     <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />

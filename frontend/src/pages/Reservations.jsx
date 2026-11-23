@@ -287,9 +287,8 @@ function PageButton({ children, ...props }) {
             type="button"
             className="min-w-9 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-caption
 text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600
-disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200
-disabled:hover:text-neutral-900 aria-disabled:cursor-not-allowed aria-disabled:opacity-50
-aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
+aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200
+aria-disabled:hover:text-neutral-900"
             {...props}
         >
             {children}
@@ -751,7 +750,7 @@ p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                             Los montos estimados pueden variar según el tiempo real de uso.
                         </p>
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                            <p ref={rangeRef} tabIndex={-1} className="text-caption text-neutral-600 focus:outline-none" aria-live="polite">
+                            <p ref={rangeRef} tabIndex={-1} className="text-caption text-neutral-600 focus:outline-none">
                                 Mostrando {firstShown}–{lastShown} de {pagination.total} reservas
                             </p>
                             {/* AC-10 */}
@@ -761,7 +760,12 @@ p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                     className="flex flex-wrap
 items-center gap-1.5"
                                 >
-                                    <PageButton onClick={() => goToPage(page - 1)} disabled={page === 1}>
+                                    <PageButton
+                                        onClick={() => {
+                                            if (page > 1) goToPage(page - 1);
+                                        }}
+                                        aria-disabled={page === 1 || undefined}
+                                    >
                                         Anterior
                                     </PageButton>
                                     {pageItems(page, pagination.totalPages).map((item, i) =>
