@@ -33,6 +33,8 @@ module.exports = {
     PLATE_ALREADY_REGISTERED: 'PLATE_ALREADY_REGISTERED',
     VEHICLE_HAS_ACTIVE_RESERVATION: 'VEHICLE_HAS_ACTIVE_RESERVATION',
     INVALID_PLATE_FORMAT: 'INVALID_PLATE_FORMAT',
+    // A user cannot have more than 5 active vehicles at the same time
+    VEHICLE_LIMIT_REACHED: 'VEHICLE_LIMIT_REACHED',
 
     // Zones
     ZONE_NOT_FOUND: 'ZONE_NOT_FOUND',
@@ -75,6 +77,8 @@ module.exports = {
     // HU-29: the stay does not fit the hours of the zone
     OUTSIDE_ZONE_HOURS: 'OUTSIDE_ZONE_HOURS',
     ZONE_CLOSED_THAT_DAY: 'ZONE_CLOSED_THAT_DAY',
+    // A user cannot hold more than 2 unpaid reservations at the same time
+    TOO_MANY_PENDING_RESERVATIONS: 'TOO_MANY_PENDING_RESERVATIONS',
 
     // Payments
     INVALID_PAYMENT_METHOD: 'INVALID_PAYMENT_METHOD',

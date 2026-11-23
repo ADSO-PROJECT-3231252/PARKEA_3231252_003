@@ -90,6 +90,59 @@ describe('Registering a vehicle (HU-10)', () => {
         expect(lockUser.mock.invocationCallOrder[call]).toBeLessThan(countVehicles.mock.invocationCallOrder[0]);
     });
 
+    test('a user with 5 active vehicles answers 409 VEHICLE_LIMIT_REACHED and registers nothing', async () => {
+        // Arrange
+        countVehicles.mockResolvedValue(5);
+
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, plate: 'XYZ987' });
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('VEHICLE_LIMIT_REACHED');
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
+    test('a user with 4 active vehicles can still register the fifth one', async () => {
+        // Arrange
+        countVehicles.mockResolvedValue(4);
+
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, plate: 'XYZ987' });
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(createVehicle).toHaveBeenCalledWith(expect.objectContaining({ isDefault: false, userId: USER_ID }), { transaction });
+    });
+
+    test('the limit is checked after locking the user, so two registrations at once cannot both take the last place', async () => {
+        // Arrange
+        countVehicles.mockResolvedValue(5);
+
+        // Act
+        await send('post', '/api/vehicles', { ...NEW_CAR, plate: 'XYZ987' });
+
+        // Assert: the count that decides the limit is the one taken with the lock held
+        expect(countVehicles).toHaveBeenCalledWith({ where: { userId: USER_ID }, transaction });
+        expect(lockUser.mock.invocationCallOrder[userLockCall()]).toBeLessThan(countVehicles.mock.invocationCallOrder[0]);
+    });
+
+    test('a user that no longer exists answers 404 USER_NOT_FOUND and registers nothing', async () => {
+        // Arrange: the session is valid, but the user is gone when the row is locked
+        lockUser.mockImplementation(async (id, options) => (options && options.lock
+            ? null
+            : { id: USER_ID, isActive: true, passwordVersion: 0, role: { name: 'user' } }));
+
+        // Act
+        const res = await send('post', '/api/vehicles', { ...NEW_CAR, plate: 'XYZ987' });
+
+        // Assert
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('USER_NOT_FOUND');
+        expect(countVehicles).not.toHaveBeenCalled();
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
     test('the plate is saved in capital letters', async () => {
         // Act
         await send('post', '/api/vehicles', { ...NEW_CAR, plate: 'abc123' });
