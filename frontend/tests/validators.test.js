@@ -1,4 +1,4 @@
-import { isValidEmail, isValidPlate, normalizePhone, isNotEmpty } from '../src/utils/validators';
+import { isValidEmail, isValidPlate, normalizePhone, isNotEmpty, isValidPassword } from '../src/utils/validators';
 
 describe('isValidEmail', () => {
     test('accepts a normal email', () => {
@@ -65,5 +65,40 @@ describe('isNotEmpty', () => {
 
     test.each([undefined, null, '', '   '])('rejects %p', (value) => {
         expect(isNotEmpty(value)).toBe(false);
+    });
+});
+
+// #313: the same rule as the backend (auth.validator.js), which counts the
+// characters with isLength of express-validator
+describe('isValidPassword', () => {
+    test.each([
+        ['A1!aaaaa', 'exactly 8 characters'],
+        ['A1!' + 'a'.repeat(17), 'exactly 20 characters'],
+        ['A1!aaaa😀', '8 characters, one of them an emoji'],
+        ['A1!' + 'a'.repeat(16) + '😀', '20 characters, one of them an emoji'],
+        ['Ab1!' + '😀'.repeat(16), '20 characters, 16 of them emojis'],
+        ['A1!aaaa❤\uFE0F', '8 characters, with an emoji and its variation selector'],
+        ['A1\u2028aaaaa', 'a line separator (U+2028) as the special character'],
+        ['A1\u2029aaaaa', 'a paragraph separator (U+2029) as the special character'],
+    ])('accepts %j (%s)', (password) => {
+        expect(isValidPassword(password)).toBe(true);
+    });
+
+    test.each([
+        ['A1!aaaa', '7 characters'],
+        ['A1!' + 'a'.repeat(18), '21 characters'],
+        ['A1!aaa😀', '7 characters, one of them an emoji'],
+        ['A1!' + 'a'.repeat(17) + '😀', '21 characters, one of them an emoji'],
+        ['A1!aaa❤\uFE0F', '7 characters, with an emoji and its variation selector'],
+        ['a1!aaaaa', 'no uppercase letter'],
+        ['Aa!aaaaa', 'no number'],
+        ['A1aaaaaa', 'no special character'],
+        ['', 'an empty text'],
+    ])('rejects %j (%s)', (password) => {
+        expect(isValidPassword(password)).toBe(false);
+    });
+
+    test.each([undefined, null, 12345678, ['A1!aaaaa']])('rejects %p, which is not text', (value) => {
+        expect(isValidPassword(value)).toBe(false);
     });
 });
