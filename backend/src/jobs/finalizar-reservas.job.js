@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { sequelize, Reserva, Zona, ParkingSpot, Pago } = require('../models');
+const { sequelize, Reserva, Pago } = require('../models');
 const { openStayCharge, paidBeforeBalance } = require('../utils/stayPricing');
 const { safeRollback } = require('../utils/transaction');
 
@@ -18,9 +18,11 @@ async function finalizarReservasVencidas() {
     for (const reserva of vencidas) {
         const t = await sequelize.transaction();
         try {
-            // Read it again using lock, in case another thread has already processed it in the meantime
+            // Read it again using lock, in case another thread has already processed it in the meantime.
+            // #373: an extension saved meanwhile moved its exit time, so the
+            // exit time is checked again too: then it is not finished yet
             const reservaActual = await Reserva.findOne({
-                where: { id: reserva.id, status: 'Active' },
+                where: { id: reserva.id, status: 'Active', endTime: { [Op.lt]: ahora } },
                 transaction: t,
                 lock: t.LOCK.UPDATE,
             });
@@ -30,27 +32,9 @@ async function finalizarReservasVencidas() {
                 continue;
             }
 
-            // #371: the zone is locked before the spot, in the same order as
-            // updateZona, crear and cancelar, so a capacity edit at the same
-            // time waits instead of a deadlock
-            const zona = await Zona.findByPk(reservaActual.zoneId, {
-                transaction: t,
-                lock: t.LOCK.UPDATE,
-            });
-
-            // Release the physical spot — this is the whole point of this job:
-            // without it, a finished (but never re-checked) reservation would
-            // keep its spot Occupied forever
-            if (reservaActual.parkingSpotId) {
-                const cupo = await ParkingSpot.findByPk(reservaActual.parkingSpotId, {
-                    transaction: t,
-                    lock: t.LOCK.UPDATE,
-                });
-                if (cupo && cupo.status === 'Occupied') {
-                    await cupo.update({ status: 'Available' }, { transaction: t });
-                }
-            }
-
+            // #373: the spot is free from the exit time whether this job ran
+            // or not, so no spot or counter of the zone is changed: the job
+            // marks the reservation Finished and charges an open stay
             await reservaActual.update({ status: 'Finished' }, { transaction: t });
 
             // HU-27 AC-10: an open stay not finished in time closes here. Its
@@ -72,10 +56,8 @@ async function finalizarReservasVencidas() {
                 }
             }
 
-            await zona.increment('availableSlots', { by: 1, transaction: t });
-
             await t.commit();
-            console.log(`[finalizar-reservas] Reserva ${reservaActual.id} finalizada, cupo liberado en "${zona.name}"`);
+            console.log(`[finalizar-reservas] Reserva ${reservaActual.id} finalizada`);
         } catch (error) {
             await safeRollback(t);
             console.error(`[finalizar-reservas] Error procesando reserva ${reserva.id}:`, error);

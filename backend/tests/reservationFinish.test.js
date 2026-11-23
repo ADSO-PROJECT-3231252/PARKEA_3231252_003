@@ -21,8 +21,6 @@ const token = jwt.sign({ id: USER_ID, email: 'laura@correo.test', rol: 'user' },
 let transaction;
 let findReservation;
 let createPayment;
-let spot;
-let zona;
 
 const paid = (type, amount) => ({ type, amount, paymentStatus: 'Paid' });
 
@@ -48,10 +46,9 @@ function arrange(reserva = stay(), payments = [paid('initial', '2000.00')]) {
     findReservation = jest.spyOn(Reserva, 'findOne').mockResolvedValue(reserva);
     jest.spyOn(Pago, 'findAll').mockResolvedValue(payments);
     createPayment = jest.spyOn(Pago, 'create').mockResolvedValue({});
-    spot = { id: SPOT_ID, status: 'Occupied', update: jest.fn() };
-    jest.spyOn(ParkingSpot, 'findByPk').mockResolvedValue(spot);
-    zona = { id: ZONE_ID, increment: jest.fn() };
-    jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
+    // Spied on only to check that the spot and the zone do not change (#373)
+    jest.spyOn(ParkingSpot, 'findByPk');
+    jest.spyOn(Zona, 'findByPk');
     return reserva;
 }
 
@@ -77,7 +74,6 @@ afterEach(() => {
 function expectNothingSaved(reserva) {
     expect(reserva.update).not.toHaveBeenCalled();
     expect(createPayment).not.toHaveBeenCalled();
-    expect(zona.increment).not.toHaveBeenCalled();
     expect(transaction.rollback).toHaveBeenCalled();
     expect(transaction.commit).not.toHaveBeenCalled();
 }
@@ -177,32 +173,19 @@ describe('The amount the user confirmed (HU-27, AC-06)', () => {
 });
 
 describe('Finishing an open stay (HU-27, AC-07 to AC-09)', () => {
-    test('it is Finished at this moment, the spot is Available and the zone gets the slot back', async () => {
+    test('it is Finished at this moment, and from then its spot is free with no other change (#373)', async () => {
         // Arrange
         const reserva = arrange();
 
         // Act
         const res = await finish();
 
-        // Assert
+        // Assert: no spot and no zone change, and none is locked
         expect(res.status).toBe(200);
         expect(reserva.update).toHaveBeenCalledWith({ endTime: NOW, status: 'Finished' }, { transaction });
-        expect(spot.update).toHaveBeenCalledWith({ status: 'Available' }, { transaction });
-        expect(zona.increment).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
+        expect(ParkingSpot.findByPk).not.toHaveBeenCalled();
+        expect(Zona.findByPk).not.toHaveBeenCalled();
         expect(transaction.commit).toHaveBeenCalled();
-    });
-
-    test('the zone is locked before the spot, as in a capacity edit, so both at the same time wait instead of a deadlock (#371)', async () => {
-        // Arrange
-        arrange();
-
-        // Act
-        await finish();
-
-        // Assert
-        expect(Zona.findByPk).toHaveBeenCalledWith(ZONE_ID, { transaction, lock: 'UPDATE' });
-        expect(ParkingSpot.findByPk).toHaveBeenCalledWith(SPOT_ID, { transaction, lock: 'UPDATE' });
-        expect(Zona.findByPk.mock.invocationCallOrder[0]).toBeLessThan(ParkingSpot.findByPk.mock.invocationCallOrder[0]);
     });
 
     test('every started hour is charged and what was already paid becomes a pending balance for the rest', async () => {

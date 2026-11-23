@@ -236,8 +236,6 @@ describe.each([
             }
             return next;
         });
-        jest.spyOn(Zona, 'findByPk').mockResolvedValue({ id: ZONE_ID, name: 'Centro', increment: jest.fn() });
-        jest.spyOn(ParkingSpot, 'findByPk').mockResolvedValue(null);
         jest.spyOn(Pago, 'findAll').mockResolvedValue([]);
 
         // Act
@@ -270,12 +268,11 @@ describe.each([
 // again (after the commit) fails
 function zoneThatCannotBeReadAgain(values = {}) {
     const zona = Zona.build(
-        { id: ZONE_ID, ...ZONE, availableSlots: 10, isActive: true, schedules: [], ...values },
+        { id: ZONE_ID, ...ZONE, isActive: true, schedules: [], ...values },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
     jest.spyOn(zona, 'reload').mockRejectedValue(new Error('Connection lost'));
     jest.spyOn(zona, 'update').mockResolvedValue(zona);
-    jest.spyOn(zona, 'decrement').mockResolvedValue(zona);
     return zona;
 }
 

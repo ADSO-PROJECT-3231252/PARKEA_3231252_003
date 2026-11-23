@@ -26,7 +26,7 @@ const send = (method, path, body) => request(app)[method](path).set('Authorizati
 
 // A zone as the model gives it, without a database behind it
 function zoneInstance(values = {}) {
-    const zona = Zona.build({ id: ZONE_ID, ...ZONE, availableSlots: 10, isActive: true, open24h: true, ...values });
+    const zona = Zona.build({ id: ZONE_ID, ...ZONE, isActive: true, open24h: true, ...values });
     jest.spyOn(zona, 'reload').mockResolvedValue(zona);
     jest.spyOn(zona, 'update').mockResolvedValue(zona);
     return zona;

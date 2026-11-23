@@ -1,5 +1,6 @@
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
+const { Op } = require('sequelize');
 const { Zona, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
 const { expirarReservasVencidas } = require('../src/jobs/expirar-reservas.job');
 const { finalizarReservasVencidas } = require('../src/jobs/finalizar-reservas.job');
@@ -14,16 +15,21 @@ let lockReservation;
 let lockZone;
 let lockSpot;
 
-// A reservation of the zone, on its spot, read again with a lock by the job
+// A reservation of the zone, on its spot, read again with a lock by the job.
+// Its exit time passed a minute ago, unless the test changes it.
 function reservation(id, values = {}) {
-    return { id, zoneId: ZONE_ID, parkingSpotId: SPOT_ID, openEnded: false, update: jest.fn(), ...values };
+    return { id, zoneId: ZONE_ID, parkingSpotId: SPOT_ID, openEnded: false, endTime: new Date(Date.now() - 60 * 1000), update: jest.fn(), ...values };
 }
 
 function arrange(found) {
     jest.spyOn(Reserva, 'findAll').mockResolvedValue(found.map(({ id }) => ({ id })));
-    lockReservation = jest.spyOn(Reserva, 'findOne').mockImplementation(async ({ where }) => found.find((r) => r.id === where.id) ?? null);
-    lockZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue({ id: ZONE_ID, name: 'Centro', increment: jest.fn() });
-    lockSpot = jest.spyOn(ParkingSpot, 'findByPk').mockResolvedValue({ id: SPOT_ID, status: 'Occupied', update: jest.fn() });
+    // The locked read finds the reservation only if it still matches the
+    // where of the job: its status and, for the finish job, its exit time
+    lockReservation = jest.spyOn(Reserva, 'findOne').mockImplementation(async ({ where }) => found.find((r) => r.id === where.id
+        && (!where.endTime || r.endTime < where.endTime[Op.lt])) ?? null);
+    // Spied on only to check that the zone and the spot do not change (#373)
+    lockZone = jest.spyOn(Zona, 'findByPk');
+    lockSpot = jest.spyOn(ParkingSpot, 'findByPk');
     jest.spyOn(Pago, 'findAll').mockResolvedValue([]);
 }
 
@@ -38,10 +44,10 @@ afterEach(() => {
 });
 
 describe.each([
-    ['expiration', expirarReservasVencidas, 'Expired'],
-    ['finish', finalizarReservasVencidas, 'Finished'],
-])('The %s job', (_name, runJob, status) => {
-    test(`marks the reservation ${status} and gives the spot and the slot back`, async () => {
+    ['expiration', expirarReservasVencidas, 'Expired', 'Pending'],
+    ['finish', finalizarReservasVencidas, 'Finished', 'Active'],
+])('The %s job (#373)', (_name, runJob, status, before) => {
+    test(`marks the reservation ${status}, with no change to its spot or its zone`, async () => {
         // Arrange
         const reserva = reservation('r1');
         arrange([reserva]);
@@ -49,25 +55,54 @@ describe.each([
         // Act
         await runJob();
 
-        // Assert
+        // Assert: the reservation was read again, locked, with its status
+        expect(lockReservation).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ id: 'r1', status: before }), transaction, lock: 'UPDATE' }));
         expect(reserva.update).toHaveBeenCalledWith({ status }, { transaction });
-        expect((await lockSpot.mock.results[0].value).update).toHaveBeenCalledWith({ status: 'Available' }, { transaction });
-        expect((await lockZone.mock.results[0].value).increment).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
+        expect(lockZone).not.toHaveBeenCalled();
+        expect(lockSpot).not.toHaveBeenCalled();
         expect(transaction.commit).toHaveBeenCalled();
     });
 
-    test('locks the reservation, then the zone and then the spot, as a capacity edit does (zone, then spots) (#371)', async () => {
-        // Arrange
-        arrange([reservation('r1')]);
+    test('a reservation another run already changed is left as it is', async () => {
+        // Arrange: it is found, but read again it no longer has its status
+        arrange([]);
+        jest.spyOn(Reserva, 'findAll').mockResolvedValue([{ id: 'r1' }]);
 
         // Act
         await runJob();
 
         // Assert
-        expect(lockReservation).toHaveBeenCalledWith(expect.objectContaining({ transaction, lock: 'UPDATE' }));
-        expect(lockZone).toHaveBeenCalledWith(ZONE_ID, { transaction, lock: 'UPDATE' });
-        expect(lockSpot).toHaveBeenCalledWith(SPOT_ID, { transaction, lock: 'UPDATE' });
-        expect(lockReservation.mock.invocationCallOrder[0]).toBeLessThan(lockZone.mock.invocationCallOrder[0]);
-        expect(lockZone.mock.invocationCallOrder[0]).toBeLessThan(lockSpot.mock.invocationCallOrder[0]);
+        expect(transaction.rollback).toHaveBeenCalled();
+        expect(transaction.commit).not.toHaveBeenCalled();
+    });
+});
+
+describe('The finish job and an extension at the same time (#373)', () => {
+    test('the locked read checks the exit time again, with the time of the run', async () => {
+        // Arrange
+        arrange([reservation('r1')]);
+
+        // Act
+        await finalizarReservasVencidas();
+
+        // Assert
+        const { where } = lockReservation.mock.calls[0][0];
+        expect(where.endTime[Op.lt]).toBeInstanceOf(Date);
+        expect(where.endTime[Op.lt].getTime()).toBeLessThanOrEqual(Date.now());
+    });
+
+    test('a stay whose exit time an extension moved while the job waited for its lock is not finished', async () => {
+        // Arrange: found with its old exit time, but read again with the lock
+        // it has the new one, an hour from now
+        const reserva = reservation('r1', { endTime: new Date(Date.now() + 60 * 60 * 1000) });
+        arrange([reserva]);
+
+        // Act
+        await finalizarReservasVencidas();
+
+        // Assert
+        expect(reserva.update).not.toHaveBeenCalled();
+        expect(transaction.rollback).toHaveBeenCalled();
+        expect(transaction.commit).not.toHaveBeenCalled();
     });
 });
