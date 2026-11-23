@@ -84,11 +84,17 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
     const navigate = useNavigate();
     // The screen behind may have been loaded before the exit time passed.
     const exitPassed = new Date(reservation.endTime).getTime() <= openedAt;
-    // #373: set when switching to an open stay answered SPOT_RESERVED_LATER:
-    // the spot has another reservation later. 'none' when it is not free
-    // after the current exit time, or the time until it is free.
-    const [spotLimit, setSpotLimit] = useState(null);
-    const [options, setOptions] = useState(() => (exitPassed ? [] : extensionOptions(reservation)));
+    // #373: the spot has another reservation later: 'none' when it is not
+    // free after the current exit time, or the time until it is free. #375:
+    // the API sends it with the reservation (spotFreeUntil), so only the exit
+    // times before that reservation are offered from the start; it is also
+    // set when switching to an open stay answers SPOT_RESERVED_LATER.
+    const [spotLimit, setSpotLimit] = useState(() =>
+        reservation.spotFreeUntil ? (spotFreeUntil(reservation.spotFreeUntil, reservation.endTime) ?? 'none') : null
+    );
+    const [options, setOptions] = useState(() =>
+        exitPassed || spotLimit === 'none' ? [] : extensionOptions(reservation, spotLimit)
+    );
     const [choice, setChoice] = useState(() => options[0] ?? '');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(() => (exitPassed ? translateError('EXIT_TIME_PASSED') : ''));
@@ -105,7 +111,12 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
     }
     let message = `${sentence(`Tu salida actual es ${exitText}`)} Puedes ampliarla ${howFar}y conservas el mismo cupo (${reservation.spotNumber}).`;
     if (exitPassed) message = sentence(`Tu salida era ${exitText}`);
-    else if (spotLimit === 'none') message = sentence(`Tu salida actual es ${exitText}`);
+    else if (spotLimit === 'none') {
+        message = sentence(`Tu salida actual es ${exitText}`);
+        // #375: known from the start, it says why; after an answer of the
+        // API the error says it
+        if (!error) message += ` ${sentence(extendErrorMessage('SPOT_RESERVED_LATER', false, null, { freeUntil: reservation.spotFreeUntil, from: reservation.endTime }))}`;
+    }
 
     const handleClose = () => {
         if (saving) return;
