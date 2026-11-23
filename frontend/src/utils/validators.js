@@ -28,3 +28,9 @@ export const isNotEmpty = (value) => {
 
 // Shared message for empty required fields, so every form says it the same way.
 export const REQUIRED_MESSAGE = 'Este campo es obligatorio.';
+
+// The password rule and its message are shared by sign-up, profile and password reset (#313)
+export const PASSWORD_RULE = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/;
+export const PASSWORD_MESSAGE = 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+
+export const isValidPassword = (password) => PASSWORD_RULE.test(password);

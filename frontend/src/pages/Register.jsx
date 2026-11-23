@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { isValidEmail, isNotEmpty, normalizePhone } from '../utils/validators';
+import { isValidEmail, isNotEmpty, isValidPassword, normalizePhone, PASSWORD_MESSAGE } from '../utils/validators';
 import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { register } from '../services/authService';
 import logo from '../assets/logo.webp';
@@ -91,14 +91,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.password)) {
             newErrors.password = 'La contraseña es obligatoria.';
-        } else if (
-            form.password.length < 8 ||
-            form.password.length > 20 ||
-            !/[A-Z]/.test(form.password) ||
-            !/[0-9]/.test(form.password) ||
-            !/[^A-Za-z0-9]/.test(form.password)
-        ) {
-            newErrors.password = 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+        } else if (!isValidPassword(form.password)) {
+            newErrors.password = PASSWORD_MESSAGE;
         }
 
         if (!isNotEmpty(form.confirmPassword)) {

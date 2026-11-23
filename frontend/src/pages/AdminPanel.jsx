@@ -248,7 +248,7 @@ export default function AdminPanel() {
                                 aria-hidden="true"
                             />
                                 <p className="break-words text-body text-neutral-900">
-                                    {alert.message}
+                                    {`La zona "${alert.zoneName}" ha alcanzado su capacidad máxima.`}
                                 </p>
                             </div>
                             {alert.type === 'zone_full' && (

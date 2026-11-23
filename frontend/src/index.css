@@ -3,7 +3,7 @@
 @source not "../tests";
 
 @theme {
-    /* Verde primario — el 600 es el tono por defecto para botones/links/texto */
+    /* Primary green: 600 is the default shade for buttons, links and text */
     --color-parkea-50: #ECF7F1;
     --color-parkea-100: #D0EADD;
     --color-parkea-200: #A5D6BF;
@@ -15,7 +15,7 @@
     --color-parkea-800: #103728;
     --color-parkea-900: #0A2318;
 
-    /* Semánticos — tono sólido + fondo suave */
+    /* Semantic colors: solid shade + soft background */
     --color-warning: #8A5A0E;
     --color-warning-soft: #FDF3E2;
     --color-danger: #B3261E;
@@ -23,7 +23,7 @@
     --color-info: #1B5FA8;
     --color-info-soft: #EAF1FA;
 
-    /* Neutros */
+    /* Neutrals */
     --color-neutral-50: #F6F8F7;
     --color-neutral-100: #EDEFEE;
     --color-neutral-200: #DCE0DE;
@@ -35,7 +35,7 @@
     --color-neutral-800: #272C2A;
     --color-neutral-900: #161A18;
 
-    /* Dorado — uso puntual */
+    /* Gold: occasional use */
     --color-gold-500: #F5C518;
 
     /* Colombian flag stripes, used on the license plate (VehicleList) */
@@ -45,12 +45,12 @@
     /* Light green at the edges of the 404 picture, so the page around it blends in (NotFound) */
     --color-illustration: #F1F8F1;
 
-    /* Familias tipográficas */
+    /* Font families */
     --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
     --font-sans: "Barlow", system-ui, sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-    /* Escala tipográfica */
+    /* Type scale */
     --text-hero: 4rem;
     /* 64px */
     --text-hero--line-height: 1.1;
@@ -94,7 +94,7 @@
     /* 12.5px */
     --text-caption--line-height: 1.4;
 
-    /* Radios */
+    /* Radii */
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 12px;
