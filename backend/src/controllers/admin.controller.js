@@ -220,7 +220,7 @@ async function getUsuarios(req, res, next) {
 
     const where = {};
 
-        if (search) {
+    if (search) {
       const escapedSearch = String(search).replace(/[\\%_]/g, '\\$&');
       const pattern = `%${escapedSearch}%`;
 
@@ -322,7 +322,7 @@ async function cambiarRol(req, res, next) {
       return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot change your own role' });
     }
 
-     const usuario = await Usuario.findByPk(id, {
+    const usuario = await Usuario.findByPk(id, {
       include: [{ model: Rol, as: 'role' }],
       transaction: t,
       lock: t.LOCK.UPDATE,
