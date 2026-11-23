@@ -11,7 +11,10 @@ In the Access column, **Authenticated** is any signed-in account, **User**
 only an account with the user role and **Admin** only an administrator. The
 vehicles, reservations and payments belong to users: an administrator gets
 403 `FORBIDDEN_ROLE` there (#316). The role is read from the database on
-every request, not from the token.
+every request, not from the token. Creating a reservation and paying it read
+the account again after locking it (#348): if an administrator deactivated it
+or made it administrator while the request waited, it answers 403
+`ACCOUNT_DEACTIVATED` or `FORBIDDEN_ROLE` and saves nothing.
 
 Every error response includes a short `code` field (see
 `src/constants/errorCodes.js`) in addition to the `message`, so the
@@ -212,8 +215,8 @@ zone depend on the hours asked and are not stored.
 | GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: an active zone with no spot free now (HU-22, #373) |
 | GET | `/admin/users?search=&role=&status=&page=&limit=` | Admin | List users with filters, pagination (at most 100 per page), and reservation count per user (HU-23). `search` looks for `%`, `_` and `\` as written (#304) |
 | GET | `/admin/users/logs` | Admin | Last 10 role/status changes made by admins (HU-23) |
-| PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin. The role it already has answers 200 and writes no line in the log (#304) |
-| PATCH | `/admin/users/:id/status` | Admin | Activate/deactivate an account (HU-23). Same protections as above. The status it already has answers 200 and writes no line in the log (#304) |
+| PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin. The role it already has answers 200 and writes no line in the log (#304). An account with an `Active` reservation, a `Pending` one whose 15 minutes to pay are still running, or a balance to pay answers 409 `USER_HAS_OPEN_RESERVATIONS` (#348). Both accounts (the admin and the one changed) are locked first, in the order of their id; if the other admin deactivated this one or removed its role meanwhile, 403 `ACCOUNT_DEACTIVATED` or `FORBIDDEN_ROLE` |
+| PATCH | `/admin/users/:id/status` | Admin | Activate/deactivate an account (HU-23). Same protections as above. The status it already has answers 200 and writes no line in the log (#304). Deactivating has the same 409 `USER_HAS_OPEN_RESERVATIONS` (#348); activating is never blocked |
 
 ### Dashboard ranges (HU-22)
 

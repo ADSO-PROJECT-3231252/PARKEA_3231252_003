@@ -8,6 +8,7 @@ const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
 const { safeRollback } = require('../utils/transaction');
 const availability = require('../services/availability');
+const { pendingBalance } = require('../services/accountOpenItems');
 
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
@@ -113,13 +114,25 @@ async function crear(req, res, next) {
         // the first plain read fixes what the transaction sees, so a plain read
         // before them would hide the reservation the other request just created.
         const usuario = await Usuario.findByPk(userId, {
-            attributes: ['id'],
+            attributes: ['id', 'isActive', 'roleId'],
             transaction: t,
             lock: t.LOCK.UPDATE,
         });
         if (!usuario) {
             await t.rollback();
             return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+        // #348: the session was checked when the request arrived, but an admin
+        // may have deactivated the account or made it administrator while this
+        // request waited at the lock of the user. The locked read is the
+        // account as it is now; a new role means it is no longer a user.
+        if (!usuario.isActive) {
+            await t.rollback();
+            return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
+        }
+        if (usuario.roleId !== req.usuario.roleId) {
+            await t.rollback();
+            return res.status(403).json({ code: ErrorCodes.FORBIDDEN_ROLE, message: 'You do not have permission for this action' });
         }
 
         const vehiculo = await Vehiculo.findOne({
@@ -192,11 +205,7 @@ async function crear(req, res, next) {
         if (isOpenStay && horario.closesAt) end = horario.closesAt;
 
         // HU-27 AC-12: an unpaid balance from an open stay blocks new reservations
-        const saldoPendiente = await Pago.findOne({
-            where: { type: 'balance', paymentStatus: 'Pending' },
-            include: [{ model: Reserva, as: 'reservation', where: { userId }, attributes: [] }],
-            transaction: t,
-        });
+        const saldoPendiente = await pendingBalance(userId, { transaction: t });
         if (saldoPendiente) {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.PENDING_BALANCE, message: 'You have a pending balance. Please pay it before making a new reservation' });

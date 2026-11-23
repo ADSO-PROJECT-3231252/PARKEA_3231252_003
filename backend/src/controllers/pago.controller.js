@@ -1,4 +1,4 @@
-const { Pago, Reserva, Zona } = require('../models');
+const { Pago, Reserva, Zona, Usuario } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
@@ -19,6 +19,28 @@ const crearPago = async (req, res) => {
 
   const t = await sequelize.transaction();
   try {
+    // #348: the account is locked first, like in crear, and read again. A
+    // payment that passed the deadline check could otherwise save the
+    // reservation as Active after an admin changed the role or the status of
+    // the account: the change saw a Pending reservation whose 15 minutes had
+    // ended, which no longer counts. With this lock the change waits for the
+    // payment and then sees the reservation Active (409), or the payment
+    // waits for the change and answers 403. The order is account,
+    // reservation and zone.
+    const cuenta = await Usuario.findByPk(usuarioId, {
+      attributes: ['id', 'isActive', 'roleId'],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!cuenta || !cuenta.isActive) {
+      await t.rollback();
+      return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
+    }
+    if (cuenta.roleId !== req.usuario.roleId) {
+      await t.rollback();
+      return res.status(403).json({ code: ErrorCodes.FORBIDDEN_ROLE, message: 'You do not have permission for this action' });
+    }
+
     const reserva = await Reserva.findByPk(reservationId, { transaction: t, lock: t.LOCK.UPDATE });
     if (!reserva) {
       await t.rollback();
