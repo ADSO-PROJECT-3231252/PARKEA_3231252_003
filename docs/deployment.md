@@ -203,11 +203,25 @@ export DATABASE_URL='mysql://parkeaadmin:<password>@parkea-db-sena.mysql.databas
 npx sequelize-cli db:migrate --env production
 ```
 
-Only on an empty database, load the initial data:
+Only on an empty database, load the initial data. The seeder of the primary administrator needs `PRIMARY_ADMIN_EMAIL` and `PRIMARY_ADMIN_PASSWORD` in the same terminal: demo mode (`SEED_DEMO_ADMIN=true`) never seeds this database, because it is not on your computer. `read -s` asks for the password without showing it or keeping it in the history:
+
+```
+export PRIMARY_ADMIN_EMAIL='admin@parkeaweb.me'
+```
+
+```
+read -rs -p 'Administrator password: ' PRIMARY_ADMIN_PASSWORD && export PRIMARY_ADMIN_PASSWORD
+```
 
 ```
 npx sequelize-cli db:seed:all --env production
 ```
+
+```
+unset PRIMARY_ADMIN_EMAIL PRIMARY_ADMIN_PASSWORD
+```
+
+The password needs 8 to 20 characters, an uppercase letter, a number and a special character. Never write it in the repository or in a chat. If someone else saw it, change it afterwards with "¿Olvidaste tu contraseña?" on the sign-in page: the email reaches the team inbox (see Administrator email).
 
 Always finish with:
 
@@ -233,7 +247,7 @@ Resend only sends from a domain verified in its account, so PARKEA has its own d
 | Resend region | São Paulo (`sa-east-1`) |
 | Sender | `PARKEA <no-reply@parkeaweb.me>` |
 | Click and open tracking | Off, so the recovery link is never rewritten |
-| Receiving | Off. PARKEA only sends emails. |
+| Receiving | Off. PARKEA only sends emails; `admin@parkeaweb.me` is forwarded by Namecheap (see Administrator email). |
 
 ### DNS records
 
@@ -270,6 +284,20 @@ If Resend fails, the daily limit runs out or the domain expires, the site keeps 
 2. Click Apply twice. The API restarts by itself; no deploy is needed.
 
 From then on the emails go to the Mailtrap inbox instead of real inboxes. To go back to Resend, set the values of the backend table in Environment variables again.
+
+### Administrator email
+
+The primary administrator uses `admin@parkeaweb.me`, so its password recovery emails reach the team and not a domain we do not own (#370).
+
+1. **Team inbox:** a Gmail account only for PARKEA, shared by the team. It is not anyone's personal account, because whoever reads it can reset the administrator password. Its password is never written in the repository or in a chat.
+2. **Forwarding:** in Namecheap, in the mail settings of `parkeaweb.me`, forward `admin@parkeaweb.me` to the team inbox. It does not change the Resend records of the table above.
+3. **Hosted administrator:** with a MySQL client connected to `parkea-db-sena`, run once:
+
+    ```sql
+    UPDATE users SET email = 'admin@parkeaweb.me' WHERE is_primary_admin = 1;
+    ```
+
+4. **Check:** on the published site, use "¿Olvidaste tu contraseña?" with `admin@parkeaweb.me` and confirm that the email arrives in the team inbox.
 
 ## Free tier behavior and costs
 
