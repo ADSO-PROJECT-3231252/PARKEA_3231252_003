@@ -168,6 +168,34 @@ describe('"Mis reservas" when the 15 minutes to pay end (#347)', () => {
     });
 });
 
+describe('Keyboard focus when a pending reservation expires (#361)', () => {
+    test.each([
+        ['table', 'tr', PAY_PENDING],
+        ['table', 'tr', CANCEL_PENDING],
+        ['card', 'li', PAY_PENDING],
+        ['card', 'li', CANCEL_PENDING],
+    ])('keeps focus in the same %s (%s) when "%s" disappears', async (
+        _view, containerSelector, actionName,
+    ) => {
+        // Arrange
+        answer([paid, pending]);
+        renderList();
+        const actions = await screen.findAllByRole('button', { name: actionName });
+        const action = actions.find((button) => button.closest(containerSelector));
+        const container = action.closest(containerSelector);
+        const detail = within(container).getByRole('button', { name: DETAIL_PENDING });
+        action.focus();
+        expect(action).toHaveFocus();
+
+        // Act
+        await wait(10 * MINUTE + 100);
+
+        // Assert
+        expect(action).not.toBeInTheDocument();
+        expect(detail).toHaveFocus();
+    });
+});
+
 // #307: the status filter lives in the URL. The address of the screen, and
 // whether the last change replaced it (a filter is not a new page to go back to).
 function CurrentAddress() {
@@ -269,5 +297,46 @@ describe('The status filter in the URL (#307)', () => {
         expect(getReservations).toHaveBeenLastCalledWith({ status: 'All', page: 1, limit: 10 });
         expect(screen.getByText('Cargando reservas…')).toBeInTheDocument();
         expect(screen.queryByText(/^Reserva AAAAAAAA cancelada/)).not.toBeInTheDocument();
+    });
+});
+
+describe('Keyboard focus when a paid stay reaches its exit time (#361)', () => {
+    const endingStay = { ...paid, startTime: at(-30 * MINUTE), endTime: at(MINUTE) };
+    const extendName = 'Ampliar la estadía de la reserva BBBBBBBB en Zona Pagada';
+    const detailName = 'Ver detalle de la reserva BBBBBBBB en Zona Pagada';
+
+    test.each(['tr', 'li'])('moves focus to the detail button in the same %s', async (selector) => {
+        // Arrange
+        answer([pending, endingStay]);
+        renderList();
+        const actions = await screen.findAllByRole('button', { name: extendName });
+        const action = actions.find((button) => button.closest(selector));
+        const container = action.closest(selector);
+        action.focus();
+        expect(action).toHaveFocus();
+
+        // Act
+        await wait(MINUTE + 100);
+
+        // Assert
+        expect(action).not.toBeInTheDocument();
+        expect(within(container).getByRole('button', { name: detailName })).toHaveFocus();
+    });
+
+    test('keeps focus on another reservation when the extend button disappears', async () => {
+        // Arrange
+        answer([pending, endingStay]);
+        renderList();
+        expect(await screen.findAllByRole('button', { name: extendName })).toHaveLength(2);
+        const otherAction = buttons(PAY_PENDING)[0];
+        otherAction.focus();
+        expect(otherAction).toHaveFocus();
+
+        // Act
+        await wait(MINUTE + 100);
+
+        // Assert
+        expect(buttons(extendName)).toHaveLength(0);
+        expect(otherAction).toHaveFocus();
     });
 });

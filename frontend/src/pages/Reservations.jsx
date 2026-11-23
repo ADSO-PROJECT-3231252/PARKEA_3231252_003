@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Car,
@@ -149,6 +149,26 @@ function StatusInfo({ reservation, now }) {
     );
 }
 function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, onExtend, inline = false }) {
+    const detailRef = useRef(null);
+    const restoreFocusRef = useRef(false);
+
+    // React detaches the ref before removing the button from the DOM.
+    const trackExpiringAction = useCallback((button) => {
+        if (!button) return;
+        return () => {
+            if (document.activeElement === button) {
+                restoreFocusRef.current = true;
+            }
+        };
+    }, []);
+
+    useLayoutEffect(() => {
+        if (restoreFocusRef.current) {
+            restoreFocusRef.current = false;
+            detailRef.current?.focus();
+        }
+    });
+
     const canPay = canPayReservation(reservation, now);
     const canCancel = canCancelReservation(reservation, now);
     const canFinish = canFinishStay(reservation, now);
@@ -171,6 +191,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {canPay && (
                 <button
                     type="button"
+                    ref={trackExpiringAction}
                     onClick={() => onPay(reservation.id)}
                     aria-label={`Pagar la ${which}`}
                     className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
@@ -207,6 +228,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {canExtend && (
                 <button
                     type="button"
+                    ref={trackExpiringAction}
                     onClick={() => onExtend(reservation)}
                     aria-label={`Ampliar la estadía de la ${which}`}
                     className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
@@ -220,6 +242,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {canCancel && (
                 <button
                     type="button"
+                    ref={trackExpiringAction}
                     onClick={() => onCancel(reservation)}
                     aria-label={`Cancelar la ${which}`}
                     className={`${base} border-danger text-danger hover:bg-danger-soft`}
@@ -231,6 +254,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {/* AC-07: every entry — including Pending, which the mockup omits — opens its confirmation (HU-15). */}
             <button
                 type="button"
+                ref={detailRef}
                 onClick={() => onViewDetails(reservation.id)}
                 aria-label={`Ver detalle de la ${which}`}
                 className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
