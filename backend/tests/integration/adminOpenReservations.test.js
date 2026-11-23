@@ -197,9 +197,9 @@ describe('A reservation at the same moment as the change (#348)', () => {
     });
 
     test.each([
-        ['made administrator', { roleId: 'admin' }, 'FORBIDDEN_ROLE'],
-        ['deactivated', { isActive: false }, 'ACCOUNT_DEACTIVATED'],
-    ])('a reservation that waits while the account is %s answers 403 %s and saves nothing', async (_case, change, code) => {
+        ['made administrator', 'FORBIDDEN_ROLE', { roleId: 'admin' }],
+        ['deactivated', 'ACCOUNT_DEACTIVATED', { isActive: false }],
+    ])('a reservation that waits while the account is %s answers 403 %s and saves nothing', async (_case, code, change) => {
         // Arrange
         const cuenta = await createUser();
         const values = change.roleId ? { roleId: (await Rol.findOne({ where: { name: 'admin' } })).id } : change;
@@ -312,9 +312,9 @@ describe('A payment at the same moment as the change (#348)', () => {
     });
 
     test.each([
-        ['made administrator', { roleId: 'admin' }, 'FORBIDDEN_ROLE'],
-        ['deactivated', { isActive: false }, 'ACCOUNT_DEACTIVATED'],
-    ])('a payment that waits while the account is %s answers 403 %s and pays nothing', async (_case, change, code) => {
+        ['made administrator', 'FORBIDDEN_ROLE', { roleId: 'admin' }],
+        ['deactivated', 'ACCOUNT_DEACTIVATED', { isActive: false }],
+    ])('a payment that waits while the account is %s answers 403 %s and pays nothing', async (_case, code, change) => {
         // Arrange
         const cuenta = await createUser();
         const reservationId = await pendingReservation(cuenta, 180);
