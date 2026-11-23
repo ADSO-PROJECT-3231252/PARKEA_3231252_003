@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Zona, ParkingSpot } = require('../src/models');
+const { Usuario, Zona, ParkingSpot, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // HU-22 and #373: the occupation and the alerts of the dashboard come from
@@ -15,6 +15,8 @@ const ADMIN_ID = '11111111-1111-4111-8111-111111111111';
 const CENTRO = '22222222-2222-4222-8222-222222222222';
 const NORTE = '55555555-5555-4555-8555-555555555555';
 const adminToken = jwt.sign({ id: ADMIN_ID, email: 'admin@parkea.com', rol: 'admin' }, process.env.JWT_SECRET);
+// The transaction both reads share (#373)
+const TRANSACTION = { id: 'dashboard-reads' };
 const get = (path) => request(app).get(`/api/admin/dashboard/${path}`).set('Authorization', `Bearer ${adminToken}`);
 
 beforeEach(() => {
@@ -27,7 +29,16 @@ beforeEach(() => {
     ]);
     // Centro has 7 spots free now and Norte none
     jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, free: 7 }]);
+    // A managed transaction: it runs the function with its transaction
+    jest.spyOn(sequelize, 'transaction').mockImplementation(async (work) => work(TRANSACTION));
 });
+
+// The zones and their free spots were read in the same transaction
+function expectOneMoment() {
+    expect(sequelize.transaction).toHaveBeenCalledTimes(1);
+    expect(Zona.findAll.mock.calls[0][0].transaction).toBe(TRANSACTION);
+    expect(ParkingSpot.findAll.mock.calls[0][0].transaction).toBe(TRANSACTION);
+}
 
 afterEach(() => {
     jest.useRealTimers();
@@ -51,6 +62,14 @@ describe('GET /api/admin/dashboard/occupancy (HU-22, #373)', () => {
         expect(where.zoneId).toEqual([CENTRO, NORTE]);
         expect(where[Op.and][0].val).toContain("r.start_time < '2026-11-10 15:40:00'");
     });
+
+    test('the zones and their free spots are read in one transaction, so a capacity changed between them never gives a negative number', async () => {
+        // Act
+        await get('occupancy');
+
+        // Assert
+        expectOneMoment();
+    });
 });
 
 describe('GET /api/admin/dashboard/alerts (HU-22, #373)', () => {
@@ -68,6 +87,7 @@ describe('GET /api/admin/dashboard/alerts (HU-22, #373)', () => {
         }]);
         expect(Zona.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { isActive: true } }));
         expect(ParkingSpot.findAll).toHaveBeenCalledTimes(1);
+        expectOneMoment();
     });
 
     test('with spots free in every zone there is no alert', async () => {
