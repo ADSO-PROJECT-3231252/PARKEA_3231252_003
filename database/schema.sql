@@ -1,6 +1,6 @@
 -- PARKEA (SIGMUI) — Official database schema
 -- Written from a database built with the Sequelize migrations in
--- backend/src/migrations (32 migrations, up to
+-- backend/src/migrations (33 migrations, up to
 -- 20261123100200-require-api-required-columns), with SHOW CREATE TABLE, so it
 -- has the same tables, columns, defaults, indexes, foreign keys and CHECK
 -- constraints. The application's database is created with those migrations
@@ -82,6 +82,8 @@ CREATE TABLE `vehicles` (
 
 -- 4. Table: zones
 -- Coordinates are required to locate the zone on a map (HU-25)
+-- The name is unique, also without capitals or accents (zones_name_unique,
+-- #304), so two administrators cannot save the same name at the same time
 -- Zones are never deleted: they are deactivated with is_active = FALSE
 -- open_24h: TRUE for a zone open 24 hours, FALSE when its hours are in
 -- zone_schedules (HU-29). Zones created before HU-29 are open 24 hours
@@ -99,6 +101,7 @@ CREATE TABLE `zones` (
     `is_active` tinyint(1) NOT NULL DEFAULT '1',
     `open_24h` tinyint(1) NOT NULL DEFAULT '1',
     PRIMARY KEY (`id`),
+    UNIQUE KEY `zones_name_unique` (`name`),
     CONSTRAINT `zones_hourly_rate_positive` CHECK ((`hourly_rate` > 0))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
