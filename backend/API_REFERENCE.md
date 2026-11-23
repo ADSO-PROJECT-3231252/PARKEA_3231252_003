@@ -74,9 +74,9 @@ counted only per network, so everyone on that network shares their count
 | GET | `/zones` | Public | List active zones only (HU-09), the ones with the largest share of free spots first. Every zone has `open24h` and its `schedule` (HU-29, see below), and `availableSlots`: the spots free now (#373, see below) |
 | GET | `/zones/all` | Admin | List every zone, active and inactive (HU-19). Each one also has `activeReservations` (its `Pending` and `Active` reservations) and `spotsInUse` (#373: the spots with a `Pending` or `Active` reservation from now on, the least capacity it can have) |
 | GET | `/zones/:id` | Public | Single zone detail. Not filtered by active status, so admins can reach a deactivated zone to edit/reactivate it |
-| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate greater than 0 with at most 2 decimals (#316: a rate of 0 answers 400 `VALIDATION_ERROR` on `hourlyRate`, a negative one `NEGATIVE_VALUE`), and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule` |
+| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate greater than 0 with at most 2 decimals (#316: a rate of 0 answers 400 `VALIDATION_ERROR` on `hourlyRate`, a negative one `NEGATIVE_VALUE`), and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule`. The name must not belong to another zone, without telling capitals or accents apart: 409 `ZONE_NAME_TAKEN`, also when two admins save the same name at the same time (#304, unique index `zones_name_unique`) |
 | PUT | `/zones/:id` | Admin | Edit a zone; adjusts spots if capacity changes (HU-21). Same rules as creation, opening hours included. New hours apply to new reservations and extensions; existing reservations keep their times (HU-29). Lowering the capacity disables only spots with no `Pending` or `Active` reservation from now on, the highest numbers first; below the spots in use it answers 400 `CAPACITY_BELOW_IN_USE` with `spotsInUse` (#373) |
-| PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19) |
+| PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19). The body says the state wanted, `{ "isActive": true }` or `false` (#304): repeating it changes nothing, so two admins who deactivate it at the same time both leave it inactive. Without a real boolean it answers 400 `VALIDATION_ERROR` |
 
 ### Opening hours (HU-29)
 
@@ -210,10 +210,10 @@ zone depend on the hours asked and are not stored.
 | GET | `/admin/dashboard/payments-status?range=today\|week\|month` | Admin | Payment count by status (HU-22) |
 | GET | `/admin/dashboard/recent-payments` | Admin | Last 5 payments (HU-22) |
 | GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: an active zone with no spot free now (HU-22, #373) |
-| GET | `/admin/users?search=&role=&status=&page=&limit=` | Admin | List users with filters, pagination (at most 100 per page), and reservation count per user (HU-23) |
+| GET | `/admin/users?search=&role=&status=&page=&limit=` | Admin | List users with filters, pagination (at most 100 per page), and reservation count per user (HU-23). `search` looks for `%`, `_` and `\` as written (#304) |
 | GET | `/admin/users/logs` | Admin | Last 10 role/status changes made by admins (HU-23) |
-| PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin |
-| PATCH | `/admin/users/:id/status` | Admin | Activate/deactivate an account (HU-23). Same protections as above |
+| PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin. The role it already has answers 200 and writes no line in the log (#304) |
+| PATCH | `/admin/users/:id/status` | Admin | Activate/deactivate an account (HU-23). Same protections as above. The status it already has answers 200 and writes no line in the log (#304) |
 
 ### Dashboard ranges (HU-22)
 

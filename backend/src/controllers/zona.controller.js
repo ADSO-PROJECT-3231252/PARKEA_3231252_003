@@ -139,6 +139,20 @@ async function responderZonaGuardada(res, status, message, zona, availableSlots)
   return res.status(status).json({ message, zone: zona });
 }
 
+// #304: the unique index of zones.name (zones_name_unique) rejected the name.
+// Two requests can pass the check of the name at the same time (two
+// creations, two renames, or one of each); the index lets only the first one
+// save it, and the other one answers 409 like the check does.
+function esNombreRepetido(err) {
+  if (err.name !== 'SequelizeUniqueConstraintError') return false;
+  return Object.keys(err.fields ?? {}).some((field) => {
+    const key = field.split('.').pop();
+    return key === 'name' || key === 'zones_name_unique';
+  });
+}
+
+const NOMBRE_REPETIDO = { code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' };
+
 // POST /api/zones — admin only
 async function createZona(req, res, next) {
   const error = validarZona(req.body) || validarHorario(req.body);
@@ -182,6 +196,9 @@ async function createZona(req, res, next) {
     await t.commit();
   } catch (err) {
     await safeRollback(t);
+    if (esNombreRepetido(err)) {
+      return res.status(409).json(NOMBRE_REPETIDO);
+    }
     return next(err);
   }
 
@@ -309,6 +326,9 @@ async function updateZona(req, res, next) {
     await t.commit();
   } catch (err) {
     await safeRollback(t);
+    if (esNombreRepetido(err)) {
+      return res.status(409).json(NOMBRE_REPETIDO);
+    }
     return next(err);
   }
 
@@ -317,14 +337,22 @@ async function updateZona(req, res, next) {
 }
 
 // PATCH /api/zones/:id/toggle — admin only, activate/deactivate instead of deleting
+// #304: the body says the state wanted ({ isActive: true | false }) and the
+// zone gets it, so two admins who deactivate it at the same time both leave
+// it inactive, instead of the second one activating it again.
 async function toggleZona(req, res, next) {
+  // Without a body, req.body is undefined (Express 5)
+  const isActive = req.body?.isActive;
+  if (typeof isActive !== 'boolean') {
+    return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'isActive', msg: 'isActive must be true or false' }] });
+  }
+
   try {
     const { id } = req.params;
     // #373: the zone is sent as everywhere else, with its free spots, read
     // with it in one moment. They are counted before saving: activating or
     // deactivating does not change them, and if counting fails nothing was
-    // changed, so the request can be repeated (a 500 after saving would make
-    // the retry toggle the zone back).
+    // changed, so the request can be repeated.
     const leida = await enUnMomento(async (transaction) => {
       const encontrada = await Zona.findByPk(id, { include: [CON_HORARIO], transaction });
       return encontrada && { zona: encontrada, disponibles: await availability.availableNow(encontrada.id, { transaction }) };
@@ -334,7 +362,7 @@ async function toggleZona(req, res, next) {
     }
     const { zona, disponibles } = leida;
 
-    await zona.update({ isActive: !zona.isActive });
+    await zona.update({ isActive });
     zona.setDataValue('availableSlots', disponibles);
 
     return res.status(200).json({
