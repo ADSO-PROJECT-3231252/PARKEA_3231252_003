@@ -323,6 +323,32 @@ describe('Keyboard focus when a paid stay reaches its exit time (#361)', () => {
         expect(within(container).getByRole('button', { name: detailName })).toHaveFocus();
     });
 
+    test.each([
+        ['tr', 'Volver'],
+        ['li', 'Escape'],
+    ])('returns to the detail button in the same %s when the extend dialog closes with %s after the exit time', async (selector, way) => {
+        // Arrange: the dialog opens before the exit time
+        answer([pending, endingStay]);
+        renderList();
+        const actions = await screen.findAllByRole('button', { name: extendName });
+        const opener = actions.find((button) => button.closest(selector));
+        const container = opener.closest(selector);
+        opener.focus();
+        fireEvent.click(opener);
+        const back = within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Volver' });
+        expect(back).toHaveFocus();
+
+        // Act: the exit time passes while it is open, and then it closes
+        await wait(MINUTE + 100);
+        expect(opener).not.toBeInTheDocument();
+        if (way === 'Escape') fireEvent.keyDown(document, { key: 'Escape' });
+        else fireEvent.click(back);
+
+        // Assert
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(within(container).getByRole('button', { name: detailName })).toHaveFocus();
+    });
+
     test('keeps focus on another reservation when the extend button disappears', async () => {
         // Arrange
         answer([pending, endingStay]);

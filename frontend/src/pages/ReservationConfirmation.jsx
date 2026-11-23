@@ -855,7 +855,12 @@ export default function ReservationConfirmation() {
                 )}
                 {/* HU-28 AC-01: paid, with an exit time that has not been reached */}
                 {canExtend && (
-                    <button type="button" onClick={() => setExtendOpenedAt(Date.now())} className={primaryAction}>
+                    <button
+                        type="button"
+                        ref={trackExpiringAction}
+                        onClick={() => setExtendOpenedAt(Date.now())}
+                        className={primaryAction}
+                    >
                         <ClockPlus className="h-4 w-4" aria-hidden="true" />
                         Ampliar estadía
                     </button>
@@ -879,6 +884,7 @@ export default function ReservationConfirmation() {
             )}
             {extendOpenedAt !== null && (
                 <ExtendStayDialog
+                    fallbackFocusRef={statusRef}
                     reservation={reservation}
                     hourlyRate={hourlyRate}
                     paid={paidTotal}

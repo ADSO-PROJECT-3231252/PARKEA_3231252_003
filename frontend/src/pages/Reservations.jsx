@@ -229,7 +229,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                 <button
                     type="button"
                     ref={trackExpiringAction}
-                    onClick={() => onExtend(reservation)}
+                    onClick={() => onExtend(reservation, detailRef.current)}
                     aria-label={`Ampliar la estadía de la ${which}`}
                     className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
                 >
@@ -327,7 +327,10 @@ export default function Reservations() {
     // stay in the finish dialog and when it was opened. The message shown
     // after either action (HU-16 AC-06, HU-27 AC-09).
     const [cancelTarget, setCancelTarget] = useState(null);
-    const cancelFallbackRef = useRef(null);
+    // #361: the "Ver detalle" button of the reservation whose cancel or
+    // extend dialog is open. The focus goes back there when the button that
+    // opened the dialog disappeared meanwhile.
+    const actionFallbackRef = useRef(null);
     const headingRef = useRef(null);
     const trackReservationRow = useCallback((row) => {
         if (!row) return;
@@ -427,7 +430,7 @@ export default function Reservations() {
     const handlePay = (id) => navigate(`/reservations/${id}/payment`);
     // HU-16
     const handleCancel = (reservation, detailButton) => {
-        cancelFallbackRef.current = detailButton;
+        actionFallbackRef.current = detailButton;
         setCancelTarget(reservation);
     };
     const handleCancelClose = ({ stale }) => {
@@ -457,7 +460,10 @@ export default function Reservations() {
     };
     // HU-28: a later exit time goes to the payment screen; switching to an
     // open stay reloads the list, where the stay shows without an exit time.
-    const handleExtend = (reservation) => setExtendTarget({ reservation, openedAt: Date.now() });
+    const handleExtend = (reservation, detailButton) => {
+        actionFallbackRef.current = detailButton;
+        setExtendTarget({ reservation, openedAt: Date.now() });
+    };
     const handleExtendClose = ({ stale }) => {
         setExtendTarget(null);
         if (stale) setReloadKey((k) => k + 1);
@@ -789,7 +795,7 @@ text-center text-caption font-medium text-white"
                 )}
             </div>
             <CancelReservationDialog
-                fallbackFocusRef={cancelFallbackRef}
+                fallbackFocusRef={actionFallbackRef}
                 reservation={cancelTarget}
                 onClose={handleCancelClose}
                 onCancelled={handleCancelled}
@@ -805,6 +811,7 @@ text-center text-caption font-medium text-white"
             )}
             {extendTarget && (
                 <ExtendStayDialog
+                    fallbackFocusRef={actionFallbackRef}
                     reservation={extendTarget.reservation}
                     hourlyRate={extendTarget.reservation.appliedHourlyRate}
                     paid={extendTarget.reservation.amount}
