@@ -146,7 +146,7 @@ focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-ne
                                 aria-disabled={loading || undefined}
                                 className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium
 py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2
-focus:ring-offset-2 focus:ring-parkea-600 transition aria-disabled:opacity-60"
+focus:ring-offset-2 focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                             >
                                 {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
                             </button>
