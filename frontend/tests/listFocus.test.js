@@ -149,6 +149,13 @@ describe.each([
         expect(previousButton).not.toBeDisabled();
         expect(previousButton).toHaveFocus();
         expect(screen.getAllByText(firstItem).length).toBeGreaterThan(0);
+
+        // Act: Enter again, now on the first page
+        await user.keyboard('{Enter}');
+
+        // Assert: the first page stays, with the focus on Anterior
+        expect(screen.getAllByText(firstItem).length).toBeGreaterThan(0);
+        expect(previousButton).toHaveFocus();
     });
 });
 
@@ -171,6 +178,13 @@ describe('The focus goes to "Mostrando…" after a page change (#311)', () => {
         // Assert
         expect(await screen.findByText('Mostrando 11 a 20 de 20 usuarios')).toHaveFocus();
 
+        // Act: "Limpiar filtros" has nothing to clear, so it asks for nothing
+        const callsOnSecondPage = getUsers.mock.calls.length;
+        await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+
+        // Assert: still the second page
+        expect(getUsers).toHaveBeenCalledTimes(callsOnSecondPage);
+
         // Act
         await user.click(screen.getByRole('button', { name: 'Página anterior' }));
 
@@ -178,6 +192,14 @@ describe('The focus goes to "Mostrando…" after a page change (#311)', () => {
         expect(await screen.findByText('Mostrando 1 a 10 de 20 usuarios')).toHaveFocus();
         expect(screen.getByRole('button', { name: 'Página anterior' })).toHaveAttribute('aria-disabled', 'true');
         expect(screen.getByRole('button', { name: 'Primera página' })).toHaveAttribute('aria-disabled', 'true');
+
+        // Act: Anterior and Primera página again, now on the first page
+        const callsOnFirstPage = getUsers.mock.calls.length;
+        await user.click(screen.getByRole('button', { name: 'Página anterior' }));
+        await user.click(screen.getByRole('button', { name: 'Primera página' }));
+
+        // Assert: no other page is asked for
+        expect(getUsers).toHaveBeenCalledTimes(callsOnFirstPage);
     });
 
     test('Mis reservas, whose "Mostrando…" is not a live region, so it is read once', async () => {
@@ -202,5 +224,12 @@ describe('The focus goes to "Mostrando…" after a page change (#311)', () => {
         // Assert
         expect(await screen.findByText('Mostrando 1–10 de 20 reservas')).toHaveFocus();
         expect(screen.getByRole('button', { name: 'Anterior' })).toHaveAttribute('aria-disabled', 'true');
+
+        // Act: Anterior again, now on the first page
+        const callsOnFirstPage = getReservations.mock.calls.length;
+        await user.click(screen.getByRole('button', { name: 'Anterior' }));
+
+        // Assert: no other page is asked for
+        expect(getReservations).toHaveBeenCalledTimes(callsOnFirstPage);
     });
 });

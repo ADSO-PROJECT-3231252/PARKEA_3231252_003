@@ -93,6 +93,37 @@ describe('The focus stays when a form gets an error from the API (#311)', () => 
         expect(button).toHaveFocus();
     });
 
+    test('password reset when the server fails: the button keeps the focus', async () => {
+        // Arrange
+        const answer = failLater(resetPassword, apiError(500, 'INTERNAL_ERROR'));
+        const user = userEvent.setup();
+        render(
+            <MemoryRouter initialEntries={[`/reset-password?token=${'a'.repeat(64)}`]}>
+                <ResetPassword />
+            </MemoryRouter>,
+        );
+        await user.type(field('newPassword'), 'Clave123*');
+        await user.type(field('confirmNewPassword'), 'Clave123*');
+        const button = screen.getByRole('button', { name: 'Guardar nueva contraseña' });
+        button.focus();
+
+        // Act: send it, and press Enter again while it waits
+        await user.keyboard('{Enter}');
+        await user.keyboard('{Enter}');
+
+        // Assert: it waits aria-disabled, never disabled
+        expect(resetPassword).toHaveBeenCalledTimes(1);
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        expect(button).not.toBeDisabled();
+
+        // Act
+        await answer();
+
+        // Assert
+        expect(button).not.toHaveAttribute('aria-disabled');
+        expect(button).toHaveFocus();
+    });
+
     test('password reset with a link that is no longer valid: the focus goes to the message', async () => {
         // Arrange
         resetPassword.mockRejectedValue(apiError(400, 'RESET_TOKEN_INVALID'));
