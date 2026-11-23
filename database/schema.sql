@@ -1,18 +1,22 @@
 -- PARKEA (SIGMUI) — Official database schema
--- Mirrors the Sequelize migrations in backend/src/migrations (29 migrations,
--- up to 20261122100200-remove-zone-available-slots). The application's
--- database is created with those migrations and seeders (see README); this
--- file is the readable reference of the same design. The CHECK constraints
--- below document rules that the backend also validates.
+-- Written from a database built with the Sequelize migrations in
+-- backend/src/migrations (33 migrations, up to
+-- 20261123100200-require-api-required-columns), with SHOW CREATE TABLE, so it
+-- has the same tables, columns, defaults, indexes, foreign keys and CHECK
+-- constraints. The application's database is created with those migrations
+-- and seeders (see README); this file is the readable reference of the same
+-- design, and the comments explain each table.
 
 CREATE DATABASE IF NOT EXISTS parkea_db;
 USE parkea_db;
 
 -- 1. Table: roles
-CREATE TABLE roles (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    name ENUM('admin', 'user') NOT NULL UNIQUE
-);
+CREATE TABLE `roles` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `name` enum('admin','user') NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 2. Table: users
 -- Relation: roles (1) - (N) users
@@ -27,22 +31,28 @@ CREATE TABLE roles (
 -- administrator of the seeders are verified
 -- password_version goes up on every password change, and a session token
 -- issued with an older version stops working (#199)
-CREATE TABLE users (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    full_name VARCHAR(100) NOT NULL,
-    email VARCHAR(150) NOT NULL UNIQUE,
-    password VARCHAR(255) NOT NULL,
-    phone VARCHAR(20),
-    document_type ENUM('CC', 'TI', 'CE', 'PASSPORT'),
-    document_number VARCHAR(20) UNIQUE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    is_primary_admin BOOLEAN NOT NULL DEFAULT FALSE,
-    role_id VARCHAR(36) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    email_verified_at DATETIME NULL,
-    password_version INT NOT NULL DEFAULT 0,
-    FOREIGN KEY (role_id) REFERENCES roles(id)
-);
+-- document_number can be NULL only for that case; phone can be NULL because
+-- the administrator of the seeders has none (#372)
+CREATE TABLE `users` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `full_name` varchar(100) NOT NULL,
+    `email` varchar(150) NOT NULL,
+    `password` varchar(255) NOT NULL,
+    `phone` varchar(20) DEFAULT NULL,
+    `role_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `created_at` datetime NOT NULL,
+    `document_type` enum('CC','TI','CE','PASSPORT') NOT NULL,
+    `document_number` varchar(20) DEFAULT NULL,
+    `is_active` tinyint(1) NOT NULL DEFAULT '1',
+    `is_primary_admin` tinyint(1) NOT NULL DEFAULT '0',
+    `email_verified_at` datetime DEFAULT NULL,
+    `password_version` int NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `email` (`email`),
+    UNIQUE KEY `users_document_number_unique` (`document_number`),
+    KEY `role_id` (`role_id`),
+    CONSTRAINT `users_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 3. Table: vehicles
 -- Relation: users (1) - (N) vehicles
@@ -51,42 +61,49 @@ CREATE TABLE users (
 -- plate_active is NULL for deleted vehicles and MySQL allows several NULLs in
 -- a unique index, so a plate is unique only among vehicles that are not
 -- deleted: the plate of a deleted vehicle can be registered again (HU-10, AC-04)
-CREATE TABLE vehicles (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    user_id VARCHAR(36) NOT NULL,
-    plate VARCHAR(20) NOT NULL,
-    vehicle_type ENUM('car', 'motorcycle', 'truck') NOT NULL DEFAULT 'car',
-    brand VARCHAR(50),
-    model VARCHAR(50),
-    color VARCHAR(30),
-    visual_description VARCHAR(255),
-    is_default BOOLEAN NOT NULL DEFAULT FALSE,
-    deleted_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    plate_active VARCHAR(20)
-        GENERATED ALWAYS AS (IF(deleted_at IS NULL, plate, NULL)) STORED,
-    UNIQUE KEY vehicles_plate_active_unique (plate_active),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+CREATE TABLE `vehicles` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `plate` varchar(20) NOT NULL,
+    `brand` varchar(50) NOT NULL,
+    `model` varchar(50) NOT NULL,
+    `color` varchar(30) NOT NULL,
+    `user_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `vehicle_type` enum('car','motorcycle','truck') NOT NULL DEFAULT 'car',
+    `visual_description` varchar(255) DEFAULT NULL,
+    `is_default` tinyint(1) NOT NULL DEFAULT '0',
+    `deleted_at` datetime DEFAULT NULL,
+    `created_at` datetime NOT NULL,
+    `plate_active` varchar(20) GENERATED ALWAYS AS (if((`deleted_at` is null),`plate`,NULL)) STORED,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `vehicles_plate_active_unique` (`plate_active`),
+    KEY `user_id` (`user_id`),
+    CONSTRAINT `vehicles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 4. Table: zones
 -- Coordinates are required to locate the zone on a map (HU-25)
+-- The name is unique, also without capitals or accents (zones_name_unique,
+-- #304), so two administrators cannot save the same name at the same time
 -- Zones are never deleted: they are deactivated with is_active = FALSE
 -- open_24h: TRUE for a zone open 24 hours, FALSE when its hours are in
 -- zone_schedules (HU-29). Zones created before HU-29 are open 24 hours
 -- The free spots are not stored: they depend on the hours asked, and the API
 -- calculates them from the reservations (#373)
-CREATE TABLE zones (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    name VARCHAR(100) NOT NULL,
-    address VARCHAR(255),
-    latitude DECIMAL(10,7),
-    longitude DECIMAL(10,7),
-    total_slots INT NOT NULL DEFAULT 0,
-    hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate > 0),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    open_24h BOOLEAN NOT NULL DEFAULT TRUE
-);
+-- hourly_rate must be greater than 0 (CHECK zones_hourly_rate_positive, #372)
+CREATE TABLE `zones` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `name` varchar(100) NOT NULL,
+    `address` varchar(255) NOT NULL,
+    `total_slots` int NOT NULL DEFAULT '0',
+    `hourly_rate` decimal(10,2) NOT NULL,
+    `latitude` decimal(10,7) NOT NULL,
+    `longitude` decimal(10,7) NOT NULL,
+    `is_active` tinyint(1) NOT NULL DEFAULT '1',
+    `open_24h` tinyint(1) NOT NULL DEFAULT '1',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `zones_name_unique` (`name`),
+    CONSTRAINT `zones_hourly_rate_positive` CHECK ((`hourly_rate` > 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 5. Table: zone_schedules
 -- Relation: zones (1) - (N) zone_schedules
@@ -97,18 +114,21 @@ CREATE TABLE zones (
 -- before it closes
 -- New hours apply to new reservations and extensions: the reservations that
 -- already exist keep their times
-CREATE TABLE zone_schedules (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    zone_id VARCHAR(36) NOT NULL,
-    day_of_week TINYINT NOT NULL CHECK (day_of_week BETWEEN 1 AND 7),
-    opens_at TIME NOT NULL,
-    closes_at TIME NOT NULL,
-    CHECK (TIME_TO_SEC(closes_at) - TIME_TO_SEC(opens_at) >= 30 * 60),
-    CHECK (opens_at >= '00:00:00' AND closes_at <= '23:59:00'),
-    CHECK (SECOND(opens_at) = 0 AND SECOND(closes_at) = 0),
-    UNIQUE KEY zone_schedules_zone_day_unique (zone_id, day_of_week),
-    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
-);
+-- The four rules above are the CHECKs of this table (#372)
+CREATE TABLE `zone_schedules` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `zone_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `day_of_week` tinyint NOT NULL,
+    `opens_at` time NOT NULL,
+    `closes_at` time NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `zone_schedules_zone_day_unique` (`zone_id`,`day_of_week`),
+    CONSTRAINT `zone_schedules_ibfk_1` FOREIGN KEY (`zone_id`) REFERENCES `zones` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `zone_schedules_day_of_week_range` CHECK ((`day_of_week` between 1 and 7)),
+    CONSTRAINT `zone_schedules_open_30_minutes` CHECK (((time_to_sec(`closes_at`) - time_to_sec(`opens_at`)) >= (30 * 60))),
+    CONSTRAINT `zone_schedules_times_in_day` CHECK (((`opens_at` >= '00:00:00') and (`closes_at` <= '23:59:00'))),
+    CONSTRAINT `zone_schedules_whole_minutes` CHECK (((second(`opens_at`) = 0) and (second(`closes_at`) = 0)))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 6. Table: parking_spots
 -- Relation: zones (1) - (N) parking_spots
@@ -118,14 +138,15 @@ CREATE TABLE zone_schedules (
 -- instead, so reservation history keeps its reference intact. A spot is
 -- taken only for the hours of its reservations (#373), so its status only
 -- says whether it can be reserved.
-CREATE TABLE parking_spots (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    zone_id VARCHAR(36) NOT NULL,
-    spot_number INT NOT NULL,
-    status ENUM('Available', 'Disabled') NOT NULL DEFAULT 'Available',
-    UNIQUE KEY parking_spots_zone_spot_unique (zone_id, spot_number),
-    FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
-);
+CREATE TABLE `parking_spots` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `zone_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `spot_number` int NOT NULL,
+    `status` enum('Available','Disabled') NOT NULL DEFAULT 'Available',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `parking_spots_zone_spot_unique` (`zone_id`,`spot_number`),
+    CONSTRAINT `parking_spots_ibfk_1` FOREIGN KEY (`zone_id`) REFERENCES `zones` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 7. Table: reservations
 -- Relations: users (1) - (N) | zones (1) - (N) | vehicles (1) - (N) | parking_spots (1) - (N)
@@ -145,30 +166,36 @@ CREATE TABLE parking_spots (
 -- tells it apart from a reservation with an exit time
 -- Foreign keys use RESTRICT so removing a user, zone, vehicle, or spot can
 -- never destroy the booking history
-CREATE TABLE reservations (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    user_id VARCHAR(36) NOT NULL,
-    zone_id VARCHAR(36) NOT NULL,
-    vehicle_id VARCHAR(36) NOT NULL,
-    parking_spot_id VARCHAR(36) NULL,
-    spot_number INT NOT NULL,
-    start_time DATETIME NOT NULL,
-    end_time DATETIME NOT NULL,
-    hold_expires_at DATETIME NULL,
-    applied_hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0,
-    status ENUM('Pending', 'Active', 'Finished', 'Cancelled', 'Expired')
-        NOT NULL DEFAULT 'Pending',
-    open_ended BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT reservations_user_id_fk FOREIGN KEY (user_id)
-        REFERENCES users(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT reservations_zone_id_fk FOREIGN KEY (zone_id)
-        REFERENCES zones(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT reservations_vehicle_id_fk FOREIGN KEY (vehicle_id)
-        REFERENCES vehicles(id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT reservations_parking_spot_id_fk FOREIGN KEY (parking_spot_id)
-        REFERENCES parking_spots(id) ON DELETE RESTRICT,
-    KEY reservations_spot_status_times_idx (parking_spot_id, status, start_time, end_time)
-);
+-- The two jobs find, every minute, the Pending reservations whose 15 minutes
+-- ended and the Active ones whose time ended, with the indexes on status and
+-- hold_expires_at and on status and end_time (#372)
+-- applied_hourly_rate has no default: a reservation without its rate fails
+-- instead of charging nothing (#372)
+CREATE TABLE `reservations` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `user_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `zone_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `vehicle_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `start_time` datetime NOT NULL,
+    `end_time` datetime NOT NULL,
+    `spot_number` int NOT NULL,
+    `status` enum('Pending','Active','Finished','Cancelled','Expired') NOT NULL DEFAULT 'Pending',
+    `hold_expires_at` datetime DEFAULT NULL,
+    `applied_hourly_rate` decimal(10,2) NOT NULL,
+    `parking_spot_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+    `open_ended` tinyint(1) NOT NULL DEFAULT '0',
+    PRIMARY KEY (`id`),
+    KEY `reservations_vehicle_id_fk` (`vehicle_id`),
+    KEY `reservations_user_id_fk` (`user_id`),
+    KEY `reservations_zone_id_fk` (`zone_id`),
+    KEY `reservations_spot_status_times_idx` (`parking_spot_id`,`status`,`start_time`,`end_time`),
+    KEY `reservations_status_hold_expires_at_idx` (`status`,`hold_expires_at`),
+    KEY `reservations_status_end_time_idx` (`status`,`end_time`),
+    CONSTRAINT `reservations_parking_spot_id_foreign_idx` FOREIGN KEY (`parking_spot_id`) REFERENCES `parking_spots` (`id`) ON DELETE RESTRICT,
+    CONSTRAINT `reservations_user_id_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT `reservations_vehicle_id_fk` FOREIGN KEY (`vehicle_id`) REFERENCES `vehicles` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT `reservations_zone_id_fk` FOREIGN KEY (`zone_id`) REFERENCES `zones` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 8. Table: payments
 -- Relation: reservations (1) - (N) payments
@@ -181,22 +208,24 @@ CREATE TABLE reservations (
 -- same pattern as plate_active on vehicles
 -- The full card number is never stored, only the last four digits
 -- RESTRICT keeps a reservation from being deleted while it has a payment
-CREATE TABLE payments (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    reservation_id VARCHAR(36) NOT NULL,
-    amount DECIMAL(10,2) NOT NULL CHECK (amount >= 0),
-    payment_status ENUM('Pending', 'Paid', 'Cancelled', 'Refunded')
-        NOT NULL DEFAULT 'Pending',
-    payment_method ENUM('card', 'pse'),
-    card_last_four VARCHAR(4),
-    paid_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    type ENUM('initial', 'extension', 'balance') NOT NULL DEFAULT 'initial',
-    initial_reservation_id VARCHAR(36)
-        GENERATED ALWAYS AS (IF(type = 'initial', reservation_id, NULL)) STORED,
-    UNIQUE KEY payments_initial_reservation_unique (initial_reservation_id),
-    FOREIGN KEY (reservation_id) REFERENCES reservations(id) ON DELETE RESTRICT
-);
+-- amount is never negative (CHECK payments_amount_not_negative, SRS 3.5, #372)
+CREATE TABLE `payments` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `reservation_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `amount` decimal(10,2) NOT NULL,
+    `payment_status` enum('Pending','Paid','Cancelled','Refunded') NOT NULL DEFAULT 'Pending',
+    `payment_method` enum('card','pse') DEFAULT NULL,
+    `card_last_four` varchar(4) DEFAULT NULL,
+    `paid_at` datetime DEFAULT NULL,
+    `created_at` datetime NOT NULL,
+    `type` enum('initial','extension','balance') NOT NULL DEFAULT 'initial',
+    `initial_reservation_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin GENERATED ALWAYS AS (if((`type` = _utf8mb4'initial'),rtrim(`reservation_id`),NULL)) STORED,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `payments_initial_reservation_unique` (`initial_reservation_id`),
+    KEY `payments_reservation_id` (`reservation_id`),
+    CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`reservation_id`) REFERENCES `reservations` (`id`),
+    CONSTRAINT `payments_amount_not_negative` CHECK ((`amount` >= 0))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 9. Table: password_reset_tokens
 -- Relation: users (1) - (N) password_reset_tokens
@@ -204,15 +233,19 @@ CREATE TABLE payments (
 -- Only the hash of the token is stored, never the token itself
 -- A new link, a reset or a password change from the profile marks the other
 -- links of the account as used (#199)
-CREATE TABLE password_reset_tokens (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    user_id VARCHAR(36) NOT NULL,
-    token_hash VARCHAR(255) NOT NULL,
-    expires_at DATETIME NOT NULL,
-    used_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+-- Opening a link looks the hash up in its index (#372)
+CREATE TABLE `password_reset_tokens` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `user_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `token_hash` varchar(255) NOT NULL,
+    `expires_at` datetime NOT NULL,
+    `used_at` datetime DEFAULT NULL,
+    `created_at` datetime NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `user_id` (`user_id`),
+    KEY `password_reset_tokens_token_hash_idx` (`token_hash`),
+    CONSTRAINT `password_reset_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 10. Table: email_verification_tokens
 -- Relation: users (1) - (N) email_verification_tokens
@@ -221,29 +254,34 @@ CREATE TABLE password_reset_tokens (
 -- new password set with a recovery link also marks them as used
 -- Only the SHA-256 hash of the token is stored (64 characters), never the
 -- token itself; opening a link looks the hash up in the unique index
-CREATE TABLE email_verification_tokens (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    user_id VARCHAR(36) NOT NULL,
-    token_hash VARCHAR(64) NOT NULL,
-    expires_at DATETIME NOT NULL,
-    used_at DATETIME NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY email_verification_tokens_token_hash (token_hash),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+CREATE TABLE `email_verification_tokens` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `user_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `token_hash` varchar(64) NOT NULL,
+    `expires_at` datetime NOT NULL,
+    `used_at` datetime DEFAULT NULL,
+    `created_at` datetime NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `email_verification_tokens_token_hash` (`token_hash`),
+    KEY `user_id` (`user_id`),
+    CONSTRAINT `email_verification_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- 11. Table: admin_action_logs
 -- Relation: users (1) - (N) admin_action_logs, twice (admin and target)
 -- Audit trail of role and account-status changes made by administrators
 -- (HU-23, AC-14). RESTRICT keeps the trail even if an account is removed
-CREATE TABLE admin_action_logs (
-    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
-    admin_id VARCHAR(36) NOT NULL,
-    target_user_id VARCHAR(36) NOT NULL,
-    action ENUM('role_changed', 'status_changed') NOT NULL,
-    details VARCHAR(255) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX admin_action_logs_created_at_idx (created_at),
-    FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE RESTRICT,
-    FOREIGN KEY (target_user_id) REFERENCES users(id) ON DELETE RESTRICT
-);
+CREATE TABLE `admin_action_logs` (
+    `id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `admin_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `target_user_id` char(36) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+    `action` enum('role_changed','status_changed') NOT NULL,
+    `details` varchar(255) NOT NULL,
+    `created_at` datetime NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `admin_id` (`admin_id`),
+    KEY `target_user_id` (`target_user_id`),
+    KEY `admin_action_logs_created_at_idx` (`created_at`),
+    CONSTRAINT `admin_action_logs_ibfk_1` FOREIGN KEY (`admin_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
+    CONSTRAINT `admin_action_logs_ibfk_2` FOREIGN KEY (`target_user_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
