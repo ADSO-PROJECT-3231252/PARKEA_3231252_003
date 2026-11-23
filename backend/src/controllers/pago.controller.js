@@ -1,8 +1,9 @@
-const { Pago, Reserva } = require('../models');
+const { Pago, Reserva, Zona } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
+const { firstPaymentAmount } = require('../utils/stayPricing');
 const { safeRollback } = require('../utils/transaction');
 
 // POST /api/payments/:reservationId
@@ -27,6 +28,13 @@ const crearPago = async (req, res) => {
       await t.rollback();
       return res.status(403).json({ code: ErrorCodes.RESERVATION_NOT_OWNED, message: 'This reservation does not belong to you' });
     }
+    // #373: the zone is locked after the reservation, like in ampliar, so a
+    // new reservation or a lower capacity of the zone waits until this payment
+    // ends. The deadline is checked after the lock, with the time of that
+    // moment: a reservation saved while this payment waited already counted
+    // this one as expired, so it must not be paid and take the spot back.
+    await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+
     // The deadline decides whether it can still be paid, even if the job has
     // not marked it Expired yet (HU-26, AC-06)
     if (countsAsExpired(reserva)) {
@@ -51,10 +59,8 @@ const crearPago = async (req, res) => {
     }
 
     // HU-27 AC-03: an open stay is confirmed by paying its first hour
-    const horas = reserva.openEnded
-      ? 1
-      : (new Date(reserva.endTime) - new Date(reserva.startTime)) / (1000 * 60 * 60);
-    const amount = Number((horas * Number(reserva.appliedHourlyRate)).toFixed(2));
+    // (#373: the same amount the confirmation and the list show)
+    const amount = firstPaymentAmount(reserva);
 
     const pago = await Pago.create({
       reservationId: reserva.id,

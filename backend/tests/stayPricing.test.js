@@ -1,4 +1,4 @@
-const { chargedHours, provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../src/utils/stayPricing');
+const { chargedHours, provisionalEndTime, openStayCharge, paidBeforeBalance, firstPaymentAmount, extensionCharge } = require('../src/utils/stayPricing');
 
 // HU-27: open stays are charged per started hour, with the first hour as the
 // minimum and 24 hours as the maximum.
@@ -172,6 +172,31 @@ describe('paidBeforeBalance (HU-28)', () => {
         // Act / Assert
         expect(paidBeforeBalance(reserva, [])).toBe(2500);
         expect(paidBeforeBalance(reserva)).toBe(2500);
+    });
+});
+
+describe('firstPaymentAmount: the first payment of a reservation (HU-17, #373)', () => {
+    const reservation = (minutes, values = {}) => ({ startTime: START, endTime: after(minutes), appliedHourlyRate: '2500.00', openEnded: false, ...values });
+
+    test.each([
+        { label: '30 minutes', minutes: 30, amount: 1250 },
+        { label: '2 hours', minutes: 120, amount: 5000 },
+        { label: '1 hour and 20 minutes', minutes: 80, amount: 3333.33 },
+        { label: '24 hours', minutes: 24 * 60, amount: 60000 },
+    ])('$label cost the time of the stay at the stored rate: $ $amount', ({ minutes, amount }) => {
+        // Act
+        const result = firstPaymentAmount(reservation(minutes));
+
+        // Assert
+        expect(result).toBe(amount);
+    });
+
+    test('an open stay pays its first hour, whatever its provisional exit time (HU-27 AC-03)', () => {
+        // Act
+        const result = firstPaymentAmount(reservation(24 * 60, { openEnded: true }));
+
+        // Assert
+        expect(result).toBe(2500);
     });
 });
 

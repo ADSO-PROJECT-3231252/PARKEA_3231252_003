@@ -274,13 +274,29 @@ describe('Paying an extension (HU-28, AC-04 to AC-06)', () => {
         // Act
         await payByCard(colombia('10:00'));
 
-        // Assert
+        // Assert: the reservations that hold their spot, the rule of the
+        // availability service (#373)
         const { where } = findReservation.mock.calls[1][0];
         expect(where.id[Op.ne]).toBe(RESERVATION_ID);
         expect(where.vehicleId).toBe(VEHICLE_ID);
-        expect(where.status).toEqual(['Pending', 'Active']);
+        expect(where.status).toBeUndefined();
+        expect(where[Op.and][0][Op.or][0]).toEqual({ status: 'Active' });
         expect(where.startTime[Op.lt]).toEqual(colombia('10:00'));
         expect(where.endTime[Op.gt]).toEqual(colombia('09:00'));
+    });
+
+    test('a Pending reservation of the vehicle whose 15 minutes ended does not count, even before the job runs (#373)', async () => {
+        // Arrange
+        arrange();
+
+        // Act
+        await payByCard(colombia('10:00'));
+
+        // Assert: Pending counts only with its deadline still ahead (or none)
+        const { where } = findReservation.mock.calls[1][0];
+        const [, pending] = where[Op.and][0][Op.or];
+        expect(pending.status).toBe('Pending');
+        expect(pending[Op.or]).toEqual([{ holdExpiresAt: null }, { holdExpiresAt: { [Op.gt]: NOW } }]);
     });
 
     test('the vehicle is locked before the zone is read and before the overlap check', async () => {
@@ -295,6 +311,17 @@ describe('Paying an extension (HU-28, AC-04 to AC-06)', () => {
         const vehicleLocked = lockVehicle.mock.invocationCallOrder[0];
         expect(vehicleLocked).toBeLessThan(readZone.mock.invocationCallOrder[0]);
         expect(vehicleLocked).toBeLessThan(findReservation.mock.invocationCallOrder[1]);
+    });
+
+    test('the zone is locked, like when a reservation is created, so both wait for each other (#373)', async () => {
+        // Arrange
+        arrange();
+
+        // Act
+        await payByCard(colombia('10:00'));
+
+        // Assert
+        expect(readZone).toHaveBeenCalledWith(ZONE_ID, expect.objectContaining({ transaction, lock: 'UPDATE' }));
     });
 
     test('20 minutes more are charged as 1 hour, with the card, and the new exit time is saved', async () => {
@@ -330,6 +357,83 @@ describe('Paying an extension (HU-28, AC-04 to AC-06)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(createPayment).toHaveBeenCalledWith(expect.objectContaining({ amount: 6000, paymentMethod: 'pse', cardLastFour: null }), { transaction });
+    });
+});
+
+describe('The spot of the stay in the added time (HU-28 AC-05, #373)', () => {
+    const SPOT_ID = '55555555-5555-4555-8555-555555555555';
+
+    // A stay in spot 1, and what the next findOne answers: the overlap of
+    // the vehicle (none) and then the next reservation of the same spot
+    function arrangeSpot(nextOfSpot, values = {}) {
+        const reserva = arrange(stay({ parkingSpotId: SPOT_ID, ...values }));
+        findReservation.mockReset()
+            .mockResolvedValueOnce(reserva)
+            .mockResolvedValueOnce(null)
+            .mockResolvedValueOnce(nextOfSpot);
+        return reserva;
+    }
+
+    test('another reservation of the same spot in the added time answers 409 SPOT_RESERVED_LATER, with until when it is free', async () => {
+        // Arrange: the spot is reserved again from 11:00 a. m.
+        const reserva = arrangeSpot({ id: 'next', startTime: colombia('11:00') });
+
+        // Act
+        const res = await payByCard(colombia('11:00'));
+
+        // Assert: free until 10 minutes before
+        expect(res.status).toBe(409);
+        expect(res.body).toMatchObject({ code: 'SPOT_RESERVED_LATER', freeUntil: colombia('10:50').toISOString() });
+        expect(res.body.message).toContain(colombia('10:50').toISOString());
+        expectNothingSaved(reserva);
+    });
+
+    test('the spot check looks at the same spot from the current exit time to the new one, with 10 minutes, without this stay', async () => {
+        // Arrange
+        arrangeSpot(null);
+
+        // Act
+        const res = await payByCard(colombia('10:00'));
+
+        // Assert
+        expect(res.status).toBe(200);
+        const { where } = findReservation.mock.calls[2][0];
+        expect(where).toMatchObject({
+            id: { [Op.ne]: RESERVATION_ID },
+            parkingSpotId: SPOT_ID,
+            startTime: { [Op.lt]: colombia('10:10') },
+            endTime: { [Op.gt]: colombia('08:50') },
+        });
+        // The vehicle is locked and the zone is read before it
+        expect(readZone.mock.invocationCallOrder[0]).toBeLessThan(findReservation.mock.invocationCallOrder[2]);
+    });
+
+    test('the spot is checked after the overlap of the vehicle and before the payment, so a declined card is not even asked', async () => {
+        // Arrange
+        const reserva = arrangeSpot({ id: 'next', startTime: colombia('09:30') });
+
+        // Act: 0002 is the card that is always declined
+        const res = await payByCard(colombia('10:00'), '0002');
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('SPOT_RESERVED_LATER');
+        expectNothingSaved(reserva);
+    });
+
+    test('switching to an open stay needs the spot free until the provisional exit time', async () => {
+        // Arrange: the spot is reserved again tomorrow at 6:00 a. m.
+        const reserva = arrangeSpot({ id: 'next', startTime: colombia('06:00', '2026-11-17') });
+
+        // Act
+        const res = await extend({ openEnded: true });
+
+        // Assert: the open stay would hold it until 7:00 a. m. of tomorrow
+        expect(res.status).toBe(409);
+        expect(res.body).toMatchObject({ code: 'SPOT_RESERVED_LATER', freeUntil: colombia('05:50', '2026-11-17').toISOString() });
+        const { where } = findReservation.mock.calls[2][0];
+        expect(where.startTime[Op.lt]).toEqual(colombia('07:10', '2026-11-17'));
+        expectNothingSaved(reserva);
     });
 });
 

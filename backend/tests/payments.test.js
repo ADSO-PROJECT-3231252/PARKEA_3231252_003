@@ -3,7 +3,7 @@ const request = require('supertest');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Reserva, Pago, sequelize } = require('../src/models');
+const { Usuario, Reserva, Pago, Zona, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // HU-17: paying a reservation, and HU-27: paying the balance of an open stay.
@@ -16,11 +16,13 @@ const MINUTE = 60 * 1000;
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OTHER_USER_ID = '66666666-6666-4666-8666-666666666666';
 const RESERVATION_ID = '44444444-4444-4444-8444-444444444444';
+const ZONE_ID = '22222222-2222-4222-8222-222222222222';
 const token = jwt.sign({ id: USER_ID, email: 'laura@correo.test', rol: 'user' }, process.env.JWT_SECRET);
 
 let transaction;
 let startTransaction;
 let findReservation;
+let lockZone;
 let findPayment;
 let createPayment;
 
@@ -30,6 +32,7 @@ function reservation(values = {}) {
     return {
         id: RESERVATION_ID,
         userId: USER_ID,
+        zoneId: ZONE_ID,
         status: 'Pending',
         openEnded: false,
         startTime: colombia('10:00'),
@@ -43,6 +46,7 @@ function reservation(values = {}) {
 
 function arrange(reserva = reservation(), payment = null) {
     findReservation = jest.spyOn(Reserva, 'findByPk').mockResolvedValue(reserva);
+    lockZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue({ id: ZONE_ID });
     findPayment = jest.spyOn(Pago, 'findOne').mockResolvedValue(payment);
     createPayment = jest.spyOn(Pago, 'create').mockImplementation(async (values) => ({ id: 'payment-1', ...values }));
     return reserva;
@@ -143,6 +147,40 @@ describe('When a reservation can be paid (HU-17, HU-26)', () => {
 
         // Assert
         expect(findReservation).toHaveBeenCalledWith(RESERVATION_ID, { transaction, lock: 'UPDATE' });
+    });
+
+    test('then the zone is locked, like in ampliar, so a new reservation of the zone waits for the payment (#373)', async () => {
+        // Arrange
+        arrange();
+
+        // Act
+        await pay(CARD);
+
+        // Assert
+        expect(lockZone).toHaveBeenCalledWith(ZONE_ID, { transaction, lock: 'UPDATE' });
+        expect(findReservation.mock.invocationCallOrder[0]).toBeLessThan(lockZone.mock.invocationCallOrder[0]);
+        expect(lockZone.mock.invocationCallOrder[0]).toBeLessThan(createPayment.mock.invocationCallOrder[0]);
+    });
+
+    test('the deadline is checked after the zone lock: if the 15 minutes end while it waits, it answers 400 RESERVATION_EXPIRED (#373)', async () => {
+        // Arrange: 2 minutes left to pay, and the lock of the zone takes 3,
+        // because a new reservation of the zone holds it. That reservation
+        // already counted this one as expired and may have taken its spot.
+        const reserva = arrange(reservation({ holdExpiresAt: new Date(NOW.getTime() + 2 * MINUTE) }));
+        lockZone.mockImplementation(async () => {
+            jest.setSystemTime(new Date(NOW.getTime() + 3 * MINUTE));
+            return { id: ZONE_ID };
+        });
+
+        // Act
+        const res = await pay(CARD);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('RESERVATION_EXPIRED');
+        expect(createPayment).not.toHaveBeenCalled();
+        expect(reserva.save).not.toHaveBeenCalled();
+        expect(transaction.rollback).toHaveBeenCalled();
     });
 
     test('a reservation with status Expired answers 400 RESERVATION_EXPIRED', async () => {
