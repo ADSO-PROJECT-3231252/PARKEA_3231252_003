@@ -394,14 +394,16 @@ test('keeps focus on the cancellation message after the refreshed list removes t
     await act(async () => {
         resolveRefresh({
             data: {
-                reservations: [{ ...pending, status: 'Canceled' }],
+                reservations: [{ ...pending, status: 'Cancelled' }],
                 pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
             },
         });
     });
 
-    // Assert
+    // Assert: the row of the table and the card of a phone both show it
     expect(buttons(CANCEL_PENDING)).toHaveLength(0);
+    expect(screen.getByRole('row', { name: /AAAAAAAA/ })).toHaveTextContent('Cancelada');
+    expect(screen.getAllByRole('listitem').find((item) => item.textContent.includes('AAAAAAAA'))).toHaveTextContent('Cancelada');
     expect(message).toHaveFocus();
 });
 
@@ -429,14 +431,15 @@ test('focuses the same reservation details when its cancel action expires while 
     expect(within(row).getByRole('button', { name: DETAIL_PENDING })).toHaveFocus();
 });
 
-test('focuses the list heading when a refresh removes the reservation after a cancellation error (#361)', async () => {
+test.each(['tr', 'li'])('focuses the list heading when a refresh removes the reservation of the %s after a cancellation error (#361)', async (selector) => {
     // Arrange
     answer([paid, pending]);
     cancelReservation.mockRejectedValueOnce({
         response: { status: 404, data: { code: 'RESERVATION_NOT_FOUND' } },
     });
     renderList();
-    const [opener] = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    const actions = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    const opener = actions.find((button) => button.closest(selector));
     opener.focus();
     fireEvent.click(opener);
 
