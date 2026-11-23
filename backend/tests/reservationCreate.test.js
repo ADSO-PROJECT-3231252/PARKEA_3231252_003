@@ -7,6 +7,17 @@ const { Op } = require('sequelize');
 const { Usuario, Vehiculo, Zona, ZoneSchedule, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
 const app = require('../src/app');
 
+// The where of a reservation that holds its spot at `now`, the rule of the
+// availability service (#373): Active, or Pending with its 15 minutes running
+function expectHoldsItsSpot(where, now) {
+    expect(where.status).toBeUndefined();
+    const [rule] = where[Op.and];
+    const [active, pending] = rule[Op.or];
+    expect(active).toEqual({ status: 'Active' });
+    expect(pending.status).toBe('Pending');
+    expect(pending[Op.or][1].holdExpiresAt[Op.gt]).toEqual(now);
+}
+
 // HU-14: creating a reservation. The zone is open 24 hours here; the opening
 // hours are tested in reservationHours.test.js. The times are in Colombia
 // (UTC-5), and "now" is Monday 2026-11-16 at 8:00 a. m.
@@ -254,16 +265,27 @@ describe('What a new reservation needs (HU-14)', () => {
         expectNothingSaved();
     });
 
-    test('the overlap check looks at the pending and active reservations of the vehicle in that time range', async () => {
+    test('the overlap check looks at the reservations of the vehicle that hold their spot in that time range', async () => {
         // Act
         await book();
 
         // Assert: it starts before this one ends and ends after this one starts
         const { where } = findOverlap.mock.calls[0][0];
         expect(where.vehicleId).toBe(VEHICLE_ID);
-        expect(where.status).toEqual(['Pending', 'Active']);
+        expectHoldsItsSpot(where, NOW);
         expect(where.startTime[Op.lt]).toEqual(colombia('12:00'));
         expect(where.endTime[Op.gt]).toEqual(colombia('10:00'));
+    });
+
+    test('a Pending reservation of the vehicle whose 15 minutes ended does not count, even before the job runs (#373)', async () => {
+        // Act
+        await book();
+
+        // Assert: Active, or Pending with its deadline still ahead (or none)
+        const { where } = findOverlap.mock.calls[0][0];
+        const [, pending] = where[Op.and][0][Op.or];
+        expect(pending.status).toBe('Pending');
+        expect(pending[Op.or]).toEqual([{ holdExpiresAt: null }, { holdExpiresAt: { [Op.gt]: NOW } }]);
     });
 
     test('a full zone answers 409 NO_SPOTS_AVAILABLE', async () => {

@@ -164,11 +164,13 @@ async function crear(req, res, next) {
         }
 
         // Reject if this vehicle already has a Pending/Active reservation
-        // that overlaps the requested time range
+        // that overlaps the requested time range. #373: with the same rule as
+        // the spots, so a Pending one whose 15 minutes ended does not count,
+        // even before the job marks it Expired (#347)
         const solapada = await Reserva.findOne({
             where: {
                 vehicleId,
-                status: ['Pending', 'Active'],
+                [Op.and]: [availability.holdsItsSpot(now)],
                 startTime: { [Op.lt]: end },
                 endTime: { [Op.gt]: start },
             },
