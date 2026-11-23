@@ -7,29 +7,21 @@ const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulate
 const { checkStay, latestExit, hoursOfStart } = require('../utils/zoneHours');
 const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
 const { safeRollback } = require('../utils/transaction');
+const { STAY_MAX_MS, checkStayTimes, outsideHoursError } = require('../utils/stayRequest');
 const availability = require('../services/availability');
 const { pendingBalance } = require('../services/accountOpenItems');
 
-const DURACION_MIN_MS = 30 * 60 * 1000;
-const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
-const ANTICIPACION_MAX_MS = 48 * 60 * 60 * 1000;
 const MAX_PENDING_RESERVATIONS = 2;
 
 // HU-29: the zone is read with its opening hours
 const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
 
-// HU-29 (AC-03, AC-05): a stay that does not fit the hours of its day. The
-// answer carries the hours of that day ({ day, opensAt, closesAt } or
-// { day, closed: true }), so the screen can show them.
+// HU-29 (AC-03, AC-05): a stay that does not fit the hours of its day, with
+// the hours of that day (utils/stayRequest.js, shared with GET
+// /zones/:id/availability, #375)
 function fueraDeHorario(res, hours) {
-    if (hours.closed) {
-        return res.status(400).json({ code: ErrorCodes.ZONE_CLOSED_THAT_DAY, message: 'This zone does not open on that day', hours });
-    }
-    return res.status(400).json({
-        code: ErrorCodes.OUTSIDE_ZONE_HOURS,
-        message: `On that day this zone opens from ${hours.opensAt} to ${hours.closesAt}, and the entry must be at least 30 minutes before closing`,
-        hours,
-    });
+    const { status, body } = outsideHoursError(hours);
+    return res.status(status).json(body);
 }
 
 // #371: the answer to a reservation that is already saved (after the
@@ -71,37 +63,19 @@ async function crear(req, res, next) {
     const t = await sequelize.transaction();
     let reserva;
     try {
-        const start = new Date(startTime);
+        // The dates, the 48 hours in advance and the duration, with the same
+        // rules as GET /zones/:id/availability (#375, utils/stayRequest.js).
         // An open stay keeps a provisional exit time, so the overlap check and
         // the jobs work as with any other reservation: entry + 24 h, or the
         // closing time of a zone that is not open 24 hours (set below, HU-29)
-        let end = isOpenStay ? provisionalEndTime(start) : new Date(endTime);
         const now = new Date();
-        // A value that is not a date ("abc") gives an invalid Date, and every
-        // comparison below would let it through until the database rejects it
-        if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        const horas = checkStayTimes({ startTime, endTime, openEnded: isOpenStay }, now);
+        if (horas.error) {
             await t.rollback();
-            return res.status(400).json({ code: ErrorCodes.INVALID_DATE, message: 'startTime and endTime must be valid dates' });
+            return res.status(horas.error.status).json(horas.error.body);
         }
-
-        if (start <= now) {
-            await t.rollback();
-            return res.status(400).json({ code: ErrorCodes.START_TIME_IN_PAST, message: 'The start time must be in the future' });
-        }
-        if (start - now > ANTICIPACION_MAX_MS) {
-            await t.rollback();
-            return res.status(400).json({ code: ErrorCodes.RESERVATION_TOO_FAR_AHEAD, message: 'Reservations can only be made up to 48 hours in advance' });
-        }
-        if (!isOpenStay && end <= start) {
-            await t.rollback();
-            return res.status(400).json({ code: ErrorCodes.END_BEFORE_START, message: 'The end time must be after the start time' });
-        }
-
-        const duracionMs = end - start;
-        if (!isOpenStay && (duracionMs < DURACION_MIN_MS || duracionMs > DURACION_MAX_MS)) {
-            await t.rollback();
-            return res.status(400).json({ code: ErrorCodes.INVALID_DURATION, message: 'The reservation must last between 30 minutes and 24 hours' });
-        }
+        const { start } = horas;
+        let { end } = horas;
 
         // Locked until the transaction ends, first the user and then the
         // vehicle: if the same vehicle is booked twice at the same moment
@@ -601,7 +575,7 @@ async function ampliar(req, res, next) {
             return res.status(400).json({ code: ErrorCodes.EXTENSION_NOT_LATER, message: 'The new exit time must be later than the current one' });
         }
         // AC-03: never more than 24 hours from the entry
-        if (salidaNueva - inicio > DURACION_MAX_MS) {
+        if (salidaNueva - inicio > STAY_MAX_MS) {
             await t.rollback();
             return res.status(400).json({ code: ErrorCodes.EXTENSION_TOO_LONG, message: 'The stay cannot last more than 24 hours from the entry' });
         }
