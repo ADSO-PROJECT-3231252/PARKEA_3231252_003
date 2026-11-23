@@ -78,6 +78,7 @@ describe('isValidPassword', () => {
         ['A1!' + 'a'.repeat(16) + '😀', '20 characters, one of them an emoji'],
         ['Ab1!' + '😀'.repeat(16), '20 characters, 16 of them emojis'],
         ['A1!aaaa❤\uFE0F', '8 characters, with an emoji and its variation selector'],
+        ['A1!aaaa\uFE0F\uFE0F', '8 characters: of two variation selectors in a row, only the first one is not counted'],
         ['A1\u2028aaaaa', 'a line separator (U+2028) as the special character'],
         ['A1\u2029aaaaa', 'a paragraph separator (U+2029) as the special character'],
     ])('accepts %j (%s)', (password) => {
