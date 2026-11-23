@@ -11,16 +11,20 @@ const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
 // The share of the spots of a zone that is free now (#373)
 const shareFree = (zona) => zona.get('availableSlots') / zona.totalSlots;
 
+// #373: the zones and their free spots are read in one transaction, so all
+// the reads see the same moment (REPEATABLE READ): a capacity changed between
+// them would give a zone more free spots than its capacity
+const enUnMomento = (work) => sequelize.transaction(work);
+
 // GET /api/zones — public, list only active zones, ordered by highest availability first
 async function getZonas(req, res, next) {
   try {
-    const zonas = await Zona.findAll({
-      where: { isActive: true },
-      include: [CON_HORARIO],
-    });
     // #373: availableSlots is calculated from the reservations, for all the
     // zones in one query, and they are ordered by it (then by name)
-    await availability.withAvailableSlots(zonas);
+    const zonas = await enUnMomento(async (transaction) => availability.withAvailableSlots(
+      await Zona.findAll({ where: { isActive: true }, include: [CON_HORARIO], transaction }),
+      { transaction },
+    ));
     zonas.sort((a, b) => shareFree(b) - shareFree(a) || a.name.localeCompare(b.name, 'es'));
     return res.status(200).json({ zones: zonas });
   } catch (error) {
@@ -340,12 +344,15 @@ async function getZonaPorId(req, res, next) {
   try {
     const { id } = req.params;
 
-    const zona = await Zona.findByPk(id, { include: [CON_HORARIO] });
+    // #373: the spots free now, calculated from the reservations
+    const zona = await enUnMomento(async (transaction) => {
+      const leida = await Zona.findByPk(id, { include: [CON_HORARIO], transaction });
+      if (leida) leida.setDataValue('availableSlots', await availability.availableNow(leida.id, { transaction }));
+      return leida;
+    });
     if (!zona) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
-    // #373: the spots free now, calculated from the reservations
-    zona.setDataValue('availableSlots', await availability.availableNow(zona.id));
 
     return res.status(200).json({ zone: zona });
   } catch (error) {
@@ -358,25 +365,29 @@ async function getTodasLasZonas(req, res, next) {
   try {
     // activeReservations: Pending or Active reservations of each zone, so the
     // screen can warn before deactivating it (HU-19, AC-08)
-    const zonas = await Zona.findAll({
-      attributes: {
-        include: [[
-          sequelize.literal(`(
-            SELECT COUNT(*) FROM reservations AS r
-            WHERE r.zone_id = Zona.id AND r.status IN ('Pending', 'Active')
-          )`),
-          'activeReservations',
-        ]],
-      },
-      include: [CON_HORARIO],
-      order: [['name', 'ASC']],
+    const zonas = await enUnMomento(async (transaction) => {
+      const leidas = await Zona.findAll({
+        attributes: {
+          include: [[
+            sequelize.literal(`(
+              SELECT COUNT(*) FROM reservations AS r
+              WHERE r.zone_id = Zona.id AND r.status IN ('Pending', 'Active')
+            )`),
+            'activeReservations',
+          ]],
+        },
+        include: [CON_HORARIO],
+        order: [['name', 'ASC']],
+        transaction,
+      });
+      // #373: availableSlots, and spotsInUse: the spots with a Pending or
+      // Active reservation from now on, the least capacity the zone can have
+      // (HU-21, AC-03). Each one is one query for all the zones.
+      await availability.withAvailableSlots(leidas, { transaction });
+      const enUso = await availability.spotsInUseByZone(leidas.map((zona) => zona.id), { transaction });
+      for (const zona of leidas) zona.setDataValue('spotsInUse', enUso.get(zona.id));
+      return leidas;
     });
-    // #373: availableSlots, and spotsInUse: the spots with a Pending or Active
-    // reservation from now on, the least capacity the zone can have (HU-21,
-    // AC-03). Each one is one query for all the zones.
-    await availability.withAvailableSlots(zonas);
-    const enUso = await availability.spotsInUseByZone(zonas.map((zona) => zona.id));
-    for (const zona of zonas) zona.setDataValue('spotsInUse', enUso.get(zona.id));
     return res.status(200).json({ zones: zonas });
   } catch (error) {
     next(error);

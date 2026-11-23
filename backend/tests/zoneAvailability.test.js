@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Zona, ZoneSchedule, ParkingSpot, Reserva } = require('../src/models');
+const { Usuario, Zona, ZoneSchedule, ParkingSpot, Reserva, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // #373: the free spots of each zone are calculated from the reservations.
@@ -15,6 +15,8 @@ const NORTE = '55555555-5555-4555-8555-555555555555';
 const SUR = '66666666-6666-4666-8666-666666666666';
 const ADMIN_ID = '99999999-9999-4999-8999-999999999999';
 const adminToken = jwt.sign({ id: ADMIN_ID, email: 'admin@parkea.com', rol: 'admin' }, process.env.JWT_SECRET);
+// The transaction the reads of a zone and its free spots share (#373)
+const TRANSACTION = { id: 'zone-reads' };
 const asAdmin = (req) => req.set('Authorization', `Bearer ${adminToken}`);
 
 // A zone as the model gives it, read with its hours
@@ -27,7 +29,16 @@ function zone(id, name, totalSlots) {
 
 beforeEach(() => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask'] });
+    // A managed transaction: it runs the function with its transaction
+    jest.spyOn(sequelize, 'transaction').mockImplementation(async (work) => work(TRANSACTION));
 });
+
+// Every read was made in the same transaction, so they see the same moment
+// and a capacity changed meanwhile never gives more free spots than it
+function expectOneMoment(...spies) {
+    expect(sequelize.transaction).toHaveBeenCalledTimes(1);
+    for (const spy of spies) expect(spy.mock.calls[0].at(-1).transaction).toBe(TRANSACTION);
+}
 
 afterEach(() => {
     jest.useRealTimers();
@@ -50,6 +61,7 @@ describe('GET /api/zones (HU-09, #373)', () => {
         const { where } = ParkingSpot.findAll.mock.calls[0][0];
         expect(where.zoneId).toEqual([CENTRO, NORTE]);
         expect(where[Op.and][0].val).toContain("r.start_time < '2026-11-16 13:40:00'");
+        expectOneMoment(Zona.findAll, ParkingSpot.findAll);
     });
 
     test('lists the zones by the share of free spots, the highest first, and a full zone last', async () => {
@@ -107,6 +119,7 @@ describe('GET /api/zones/:id (HU-14, #373)', () => {
         const { where } = ParkingSpot.count.mock.calls[0][0];
         expect(where).toMatchObject({ zoneId: CENTRO, status: { [Op.ne]: 'Disabled' } });
         expect(where[Op.and][0].val).toContain("r.start_time < '2026-11-16 13:40:00'");
+        expectOneMoment(Zona.findByPk, ParkingSpot.count);
     });
 
     test('a zone that does not exist answers 404 and counts nothing', async () => {
@@ -147,6 +160,7 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         expect(ParkingSpot.findAll).toHaveBeenCalledTimes(1);
         expect(Reserva.findAll).toHaveBeenCalledTimes(1);
         expect(Reserva.findAll.mock.calls[0][0].where).toMatchObject({ zoneId: [CENTRO, NORTE], endTime: { [Op.gt]: NOW } });
+        expectOneMoment(Zona.findAll, ParkingSpot.findAll, Reserva.findAll);
     });
 
     test('PATCH /api/zones/:id/toggle sends the zone with its free spots', async () => {
