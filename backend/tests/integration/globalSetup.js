@@ -30,7 +30,11 @@ function sequelizeCli(command, url) {
     try {
         execFileSync(process.execPath, [SEQUELIZE_CLI, command], {
             cwd: BACKEND,
-            env: { ...process.env, DATABASE_URL: url, NODE_ENV: 'test' },
+            // #370: the demo administrator, whatever backend/.env says
+            env: {
+                ...process.env, DATABASE_URL: url, NODE_ENV: 'test',
+                SEED_DEMO_ADMIN: 'true', PRIMARY_ADMIN_EMAIL: '', PRIMARY_ADMIN_PASSWORD: '',
+            },
             stdio: 'pipe',
         });
     } catch (error) {
