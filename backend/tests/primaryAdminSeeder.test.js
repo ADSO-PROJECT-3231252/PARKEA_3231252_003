@@ -1,5 +1,8 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const bcrypt = require('bcrypt');
+const dotenv = require('dotenv');
 const express = require('express');
 const request = require('supertest');
 const seeder = require('../src/seeders/20260808234824-demo-primary-admin');
@@ -135,14 +138,33 @@ describe('Primary administrator seeder (#370)', () => {
         }
     );
 
-    test('does not seed the demo administrator in a database of another computer', async () => {
-        process.env.SEED_DEMO_ADMIN = 'true';
-        queryInterface.sequelize.config.host = 'parkea-db.mysql.database.azure.com';
+    // 0.0.0.0 is not this computer for a client, a name that only starts with
+    // localhost is another host, and mysql is the usual name of a Docker container
+    test.each(['parkea-db.mysql.database.azure.com', '0.0.0.0', 'localhost.example.test', 'mysql'])(
+        'does not seed the demo administrator in a database at %s',
+        async (host) => {
+            process.env.SEED_DEMO_ADMIN = 'true';
+            queryInterface.sequelize.config.host = host;
 
-        await expect(seeder.up(queryInterface)).rejects.toThrow(
-            'SEED_DEMO_ADMIN=true only seeds a local database, not parkea-db.mysql.database.azure.com'
-        );
-        expect(queryInterface.bulkInsert).not.toHaveBeenCalled();
+            await expect(seeder.up(queryInterface)).rejects.toThrow(
+                `SEED_DEMO_ADMIN=true only seeds a local database, not ${host}: set PRIMARY_ADMIN_EMAIL and PRIMARY_ADMIN_PASSWORD.`
+            );
+            expect(queryInterface.bulkInsert).not.toHaveBeenCalled();
+        }
+    );
+
+    test('seeds the demo administrator with a backend/.env copied from .env.example', async () => {
+        // Arrange: the three values of .env.example, read as dotenv reads them
+        const example = dotenv.parse(fs.readFileSync(path.join(__dirname, '../.env.example')));
+        process.env.PRIMARY_ADMIN_EMAIL = example.PRIMARY_ADMIN_EMAIL;
+        process.env.PRIMARY_ADMIN_PASSWORD = example.PRIMARY_ADMIN_PASSWORD;
+        process.env.SEED_DEMO_ADMIN = example.SEED_DEMO_ADMIN;
+
+        // Act
+        await seeder.up(queryInterface);
+
+        // Assert
+        expect(queryInterface.bulkInsert.mock.calls[0][1][0].email).toBe('admin@parkea.com');
     });
 
     test.each(['localhost', '127.0.0.1', '::1'])('seeds the demo administrator in a database at %s', async (host) => {
