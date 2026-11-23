@@ -8,6 +8,17 @@ import { getZones } from '../src/services/zoneService';
 // The screens do not call the real API
 jest.mock('../src/services/zoneService', () => ({ getZones: jest.fn() }));
 
+// jsdom cannot draw the map: its pieces only render what they hold, so the
+// summary of every pin is in the page, as if it were open
+jest.mock('react-leaflet', () => ({
+    MapContainer: ({ children }) => children,
+    TileLayer: () => null,
+    ZoomControl: () => null,
+    Marker: ({ children }) => children,
+    Popup: ({ children }) => children,
+    useMap: () => ({ closePopup: jest.fn() }),
+}));
+
 // #373: availableSlots is the room now (the spots free for the next 30
 // minutes). A zone with none now can still be reserved for other hours.
 const zone = (id, name, availableSlots, latitude) => ({
@@ -93,6 +104,45 @@ describe('A zone with no room now can still be reserved from the list (#375)', (
 
         // Act
         await user.click(await screen.findByRole('button', { name: 'Reservar en Parqueadero Centro' }));
+
+        // Assert
+        expect(screen.getByText('Pantalla de inicio de sesión')).toBeInTheDocument();
+    });
+});
+
+describe('A zone with no room now can still be reserved from the map (#375)', () => {
+    // The map is downloaded apart (lazy), so the summaries take a moment
+    const summaryButton = (name) => screen.findByRole('button', { name }, { timeout: 3000 });
+
+    test('its summary has "Reservar" enabled and says why there is no room now', async () => {
+        // Arrange + Act
+        renderList('?view=map');
+        const button = await summaryButton('Reservar en Parqueadero Centro');
+
+        // Assert
+        expect(button).toBeEnabled();
+        expect(button).not.toHaveAttribute('aria-disabled');
+        expect(button).toHaveTextContent('Reservar');
+        expect(button).toHaveAccessibleDescription(NOTE);
+        expect(screen.getAllByText('cupos libres ahora', { exact: false })).toHaveLength(2);
+        expect(screen.getByText('Llena (sin cupos ahora)')).toBeInTheDocument();
+        expect(screen.queryByText('Sin cupos disponibles')).not.toBeInTheDocument();
+    });
+
+    test('a zone with room has no note', async () => {
+        renderList('?view=map');
+        const button = await summaryButton('Reservar en Av. Simón Bolívar');
+        expect(button).not.toHaveAccessibleDescription();
+        expect(screen.getAllByText(NOTE)).toHaveLength(1);
+    });
+
+    test('clicking it opens the reserve flow', async () => {
+        // Arrange
+        const user = userEvent.setup();
+        renderList('?view=map');
+
+        // Act
+        await user.click(await summaryButton('Reservar en Parqueadero Centro'));
 
         // Assert
         expect(screen.getByText('Pantalla de inicio de sesión')).toBeInTheDocument();
