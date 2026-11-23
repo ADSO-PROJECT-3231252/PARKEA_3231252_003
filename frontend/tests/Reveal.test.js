@@ -35,14 +35,14 @@ describe('Reveal (#330)', () => {
         delete globalThis.IntersectionObserver;
     });
 
-    test('without IntersectionObserver the cards show at once, each at its step', () => {
+    test('without IntersectionObserver the cards show at once, without waiting or moving', () => {
         // Act
         renderCards();
 
-        // Assert
-        expect(card(1).className).toBe(`card ${STEPS[0]}`);
-        expect(card(2).className).toBe(`card ${STEPS[1]}`);
-        expect(card(3).className).toBe(`card ${STEPS[2]}`);
+        // Assert: only their own classes
+        expect(card(1).className).toBe('card');
+        expect(card(2).className).toBe('card');
+        expect(card(3).className).toBe('card');
     });
 
     describe('with IntersectionObserver', () => {
@@ -65,7 +65,7 @@ describe('Reveal (#330)', () => {
             expect(card(2).className).toBe(`card ${HIDDEN}`);
 
             // Act: it scrolls into view
-            act(() => observerOf(card(2)).callback([{ isIntersecting: true }]));
+            act(() => observerOf(card(2)).callback([{ isIntersecting: true, intersectionRatio: 1 }]));
 
             // Assert: only that one appears, at its step, and it is no longer watched
             expect(card(2).className).toBe(`card ${STEPS[1]}`);
@@ -80,10 +80,21 @@ describe('Reveal (#330)', () => {
             renderCards(4);
 
             // Act
-            act(() => observerOf(card(4)).callback([{ isIntersecting: true }]));
+            act(() => observerOf(card(4)).callback([{ isIntersecting: true, intersectionRatio: 1 }]));
 
             // Assert
             expect(card(4).className).toBe(`card ${STEPS[2]}`);
+        });
+
+        test('a card without classes of its own gets only its step', () => {
+            // Arrange
+            render(<Reveal>Sola</Reveal>);
+
+            // Act
+            act(() => observers[0].callback([{ isIntersecting: true, intersectionRatio: 1 }]));
+
+            // Assert
+            expect(screen.getByText('Sola').className).toBe(STEPS[0]);
         });
 
         test('leaving the page stops watching the cards', () => {
@@ -98,11 +109,11 @@ describe('Reveal (#330)', () => {
         });
     });
 
-    test('a card without classes of its own gets only its step', () => {
+    test('a card without classes of its own and without IntersectionObserver has no class', () => {
         // Act
         render(<Reveal>Sola</Reveal>);
 
         // Assert
-        expect(screen.getByText('Sola').className).toBe(STEPS[0]);
+        expect(screen.getByText('Sola')).not.toHaveAttribute('class');
     });
 });

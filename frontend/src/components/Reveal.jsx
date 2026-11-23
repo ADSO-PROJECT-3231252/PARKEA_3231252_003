@@ -9,12 +9,13 @@ const STEPS = ['motion-safe:animate-fade-up', 'motion-safe:animate-fade-up-2', '
 
 export default function Reveal({ step = 0, className, children }) {
     const ref = useRef(null);
-    // Without IntersectionObserver nothing would show the card: it is shown at
-    // once, so no content can stay hidden
-    const [shown, setShown] = useState(() => typeof IntersectionObserver === 'undefined');
+    // Without IntersectionObserver nothing can tell when the card is in view,
+    // so it is shown at once, without moving: no content can stay hidden
+    const watches = typeof IntersectionObserver !== 'undefined';
+    const [shown, setShown] = useState(false);
 
     useEffect(() => {
-        if (shown) return undefined;
+        if (!watches || shown) return undefined;
         // Once shown, the effect ends and stops watching the card. It waits
         // until a part of the card is in view, not just its first pixel.
         const observer = new IntersectionObserver(
@@ -25,13 +26,15 @@ export default function Reveal({ step = 0, className, children }) {
         );
         observer.observe(ref.current);
         return () => observer.disconnect();
-    }, [shown]);
+    }, [watches, shown]);
 
     // Until then the card is transparent (but printed). motion-safe: shows it
     // at once, without moving, to a person who asked the system to reduce motion.
-    const motion = shown ? STEPS[Math.min(step, STEPS.length - 1)] : 'motion-safe:opacity-0 print:opacity-100';
+    let motion = null;
+    if (watches) motion = shown ? STEPS[Math.min(step, STEPS.length - 1)] : 'motion-safe:opacity-0 print:opacity-100';
+    const classes = [className, motion].filter(Boolean).join(' ');
     return (
-        <div ref={ref} className={className ? `${className} ${motion}` : motion}>
+        <div ref={ref} className={classes || undefined}>
             {children}
         </div>
     );

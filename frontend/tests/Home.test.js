@@ -384,7 +384,7 @@ describe('The motion of the three homes (#330)', () => {
 
             // Act: the three of a row scroll into view together
             for (const card of cards(home)) {
-                act(() => observers.find((observer) => observer.element === card).callback([{ isIntersecting: true }]));
+                act(() => observers.find((observer) => observer.element === card).callback([{ isIntersecting: true, intersectionRatio: 1 }]));
             }
 
             // Assert
@@ -430,7 +430,7 @@ describe('The motion of the three homes (#330)', () => {
         ['visitor', null],
         ['user', 'user'],
         ['admin', 'admin'],
-    ])('without IntersectionObserver the cards of the %s home show at once', async (home, role) => {
+    ])('without IntersectionObserver the cards of the %s home show at once, without waiting or moving', async (home, role) => {
         // Arrange
         signIn(role);
 
@@ -439,9 +439,9 @@ describe('The motion of the three homes (#330)', () => {
         await act(async () => {});
 
         // Assert
-        cards(home).forEach((card, i) => {
+        for (const card of cards(home)) {
             expect(card).not.toHaveClass('motion-safe:opacity-0');
-            expect(card).toHaveClass(STEPS[i]);
-        });
+            for (const step of STEPS) expect(card).not.toHaveClass(step);
+        }
     });
 });
