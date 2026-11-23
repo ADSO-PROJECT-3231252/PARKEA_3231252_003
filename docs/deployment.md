@@ -221,7 +221,7 @@ npx sequelize-cli db:seed:all --env production
 unset PRIMARY_ADMIN_EMAIL PRIMARY_ADMIN_PASSWORD
 ```
 
-The password needs 8 to 20 characters, an uppercase letter, a number and a special character. Never write it in the repository or in a chat. If someone else saw it, change it afterwards with "¿Olvidaste tu contraseña?" on the sign-in page: the email reaches the team inbox (see Administrator email).
+Both values follow the rules of the sign-up: a valid email of at most 100 characters, and a password of 8 to 20 characters with an uppercase letter, a number and a special character. Never write the password in the repository or in a chat. After this first seed, as soon as the site is published, change it with step 4 of Administrator email.
 
 Always finish with:
 
@@ -297,7 +297,7 @@ The primary administrator uses `admin@parkeaweb.me`, so its password recovery em
     UPDATE users SET email = 'admin@parkeaweb.me' WHERE is_primary_admin = 1;
     ```
 
-4. **Check:** on the published site, use "¿Olvidaste tu contraseña?" with `admin@parkeaweb.me` and confirm that the email arrives in the team inbox.
+4. **Check:** on the published site, use "¿Olvidaste tu contraseña?" with `admin@parkeaweb.me` and confirm that the email arrives in the team inbox. On a new database, also set a new password with its link: it replaces the one typed for the first seed.
 
 ## Free tier behavior and costs
 
