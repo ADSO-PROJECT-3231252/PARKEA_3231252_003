@@ -19,12 +19,13 @@ export default function ConfirmDialog({
     variant = 'default', // 'default' | 'danger'
     error = '',
     confirmDisabled = false,
+    fallbackFocusRef,
     // HU-28: optional content under the message, such as a field to choose from
     children = null,
 }) {
     const dialogRef = useRef(null);
     const cancelButtonRef = useRef(null);
-    const previouslyFocusedRef = useRef(null);
+    const confirmingRef = useRef(confirming);
     // The latest onCancel. The parent creates a new function on every render,
     // and the effect below must not run again because of it: that would move
     // the focus back to the cancel button while the user is choosing an option.
@@ -34,6 +35,7 @@ export default function ConfirmDialog({
 
     useEffect(() => {
         onCancelRef.current = onCancel;
+        confirmingRef.current = confirming;
     });
 
     useEffect(() => {
@@ -41,14 +43,15 @@ export default function ConfirmDialog({
 
         // Remember what had focus before opening, to restore it on close --
         // otherwise focus silently drops to <body>, a WCAG 2.1 AA gap.
-        previouslyFocusedRef.current = document.activeElement;
+        const opener = document.activeElement;
+        const fallbackTarget = fallbackFocusRef?.current;
         // Focus the least destructive action by default, so a stray Enter
         // key press right after opening can't confirm the action by accident.
         cancelButtonRef.current?.focus();
 
         function handleKeyDown(event) {
             if (event.key === 'Escape') {
-                if (!confirming) onCancelRef.current();
+                if (!confirmingRef.current) onCancelRef.current();
                 return;
             }
             if (event.key !== 'Tab') return;
@@ -73,8 +76,22 @@ export default function ConfirmDialog({
         document.addEventListener('keydown', handleKeyDown);
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            previouslyFocusedRef.current?.focus();
+            if (opener?.isConnected && opener !== document.body) {
+                opener.focus();
+            } else if (fallbackTarget?.isConnected) {
+                fallbackTarget.focus();
+            }
         };
+    }, [open, fallbackFocusRef]);
+
+    // Both buttons are disabled while confirming, and the browser moves the
+    // focus of a disabled button to the body. If the dialog is still open
+    // when it ends (the action failed), the focus goes back to the cancel
+    // button, so Tab stays inside the dialog (#361).
+    useEffect(() => {
+        if (open && !confirming && !dialogRef.current?.contains(document.activeElement)) {
+            cancelButtonRef.current?.focus();
+        }
     }, [open, confirming]);
 
     if (!open) return null;

@@ -80,7 +80,9 @@ function choiceSummary(choice, reservation, hourlyRate, paid) {
 // openedAt: the moment "Ampliar estadía" was clicked.
 // onClose({ stale }): nothing changed; stale = reload the screen.
 // onExtended(message): switched to an open stay; message is the result.
-export default function ExtendStayDialog({ reservation, hourlyRate, paid, openedAt, onClose, onExtended }) {
+// fallbackFocusRef: where the focus goes on close if "Ampliar estadía" is
+// gone by then, because the exit time passed (#361).
+export default function ExtendStayDialog({ reservation, hourlyRate, paid, openedAt, onClose, onExtended, fallbackFocusRef }) {
     const navigate = useNavigate();
     // The screen behind may have been loaded before the exit time passed.
     const exitPassed = new Date(reservation.endTime).getTime() <= openedAt;
@@ -137,6 +139,7 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
 
     return (
         <ConfirmDialog
+            fallbackFocusRef={fallbackFocusRef}
             open
             title="Ampliar estadía"
             message={message}

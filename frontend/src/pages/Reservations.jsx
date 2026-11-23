@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Car,
@@ -149,6 +149,26 @@ function StatusInfo({ reservation, now }) {
     );
 }
 function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, onExtend, inline = false }) {
+    const detailRef = useRef(null);
+    const restoreFocusRef = useRef(false);
+
+    // React detaches the ref before removing the button from the DOM.
+    const trackExpiringAction = useCallback((button) => {
+        if (!button) return;
+        return () => {
+            if (document.activeElement === button) {
+                restoreFocusRef.current = true;
+            }
+        };
+    }, []);
+
+    useLayoutEffect(() => {
+        if (restoreFocusRef.current) {
+            restoreFocusRef.current = false;
+            detailRef.current?.focus();
+        }
+    });
+
     const canPay = canPayReservation(reservation, now);
     const canCancel = canCancelReservation(reservation, now);
     const canFinish = canFinishStay(reservation, now);
@@ -171,6 +191,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {canPay && (
                 <button
                     type="button"
+                    ref={trackExpiringAction}
                     onClick={() => onPay(reservation.id)}
                     aria-label={`Pagar la ${which}`}
                     className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
@@ -207,7 +228,8 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {canExtend && (
                 <button
                     type="button"
-                    onClick={() => onExtend(reservation)}
+                    ref={trackExpiringAction}
+                    onClick={() => onExtend(reservation, detailRef.current)}
                     aria-label={`Ampliar la estadía de la ${which}`}
                     className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
                 >
@@ -220,7 +242,8 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {canCancel && (
                 <button
                     type="button"
-                    onClick={() => onCancel(reservation)}
+                    ref={trackExpiringAction}
+                    onClick={() => onCancel(reservation, detailRef.current)}
                     aria-label={`Cancelar la ${which}`}
                     className={`${base} border-danger text-danger hover:bg-danger-soft`}
                 >
@@ -231,6 +254,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {/* AC-07: every entry — including Pending, which the mockup omits — opens its confirmation (HU-15). */}
             <button
                 type="button"
+                ref={detailRef}
                 onClick={() => onViewDetails(reservation.id)}
                 aria-label={`Ver detalle de la ${which}`}
                 className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
@@ -307,6 +331,18 @@ export default function Reservations() {
     // stay in the finish dialog and when it was opened. The message shown
     // after either action (HU-16 AC-06, HU-27 AC-09).
     const [cancelTarget, setCancelTarget] = useState(null);
+    // #361: the "Ver detalle" button of the reservation whose cancel or
+    // extend dialog is open. The focus goes back there when the button that
+    // opened the dialog disappeared meanwhile.
+    const actionFallbackRef = useRef(null);
+    const headingRef = useRef(null);
+    const trackReservationRow = useCallback((row) => {
+        if (!row) return;
+        return () => {
+            // Keep the keyboard position on the list when the focused row is removed.
+            if (row.contains(document.activeElement)) headingRef.current?.focus();
+        };
+    }, []);
     const [finishTarget, setFinishTarget] = useState(null);
     // HU-28: the stay in the extend dialog and when it was opened.
     const [extendTarget, setExtendTarget] = useState(null);
@@ -398,7 +434,10 @@ export default function Reservations() {
     const handleViewDetails = (id) => navigate(`/reservations/${id}`);
     const handlePay = (id) => navigate(`/reservations/${id}/payment`);
     // HU-16
-    const handleCancel = (reservation) => setCancelTarget(reservation);
+    const handleCancel = (reservation, detailButton) => {
+        actionFallbackRef.current = detailButton;
+        setCancelTarget(reservation);
+    };
     const handleCancelClose = ({ stale }) => {
         setCancelTarget(null);
         // The reservation changed since the list was loaded (e.g. it started):
@@ -426,7 +465,10 @@ export default function Reservations() {
     };
     // HU-28: a later exit time goes to the payment screen; switching to an
     // open stay reloads the list, where the stay shows without an exit time.
-    const handleExtend = (reservation) => setExtendTarget({ reservation, openedAt: Date.now() });
+    const handleExtend = (reservation, detailButton) => {
+        actionFallbackRef.current = detailButton;
+        setExtendTarget({ reservation, openedAt: Date.now() });
+    };
     const handleExtendClose = ({ stale }) => {
         setExtendTarget(null);
         if (stale) setReloadKey((k) => k + 1);
@@ -456,7 +498,7 @@ export default function Reservations() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <title>Mis reservas | PARKEA</title>
-            <h1 className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
+            <h1 ref={headingRef} tabIndex={-1} className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Consulta el historial de tus reservas y su estado.
             </p>
@@ -626,6 +668,7 @@ bg-white lg:block"
                                     {reservations.map((r) => (
                                         <tr
                                             key={r.id}
+                                            ref={trackReservationRow}
                                             className={`border-t border-l-4 border-t-neutral-200
 align-middle ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                         >
@@ -671,6 +714,7 @@ text-neutral-900"
                             {reservations.map((r) => (
                                 <li
                                     key={r.id}
+                                    ref={trackReservationRow}
                                     className={`rounded-lg border border-l-4 border-neutral-200 bg-white
 p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                 >
@@ -764,6 +808,7 @@ text-center text-caption font-medium text-white"
                 )}
             </div>
             <CancelReservationDialog
+                fallbackFocusRef={actionFallbackRef}
                 reservation={cancelTarget}
                 onClose={handleCancelClose}
                 onCancelled={handleCancelled}
@@ -779,6 +824,7 @@ text-center text-caption font-medium text-white"
             )}
             {extendTarget && (
                 <ExtendStayDialog
+                    fallbackFocusRef={actionFallbackRef}
                     reservation={extendTarget.reservation}
                     hourlyRate={extendTarget.reservation.appliedHourlyRate}
                     paid={extendTarget.reservation.amount}

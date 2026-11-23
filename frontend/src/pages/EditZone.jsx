@@ -182,7 +182,7 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
         setToggling(true);
         setToggleError('');
         try {
-            const { data } = await toggleZone(zone.id);
+            const { data } = await toggleZone(zone.id, !zone.isActive);
             // Only the status changes: what was typed in the form stays there
             setZone((prev) => ({ ...prev, isActive: data.zone.isActive }));
             setToggleMessage(getZoneToggleSuccess(data.zone));

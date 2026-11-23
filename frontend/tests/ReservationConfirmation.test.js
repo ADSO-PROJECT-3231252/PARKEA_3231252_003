@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ReservationConfirmation from '../src/pages/ReservationConfirmation';
 import { getReservation } from '../src/services/reservationService';
@@ -148,5 +148,94 @@ describe('The reservation screen when the 15 minutes to pay end (#347)', () => {
         expect(await screen.findByText('Expirada')).toBeInTheDocument();
         expect(payLink()).not.toBeInTheDocument();
         expect(cancelButton()).not.toBeInTheDocument();
+    });
+});
+
+describe('Keyboard focus when the reservation countdown ends (#361)', () => {
+    test.each([
+        ['link', 'Ir al pago'],
+        ['button', 'Cancelar reserva'],
+    ])('focuses the expired status when the focused %s "%s" disappears', async (role, name) => {
+        // Arrange
+        answer();
+        renderScreen();
+        const action = await screen.findByRole(role, { name });
+        await wait(10 * MINUTE - 1000);
+        action.focus();
+        expect(action).toHaveFocus();
+
+        // Act
+        await wait(1000);
+
+        // Assert
+        expect(action).not.toBeInTheDocument();
+        expect(screen.getByText('Expirada')).toHaveFocus();
+    });
+});
+
+test('focuses the expired status after closing a cancellation dialog opened before expiry (#361)', async () => {
+    // Arrange
+    answer();
+    renderScreen();
+    const opener = await screen.findByRole('button', { name: 'Cancelar reserva' });
+    opener.focus();
+    await act(async () => { opener.click(); });
+    const keep = screen.getByRole('button', { name: 'Conservar reserva' });
+    expect(keep).toHaveFocus();
+
+    // Act
+    await wait(10 * MINUTE);
+    expect(opener).not.toBeInTheDocument();
+    expect(keep).toHaveFocus();
+    await act(async () => { keep.click(); });
+
+    // Assert
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByText('Expirada')).toHaveFocus();
+});
+
+describe('Keyboard focus when a paid stay reaches its exit time on the reservation screen (#361)', () => {
+    // Paid, from 7:00 a. m. to 8:10 a. m.: "Ampliar estadía" disappears at 8:10
+    const endingStay = {
+        status: 'Active',
+        holdExpiresAt: null,
+        startTime: at(-60 * MINUTE),
+        endTime: at(10 * MINUTE),
+        paymentSummary: { ...reservation().paymentSummary, paidTotal: 4000 },
+    };
+
+    test('focuses the reservation status when the focused "Ampliar estadía" disappears', async () => {
+        // Arrange
+        answer(endingStay);
+        renderScreen();
+        const action = await screen.findByRole('button', { name: 'Ampliar estadía' });
+        action.focus();
+        expect(action).toHaveFocus();
+
+        // Act
+        await wait(10 * MINUTE + 1000);
+
+        // Assert
+        expect(action).not.toBeInTheDocument();
+        expect(screen.getByText('Activa')).toHaveFocus();
+    });
+
+    test('focuses the reservation status when the extend dialog closes after the exit time', async () => {
+        // Arrange: the dialog opens before the exit time
+        answer(endingStay);
+        renderScreen();
+        const opener = await screen.findByRole('button', { name: 'Ampliar estadía' });
+        opener.focus();
+        await act(async () => { opener.click(); });
+        expect(screen.getByRole('button', { name: 'Volver' })).toHaveFocus();
+
+        // Act: the exit time passes while it is open, and then Escape
+        await wait(10 * MINUTE + 1000);
+        expect(opener).not.toBeInTheDocument();
+        await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }); });
+
+        // Assert
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(screen.getByText('Activa')).toHaveFocus();
     });
 });
