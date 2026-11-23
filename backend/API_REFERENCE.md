@@ -197,7 +197,7 @@ zone depend on the hours asked and are not stored.
 | Method | Route | Access | Description |
 |---|---|---|---|
 | GET | `/users/me` | Authenticated | Load my profile (HU-08) |
-| PUT | `/users/me` | Authenticated | Edit full name and phone (HU-08). Email and document are never editable |
+| PUT | `/users/me` | Authenticated | Edit full name and phone (HU-08). Email and document are never editable. At least one of the two must come: without both it answers 400 `MISSING_REQUIRED_FIELDS` (#300) |
 | PUT | `/users/me/password` | Authenticated | Change password (HU-08). The other sessions of the account and its recovery links stop working; the answer brings a new `token` so this session goes on. Attempt limit, see [Attempt limits](#attempt-limits) |
 
 ## Admin

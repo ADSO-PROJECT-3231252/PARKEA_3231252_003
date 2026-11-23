@@ -34,7 +34,9 @@ function readBody(parser) {
 app.use(readBody(express.json()));
 app.use(readBody(express.urlencoded({ extended: true })));
 
-// Ensure requests without a body have an empty object.
+// #300: Express 5 leaves req.body undefined when a request has no body, or
+// one that no parser above reads. Reading a field of it would end in a 500;
+// with an empty object each route answers its own 400.
 app.use((req, res, next) => {
     if (req.body === undefined) {
         req.body = {};
