@@ -203,7 +203,7 @@ export DATABASE_URL='mysql://parkeaadmin:<password>@parkea-db-sena.mysql.databas
 npx sequelize-cli db:migrate --env production
 ```
 
-Only on an empty database, load the initial data. The seeder of the primary administrator needs `PRIMARY_ADMIN_EMAIL` and `PRIMARY_ADMIN_PASSWORD` in the same terminal: demo mode (`SEED_DEMO_ADMIN=true`) never seeds this database, because it is not on your computer. `read -s` asks for the password without showing it or keeping it in the history:
+Only on an empty database, load the initial data. The seeder of the primary administrator needs `PRIMARY_ADMIN_EMAIL` and `PRIMARY_ADMIN_PASSWORD` in the same terminal: demo mode (`SEED_DEMO_ADMIN=true`) never seeds this database, because it is not on your computer. Run these commands in Bash (Git Bash on Windows), like the rest of this guide: in zsh, the default terminal of a Mac, `read -p` does something else. `read -s` asks for the password without showing it or keeping it in the history:
 
 ```
 export PRIMARY_ADMIN_EMAIL='admin@parkeaweb.me'
