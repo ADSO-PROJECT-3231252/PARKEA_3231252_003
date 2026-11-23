@@ -154,6 +154,10 @@ async function crear(req, res, next) {
         // reservations that other people save while this one waits there.
         // A Pending one whose 15 minutes ended counts as expired, even if the
         // job has not marked it yet (#347), so it does not take a place either.
+        // That is decided with the time after the locks, not with `now`: a
+        // hold that ended while this request waited at them no longer counts,
+        // here, in the check of the vehicle and in the search of the spot.
+        // `now` is still the time of the dates that the user sent.
         const availabilityTime = new Date();
         const pendientes = await Reserva.count({
             where: {
