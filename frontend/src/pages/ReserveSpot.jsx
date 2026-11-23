@@ -328,7 +328,8 @@ export default function ReserveSpot() {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
                 <title>Reservar cupo | PARKEA</title>
-                <div role="alert" className="flex flex-col items-start gap-3 rounded-lg border border-danger-soft bg-danger-soft p-5">
+                <h1 className="text-title font-display uppercase text-neutral-900">Reservar cupo</h1>
+                <div role="alert" className="mt-6 flex flex-col items-start gap-3 rounded-lg border border-danger-soft bg-danger-soft p-5">
                     <p className="flex items-center gap-2 text-body text-danger">
                         <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
                         No pudimos cargar esta zona.
