@@ -11,10 +11,10 @@ In the Access column, **Authenticated** is any signed-in account, **User**
 only an account with the user role and **Admin** only an administrator. The
 vehicles, reservations and payments belong to users: an administrator gets
 403 `FORBIDDEN_ROLE` there (#316). The role is read from the database on
-every request, not from the token. Creating a reservation reads the account
-again after locking it (#348): if an administrator deactivated it or made it
-administrator while the request waited, it answers 403 `ACCOUNT_DEACTIVATED`
-or `FORBIDDEN_ROLE` and saves nothing.
+every request, not from the token. Creating a reservation and paying it read
+the account again after locking it (#348): if an administrator deactivated it
+or made it administrator while the request waited, it answers 403
+`ACCOUNT_DEACTIVATED` or `FORBIDDEN_ROLE` and saves nothing.
 
 Every error response includes a short `code` field (see
 `src/constants/errorCodes.js`) in addition to the `message`, so the
