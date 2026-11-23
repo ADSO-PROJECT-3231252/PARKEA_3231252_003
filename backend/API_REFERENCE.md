@@ -209,7 +209,7 @@ zone depend on the hours asked and are not stored.
 | GET | `/admin/dashboard/occupancy` | Admin | Occupied vs. total slots per active zone, now (HU-22): the occupied ones are the ones not free for the next 30 minutes, that is, `totalSlots` minus `availableSlots` (#373) |
 | GET | `/admin/dashboard/payments-status?range=today\|week\|month` | Admin | Payment count by status (HU-22) |
 | GET | `/admin/dashboard/recent-payments` | Admin | Last 5 payments (HU-22) |
-| GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: an active zone with no spot free now (HU-22, #373) |
+| GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: an active zone with no spot free now (HU-22, #373). Each alert brings `type` (`zone_full`), `severity`, `zoneId` and `zoneName`, and no text: the frontend writes the sentence (#313) |
 | GET | `/admin/users?search=&role=&status=&page=&limit=` | Admin | List users with filters, pagination (at most 100 per page), and reservation count per user (HU-23). `search` looks for `%`, `_` and `\` as written (#304) |
 | GET | `/admin/users/logs` | Admin | Last 10 role/status changes made by admins (HU-23) |
 | PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin. The role it already has answers 200 and writes no line in the log (#304) |
