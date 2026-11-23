@@ -5,7 +5,7 @@ const { enviarCorreoRecuperacion } = require('../utils/mailer');
 const ErrorCodes = require('../constants/errorCodes');
 const { hashToken, createSecureToken } = require('../utils/secureToken');
 
-const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hora
+const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 const SALT_ROUNDS = 10;
 
 // PHASE 1 — POST /api/auth/forgot-password

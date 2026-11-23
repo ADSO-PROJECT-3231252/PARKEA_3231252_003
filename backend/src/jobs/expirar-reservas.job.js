@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const { sequelize, Reserva } = require('../models');
 const { safeRollback } = require('../utils/transaction');
 
-const INTERVALO_MS = 60 * 1000; // corre cada minuto
+const INTERVALO_MS = 60 * 1000; // runs every minute
 
 async function expirarReservasVencidas() {
     const ahora = new Date();
