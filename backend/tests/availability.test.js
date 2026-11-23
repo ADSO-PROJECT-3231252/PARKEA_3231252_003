@@ -69,6 +69,19 @@ describe('The rules of availability (#373)', () => {
         expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
     });
 
+    test('a Finished stay keeps the 10 minutes after its exit time, as before the job marked it (#373)', async () => {
+        // Arrange
+        jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue(null);
+
+        // Act
+        await availability.firstFreeSpot(ZONE_ID, at('15:00'), at('16:00'), { now: NOW });
+
+        // Assert: Finished counts with the same times, with no deadline
+        const sql = sqlOf(ParkingSpot.findOne.mock.calls[0][0].where);
+        expect(sql).toContain("(r.status = 'Finished' OR (r.status IN ('Pending', 'Active')");
+        expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
+    });
+
     test('the free spots of several zones are counted in one query, and a zone with none has 0', async () => {
         // Arrange
         jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: ZONE_ID, free: '4' }]);
@@ -194,5 +207,7 @@ describe('The rules of availability (#373)', () => {
         expect(sql).toContain('r.parking_spot_id = `ParkingSpot`.`id`');
         expect(sql).toContain("r.end_time > '2026-11-16 13:00:00'");
         expect(sql).not.toContain('r.start_time');
+        // A Finished stay ended in the past, so it never holds a spot from now on
+        expect(sql).not.toContain('Finished');
     });
 });
