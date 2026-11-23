@@ -12,7 +12,8 @@ module.exports = (sequelize, DataTypes) => {
 
     // HU-29: the API sends the hours as `schedule`, one item for each day the
     // zone opens, from Monday (1) to Sunday (7). A zone open 24 hours has an
-    // empty list.
+    // empty list. #373: `availableSlots` is not stored; the controllers add
+    // it (services/availability.js) and it is sent as it is.
     toJSON() {
       const values = { ...this.get() };
       if (values.schedules !== undefined) {
@@ -43,12 +44,6 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 0,
       field: 'total_slots',
-    },
-    availableSlots: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      field: 'available_slots',
-      validate: { min: 0 },
     },
     hourlyRate: {
       type: DataTypes.DECIMAL(10, 2),
