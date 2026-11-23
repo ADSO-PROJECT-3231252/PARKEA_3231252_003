@@ -9,7 +9,7 @@ export default function Layout() {
                 seen while it has the focus. */}
             <a
                 href="#main-content"
-                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-label focus:text-parkea-700 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-parkea-600"
+                className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-60 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-label focus:text-parkea-700 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-parkea-600"
             >
                 Saltar al contenido
             </a>

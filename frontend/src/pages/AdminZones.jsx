@@ -70,7 +70,7 @@ function ZoneActions({ zone, onToggle }) {
                 className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600 focus-visible:ring-offset-2 ${zone.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-500 bg-neutral-500'}`}
             >
                 <span
-                    className={`absolute left-0.5 top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform ${zone.isActive ? 'translate-x-5' : 'translate-x-0'}`}
+                    className={`absolute left-0.5 top-0.5 size-4.5 rounded-full bg-white shadow-sm transition-transform ${zone.isActive ? 'translate-x-5' : 'translate-x-0'}`}
                     aria-hidden="true"
                 />
             </button>
