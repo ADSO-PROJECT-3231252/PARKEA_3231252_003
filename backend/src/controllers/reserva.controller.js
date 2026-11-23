@@ -53,19 +53,23 @@ async function responderReservaCreada(res, reserva) {
 
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
+    const userId = req.usuario.id;
+    const { zoneId, vehicleId, startTime, endTime, openEnded } = req.body;
+
+    // HU-27: an open stay has no exit time; the route only lets a boolean through
+    const isOpenStay = openEnded === true;
+
+    // Validate required fields before opening a database transaction.
+    if (!zoneId || !vehicleId || !startTime || (!isOpenStay && !endTime)) {
+        return res.status(400).json({
+            code: ErrorCodes.MISSING_REQUIRED_FIELDS,
+            message: 'zoneId, vehicleId, startTime, and endTime are required',
+        });
+    }
+
     const t = await sequelize.transaction();
     let reserva;
     try {
-        const userId = req.usuario.id;
-        const { zoneId, vehicleId, startTime, endTime, openEnded } = req.body;
-        // HU-27: an open stay has no exit time; the route only lets a boolean through
-        const isOpenStay = openEnded === true;
-
-        if (!zoneId || !vehicleId || !startTime || (!isOpenStay && !endTime)) {
-            await t.rollback();
-            return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'zoneId, vehicleId, startTime, and endTime are required' });
-        }
-
         const start = new Date(startTime);
         // An open stay keeps a provisional exit time, so the overlap check and
         // the jobs work as with any other reservation: entry + 24 h, or the

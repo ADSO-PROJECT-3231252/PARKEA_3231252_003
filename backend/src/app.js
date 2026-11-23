@@ -34,6 +34,16 @@ function readBody(parser) {
 app.use(readBody(express.json()));
 app.use(readBody(express.urlencoded({ extended: true })));
 
+// #300: Express 5 leaves req.body undefined when a request has no body, or
+// one that no parser above reads. Reading a field of it would end in a 500;
+// with an empty object each route answers its own 400.
+app.use((req, res, next) => {
+    if (req.body === undefined) {
+        req.body = {};
+    }
+    next();
+});
+
 // Health check route, useful to confirm the server is running
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'PARKEA API' });

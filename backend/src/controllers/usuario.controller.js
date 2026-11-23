@@ -44,6 +44,13 @@ async function editarPerfil(req, res, next) {
         const userId = req.usuario.id;
         const { fullName, phone } = req.body;
 
+        if (fullName === undefined && phone === undefined) {
+            return res.status(400).json({
+                code: ErrorCodes.MISSING_REQUIRED_FIELDS,
+                message: 'At least one field (fullName or phone) is required',
+            });
+        }
+
         const usuario = await Usuario.findByPk(userId);
         if (!usuario) {
             return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
