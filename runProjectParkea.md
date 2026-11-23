@@ -32,7 +32,7 @@ Open `backend/.env` and fill in:
 - `DATABASE_URL`: your local MySQL user and password, for example `mysql://root:your_password@localhost:3306/parkea_db`. If the password has special characters, encode them (`$` → `%24`, `@` → `%40`). The user must be allowed to create databases.
 - `JWT_SECRET`: any long random text.
 - `MAILTRAP_HOST`, `MAILTRAP_PORT`, `MAILTRAP_USER`, `MAILTRAP_PASS`: the SMTP settings of your Mailtrap sandbox inbox. They send the email that confirms a new account and the password recovery email. Without them you can still sign in as the administrator, but a new account cannot be confirmed.
-- `PRIMARY_ADMIN_EMAIL` and `PRIMARY_ADMIN_PASSWORD`: the email and password you want for the administrator. The password needs 8 to 20 characters, an uppercase letter, a number and a special character. If you leave both empty, `SEED_DEMO_ADMIN=true` creates the demo administrator `admin@parkea.com` instead, whose password is not written in the repository.
+- `PRIMARY_ADMIN_EMAIL` and `PRIMARY_ADMIN_PASSWORD`: the email and password you want for the administrator. Write the password between the single quotes of `.env.example`, for example `PRIMARY_ADMIN_PASSWORD='...'`: without them, dotenv cuts it at a `#`, and it cannot have a single quote itself. It needs 8 to 20 characters, an uppercase letter, a number and a special character. Only the PARKEA team, who knows the password of the demo administrator `admin@parkea.com`, can leave both empty and keep `SEED_DEMO_ADMIN=true`: that password is not written in the repository, so anyone else fills in these two values.
 
 Install the dependencies, create the database and load the demo data:
 
@@ -45,7 +45,7 @@ npm run db:seed
 
 Run `npm run db:seed` only once: the second time it fails with `Validation error` because the demo data is already there. To start over, see step 6.
 
-If it stops with `Set PRIMARY_ADMIN_EMAIL and PRIMARY_ADMIN_PASSWORD`, fill in those two values (or `SEED_DEMO_ADMIN=true`) and run only the seeder of the administrator, because the rest of the demo data is already there:
+If it stops with `Set PRIMARY_ADMIN_EMAIL and PRIMARY_ADMIN_PASSWORD`, fill in those two values (or, in the PARKEA team, `SEED_DEMO_ADMIN=true`) and run only the seeder of the administrator, because the rest of the demo data is already there:
 
 ```bash
 npx sequelize-cli db:seed --seed 20260808234824-demo-primary-admin.js
