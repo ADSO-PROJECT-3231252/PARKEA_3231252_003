@@ -34,9 +34,14 @@ async function createUser() {
         roleId: rol.id,
         emailVerifiedAt: new Date(),
     });
-    const letters = id.replace(/[^a-f]/g, '').toUpperCase().padEnd(3, 'X').slice(0, 3);
+    // A plate from the number of the id: its last 3 digits, and the next
+    // digits in base 26 for the 3 letters, so two ids give the same plate
+    // only once in 17 million (with only the letters a to f of the id, it
+    // happened in about 2 runs of every 100)
+    const n = parseInt(id, 16);
+    const letters = [0, 1, 2].map((i) => String.fromCharCode(65 + (Math.floor(n / 1000 / 26 ** i) % 26))).join('');
     const vehiculo = await Vehiculo.create({
-        plate: `${letters}${String(parseInt(id, 16) % 1000).padStart(3, '0')}`,
+        plate: `${letters}${String(n % 1000).padStart(3, '0')}`,
         vehicleType: 'car',
         brand: 'Mazda',
         model: '3',
