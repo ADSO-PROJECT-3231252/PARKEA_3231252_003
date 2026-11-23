@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { getReservations } from '../services/reservationService';
-import { formatDate, formatTime, formatCurrency } from '../utils/format';
+import { formatDate, formatTime, formatCurrency, formatStay, formatStayHours, keepTogether } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import DecorativeImage from '../components/DecorativeImage';
 import Reveal from '../components/Reveal';
@@ -331,10 +331,11 @@ function AuthenticatedHome({ user }) {
 
                             <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pl-[18px]">
                                 <p className="text-body text-neutral-600">
-                                    {/* An open stay (HU-27, or switched to it in HU-28) has no exit time yet */}
+                                    {/* An open stay (HU-27, or switched to it in HU-28) has no exit time yet.
+                                        #357: an exit on another day says its date too. */}
                                     {currentReservation.endTime
-                                        ? `${formatTime(currentReservation.startTime)} – ${formatTime(currentReservation.endTime)}`
-                                        : `${formatTime(currentReservation.startTime)} · Sin hora de salida`}
+                                        ? formatStayHours(currentReservation.startTime, currentReservation.endTime)
+                                        : `${keepTogether(formatTime(currentReservation.startTime))} · Sin hora de salida`}
                                 </p>
                                 <p className="shrink-0 font-mono text-label text-neutral-600">
                                     Cupo N.º {currentReservation.spotNumber}
@@ -413,8 +414,8 @@ function AuthenticatedHome({ user }) {
                                         <div className="min-w-0">
                                             <p className="break-words text-body leading-tight text-neutral-900">{item.zone.name}</p>
                                             <p className="text-caption leading-tight text-neutral-600">
-                                                {formatDate(item.startTime)} · {formatTime(item.startTime)} –{' '}
-                                                {formatTime(item.endTime)}
+                                                {/* #357: a stay that ends on another day shows both dates */}
+                                                {formatStay(item.startTime, item.endTime)}
                                             </p>
                                         </div>
                                     </div>
