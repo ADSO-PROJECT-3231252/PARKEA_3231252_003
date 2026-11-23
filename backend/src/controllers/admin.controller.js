@@ -4,6 +4,7 @@ const ErrorCodes = require('../constants/errorCodes');
 const { colombiaDay } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
 const availability = require('../services/availability');
+const { hasOpenReservationsOrBalance } = require('../services/accountOpenItems');
 
 const RANGOS_VALIDOS = ['today', 'week', 'month'];
 
@@ -309,6 +310,60 @@ async function getRegistroDeCambios(req, res, next) {
   }
 }
 
+// #348: locks the accounts of the administrator who asks and of the one that
+// changes, as the first reads of the transaction and always in the order of
+// their id. Two administrators who change each other at the same moment then
+// wait for each other instead of a deadlock: without it, each one locked the
+// account it changed, and the line of the log (admin_id is a foreign key)
+// waited for the account of its administrator, locked by the other request.
+// Only the rows of users are locked: reading the role with them (include)
+// would lock its row in roles too, and every change and sign-up of that
+// role would wait. Like crear, the reservation of a user waits here too.
+async function bloquearCuentas(solicitanteId, id, t) {
+  const cuentas = {};
+  for (const cuentaId of [solicitanteId, id].sort()) {
+    cuentas[cuentaId] = await Usuario.findByPk(cuentaId, {
+      attributes: ['id', 'isActive', 'isPrimaryAdmin', 'roleId'],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+  }
+  return { solicitante: cuentas[solicitanteId], usuario: cuentas[id] };
+}
+
+// #348: the session was checked when the request arrived, but the other
+// administrator may have deactivated this one or removed their role while
+// this request waited at the lock. The answer is the one of the session check.
+function solicitanteSinPermiso(req, solicitante) {
+  if (!solicitante || !solicitante.isActive) {
+    return { code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' };
+  }
+  if (solicitante.roleId !== req.usuario.roleId) {
+    return { code: ErrorCodes.FORBIDDEN_ROLE, message: 'You do not have permission for this action' };
+  }
+  return null;
+}
+
+// #348 (decision of #316): an account with a Pending or Active reservation or
+// a balance to pay cannot change its role or be deactivated, because then
+// nobody could pay, cancel or finish them
+const RESERVAS_ABIERTAS = {
+  code: ErrorCodes.USER_HAS_OPEN_RESERVATIONS,
+  message: 'This account has pending or active reservations or a balance to pay. Wait until they are resolved to change its role or deactivate it',
+};
+
+// HU-23: the system always keeps at least one active administrator
+async function quedaSinAdministradores(t) {
+  const admins = await Usuario.count({
+    where: { isActive: true },
+    include: [{ model: Rol, as: 'role', where: { name: 'admin' } }],
+    transaction: t,
+  });
+  return admins <= 1;
+}
+
+const MIN_UN_ADMIN = { code: ErrorCodes.MIN_ONE_ADMIN_REQUIRED, message: 'The system must always keep at least one active administrator' };
+
 // PATCH /api/admin/users/:id/role
 async function cambiarRol(req, res, next) {
   const t = await sequelize.transaction();
@@ -322,12 +377,13 @@ async function cambiarRol(req, res, next) {
       return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot change your own role' });
     }
 
-    const usuario = await Usuario.findByPk(id, {
-      include: [{ model: Rol, as: 'role' }],
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+    const { solicitante, usuario } = await bloquearCuentas(solicitanteId, id, t);
 
+    const sinPermiso = solicitanteSinPermiso(req, solicitante);
+    if (sinPermiso) {
+      await t.rollback();
+      return res.status(403).json(sinPermiso);
+    }
     if (!usuario) {
       await t.rollback();
       return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
@@ -337,26 +393,26 @@ async function cambiarRol(req, res, next) {
       return res.status(403).json({ code: ErrorCodes.PRIMARY_ADMIN_PROTECTED, message: 'The primary administrator role cannot be changed' });
     }
 
-    const rolAnterior = usuario.role.name;
+    // After the locks, so these plain reads see what the other requests saved
+    const roles = await Rol.findAll({ attributes: ['id', 'name'], transaction: t });
+    const rolAnterior = roles.find((r) => r.id === usuario.roleId)?.name;
 
     if (rolAnterior === role) {
       await t.commit();
       return res.status(200).json({ message: 'Role updated successfully' });
     }
 
-    if (usuario.role.name === 'admin' && role === 'user') {
-      const admins = await Usuario.count({
-        where: { isActive: true },
-        include: [{ model: Rol, as: 'role', where: { name: 'admin' } }],
-        transaction: t,
-      });
-      if (admins <= 1) {
-        await t.rollback();
-        return res.status(400).json({ code: ErrorCodes.MIN_ONE_ADMIN_REQUIRED, message: 'The system must always keep at least one active administrator' });
-      }
+    if (await hasOpenReservationsOrBalance(id, { transaction: t })) {
+      await t.rollback();
+      return res.status(409).json(RESERVAS_ABIERTAS);
     }
 
-    const nuevoRol = await Rol.findOne({ where: { name: role }, transaction: t });
+    if (rolAnterior === 'admin' && role === 'user' && await quedaSinAdministradores(t)) {
+      await t.rollback();
+      return res.status(400).json(MIN_UN_ADMIN);
+    }
+
+    const nuevoRol = roles.find((r) => r.name === role);
     if (!nuevoRol) {
       await t.rollback();
       return res.status(400).json({ code: ErrorCodes.INVALID_ROLE, message: 'Invalid role' });
@@ -393,12 +449,13 @@ async function cambiarEstado(req, res, next) {
       return res.status(403).json({ code: ErrorCodes.CANNOT_MODIFY_SELF, message: 'You cannot deactivate your own account' });
     }
 
-    const usuario = await Usuario.findByPk(id, {
-      include: [{ model: Rol, as: 'role' }],
-      transaction: t,
-      lock: t.LOCK.UPDATE,
-    });
+    const { solicitante, usuario } = await bloquearCuentas(solicitanteId, id, t);
 
+    const sinPermiso = solicitanteSinPermiso(req, solicitante);
+    if (sinPermiso) {
+      await t.rollback();
+      return res.status(403).json(sinPermiso);
+    }
     if (!usuario) {
       await t.rollback();
       return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
@@ -413,15 +470,18 @@ async function cambiarEstado(req, res, next) {
       return res.status(200).json({ message: 'Status updated successfully' });
     }
 
-    if (usuario.role.name === 'admin' && isActive === false) {
-      const admins = await Usuario.count({
-        where: { isActive: true },
-        include: [{ model: Rol, as: 'role', where: { name: 'admin' } }],
-        transaction: t,
-      });
-      if (admins <= 1) {
+    // Activating an account is never blocked
+    if (isActive === false) {
+      if (await hasOpenReservationsOrBalance(id, { transaction: t })) {
         await t.rollback();
-        return res.status(400).json({ code: ErrorCodes.MIN_ONE_ADMIN_REQUIRED, message: 'The system must always keep at least one active administrator' });
+        return res.status(409).json(RESERVAS_ABIERTAS);
+      }
+
+      // After the locks, so this plain read sees what the other requests saved
+      const rol = await Rol.findByPk(usuario.roleId, { attributes: ['name'], transaction: t });
+      if (rol?.name === 'admin' && await quedaSinAdministradores(t)) {
+        await t.rollback();
+        return res.status(400).json(MIN_UN_ADMIN);
       }
     }
 

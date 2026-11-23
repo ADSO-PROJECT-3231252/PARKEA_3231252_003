@@ -3,7 +3,8 @@ const request = require('supertest');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Rol, AdminActionLog, sequelize } = require('../src/models');
+const { Op } = require('sequelize');
+const { Usuario, Rol, Reserva, Pago, AdminActionLog, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // HU-23: an administrator changes the role or the status of an account.
@@ -15,15 +16,21 @@ const ADMIN_ROLE_ID = '99999999-9999-4999-8999-999999999992';
 
 const adminToken = jwt.sign({ id: ADMIN_ID, email: 'admin@parkea.com', rol: 'admin' }, process.env.JWT_SECRET);
 
+const roleId = (name) => (name === 'admin' ? ADMIN_ROLE_ID : USER_ROLE_ID);
+
 let transaction;
 let target;
 let sessionRole;
+let adminNow;
 let countAdmins;
+let countOpen;
+let findBalance;
 let writeLog;
 
 // The account the admin changes, with its own update spy
 function account(values = {}) {
-    return { id: TARGET_ID, isActive: true, isPrimaryAdmin: false, role: { name: 'user' }, update: jest.fn(), ...values };
+    const { role = { name: 'user' }, ...rest } = values;
+    return { id: TARGET_ID, isActive: true, isPrimaryAdmin: false, roleId: roleId(role.name), update: jest.fn(), ...rest };
 }
 
 const changeRole = (role, id = TARGET_ID, token = adminToken) => request(app)
@@ -41,14 +48,25 @@ beforeEach(() => {
     jest.spyOn(sequelize, 'transaction').mockResolvedValue(transaction);
     target = account();
     sessionRole = 'admin';
-    // The session of whoever sends the request (auth middleware) and the account it changes
-    jest.spyOn(Usuario, 'findByPk').mockImplementation(async (id) => {
+    // #348: the account of the admin as the locked read gives it (null: as the session)
+    adminNow = null;
+    // The session of whoever sends the request (auth middleware), and the
+    // locked reads of that admin and of the account it changes
+    jest.spyOn(Usuario, 'findByPk').mockImplementation(async (id, options = {}) => {
         if (id === TARGET_ID) return target;
-        if (id === ADMIN_ID) return { id: ADMIN_ID, isActive: true, passwordVersion: 0, role: { name: sessionRole } };
+        if (id === ADMIN_ID) {
+            const session = { id: ADMIN_ID, isActive: true, isPrimaryAdmin: false, passwordVersion: 0, roleId: roleId(sessionRole), role: { name: sessionRole } };
+            return options.lock && adminNow ? { ...session, ...adminNow } : session;
+        }
         return null;
     });
     countAdmins = jest.spyOn(Usuario, 'count').mockResolvedValue(2);
-    jest.spyOn(Rol, 'findOne').mockImplementation(async ({ where }) => ({ id: where.name === 'admin' ? ADMIN_ROLE_ID : USER_ROLE_ID, name: where.name }));
+    const roles = [{ id: USER_ROLE_ID, name: 'user' }, { id: ADMIN_ROLE_ID, name: 'admin' }];
+    jest.spyOn(Rol, 'findAll').mockResolvedValue(roles);
+    jest.spyOn(Rol, 'findByPk').mockImplementation(async (id) => roles.find((r) => r.id === id) ?? null);
+    // #348: no reservation that holds a spot and no balance to pay
+    countOpen = jest.spyOn(Reserva, 'count').mockResolvedValue(0);
+    findBalance = jest.spyOn(Pago, 'findOne').mockResolvedValue(null);
     writeLog = jest.spyOn(AdminActionLog, 'create').mockResolvedValue({});
 });
 
@@ -320,6 +338,164 @@ describe('Repeated admin actions (#304)', () => {
         expect(target.update).not.toHaveBeenCalled();
         expect(writeLog).not.toHaveBeenCalled();
         expect(transaction.commit).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('Accounts with open reservations or a balance to pay (#348)', () => {
+    // [case, what the account has]
+    const OPEN = [
+        ['a Pending or Active reservation', () => countOpen.mockResolvedValue(1)],
+        ['a balance to pay', () => findBalance.mockResolvedValue({ id: 'balance-1' })],
+    ];
+
+    test.each(OPEN)('with %s, changing its role answers 409 USER_HAS_OPEN_RESERVATIONS and changes nothing', async (_case, arrangeOpen) => {
+        // Arrange
+        arrangeOpen();
+
+        // Act
+        const res = await changeRole('admin');
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('USER_HAS_OPEN_RESERVATIONS');
+        expectNothingChanged();
+        expect(transaction.rollback).toHaveBeenCalled();
+    });
+
+    test.each(OPEN)('with %s, an admin cannot become a user either', async (_case, arrangeOpen) => {
+        // Arrange
+        target = account({ role: { name: 'admin' } });
+        arrangeOpen();
+
+        // Act
+        const res = await changeRole('user');
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('USER_HAS_OPEN_RESERVATIONS');
+        expectNothingChanged();
+    });
+
+    test.each(OPEN)('with %s, deactivating it answers 409 USER_HAS_OPEN_RESERVATIONS and changes nothing', async (_case, arrangeOpen) => {
+        // Arrange
+        arrangeOpen();
+
+        // Act
+        const res = await changeStatus(false);
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('USER_HAS_OPEN_RESERVATIONS');
+        expectNothingChanged();
+    });
+
+    test.each(OPEN)('with %s, activating it is not blocked', async (_case, arrangeOpen) => {
+        // Arrange
+        target = account({ isActive: false });
+        arrangeOpen();
+
+        // Act
+        const res = await changeStatus(true);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(target.update).toHaveBeenCalledWith({ isActive: true }, { transaction });
+        expect(countOpen).not.toHaveBeenCalled();
+    });
+
+    test.each([
+        ['role', () => changeRole('user')],
+        ['status', () => changeStatus(true)],
+    ])('asking for the %s it already has still answers 200 without a line in the log', async (_field, sendRequest) => {
+        // Arrange
+        countOpen.mockResolvedValue(1);
+
+        // Act
+        const res = await sendRequest();
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(target.update).not.toHaveBeenCalled();
+        expect(writeLog).not.toHaveBeenCalled();
+    });
+
+    test('the reservations counted are the ones of the account that hold a spot now, in the transaction', async () => {
+        // Act
+        await changeStatus(false);
+
+        // Assert: Active, or Pending with its 15 minutes still running (#347)
+        const [{ where, transaction: used }] = countOpen.mock.calls[0];
+        expect(used).toBe(transaction);
+        expect(where.userId).toBe(TARGET_ID);
+        const [active, pending] = where[Op.and][0][Op.or];
+        expect(active).toEqual({ status: 'Active' });
+        expect(pending.status).toBe('Pending');
+        expect(pending[Op.or][0]).toEqual({ holdExpiresAt: null });
+        expect(pending[Op.or][1].holdExpiresAt[Op.gt]).toBeInstanceOf(Date);
+        // The balance is the Pending payment of type balance of a reservation of the account
+        const [balanceQuery] = findBalance.mock.calls[0];
+        expect(balanceQuery.where).toEqual({ type: 'balance', paymentStatus: 'Pending' });
+        expect(balanceQuery.include[0].where).toEqual({ userId: TARGET_ID });
+        expect(balanceQuery.transaction).toBe(transaction);
+    });
+});
+
+describe('Two administrators at the same moment (#348)', () => {
+    // Locked reads of the change: the session reads have no lock
+    const lockedReads = () => Usuario.findByPk.mock.calls.filter(([, options]) => options?.lock);
+
+    test.each([
+        ['role', () => changeRole('admin')],
+        ['status', () => changeStatus(false)],
+    ])('the %s change locks both accounts, in the order of their id and without the role', async (_field, sendRequest) => {
+        // Act
+        await sendRequest();
+
+        // Assert: ADMIN_ID (1111...) goes before TARGET_ID (8888...)
+        const reads = lockedReads();
+        expect(reads.map(([id]) => id)).toEqual([ADMIN_ID, TARGET_ID]);
+        for (const [, options] of reads) {
+            expect(options).toEqual(expect.objectContaining({ transaction, lock: transaction.LOCK.UPDATE }));
+            // Reading the role with the lock (include) would lock its row in roles
+            expect(options.include).toBeUndefined();
+        }
+    });
+
+    test('an account whose id comes first is locked first', async () => {
+        // Arrange: an account with a lower id than the admin
+        const LOWER_ID = '05555555-5555-4555-8555-555555555555';
+        target = account({ id: LOWER_ID });
+        Usuario.findByPk.mockImplementation(async (id) => {
+            if (id === LOWER_ID) return target;
+            if (id === ADMIN_ID) return { id: ADMIN_ID, isActive: true, passwordVersion: 0, roleId: ADMIN_ROLE_ID, role: { name: 'admin' } };
+            return null;
+        });
+
+        // Act
+        const res = await changeStatus(false, LOWER_ID);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(lockedReads().map(([id]) => id)).toEqual([LOWER_ID, ADMIN_ID]);
+    });
+
+    test.each([
+        ['deactivated', { isActive: false }, 'ACCOUNT_DEACTIVATED'],
+        ['made a user', { roleId: USER_ROLE_ID }, 'FORBIDDEN_ROLE'],
+    ])('an admin %s by the other one while waiting at the lock answers 403 %s and changes nothing', async (_case, now, code) => {
+        // Arrange: the session still saw an active admin
+        adminNow = now;
+
+        // Act
+        const resRole = await changeRole('admin');
+        const resStatus = await changeStatus(false);
+
+        // Assert
+        for (const res of [resRole, resStatus]) {
+            expect(res.status).toBe(403);
+            expect(res.body.code).toBe(code);
+        }
+        expectNothingChanged();
     });
 });
 

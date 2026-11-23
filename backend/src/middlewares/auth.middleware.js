@@ -20,7 +20,7 @@ function verificarToken(req, res, next) {
             // deactivated or its role changed after it was issued, so the
             // current state is read on every request (HU-23, AC-05 and AC-11)
             const usuario = await Usuario.findByPk(payload.id, {
-                attributes: ['isActive', 'passwordVersion'],
+                attributes: ['isActive', 'passwordVersion', 'roleId'],
                 include: { model: Rol, as: 'role', attributes: ['name'] },
             });
             if (!usuario || !usuario.isActive) {
@@ -33,8 +33,9 @@ function verificarToken(req, res, next) {
                 return res.status(403).json({ code: ErrorCodes.INVALID_TOKEN, message: 'Invalid or expired token' });
             }
 
-            // verificarRol reads req.usuario.rol: use the role stored now, not the one in the token
-            req.usuario = { ...payload, rol: usuario.role.name };
+            // verificarRol reads req.usuario.rol: use the role stored now, not the one in the token.
+            // #348: roleId lets a request see if the role changed while it waited at a lock
+            req.usuario = { ...payload, rol: usuario.role.name, roleId: usuario.roleId };
             next();
         } catch (error) {
             console.error('Error checking the session:', error);
