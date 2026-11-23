@@ -260,7 +260,7 @@ npx sequelize-cli db:migrate
 npx sequelize-cli db:seed:all
 ```
 
-> The 29 migrations create the 11 tables: roles, users, vehicles, zones, zone_schedules, parking_spots, reservations, payments, password_reset_tokens, email_verification_tokens and admin_action_logs.
+> The 32 migrations create the 11 tables: roles, users, vehicles, zones, zone_schedules, parking_spots, reservations, payments, password_reset_tokens, email_verification_tokens and admin_action_logs.
 > The seeders add the `admin` and `user` roles, 4 demo zones open 24 hours with their parking spots, and the primary administrator, already verified. It gets the email and password of `PRIMARY_ADMIN_EMAIL` and `PRIMARY_ADMIN_PASSWORD`. With both empty and `SEED_DEMO_ADMIN=true` (the value of `.env.example`), it is the demo administrator `admin@parkea.com`, whose password the repository does not keep: demo mode is for the PARKEA team, who knows it, and anyone else sets the two values. With neither, the seeders stop and create no administrator (see Environment Variables).
 > A new account must confirm its email before signing in. On your computer the email arrives in your Mailtrap inbox, so fill in the `MAILTRAP_*` variables (see Environment Variables).
 
