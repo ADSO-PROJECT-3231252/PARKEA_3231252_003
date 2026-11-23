@@ -307,3 +307,141 @@ describe('The card of the home updates itself while the page is open (#347)', ()
         expect(within(card).queryByText('Zona Corriendo')).not.toBeInTheDocument();
     });
 });
+
+describe('The motion of the three homes (#330)', () => {
+    // Signs in with the role, or leaves the visitor signed out
+    const signIn = (role) => {
+        localStorage.clear();
+        if (!role) return;
+        localStorage.setItem('token', 'test-token');
+        localStorage.setItem('user', JSON.stringify({ id: `${role}-1`, fullName: 'Laura Gómez', role }));
+    };
+
+    beforeEach(() => {
+        getReservations.mockReset().mockResolvedValue({ data: { reservations: [] } });
+        getZones.mockReset().mockResolvedValue({ data: { zones: [] } });
+    });
+
+    test.each([
+        ['visitor', null],
+        ['user', 'user'],
+        ['admin', 'admin'],
+    ])('the hero of the %s home appears in steps, and its illustration slides in', async (_, role) => {
+        // Arrange
+        signIn(role);
+
+        // Act
+        renderHome();
+        await act(async () => {});
+
+        // Assert: the title, then the text, then the button
+        const title = screen.getByRole('heading', { level: 1 });
+        const hero = title.closest('section');
+        expect(title).toHaveClass('motion-safe:animate-fade-up');
+        expect(within(hero).getByText(/^(Encuentra|Desde aquí)/)).toHaveClass('motion-safe:animate-fade-up-2');
+        expect(within(hero).getByRole('link')).toHaveClass('motion-safe:animate-fade-up-3');
+        expect(hero.querySelector('img')).toHaveClass('motion-safe:animate-hero-illustration');
+    });
+
+    // The headings of the three cards of each home
+    const CARDS = {
+        visitor: ['Reservas', 'Zonas', 'Historial'],
+        user: ['Reservas', 'Zonas', 'Historial'],
+        admin: ['Panel de control', 'Gestión de zonas', 'Gestión de usuarios'],
+    };
+    const cards = (home) => CARDS[home].map((name) => screen.getByRole('heading', { name }).closest('.rounded-lg'));
+    const STEPS = ['motion-safe:animate-fade-up', 'motion-safe:animate-fade-up-2', 'motion-safe:animate-fade-up-3'];
+
+    describe('with IntersectionObserver', () => {
+        let observers;
+
+        beforeEach(() => {
+            // A fake one: the test says when each card scrolls into view
+            observers = [];
+            globalThis.IntersectionObserver = class {
+                constructor(callback) {
+                    const observer = { callback, observe: (element) => { observer.element = element; }, disconnect: jest.fn() };
+                    observers.push(observer);
+                    return observer;
+                }
+            };
+        });
+
+        afterEach(() => {
+            delete globalThis.IntersectionObserver;
+        });
+
+        test.each([
+            ['visitor', null],
+            ['user', 'user'],
+            ['admin', 'admin'],
+        ])('the cards of the %s home wait to scroll into view, and then appear one after the other', async (home, role) => {
+            // Arrange
+            signIn(role);
+            renderHome();
+            await act(async () => {});
+            for (const card of cards(home)) expect(card).toHaveClass('motion-safe:opacity-0');
+
+            // Act: the three of a row scroll into view together
+            for (const card of cards(home)) {
+                act(() => observers.find((observer) => observer.element === card).callback([{ isIntersecting: true, intersectionRatio: 1 }]));
+            }
+
+            // Assert
+            cards(home).forEach((card, i) => {
+                expect(card).not.toHaveClass('motion-safe:opacity-0');
+                expect(card).toHaveClass(STEPS[i]);
+            });
+        });
+    });
+
+    test.each([
+        ['visitor', null, false],
+        ['user', 'user', true],
+        ['admin', 'admin', true],
+    ])('on the %s home the main button rises on hover, and so do the cards with an action', async (home, role, cardsAct) => {
+        // Arrange
+        signIn(role);
+
+        // Act
+        renderHome();
+        await act(async () => {});
+
+        // Assert: a card without an action (visitor) does not rise, so it does
+        // not look like a link; only its icon grows a little
+        const hero = screen.getByRole('heading', { level: 1 }).closest('section');
+        const button = within(hero).getByRole('link');
+        expect(button).toHaveClass('group', 'hover:shadow-md', 'motion-safe:hover:-translate-y-0.5');
+        expect(button.querySelector('svg')).toHaveClass('motion-safe:group-hover:scale-110');
+        for (const card of cards(home)) {
+            expect(card).toHaveClass('group');
+            if (cardsAct) {
+                expect(card).toHaveClass('hover:shadow-lg', 'motion-safe:hover:-translate-y-1');
+                expect(within(card).getByRole('link').querySelector('svg')).toHaveClass('motion-safe:group-hover:translate-x-0.5');
+            } else {
+                expect(card).not.toHaveClass('hover:shadow-lg');
+                expect(card).not.toHaveClass('motion-safe:hover:-translate-y-1');
+                expect(card.querySelector('span')).toHaveClass('motion-safe:group-hover:scale-110');
+            }
+        }
+    });
+
+    test.each([
+        ['visitor', null],
+        ['user', 'user'],
+        ['admin', 'admin'],
+    ])('without IntersectionObserver the cards of the %s home show at once, without waiting or moving', async (home, role) => {
+        // Arrange
+        signIn(role);
+
+        // Act
+        renderHome();
+        await act(async () => {});
+
+        // Assert
+        for (const card of cards(home)) {
+            expect(card).not.toHaveClass('motion-safe:opacity-0');
+            for (const step of STEPS) expect(card).not.toHaveClass(step);
+        }
+    });
+});
