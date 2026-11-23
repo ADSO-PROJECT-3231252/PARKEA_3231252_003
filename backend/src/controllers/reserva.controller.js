@@ -596,11 +596,13 @@ async function ampliar(req, res, next) {
             }
         }
 
+        // #373: like in crear, a Pending one whose 15 minutes ended does not
+        // count, even before the job marks it Expired
         const solapada = await Reserva.findOne({
             where: {
                 id: { [Op.ne]: reserva.id },
                 vehicleId: reserva.vehicleId,
-                status: ['Pending', 'Active'],
+                [Op.and]: [availability.holdsItsSpot(ahora)],
                 startTime: { [Op.lt]: salidaNueva },
                 endTime: { [Op.gt]: salidaActual },
             },

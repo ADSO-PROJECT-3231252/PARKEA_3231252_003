@@ -274,13 +274,29 @@ describe('Paying an extension (HU-28, AC-04 to AC-06)', () => {
         // Act
         await payByCard(colombia('10:00'));
 
-        // Assert
+        // Assert: the reservations that hold their spot, the rule of the
+        // availability service (#373)
         const { where } = findReservation.mock.calls[1][0];
         expect(where.id[Op.ne]).toBe(RESERVATION_ID);
         expect(where.vehicleId).toBe(VEHICLE_ID);
-        expect(where.status).toEqual(['Pending', 'Active']);
+        expect(where.status).toBeUndefined();
+        expect(where[Op.and][0][Op.or][0]).toEqual({ status: 'Active' });
         expect(where.startTime[Op.lt]).toEqual(colombia('10:00'));
         expect(where.endTime[Op.gt]).toEqual(colombia('09:00'));
+    });
+
+    test('a Pending reservation of the vehicle whose 15 minutes ended does not count, even before the job runs (#373)', async () => {
+        // Arrange
+        arrange();
+
+        // Act
+        await payByCard(colombia('10:00'));
+
+        // Assert: Pending counts only with its deadline still ahead (or none)
+        const { where } = findReservation.mock.calls[1][0];
+        const [, pending] = where[Op.and][0][Op.or];
+        expect(pending.status).toBe('Pending');
+        expect(pending[Op.or]).toEqual([{ holdExpiresAt: null }, { holdExpiresAt: { [Op.gt]: NOW } }]);
     });
 
     test('the vehicle is locked before the zone is read and before the overlap check', async () => {
