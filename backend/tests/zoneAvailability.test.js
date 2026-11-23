@@ -176,6 +176,27 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(res.body.zone).toMatchObject({ id: CENTRO, isActive: false, availableSlots: 9 });
+        expectOneMoment(Zona.findByPk, ParkingSpot.count);
+    });
+
+    test('PATCH /api/zones/:id/toggle counts the free spots before saving, so a failed count changes nothing and can be repeated', async () => {
+        // Arrange
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        const centro = zone(CENTRO, 'Centro', 10);
+        jest.spyOn(centro, 'update').mockImplementation(async (values) => centro.set(values));
+        jest.spyOn(Zona, 'findByPk').mockResolvedValue(centro);
+        jest.spyOn(ParkingSpot, 'count').mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValue(9);
+
+        // Act
+        const failed = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`));
+        const again = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`));
+
+        // Assert: the first one saved nothing, so the second one deactivates it
+        expect(failed.status).toBe(500);
+        expect(centro.update).toHaveBeenCalledTimes(1);
+        expect(again.status).toBe(200);
+        expect(again.body.zone).toMatchObject({ isActive: false, availableSlots: 9 });
+        expect(ParkingSpot.count.mock.invocationCallOrder[1]).toBeLessThan(centro.update.mock.invocationCallOrder[0]);
     });
 });
 

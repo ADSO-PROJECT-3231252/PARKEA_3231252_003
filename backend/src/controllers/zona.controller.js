@@ -208,8 +208,9 @@ async function updateZona(req, res, next) {
   try {
     // Locked so a reservation can't take a spot while the capacity changes.
     // #371: the zone first and then its spots; crear and ampliar lock the
-    // zone first too, so they wait instead of a deadlock (#373: cancelar,
-    // terminar and the two jobs no longer lock the zone or a spot).
+    // zone first too, and the payment after its reservation, so they wait
+    // instead of a deadlock (#373: cancelar, terminar and the two jobs no
+    // longer lock the zone or a spot).
     zona = await Zona.findByPk(id, { transaction: t, lock: t.LOCK.UPDATE });
     if (!zona) {
       await t.rollback();
@@ -319,14 +320,22 @@ async function updateZona(req, res, next) {
 async function toggleZona(req, res, next) {
   try {
     const { id } = req.params;
-    const zona = await Zona.findByPk(id, { include: [CON_HORARIO] });
-    if (!zona) {
+    // #373: the zone is sent as everywhere else, with its free spots, read
+    // with it in one moment. They are counted before saving: activating or
+    // deactivating does not change them, and if counting fails nothing was
+    // changed, so the request can be repeated (a 500 after saving would make
+    // the retry toggle the zone back).
+    const leida = await enUnMomento(async (transaction) => {
+      const encontrada = await Zona.findByPk(id, { include: [CON_HORARIO], transaction });
+      return encontrada && { zona: encontrada, disponibles: await availability.availableNow(encontrada.id, { transaction }) };
+    });
+    if (!leida) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
+    const { zona, disponibles } = leida;
 
     await zona.update({ isActive: !zona.isActive });
-    // #373: the zone is sent as everywhere else, with its free spots
-    zona.setDataValue('availableSlots', await availability.availableNow(zona.id));
+    zona.setDataValue('availableSlots', disponibles);
 
     return res.status(200).json({
       message: `Zone ${zona.isActive ? 'activated' : 'deactivated'} successfully`,
