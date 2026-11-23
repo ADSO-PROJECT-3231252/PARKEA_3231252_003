@@ -328,6 +328,14 @@ export default function Reservations() {
     // after either action (HU-16 AC-06, HU-27 AC-09).
     const [cancelTarget, setCancelTarget] = useState(null);
     const cancelFallbackRef = useRef(null);
+    const headingRef = useRef(null);
+    const trackReservationRow = useCallback((row) => {
+        if (!row) return;
+        return () => {
+            // Keep the keyboard position on the list when the focused row is removed.
+            if (row.contains(document.activeElement)) headingRef.current?.focus();
+        };
+    }, []);
     const [finishTarget, setFinishTarget] = useState(null);
     // HU-28: the stay in the extend dialog and when it was opened.
     const [extendTarget, setExtendTarget] = useState(null);
@@ -473,7 +481,7 @@ export default function Reservations() {
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <title>Mis reservas | PARKEA</title>
-            <h1 className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
+            <h1 ref={headingRef} tabIndex={-1} className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Consulta el historial de tus reservas y su estado.
             </p>
@@ -643,6 +651,7 @@ bg-white lg:block"
                                     {reservations.map((r) => (
                                         <tr
                                             key={r.id}
+                                            ref={trackReservationRow}
                                             className={`border-t border-l-4 border-t-neutral-200
 align-middle ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                         >
@@ -688,6 +697,7 @@ text-neutral-900"
                             {reservations.map((r) => (
                                 <li
                                     key={r.id}
+                                    ref={trackReservationRow}
                                     className={`rounded-lg border border-l-4 border-neutral-200 bg-white
 p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                 >

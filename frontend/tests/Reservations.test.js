@@ -402,3 +402,44 @@ test('focuses the same reservation details when its cancel action expires while 
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(within(row).getByRole('button', { name: DETAIL_PENDING })).toHaveFocus();
 });
+
+test('focuses the list heading when a refresh removes the reservation after a cancellation error (#361)', async () => {
+    // Arrange
+    answer([paid, pending]);
+    cancelReservation.mockRejectedValueOnce({
+        response: { status: 404, data: { code: 'RESERVATION_NOT_FOUND' } },
+    });
+    renderList();
+    const [opener] = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    opener.focus();
+    fireEvent.click(opener);
+
+    const dialog = screen.getByRole('alertdialog');
+    const confirm = within(dialog).getByRole('button', { name: 'Cancelar reserva' });
+    await act(async () => { fireEvent.click(confirm); });
+    expect(within(dialog).getByRole('alert')).toBeInTheDocument();
+
+    // The refresh finishes after the dialog closes.
+    let resolveRefresh;
+    getReservations.mockReturnValueOnce(new Promise((resolve) => {
+        resolveRefresh = resolve;
+    }));
+
+    // Act
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Conservar reserva' }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(getReservations).toHaveBeenCalledTimes(2);
+    await act(async () => {
+        resolveRefresh({
+            data: {
+                reservations: [paid],
+                pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+            },
+        });
+    });
+
+    // Assert
+    expect(buttons(DETAIL_PENDING)).toHaveLength(0);
+    expect(buttons(CANCEL_PAID)).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Mis reservas' })).toHaveFocus();
+});
