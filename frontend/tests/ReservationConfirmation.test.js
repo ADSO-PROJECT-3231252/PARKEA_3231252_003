@@ -150,3 +150,25 @@ describe('The reservation screen when the 15 minutes to pay end (#347)', () => {
         expect(cancelButton()).not.toBeInTheDocument();
     });
 });
+
+describe('Keyboard focus when the reservation countdown ends (#361)', () => {
+    test.each([
+        ['link', 'Ir al pago'],
+        ['button', 'Cancelar reserva'],
+    ])('focuses the expired status when the focused %s "%s" disappears', async (role, name) => {
+        // Arrange
+        answer();
+        renderScreen();
+        const action = await screen.findByRole(role, { name });
+        await wait(10 * MINUTE - 1000);
+        action.focus();
+        expect(action).toHaveFocus();
+
+        // Act
+        await wait(1000);
+
+        // Assert
+        expect(action).not.toBeInTheDocument();
+        expect(screen.getByText('Expirada')).toHaveFocus();
+    });
+});
