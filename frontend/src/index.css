@@ -132,6 +132,12 @@
 }
 
 @layer base {
+    /* #311: the space of the scroll bar is always kept, so the page does not
+       move sideways when a dialog locks the scroll (useBodyScrollLock) */
+    html {
+        scrollbar-gutter: stable;
+    }
+
     body {
         background-color: var(--color-neutral-50);
         color: var(--color-neutral-900);
