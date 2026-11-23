@@ -154,13 +154,14 @@ async function crear(req, res, next) {
         // reservations that other people save while this one waits there.
         // A Pending one whose 15 minutes ended counts as expired, even if the
         // job has not marked it yet (#347), so it does not take a place either.
+        const availabilityTime = new Date();
         const pendientes = await Reserva.count({
             where: {
                 userId,
                 status: 'Pending',
                 [Op.or]: [
                     { holdExpiresAt: null },
-                    { holdExpiresAt: { [Op.gt]: now } },
+                    { holdExpiresAt: { [Op.gt]: availabilityTime } },
                 ],
             },
             transaction: t,
@@ -200,7 +201,7 @@ async function crear(req, res, next) {
         const solapada = await Reserva.findOne({
             where: {
                 vehicleId,
-                [Op.and]: [availability.holdsItsSpot(now)],
+                [Op.and]: [availability.holdsItsSpot(availabilityTime)],
                 startTime: { [Op.lt]: end },
                 endTime: { [Op.gt]: start },
             },
@@ -216,7 +217,7 @@ async function crear(req, res, next) {
         // taken only for the hours of its reservations, so a reservation for
         // tomorrow leaves its spot free for today. An open stay holds it
         // until its provisional exit time.
-        const cupo = await availability.firstFreeSpot(zoneId, start, end, { transaction: t, now });
+        const cupo = await availability.firstFreeSpot(zoneId, start, end, { transaction: t, now: availabilityTime });
 
         if (!cupo) {
             await t.rollback();
