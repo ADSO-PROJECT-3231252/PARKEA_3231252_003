@@ -59,7 +59,7 @@ describe('Reveal (#330)', () => {
             expect(card(1).className).toBe(`card ${HIDDEN}`);
 
             // Act: the second card is still out of view
-            act(() => observerOf(card(2)).callback([{ isIntersecting: false }]));
+            act(() => observerOf(card(2)).callback([{ isIntersecting: false, intersectionRatio: 0 }]));
 
             // Assert
             expect(card(2).className).toBe(`card ${HIDDEN}`);
@@ -73,6 +73,26 @@ describe('Reveal (#330)', () => {
             expect(card(3).className).toBe(`card ${HIDDEN}`);
             expect(observerOf(card(2)).disconnect).toHaveBeenCalled();
             expect(observerOf(card(1)).disconnect).not.toHaveBeenCalled();
+        });
+
+        test('a card that only touches the screen keeps waiting, and appears when 15% of it is in view', () => {
+            // Arrange
+            renderCards();
+            const observer = observerOf(card(3));
+
+            // Act: 1% of it is in view
+            act(() => observer.callback([{ isIntersecting: true, intersectionRatio: 0.01 }]));
+
+            // Assert
+            expect(card(3).className).toBe(`card ${HIDDEN}`);
+            expect(observer.disconnect).not.toHaveBeenCalled();
+
+            // Act: 15% of it is in view
+            act(() => observer.callback([{ isIntersecting: true, intersectionRatio: 0.15 }]));
+
+            // Assert
+            expect(card(3).className).toBe(`card ${STEPS[2]}`);
+            expect(observer.disconnect).toHaveBeenCalled();
         });
 
         test('a fourth card takes the step of the third one', () => {

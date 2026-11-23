@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react';
 
 // The steps of index.css. A fourth card or more takes the last one.
 const STEPS = ['motion-safe:animate-fade-up', 'motion-safe:animate-fade-up-2', 'motion-safe:animate-fade-up-3'];
+// The part of a card that has to be in view before it appears
+const VISIBLE_SHARE = 0.15;
 
 export default function Reveal({ step = 0, className, children }) {
     const ref = useRef(null);
@@ -16,13 +18,15 @@ export default function Reveal({ step = 0, className, children }) {
 
     useEffect(() => {
         if (!watches || shown) return undefined;
-        // Once shown, the effect ends and stops watching the card. It waits
-        // until a part of the card is in view, not just its first pixel.
+        // It waits until a part of the card is in view, not just its first
+        // pixel. An entry also comes when the card only touches the screen
+        // (right after observe, for example), so its share is checked too.
+        // Once shown, the effect ends and stops watching the card.
         const observer = new IntersectionObserver(
             (entries) => {
-                if (entries.some((entry) => entry.isIntersecting)) setShown(true);
+                if (entries.some((entry) => entry.isIntersecting && entry.intersectionRatio >= VISIBLE_SHARE)) setShown(true);
             },
-            { threshold: 0.15 },
+            { threshold: VISIBLE_SHARE },
         );
         observer.observe(ref.current);
         return () => observer.disconnect();
