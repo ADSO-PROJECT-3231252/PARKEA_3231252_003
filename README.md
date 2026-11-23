@@ -261,7 +261,7 @@ npx sequelize-cli db:seed:all
 ```
 
 > The 29 migrations create the 11 tables: roles, users, vehicles, zones, zone_schedules, parking_spots, reservations, payments, password_reset_tokens, email_verification_tokens and admin_action_logs.
-> The seeders add the `admin` and `user` roles, 4 demo zones open 24 hours with their parking spots, and the primary administrator `admin@parkea.com`, already verified (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
+> The seeders add the `admin` and `user` roles, 4 demo zones open 24 hours with their parking spots, and the primary administrator, already verified. It gets the email and password of `PRIMARY_ADMIN_EMAIL` and `PRIMARY_ADMIN_PASSWORD`. With both empty and `SEED_DEMO_ADMIN=true` (the value of `.env.example`), it is the demo administrator `admin@parkea.com`, whose password the repository does not keep: demo mode is for the PARKEA team, who knows it, and anyone else sets the two values. With neither, the seeders stop and create no administrator (see Environment Variables).
 > A new account must confirm its email before signing in. On your computer the email arrives in your Mailtrap inbox, so fill in the `MAILTRAP_*` variables (see Environment Variables).
 
 6. Start the development server:
@@ -328,6 +328,18 @@ MAILTRAP_HOST=sandbox.smtp.mailtrap.io
 MAILTRAP_PORT=2525
 MAILTRAP_USER=your_mailtrap_user
 MAILTRAP_PASS=your_mailtrap_password
+
+# Primary administrator for a new database.
+# Set both values to create the administrator with your own credentials.
+# Write the password between the single quotes: without them, dotenv cuts it
+# at a #. It cannot have a single quote itself.
+PRIMARY_ADMIN_EMAIL=
+PRIMARY_ADMIN_PASSWORD=''
+
+# Local development only, for the PARKEA team, who knows the password of the
+# demo administrator admin@parkea.com. With both values empty, seed it.
+# Anyone else sets the two values above. Disable demo mode in production.
+SEED_DEMO_ADMIN=true
 ```
 
 | Variable | Used for |
@@ -340,8 +352,12 @@ MAILTRAP_PASS=your_mailtrap_password
 | `FRONTEND_URL` | Origin allowed by CORS, and address of the links in the emails (default `http://localhost:5173`) |
 | `MAILTRAP_*` | SMTP account for the verification and password recovery emails. On your computer, the Mailtrap sandbox: without it a new account cannot be confirmed. The published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
 | `MAIL_FROM` | Sender of the emails. Leave it empty on your computer; the published site uses `no-reply@parkeaweb.me` |
+| `PRIMARY_ADMIN_EMAIL` / `PRIMARY_ADMIN_PASSWORD` | Email and password of the primary administrator that the seeders create on a new database. Set both or neither. The password needs 8 to 20 characters, an uppercase letter, a number and a special character. Write it between single quotes, as in `.env.example`: without them, dotenv cuts it at a `#`, and it cannot have a single quote itself |
+| `SEED_DEMO_ADMIN` | With `true` and both values above empty, the seeders create the demo administrator `admin@parkea.com`, only on a database of your computer (`localhost`, `127.0.0.1` or `::1`). It is for the PARKEA team, who knows its password: anyone else sets the two values above |
 
 > If the MySQL password has special characters, encode them in `DATABASE_URL` (for example `$` → `%24`, `@` → `%40`).
+
+> If your `backend/.env` is older than #370, add `SEED_DEMO_ADMIN=true` (or the two `PRIMARY_ADMIN_*` values): without them `npm run db:seed` and `npm run db:reset` stop at the seeder of the administrator.
 
 ### Frontend (`frontend/.env`)
 
