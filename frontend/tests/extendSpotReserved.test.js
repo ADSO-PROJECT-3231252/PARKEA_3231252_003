@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import PayReservation from '../src/pages/PayReservation';
+import ExtendStayDialog from '../src/components/ExtendStayDialog';
 import { extendStay, getReservation } from '../src/services/reservationService';
 import { formatCurrency, formatDate, formatTime, keepTogether } from '../src/utils/format';
 
@@ -158,5 +159,95 @@ describe('Paying an extension that reaches the next reservation of the spot (#37
         );
         expect(payButton(4000)).toBeDisabled();
         expect(screen.queryByRole('button', { name: /^Ampliar hasta/ })).not.toBeInTheDocument();
+    });
+});
+
+describe('Switching to an open stay when the spot has a later reservation (#375)', () => {
+    function renderDialog() {
+        render(
+            <MemoryRouter initialEntries={[`/reservations/${ID}`]}>
+                <Routes>
+                    <Route
+                        path="/reservations/:id"
+                        element={
+                            <ExtendStayDialog
+                                reservation={RESERVATION}
+                                hourlyRate="2000.00"
+                                paid={4000}
+                                openedAt={NOW.getTime()}
+                                onClose={jest.fn()}
+                                onExtended={jest.fn()}
+                            />
+                        }
+                    />
+                    <Route path="/reservations/:id/payment" element={<Where />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+    }
+
+    const choice = () => screen.getByLabelText('Nueva hora de salida');
+    const optionValues = () => [...choice().querySelectorAll('option')].map((option) => option.value);
+
+    async function switchToOpenStay(user, freeUntil) {
+        extendStay.mockRejectedValueOnce(spotReservedLater(freeUntil));
+        await user.selectOptions(choice(), 'open');
+        await user.click(screen.getByRole('button', { name: 'Cambiar a tiempo indefinido' }));
+        return screen.findByRole('alert');
+    }
+
+    test('only the exit times before the next reservation are left, and no open stay', async () => {
+        // Arrange
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        renderDialog();
+        expect(optionValues()).toContain('open');
+
+        // Act
+        const alert = await switchToOpenStay(user, FREE_UNTIL);
+
+        // Assert: the reason, the times left (each hour and then 3:50 p. m.)
+        // and what the dialog says now
+        expect(alert).toHaveTextContent(
+            'Tu cupo tiene otra reserva más tarde, así que esta reserva no puede quedar en tiempo indefinido. ' +
+            `Puedes ampliarla hasta las ${time(FREE_UNTIL)}`,
+        );
+        expect(optionValues()).toEqual([colombia('13:00'), colombia('14:00'), colombia('15:00'), FREE_UNTIL]);
+        expect(choice()).toHaveValue(colombia('13:00'));
+        expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
+            new RegExp(`Puedes ampliarla hasta las ${timeInName(FREE_UNTIL)}, porque después tu cupo tiene otra reserva, y conservas el mismo cupo \\(4\\)\\.$`),
+        );
+        expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeEnabled();
+    });
+
+    test('the last time left goes to the payment of that extension', async () => {
+        // Arrange
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        renderDialog();
+        await switchToOpenStay(user, FREE_UNTIL);
+
+        // Act
+        await user.selectOptions(choice(), FREE_UNTIL);
+        await user.click(screen.getByRole('button', { name: 'Continuar al pago' }));
+
+        // Assert
+        const params = new URLSearchParams({ extendTo: FREE_UNTIL, from: RESERVATION.endTime });
+        expect(screen.getByTestId('where')).toHaveTextContent(`/reservations/${ID}/payment?${params}`);
+    });
+
+    test('when the spot is not free after the exit time, nothing is left to choose', async () => {
+        // Arrange
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        renderDialog();
+
+        // Act
+        const alert = await switchToOpenStay(user, colombia('11:55'));
+
+        // Assert
+        expect(alert).toHaveTextContent(
+            'Tu cupo tiene otra reserva poco después de tu salida, así que esta estadía no se puede ampliar',
+        );
+        expect(screen.queryByLabelText('Nueva hora de salida')).not.toBeInTheDocument();
+        expect(screen.getByRole('alertdialog')).not.toHaveAccessibleDescription(/Puedes ampliarla/);
+        expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
     });
 });
