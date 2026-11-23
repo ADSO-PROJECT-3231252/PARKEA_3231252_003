@@ -357,6 +357,53 @@ describe('Paying a reservation (HU-17)', () => {
     });
 });
 
+describe('An account that an admin changed while the payment waited (#348)', () => {
+    // The session saw an active user; the locked read is the account as it is now
+    const session = { id: USER_ID, isActive: true, passwordVersion: 0, roleId: 'role-user', role: { name: 'user' } };
+
+    test.each([
+        ['was deactivated', { isActive: false }, 'ACCOUNT_DEACTIVATED'],
+        ['was made administrator', { roleId: 'role-admin' }, 'FORBIDDEN_ROLE'],
+    ])('an account that %s answers 403 %s and nothing is paid', async (_case, now, code) => {
+        // Arrange
+        const reserva = arrange();
+        Usuario.findByPk.mockImplementation(async (id, options = {}) => (options.lock ? { ...session, ...now } : session));
+
+        // Act
+        const res = await pay(CARD);
+
+        // Assert: it stops right after the lock of the account
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe(code);
+        expect(findReservation).not.toHaveBeenCalled();
+        expect(createPayment).not.toHaveBeenCalled();
+        expect(reserva.save).not.toHaveBeenCalled();
+        expect(transaction.rollback).toHaveBeenCalled();
+        expect(transaction.commit).not.toHaveBeenCalled();
+    });
+
+    test('the account is locked first, then the reservation and then the zone', async () => {
+        // Arrange
+        arrange();
+        Usuario.findByPk.mockResolvedValue(session);
+
+        // Act
+        const res = await pay(CARD);
+
+        // Assert
+        expect(res.status).toBe(201);
+        const lockAccount = Usuario.findByPk.mock.calls.findIndex(([, options]) => options?.lock);
+        expect(Usuario.findByPk.mock.calls[lockAccount]).toEqual([USER_ID, {
+            attributes: ['id', 'isActive', 'roleId'],
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        }]);
+        const accountOrder = Usuario.findByPk.mock.invocationCallOrder[lockAccount];
+        expect(accountOrder).toBeLessThan(findReservation.mock.invocationCallOrder[0]);
+        expect(findReservation.mock.invocationCallOrder[0]).toBeLessThan(lockZone.mock.invocationCallOrder[0]);
+    });
+});
+
 describe('Paying the balance of an open stay (HU-27, AC-07 and AC-11)', () => {
     // A finished open stay with $ 4.000 still to pay
     let balance;
