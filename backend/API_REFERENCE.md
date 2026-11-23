@@ -156,7 +156,12 @@ zone depend on the hours asked and are not stored.
   whose 15 minutes ended no longer holds it, even before the job marks it
   `Expired` (#347).
 - Two reservations of the same spot keep 10 minutes between them: a spot
-  reserved until 10:00 can be reserved again from 10:10.
+  reserved until 10:00 can be reserved again from 10:10. A stay that ended
+  keeps those 10 minutes after its exit time too, before and after the job
+  marks it `Finished`.
+- The check of the vehicle (409 `VEHICLE_RESERVATION_OVERLAP`) follows the
+  same rule: a `Pending` reservation whose 15 minutes ended does not block
+  its car.
 - `POST /reservations` gives the spot with the lowest number that is free
   for the stay. When none is free it answers 409 `NO_SPOTS_AVAILABLE`, even
   if the zone has free spots at other hours. An open stay needs a spot
@@ -172,7 +177,13 @@ zone depend on the hours asked and are not stored.
 ```
 
 - Cancelling, expiring or finishing a reservation changes only its status:
-  from then its hours are free again.
+  from then its hours are free again (for a finished one, 10 minutes after
+  its exit time).
+- Every reservation, extension and payment of a zone locks the zone (the
+  payment after its reservation), so they never decide on the same spot at
+  the same time. A payment checks the 15 minutes after that lock: if they
+  ended while it waited, it answers 400 `RESERVATION_EXPIRED`, because a
+  new reservation may already have the spot.
 
 ## Payments
 
@@ -195,7 +206,7 @@ zone depend on the hours asked and are not stored.
 |---|---|---|---|
 | GET | `/admin/dashboard?range=today\|week\|month` | Admin | Summary metrics: active reservations, revenue, active zones and registered users, which is the total number of accounts and not the new ones (HU-22). Ranges, see below |
 | GET | `/admin/dashboard/reservations-by-zone?range=today\|week\|month` | Admin | Reservation count per active zone (HU-22) |
-| GET | `/admin/dashboard/occupancy` | Admin | Occupied vs. total slots per active zone, now (HU-22): the occupied ones are the ones not free for the next 30 minutes, the same number as `availableSlots` (#373) |
+| GET | `/admin/dashboard/occupancy` | Admin | Occupied vs. total slots per active zone, now (HU-22): the occupied ones are the ones not free for the next 30 minutes, that is, `totalSlots` minus `availableSlots` (#373) |
 | GET | `/admin/dashboard/payments-status?range=today\|week\|month` | Admin | Payment count by status (HU-22) |
 | GET | `/admin/dashboard/recent-payments` | Admin | Last 5 payments (HU-22) |
 | GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: an active zone with no spot free now (HU-22, #373) |
@@ -250,8 +261,8 @@ Every range ends at the moment of the request and starts at midnight
   paying or cancelling answers 400 `RESERVATION_EXPIRED`, even if the job
   has not marked the reservation `Expired` yet (#347).
 - Paid (`Active`) reservations are automatically marked `Finished` once
-  their end time passes. Their spot is free from that time, before the job
-  runs too (#373).
+  their end time passes. Their spot is free 10 minutes after that time,
+  before and after the job runs (#373).
 - An open stay keeps a provisional exit time: entry + 24 hours, or the
   closing time of its zone (HU-29). If it is not finished by then, it
   closes automatically, the hours up to that time are charged and what was
