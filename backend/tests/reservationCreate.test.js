@@ -7,6 +7,17 @@ const { Op } = require('sequelize');
 const { Usuario, Vehiculo, Zona, ZoneSchedule, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
 const app = require('../src/app');
 
+// The where of a reservation that holds its spot at `now`, the rule of the
+// availability service (#373): Active, or Pending with its 15 minutes running
+function expectHoldsItsSpot(where, now) {
+    expect(where.status).toBeUndefined();
+    const [rule] = where[Op.and];
+    const [active, pending] = rule[Op.or];
+    expect(active).toEqual({ status: 'Active' });
+    expect(pending.status).toBe('Pending');
+    expect(pending[Op.or][1].holdExpiresAt[Op.gt]).toEqual(now);
+}
+
 // HU-14: creating a reservation. The zone is open 24 hours here; the opening
 // hours are tested in reservationHours.test.js. The times are in Colombia
 // (UTC-5), and "now" is Monday 2026-11-16 at 8:00 a. m.
@@ -36,10 +47,11 @@ let spot;
 // A zone open 24 hours, read with its (empty) schedule
 function openZone(values = {}) {
     const built = Zona.build(
-        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, availableSlots: 4, hourlyRate: '2500.00', isActive: true, open24h: true, schedules: [], ...values },
+        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, hourlyRate: '2500.00', isActive: true, open24h: true, schedules: [], ...values },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
-    jest.spyOn(built, 'decrement').mockResolvedValue(built);
+    // Spied on only to check that the zone does not change (#373)
+    jest.spyOn(built, 'decrement');
     return built;
 }
 
@@ -253,16 +265,27 @@ describe('What a new reservation needs (HU-14)', () => {
         expectNothingSaved();
     });
 
-    test('the overlap check looks at the pending and active reservations of the vehicle in that time range', async () => {
+    test('the overlap check looks at the reservations of the vehicle that hold their spot in that time range', async () => {
         // Act
         await book();
 
         // Assert: it starts before this one ends and ends after this one starts
         const { where } = findOverlap.mock.calls[0][0];
         expect(where.vehicleId).toBe(VEHICLE_ID);
-        expect(where.status).toEqual(['Pending', 'Active']);
+        expectHoldsItsSpot(where, NOW);
         expect(where.startTime[Op.lt]).toEqual(colombia('12:00'));
         expect(where.endTime[Op.gt]).toEqual(colombia('10:00'));
+    });
+
+    test('a Pending reservation of the vehicle whose 15 minutes ended does not count, even before the job runs (#373)', async () => {
+        // Act
+        await book();
+
+        // Assert: Active, or Pending with its deadline still ahead (or none)
+        const { where } = findOverlap.mock.calls[0][0];
+        const [, pending] = where[Op.and][0][Op.or];
+        expect(pending.status).toBe('Pending');
+        expect(pending[Op.or]).toEqual([{ holdExpiresAt: null }, { holdExpiresAt: { [Op.gt]: NOW } }]);
     });
 
     test('a full zone answers 409 NO_SPOTS_AVAILABLE', async () => {
@@ -278,18 +301,29 @@ describe('What a new reservation needs (HU-14)', () => {
         expectNothingSaved();
     });
 
-    test('the spot is claimed with a lock that skips the spots another request is taking', async () => {
+    test('the spot is the enabled one with the lowest number free for these hours, read in the transaction (#373)', async () => {
         // Act
         await book();
 
-        // Assert
-        expect(claimSpot).toHaveBeenCalledWith(expect.objectContaining({
-            where: { zoneId: ZONE_ID, status: 'Available' },
-            order: [['spotNumber', 'ASC']],
-            transaction,
-            lock: 'UPDATE',
-            skipLocked: true,
-        }));
+        // Assert: free from 9:50 a. m. to 12:10 p. m. (15:10 and 17:10 UTC),
+        // the hours with 10 minutes before and after
+        const options = claimSpot.mock.calls[0][0];
+        expect(options).toMatchObject({ order: [['spotNumber', 'ASC']], transaction });
+        expect(options.where).toMatchObject({ zoneId: ZONE_ID, status: { [Op.ne]: 'Disabled' } });
+        const sql = options.where[Op.and][0].val;
+        expect(sql).toContain("r.start_time < '2026-11-16 17:10:00'");
+        expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
+        expect(sql).toContain("r.hold_expires_at > '2026-11-16 13:00:00'");
+    });
+
+    test('an open stay needs a spot free until its provisional exit time, 24 hours after the entry (HU-27, #373)', async () => {
+        // Act
+        await book({ endTime: undefined, openEnded: true });
+
+        // Assert: from 9:50 a. m. until 10:10 a. m. of the next day
+        const sql = claimSpot.mock.calls[0][0].where[Op.and][0].val;
+        expect(sql).toContain("r.start_time < '2026-11-17 15:10:00'");
+        expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
     });
 });
 
@@ -316,16 +350,31 @@ describe('Saving a new reservation (HU-14)', () => {
         expect(transaction.commit).toHaveBeenCalled();
     });
 
-    test('the spot becomes Occupied and the zone has one available slot less, in the same transaction', async () => {
+    test('the answer brings the saved reservation, read again with its zone and its vehicle', async () => {
+        // Arrange
+        const withDetails = { id: RESERVATION_ID, zone: { id: ZONE_ID }, vehicle: { id: VEHICLE_ID } };
+        const readAgain = jest.spyOn(Reserva, 'findByPk').mockResolvedValue(withDetails);
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(readAgain).toHaveBeenCalledWith(RESERVATION_ID, { include: [{ model: Zona, as: 'zone' }, { model: Vehiculo, as: 'vehicle' }] });
+        expect(res.body.reservation).toEqual(withDetails);
+    });
+
+    test('the reservation keeps its spot, and neither the spot nor the zone change (#373)', async () => {
         // Act
         await book();
 
-        // Assert
-        expect(spot.update).toHaveBeenCalledWith({ status: 'Occupied' }, { transaction });
-        expect(zona.decrement).toHaveBeenCalledWith('availableSlots', { by: 1, transaction });
+        // Assert: the spot is taken only for the hours of the reservation
+        expect(createReservation).toHaveBeenCalledWith(expect.objectContaining({ parkingSpotId: SPOT_ID, spotNumber: 7 }), { transaction });
+        expect(spot.update).not.toHaveBeenCalled();
+        expect(zona.decrement).not.toHaveBeenCalled();
     });
 
-    test('the user is locked first, then the vehicle, and the zone is read after both locks (#288)', async () => {
+    test('the user is locked first, then the vehicle, then the zone, and the spot last (#288, #371)', async () => {
         // Act
         await book();
 
@@ -334,10 +383,15 @@ describe('Saving a new reservation (HU-14)', () => {
         const userCall = lockUser.mock.calls.findIndex(([, options]) => options && options.lock === 'UPDATE');
         expect(lockUser.mock.calls[userCall]).toEqual([USER_ID, expect.objectContaining({ transaction, lock: 'UPDATE' })]);
         expect(lockVehicle).toHaveBeenCalledWith(expect.objectContaining({ transaction, lock: 'UPDATE' }));
+        expect(readZone).toHaveBeenCalledWith(ZONE_ID, expect.objectContaining({ transaction, lock: 'UPDATE' }));
         const userLocked = lockUser.mock.invocationCallOrder[userCall];
         const vehicleLocked = lockVehicle.mock.invocationCallOrder[0];
+        const zoneLocked = readZone.mock.invocationCallOrder[0];
         expect(userLocked).toBeLessThan(vehicleLocked);
-        expect(vehicleLocked).toBeLessThan(readZone.mock.invocationCallOrder[0]);
+        expect(vehicleLocked).toBeLessThan(zoneLocked);
+        // The same order as a capacity edit (zone, then its spots), so both
+        // at the same time wait instead of a deadlock
+        expect(zoneLocked).toBeLessThan(claimSpot.mock.invocationCallOrder[0]);
     });
 
     test('if the database fails, it answers 500 and nothing is kept', async () => {

@@ -2,6 +2,8 @@ const { Usuario, Rol, Zona, Reserva, Pago, AdminActionLog, sequelize } = require
 const { Op } = require('sequelize');
 const ErrorCodes = require('../constants/errorCodes');
 const { colombiaDay } = require('../utils/zoneHours');
+const { safeRollback } = require('../utils/transaction');
+const availability = require('../services/availability');
 
 const RANGOS_VALIDOS = ['today', 'week', 'month'];
 
@@ -113,18 +115,28 @@ async function getReservasPorZona(req, res, next) {
   }
 }
 
+// #373: the active zones and the spots free now of each one, read in one
+// transaction so both reads see the same moment (REPEATABLE READ): a capacity
+// changed between them would give a negative occupancy or a wrong alert
+function zonasActivasConLibres(attributes) {
+  return sequelize.transaction(async (transaction) => {
+    const zonas = await Zona.findAll({ where: { isActive: true }, attributes, transaction });
+    const libres = await availability.availableNowByZone(zonas.map((z) => z.id), { transaction });
+    return { zonas, libres };
+  });
+}
+
 // GET /api/admin/dashboard/occupancy
+// #373: the occupied spots of each zone are the ones not free now, that is,
+// totalSlots minus availableSlots, in one query for all
 async function getOcupacionPorZona(req, res, next) {
   try {
-    const zonas = await Zona.findAll({
-      where: { isActive: true },
-      attributes: ['id', 'name', 'totalSlots', 'availableSlots'],
-    });
+    const { zonas, libres } = await zonasActivasConLibres(['id', 'name', 'totalSlots']);
     const ocupacion = zonas.map((z) => ({
       zoneId: z.id,
       zoneName: z.name,
       totalSlots: z.totalSlots,
-      occupiedSlots: z.totalSlots - z.availableSlots,
+      occupiedSlots: z.totalSlots - libres.get(z.id),
     }));
     return res.status(200).json({ occupancy: ocupacion });
   } catch (error) {
@@ -181,10 +193,9 @@ async function getPagosRecientes(req, res, next) {
 // GET /api/admin/dashboard/alerts
 async function getAlertas(req, res, next) {
   try {
-    const zonasLlenas = await Zona.findAll({
-      where: { isActive: true, availableSlots: 0 },
-      attributes: ['id', 'name'],
-    });
+    // #373: a zone is full when none of its spots is free now
+    const { zonas, libres } = await zonasActivasConLibres(['id', 'name']);
+    const zonasLlenas = zonas.filter((z) => libres.get(z.id) === 0);
 
     const alerts = zonasLlenas.map((z) => ({
       type: 'zone_full',
@@ -364,7 +375,7 @@ async function cambiarRol(req, res, next) {
 
     return res.status(200).json({ message: 'Role updated successfully' });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     next(error);
   }
 }
@@ -427,7 +438,7 @@ async function cambiarEstado(req, res, next) {
 
     return res.status(200).json({ message: 'Status updated successfully' });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     next(error);
   }
 }

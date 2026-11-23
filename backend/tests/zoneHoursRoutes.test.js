@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const request = require('supertest');
+const availability = require('../src/services/availability');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
@@ -26,7 +27,7 @@ const send = (method, path, body) => request(app)[method](path).set('Authorizati
 
 // A zone as the model gives it, without a database behind it
 function zoneInstance(values = {}) {
-    const zona = Zona.build({ id: ZONE_ID, ...ZONE, availableSlots: 10, isActive: true, open24h: true, ...values });
+    const zona = Zona.build({ id: ZONE_ID, ...ZONE, isActive: true, open24h: true, ...values });
     jest.spyOn(zona, 'reload').mockResolvedValue(zona);
     jest.spyOn(zona, 'update').mockResolvedValue(zona);
     return zona;
@@ -57,7 +58,7 @@ describe('Creating a zone with its opening hours (HU-29, AC-01 and AC-02)', () =
         createZone = jest.spyOn(Zona, 'create').mockImplementation(async (values) => zoneInstance(values));
     });
 
-      test('two requests for the same zone name return 201 and 409', async () => {
+    test('two requests for the same zone name return 201 and 409', async () => {
         // Both requests pass the initial name check. The unique index rejects one insert.
         const duplicateName = Object.assign(new Error('Duplicate zone name'), {
             name: 'SequelizeUniqueConstraintError',
@@ -198,6 +199,11 @@ describe('Setting the active state of a zone (#304)', () => {
     beforeEach(() => {
         zona = zoneInstance();
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
+        jest.spyOn(availability, 'availableNow').mockResolvedValue(7);
+        startTransaction.mockImplementation(async (...args) => {
+            const readZone = args.at(-1);
+            return readZone(transaction);
+        });
         zona.update.mockImplementation(async (values) => {
             zona.set(values);
             return zona;
@@ -224,6 +230,7 @@ describe('Setting the active state of a zone (#304)', () => {
 
         expect(response.status).toBe(200);
         expect(response.body.zone.isActive).toBe(true);
+        expect(response.body.zone.availableSlots).toBe(7);
         expect(zona.isActive).toBe(true);
     });
 

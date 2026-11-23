@@ -30,10 +30,9 @@ function zone({ open24h = false } = {}) {
         { dayOfWeek: 2, opensAt: '06:00:00', closesAt: '20:00:00' },
     ];
     const zona = Zona.build(
-        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, availableSlots: 10, hourlyRate: '2000.00', isActive: true, open24h, schedules },
+        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, hourlyRate: '2000.00', isActive: true, open24h, schedules },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
-    jest.spyOn(zona, 'decrement').mockResolvedValue(zona);
     return zona;
 }
 
