@@ -75,13 +75,33 @@ describe('A spot is free for some hours (#373)', () => {
         expect(await firstFree(zona, 60, 120)).toBe(1);
     });
 
-    test.each(['Cancelled', 'Finished', 'Expired'])('a %s reservation does not hold it', async (status) => {
+    test.each(['Cancelled', 'Expired'])('a %s reservation does not hold it', async (status) => {
         // Arrange
         const zona = await createZone(1);
         await hold(zona, 1, 60, 120, { status });
 
         // Act and assert
         expect(await firstFree(zona, 60, 120)).toBe(1);
+    });
+
+    test.each(['Active', 'Finished'])('a stay that ended 1 minute ago keeps its 10 minutes after, also once %s', async (status) => {
+        // Arrange: Active is how it is before the finish job runs, and
+        // Finished after it
+        const zona = await createZone(1);
+        await hold(zona, 1, -60, -1, { status });
+
+        // Act and assert: 2 minutes from now is too soon; 9 is not
+        expect(await firstFree(zona, 2, 60)).toBeNull();
+        expect(await firstFree(zona, 9, 60)).toBe(1);
+    });
+
+    test('a Finished stay that ended 11 minutes ago no longer holds its spot', async () => {
+        // Arrange
+        const zona = await createZone(1);
+        await hold(zona, 1, -60, -11, { status: 'Finished' });
+
+        // Act and assert
+        expect(await firstFree(zona, 1, 60)).toBe(1);
     });
 
     test('a Disabled spot is never free, and the lowest free number is the one given', async () => {

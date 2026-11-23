@@ -40,12 +40,15 @@ function holdsItsSpotSql(now) {
 }
 
 // For a query of ParkingSpot: the spots that no reservation holds between
-// `from` and `to`, with the margin before and after
+// `from` and `to`, with the margin before and after. A Finished stay keeps
+// the 10 minutes after its exit time too, so the answer is the same before
+// and after the job marks it Finished. It always ended in the past (the job
+// and terminar save the real exit time), so only those 10 minutes change.
 function freeBetween(from, to, now) {
     return literal(`NOT EXISTS (
         SELECT 1 FROM reservations AS r
         WHERE r.parking_spot_id = \`ParkingSpot\`.\`id\`
-            AND ${holdsItsSpotSql(now)}
+            AND (r.status = 'Finished' OR (${holdsItsSpotSql(now)}))
             AND r.start_time < ${sequelize.escape(plus(to, MARGIN_MS))}
             AND r.end_time > ${sequelize.escape(plus(from, -MARGIN_MS))}
     )`);
