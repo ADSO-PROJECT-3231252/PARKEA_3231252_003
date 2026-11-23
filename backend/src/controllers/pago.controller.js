@@ -1,4 +1,4 @@
-const { Pago, Reserva } = require('../models');
+const { Pago, Reserva, Zona } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
@@ -28,6 +28,13 @@ const crearPago = async (req, res) => {
       await t.rollback();
       return res.status(403).json({ code: ErrorCodes.RESERVATION_NOT_OWNED, message: 'This reservation does not belong to you' });
     }
+    // #373: the zone is locked after the reservation, like in ampliar, so a
+    // new reservation or a lower capacity of the zone waits until this payment
+    // ends. The deadline is checked after the lock, with the time of that
+    // moment: a reservation saved while this payment waited already counted
+    // this one as expired, so it must not be paid and take the spot back.
+    await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+
     // The deadline decides whether it can still be paid, even if the job has
     // not marked it Expired yet (HU-26, AC-06)
     if (countsAsExpired(reserva)) {
