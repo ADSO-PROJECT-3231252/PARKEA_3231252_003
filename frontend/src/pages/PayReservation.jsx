@@ -20,7 +20,7 @@ import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime
 import { translateError } from '../utils/errorMessages';
 import { RESERVATION_STATUS } from '../utils/reservationStatus';
 import { hoursLabel, pendingBalanceOf } from '../utils/openStay';
-import { EXTEND_FINAL_CODES, extendErrorMessage, extensionCharge, extensionProblem } from '../utils/extendStay';
+import { EXTEND_FINAL_CODES, extendErrorMessage, extensionCharge, extensionProblem, spotFreeUntil, untilText } from '../utils/extendStay';
 
 // Values the backend expects in paymentMethod (pago.controller.js).
 const METHOD_CARD = 'card';
@@ -216,7 +216,7 @@ export default function PayReservation() {
     const navigate = useNavigate();
     // HU-28: "Ampliar estadía" opens this screen with the new exit time and
     // the exit time the user saw (?extendTo=&from=).
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const extendTo = searchParams.get('extendTo');
     const extendFrom = searchParams.get('from');
     const isExtension = extendTo !== null;
@@ -239,6 +239,11 @@ export default function PayReservation() {
     const [expiredByServer, setExpiredByServer] = useState(false);
     // HU-28: the extension can no longer go on (see EXTEND_FINAL_CODES).
     const [extendBlocked, setExtendBlocked] = useState(false);
+    // #373: until when the spot is free, when the chosen exit time reached
+    // another reservation of the spot (SPOT_RESERVED_LATER)
+    const [spotFreeUntilAt, setSpotFreeUntilAt] = useState(null);
+    const payButtonRef = useRef(null);
+    const focusPayRef = useRef(false);
     const [message, setMessage] = useState(null); // { type: 'error' | 'success', text }
     const messageRef = useRef(null);
     const expiredRef = useRef(null);
@@ -283,6 +288,14 @@ export default function PayReservation() {
         if (message) messageRef.current?.focus();
     }, [message]);
 
+    // #373: after choosing the time the spot is free, the payment button
+    // (with the new amount) is next
+    useEffect(() => {
+        if (!focusPayRef.current) return;
+        focusPayRef.current = false;
+        payButtonRef.current?.focus();
+    }, [extendTo]);
+
     // Same when the backend says the hold already expired (not when the
     // countdown ends, so the user is not pulled away from what they type).
     useEffect(() => {
@@ -297,6 +310,16 @@ export default function PayReservation() {
 
     // AC-09: back to the confirmation without touching the reservation.
     const goToConfirmation = () => navigate(`/reservations/${id}`);
+
+    // #373: the same extension, up to the time the spot is free. Nothing was
+    // charged, so the new amount is shown and paid with the same button.
+    const extendUntilFree = () => {
+        setSearchParams({ extendTo: spotFreeUntilAt, from: extendFrom }, { replace: true });
+        setSpotFreeUntilAt(null);
+        setExtendBlocked(false);
+        setMessage(null);
+        focusPayRef.current = true;
+    };
 
     const handleCardChange = (e) => {
         const { name, value } = e.target;
@@ -465,8 +488,13 @@ export default function PayReservation() {
         if (isExtension) {
             // HU-28: nothing was charged. A declined payment can be tried
             // again; after the other codes the extension cannot go on.
+            const data = result.reason.response?.data;
             if (EXTEND_FINAL_CODES.includes(code)) setExtendBlocked(true);
-            setMessage({ type: 'error', text: extendErrorMessage(code, false, result.reason.response?.data?.hours) });
+            if (code === 'SPOT_RESERVED_LATER') setSpotFreeUntilAt(spotFreeUntil(data?.freeUntil, extendFrom));
+            setMessage({
+                type: 'error',
+                text: extendErrorMessage(code, false, data?.hours, { freeUntil: data?.freeUntil, from: extendFrom }),
+            });
             return;
         }
         if (code === 'NO_PENDING_BALANCE') {
@@ -776,6 +804,12 @@ export default function PayReservation() {
                         {message.text}
                     </p>
                 )}
+                {/* #373: the way on after SPOT_RESERVED_LATER */}
+                {message?.type === 'error' && spotFreeUntilAt && (
+                    <button type="button" onClick={extendUntilFree} className={`mt-3 ${OUTLINE_BUTTON_SM}`}>
+                        Ampliar hasta {untilText(spotFreeUntilAt, extendFrom)}
+                    </button>
+                )}
                 {/* HU-26 AC-06 and AC-09: expired, with a link to book again */}
                 {isTimeUp && !message && (
                     <div
@@ -807,6 +841,7 @@ export default function PayReservation() {
                         {extendBlocked ? 'Volver a la reserva' : 'Cancelar pago'}
                     </button>
                     <button
+                        ref={payButtonRef}
                         type="submit"
                         disabled={payDisabled}
                         className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2.5 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
