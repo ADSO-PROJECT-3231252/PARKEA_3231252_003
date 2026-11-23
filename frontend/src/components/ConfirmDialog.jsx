@@ -81,6 +81,16 @@ export default function ConfirmDialog({
         };
     }, [open, fallbackFocusRef]);
 
+    // Both buttons are disabled while confirming, and the browser moves the
+    // focus of a disabled button to the body. If the dialog is still open
+    // when it ends (the action failed), the focus goes back to the cancel
+    // button, so Tab stays inside the dialog (#361).
+    useEffect(() => {
+        if (open && !confirming && !dialogRef.current?.contains(document.activeElement)) {
+            cancelButtonRef.current?.focus();
+        }
+    }, [open, confirming]);
+
     if (!open) return null;
 
     return (
