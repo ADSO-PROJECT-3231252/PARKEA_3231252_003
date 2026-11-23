@@ -459,7 +459,7 @@ export default function AdminUsers() {
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Nombre, correo o documento"
+                            placeholder="Buscar usuario…"
                             className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                         />
                         {search && (

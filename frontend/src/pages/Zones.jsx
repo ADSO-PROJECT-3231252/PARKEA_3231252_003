@@ -235,7 +235,7 @@ export default function Zones() {
                     type="text"
                     value={search}
                     onChange={handleSearchChange}
-                    placeholder="Buscar por nombre de zona..."
+                    placeholder="Buscar por nombre…"
                     className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                 />
                 {search && (
