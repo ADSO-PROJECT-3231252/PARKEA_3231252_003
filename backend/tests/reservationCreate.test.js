@@ -467,3 +467,41 @@ describe('Saving a new reservation (HU-14)', () => {
         expect(transaction.commit).not.toHaveBeenCalled();
     });
 });
+
+describe('An account that an admin changed while the request waited (#348)', () => {
+    // The session saw an active user; the locked read is the account as it is now
+    const session = { id: USER_ID, isActive: true, passwordVersion: 0, roleId: 'role-user', role: { name: 'user' } };
+
+    test.each([
+        ['was deactivated', { isActive: false }, 'ACCOUNT_DEACTIVATED'],
+        ['was made administrator', { roleId: 'role-admin' }, 'FORBIDDEN_ROLE'],
+    ])('an account that %s answers 403 %s and nothing is saved', async (_case, now, code) => {
+        // Arrange
+        lockUser.mockImplementation(async (id, options = {}) => (options.lock ? { ...session, ...now } : session));
+
+        // Act
+        const res = await book();
+
+        // Assert: it stops right after the lock of the user
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe(code);
+        expectNothingSaved();
+        expect(lockVehicle).not.toHaveBeenCalled();
+    });
+
+    test('the account is read with the lock, with its status and its role', async () => {
+        // Arrange
+        lockUser.mockResolvedValue(session);
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(lockUser).toHaveBeenCalledWith(USER_ID, {
+            attributes: ['id', 'isActive', 'roleId'],
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
+    });
+});
