@@ -440,7 +440,7 @@ export default function Profile() {
                                 </p>
                             ) : (
                                 <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
-                                    Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
+                                    {PASSWORD_MESSAGE}
                                 </p>
                             )}
                         </div>
