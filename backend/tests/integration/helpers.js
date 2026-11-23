@@ -52,9 +52,11 @@ async function createUser() {
     return { usuario, vehiculo, token: tokenFor(usuario, 'user') };
 }
 
-// The administrator of the seeders
+// The administrator of the seeders. #348: the primary one, which can never
+// be deactivated or lose its role, since some tests create other
+// administrators and change them
 async function adminToken() {
-    const admin = await Usuario.findOne({ include: [{ model: Rol, as: 'role', where: { name: 'admin' } }] });
+    const admin = await Usuario.findOne({ where: { isPrimaryAdmin: true }, include: [{ model: Rol, as: 'role', where: { name: 'admin' } }] });
     return tokenFor(admin, 'admin');
 }
 
