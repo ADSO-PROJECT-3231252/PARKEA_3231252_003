@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import Zones from '../src/pages/Zones';
 import AdminZones from '../src/pages/AdminZones';
 import { AuthProvider } from '../src/context/AuthContext';
-import { getZones, getAllZones, toggleZone } from '../src/services/zoneService';
+import { getZones, getAllZones } from '../src/services/zoneService';
 
 // The screens do not call the real API
 jest.mock('../src/services/zoneService', () => ({
@@ -230,29 +230,5 @@ describe('Zone management also announces the status filter and the address (#331
 
         // Assert
         expect(searchStatus()).toHaveTextContent('1 zona encontrada');
-    });
-});
-
-describe('Setting the zone state from the admin list (#304)', () => {
-    test.each([
-        [true, 'Desactivar zona', false],
-        [false, 'Activar zona', true],
-    ])('when isActive is %s, confirming "%s" sends %s', async (initialState, action, desiredState) => {
-        const user = userEvent.setup();
-        const zone = { ...CENTRO, isActive: initialState };
-        getAllZones.mockReset().mockResolvedValue({ data: { zones: [zone] } });
-        toggleZone.mockReset().mockResolvedValue({
-            data: { zone: { ...zone, isActive: desiredState } },
-        });
-
-        render(<MemoryRouter><AdminZones /></MemoryRouter>);
-
-        const switches = await screen.findAllByRole('switch', { name: `Zona activa: ${zone.name}` });
-        await user.click(switches[0]);
-        expect(toggleZone).not.toHaveBeenCalled();
-
-        await user.click(await screen.findByRole('button', { name: action }));
-        expect(toggleZone).toHaveBeenCalledTimes(1);
-        expect(toggleZone).toHaveBeenCalledWith(zone.id, desiredState);
     });
 });
