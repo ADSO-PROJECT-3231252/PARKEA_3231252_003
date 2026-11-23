@@ -190,6 +190,45 @@ describe('Editing the opening hours of a zone (HU-29, AC-02 and AC-07)', () => {
         expect(deleteHours).toHaveBeenCalledWith(expect.objectContaining({ where: { zoneId: ZONE_ID } }));
         expect(saveHours).toHaveBeenCalledWith([], expect.anything());
     });
+
+    test('two renames to the same name at once: the unique index rejects one, and it answers 409 (#304)', async () => {
+        // Arrange: both requests pass the check of the name; the index rejects the second save
+        const duplicateName = Object.assign(new Error('Duplicate zone name'), {
+            name: 'SequelizeUniqueConstraintError',
+            fields: { 'zones.zones_name_unique': 'Norte' },
+        });
+        zona.update.mockResolvedValueOnce(zona).mockRejectedValueOnce(duplicateName);
+        const body = { ...ZONE, name: 'Norte', open24h: true };
+
+        // Act
+        const responses = await Promise.all([
+            send('put', `/api/zones/${ZONE_ID}`, body),
+            send('put', `/api/zones/${ZONE_ID}`, body),
+        ]);
+
+        // Assert
+        expect(responses.map((res) => res.status).sort()).toEqual([200, 409]);
+        const conflict = responses.find((res) => res.status === 409);
+        expect(conflict.body).toEqual({ code: 'ZONE_NAME_TAKEN', message: 'A zone with this name already exists' });
+        expect(transaction.rollback).toHaveBeenCalled();
+    });
+
+    test('another unique index that fails is still a 500 (#304)', async () => {
+        // Arrange
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        const otherIndex = Object.assign(new Error('Duplicate spot'), {
+            name: 'SequelizeUniqueConstraintError',
+            fields: { 'parking_spots.parking_spots_zone_spot_unique': '1' },
+        });
+        zona.update.mockRejectedValueOnce(otherIndex);
+
+        // Act
+        const res = await send('put', `/api/zones/${ZONE_ID}`, { ...ZONE, open24h: true });
+
+        // Assert
+        expect(res.status).toBe(500);
+        expect(res.body.code).toBe('INTERNAL_ERROR');
+    });
 });
 
 describe('Setting the active state of a zone (#304)', () => {
@@ -235,13 +274,22 @@ describe('Setting the active state of a zone (#304)', () => {
     });
 
     test.each([
-        ['missing', {}],
-        ['a string', { isActive: 'false' }],
-    ])('rejects the request when isActive is %s', async (_description, body) => {
+        ['there is no body', undefined],
+        ['isActive is missing', {}],
+        ['isActive is a string', { isActive: 'false' }],
+        ['isActive is a number', { isActive: 0 }],
+        ['isActive is null', { isActive: null }],
+    ])('rejects the request when %s, before reading the zone', async (_description, body) => {
         const response = await send('patch', path, body);
 
         expect(response.status).toBe(400);
-        expect(response.body.code).toBe('VALIDATION_ERROR');
+        // The same shape as every validation error: errors with path and msg, no message
+        expect(response.body).toEqual({
+            code: 'VALIDATION_ERROR',
+            errors: [{ path: 'isActive', msg: 'isActive must be true or false' }],
+        });
+        expect(startTransaction).not.toHaveBeenCalled();
+        expect(Zona.findByPk).not.toHaveBeenCalled();
         expect(zona.update).not.toHaveBeenCalled();
     });
 });
