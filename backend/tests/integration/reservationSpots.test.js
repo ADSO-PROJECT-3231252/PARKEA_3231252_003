@@ -106,6 +106,23 @@ describe('The spot of a new reservation (HU-14)', () => {
         expect((await Reserva.findByPk(unpaid.body.reservation.id)).status).toBe('Pending');
     });
 
+    test('the same car can reserve again the hours of its own Pending reservation whose 15 minutes ended, before the job runs (#373)', async () => {
+        // Arrange: a zone of 2 spots and a reservation of Ana not paid in time
+        const zona = await createZone(2);
+        const ana = await createUser();
+        const start = inMinutes(60).toISOString();
+        const end = inMinutes(120).toISOString();
+        const unpaid = await reserve(ana, zona, start, end);
+        await Reserva.update({ holdExpiresAt: inMinutes(-1) }, { where: { id: unpaid.body.reservation.id } });
+
+        // Act
+        const res = await reserve(ana, zona, start, end);
+
+        // Assert: the expired one does not block the car, as it does not
+        // block the spot
+        expect(res.status).toBe(201);
+    });
+
     test('an open stay is accepted only when a spot is free until its provisional exit, 24 hours later (HU-27, #373)', async () => {
         // Arrange: a zone of 1 spot, reserved for tomorrow
         const zona = await createZone(1);

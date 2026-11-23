@@ -88,6 +88,22 @@ describe('Extending a stay (HU-28, #373)', () => {
         }
     });
 
+    test('a stay can be extended over an expired Pending reservation of the same car, before the job runs (#373)', async () => {
+        // Arrange: a stay of Ana until 60 minutes from now, and another
+        // reservation of her car, later, not paid in time
+        const [zona, otherZone] = await Promise.all([createZone(1), createZone(1)]);
+        const ana = await createUser();
+        const stay = await paidStay(ana, zona, 5, 60);
+        const unpaid = await reserve(ana, otherZone, inMinutes(90).toISOString(), inMinutes(150).toISOString());
+        await Reserva.update({ holdExpiresAt: inMinutes(-1) }, { where: { id: unpaid.body.reservation.id } });
+
+        // Act
+        const res = await extend(ana, stay, { newEndTime: inMinutes(120).toISOString(), paymentMethod: 'pse' });
+
+        // Assert
+        expect(res.status).toBe(200);
+    });
+
     test('an extension that ends after the old exit time passed keeps the stay Active, even if the finish job ran meanwhile', async () => {
         // Arrange: a stay that started 30 minutes ago and ends in 2 or 3
         // seconds (a whole second, as MySQL keeps it). Its extension stops
