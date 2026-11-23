@@ -304,3 +304,51 @@ describe('Activating and deactivating an account (HU-23)', () => {
         expect(target.update).toHaveBeenCalledWith({ isActive: false }, { transaction });
     });
 });
+
+describe('Repeated admin actions (#304)', () => {
+    test.each([
+        ['role', () => changeRole('user')],
+        ['status', () => changeStatus(true)],
+    ])('requesting the current %s returns 200 without adding a log entry', async (_field, sendRequest) => {
+        const res = await sendRequest();
+
+        expect(res.status).toBe(200);
+        expect(Usuario.findByPk).toHaveBeenCalledWith(
+            TARGET_ID,
+            expect.objectContaining({ transaction, lock: transaction.LOCK.UPDATE }),
+        );
+        expect(target.update).not.toHaveBeenCalled();
+        expect(writeLog).not.toHaveBeenCalled();
+        expect(transaction.commit).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('Searching the admin user list (#304)', () => {
+    const { Op } = require('sequelize');
+
+    test.each([
+        ['%', '%\\%%'],
+        ['_', '%\\_%'],
+        ['\\', '%\\\\%'],
+        ['ana', '%ana%'],
+    ])('builds the expected search pattern for "%s"', async (search, expectedPattern) => {
+        const findUsers = jest.spyOn(Usuario, 'findAndCountAll')
+            .mockResolvedValue({ count: 0, rows: [] });
+
+        const res = await request(app)
+            .get('/api/admin/users')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .query({ search });
+
+        expect(res.status).toBe(200);
+        expect(findUsers).toHaveBeenCalledWith(expect.objectContaining({
+            where: {
+                [Op.or]: [
+                    { fullName: { [Op.like]: expectedPattern } },
+                    { email: { [Op.like]: expectedPattern } },
+                    { documentNumber: { [Op.like]: expectedPattern } },
+                ],
+            },
+        }));
+    });
+});

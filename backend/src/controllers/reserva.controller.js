@@ -12,6 +12,7 @@ const availability = require('../services/availability');
 const DURACION_MIN_MS = 30 * 60 * 1000;
 const DURACION_MAX_MS = 24 * 60 * 60 * 1000;
 const ANTICIPACION_MAX_MS = 48 * 60 * 60 * 1000;
+const MAX_PENDING_RESERVATIONS = 2;
 
 // HU-29: the zone is read with its opening hours
 const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
@@ -52,19 +53,23 @@ async function responderReservaCreada(res, reserva) {
 
 // HU-14: Reserve a Spot
 async function crear(req, res, next) {
+    const userId = req.usuario.id;
+    const { zoneId, vehicleId, startTime, endTime, openEnded } = req.body;
+
+    // HU-27: an open stay has no exit time; the route only lets a boolean through
+    const isOpenStay = openEnded === true;
+
+    // Validate required fields before opening a database transaction.
+    if (!zoneId || !vehicleId || !startTime || (!isOpenStay && !endTime)) {
+        return res.status(400).json({
+            code: ErrorCodes.MISSING_REQUIRED_FIELDS,
+            message: 'zoneId, vehicleId, startTime, and endTime are required',
+        });
+    }
+
     const t = await sequelize.transaction();
     let reserva;
     try {
-        const userId = req.usuario.id;
-        const { zoneId, vehicleId, startTime, endTime, openEnded } = req.body;
-        // HU-27: an open stay has no exit time; the route only lets a boolean through
-        const isOpenStay = openEnded === true;
-
-        if (!zoneId || !vehicleId || !startTime || (!isOpenStay && !endTime)) {
-            await t.rollback();
-            return res.status(400).json({ code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'zoneId, vehicleId, startTime, and endTime are required' });
-        }
-
         const start = new Date(startTime);
         // An open stay keeps a provisional exit time, so the overlap check and
         // the jobs work as with any other reservation: entry + 24 h, or the
@@ -143,6 +148,40 @@ async function crear(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
         }
 
+        // A user can hold at most MAX_PENDING_RESERVATIONS unpaid reservations
+        // at the same time, because each one keeps a spot for 15 minutes. The
+        // count goes after the locks of the user and the zone: the second of
+        // two requests at the same time waits at the lock of the user and then
+        // counts the reservation the first one created. It is also the first
+        // plain read of the transaction, and in MySQL that read fixes what the
+        // transaction sees, so before the lock of the zone it would hide the
+        // reservations that other people save while this one waits there.
+        // A Pending one whose 15 minutes ended counts as expired, even if the
+        // job has not marked it yet (#347), so it does not take a place either.
+        // That is decided with the time after the locks, not with `now`: a
+        // hold that ended while this request waited at them no longer counts,
+        // here, in the check of the vehicle and in the search of the spot.
+        // `now` is still the time of the dates that the user sent.
+        const availabilityTime = new Date();
+        const pendientes = await Reserva.count({
+            where: {
+                userId,
+                status: 'Pending',
+                [Op.or]: [
+                    { holdExpiresAt: null },
+                    { holdExpiresAt: { [Op.gt]: availabilityTime } },
+                ],
+            },
+            transaction: t,
+        });
+        if (pendientes >= MAX_PENDING_RESERVATIONS) {
+            await t.rollback();
+            return res.status(409).json({
+                code: ErrorCodes.TOO_MANY_PENDING_RESERVATIONS,
+                message: `You can have at most ${MAX_PENDING_RESERVATIONS} reservations waiting for payment at the same time. Pay or cancel one first`,
+            });
+        }
+
         // HU-29 (AC-03, AC-04): the whole stay must fit the hours of the day
         // of the entry. An open stay ends at the closing time of that day.
         const horario = checkStay(zona, start, isOpenStay ? null : end);
@@ -170,7 +209,7 @@ async function crear(req, res, next) {
         const solapada = await Reserva.findOne({
             where: {
                 vehicleId,
-                [Op.and]: [availability.holdsItsSpot(now)],
+                [Op.and]: [availability.holdsItsSpot(availabilityTime)],
                 startTime: { [Op.lt]: end },
                 endTime: { [Op.gt]: start },
             },
@@ -186,7 +225,7 @@ async function crear(req, res, next) {
         // taken only for the hours of its reservations, so a reservation for
         // tomorrow leaves its spot free for today. An open stay holds it
         // until its provisional exit time.
-        const cupo = await availability.firstFreeSpot(zoneId, start, end, { transaction: t, now });
+        const cupo = await availability.firstFreeSpot(zoneId, start, end, { transaction: t, now: availabilityTime });
 
         if (!cupo) {
             await t.rollback();
