@@ -30,15 +30,15 @@ module.exports = (sequelize, DataTypes) => {
     },
     brand: {
       type: DataTypes.STRING(50),
-      allowNull: true,
+      allowNull: false,
     },
     model: {
       type: DataTypes.STRING(50),
-      allowNull: true,
+      allowNull: false,
     },
     color: {
       type: DataTypes.STRING(30),
-      allowNull: true,
+      allowNull: false,
     },
     visualDescription: {
       type: DataTypes.STRING(255),

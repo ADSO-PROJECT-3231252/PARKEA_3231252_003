@@ -40,9 +40,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     documentType: {
       type: DataTypes.ENUM('CC', 'TI', 'CE', 'PASSPORT'),
-      allowNull: true,
+      allowNull: false,
       field: 'document_type',
     },
+    // #372: optional, because HU-30 frees the document of an old account that
+    // is in the admin log (auth.controller.js releaseDocument)
     documentNumber: {
       type: DataTypes.STRING(20),
       allowNull: true,

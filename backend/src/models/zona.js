@@ -37,7 +37,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     address: {
       type: DataTypes.STRING(255),
-      allowNull: true,
+      allowNull: false,
     },
     totalSlots: {
       type: DataTypes.INTEGER,
@@ -54,11 +54,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     latitude: {
       type: DataTypes.DECIMAL(10, 7),
-      allowNull: true,
+      allowNull: false,
     },
     longitude: {
       type: DataTypes.DECIMAL(10, 7),
-      allowNull: true,
+      allowNull: false,
     },
     isActive: {
       type: DataTypes.BOOLEAN,
