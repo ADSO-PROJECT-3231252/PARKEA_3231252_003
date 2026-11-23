@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     CheckCircle2,
@@ -148,6 +148,26 @@ export default function ReservationConfirmation() {
     const [extendOpenedAt, setExtendOpenedAt] = useState(null);
     const [resultMessage, setResultMessage] = useState('');
     const resultMessageRef = useRef(null);
+    const statusRef = useRef(null);
+    const payLinkRef = useRef(null);
+    const restoreStatusFocusRef = useRef(false);
+
+    // Capture focus before React removes the action from the page.
+    const trackExpiringAction = useCallback((action) => {
+        if (!action) return;
+        return () => {
+            if (document.activeElement === action) {
+                restoreStatusFocusRef.current = true;
+            }
+        };
+    }, []);
+
+    useLayoutEffect(() => {
+        if (restoreStatusFocusRef.current) {
+            restoreStatusFocusRef.current = false;
+            statusRef.current?.focus();
+        }
+    });
 
     // silent = background refresh after the hold expires: a network error
     // there must not replace the whole screen with the error state.
@@ -192,6 +212,10 @@ export default function ReservationConfirmation() {
         const expiresAtMs = new Date(holdExpiresAt).getTime();
         const interval = setInterval(() => {
             const current = Date.now();
+            // Capture focus while the payment link is still on the page.
+            if (current >= expiresAtMs && payLinkRef.current?.matches(':focus')) {
+                restoreStatusFocusRef.current = true;
+            }
             setNow(current);
             if (current >= expiresAtMs && current - lastPollRef.current >= EXPIRED_POLL_MS) {
                 lastPollRef.current = current;
@@ -489,7 +513,11 @@ export default function ReservationConfirmation() {
                 <div className="rounded-lg border border-neutral-200 bg-white p-6">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 className="text-title font-display uppercase text-neutral-900">Detalles de la reserva</h2>
-                        <span className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-label font-medium ${statusBadge}`}>
+                        <span
+                            ref={statusRef}
+                            tabIndex={-1}
+                            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-label font-medium ${statusBadge}`}
+                        >
                             <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
                             {statusLabel}
                         </span>
@@ -790,6 +818,7 @@ export default function ReservationConfirmation() {
                     {canCancel && (
                         <button
                             type="button"
+                            ref={trackExpiringAction}
                             onClick={() => setCancelOpen(true)}
                             className={DANGER_ACTION}
                         >
@@ -800,7 +829,11 @@ export default function ReservationConfirmation() {
                 </div>
                 {/* On mobile the primary action goes first, right below the payment summary. */}
                 {canPay && (
-                    <Link to={`/reservations/${reservation.id}/payment`} className={primaryAction}>
+                    <Link
+                        ref={payLinkRef}
+                        to={`/reservations/${reservation.id}/payment`}
+                        className={primaryAction}
+                    >
                         <Wallet className="h-4 w-4" aria-hidden="true" />
                         Ir al pago
                     </Link>
@@ -822,7 +855,12 @@ export default function ReservationConfirmation() {
                 )}
                 {/* HU-28 AC-01: paid, with an exit time that has not been reached */}
                 {canExtend && (
-                    <button type="button" onClick={() => setExtendOpenedAt(Date.now())} className={primaryAction}>
+                    <button
+                        type="button"
+                        ref={trackExpiringAction}
+                        onClick={() => setExtendOpenedAt(Date.now())}
+                        className={primaryAction}
+                    >
                         <ClockPlus className="h-4 w-4" aria-hidden="true" />
                         Ampliar estadía
                     </button>
@@ -830,6 +868,7 @@ export default function ReservationConfirmation() {
             </div>
 
             <CancelReservationDialog
+                fallbackFocusRef={statusRef}
                 reservation={cancelOpen ? reservation : null}
                 onClose={handleCancelClose}
                 onCancelled={handleCancelled}
@@ -845,6 +884,7 @@ export default function ReservationConfirmation() {
             )}
             {extendOpenedAt !== null && (
                 <ExtendStayDialog
+                    fallbackFocusRef={statusRef}
                     reservation={reservation}
                     hourlyRate={hourlyRate}
                     paid={paidTotal}
