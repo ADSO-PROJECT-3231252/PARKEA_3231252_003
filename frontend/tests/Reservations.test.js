@@ -340,3 +340,65 @@ describe('Keyboard focus when a paid stay reaches its exit time (#361)', () => {
         expect(otherAction).toHaveFocus();
     });
 });
+
+test('keeps focus on the cancellation message after the refreshed list removes the opener (#361)', async () => {
+    // Arrange
+    answer([pending]);
+    cancelReservation.mockResolvedValueOnce({});
+    renderList();
+    const [opener] = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('alertdialog');
+
+    // Keep the refresh pending until the dialog has closed.
+    let resolveRefresh;
+    getReservations.mockReturnValueOnce(new Promise((resolve) => {
+        resolveRefresh = resolve;
+    }));
+
+    // Act
+    await act(async () => {
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar reserva' }));
+    });
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    const message = screen.getByText(/^Reserva AAAAAAAA cancelada/);
+    expect(message).toHaveFocus();
+
+    await act(async () => {
+        resolveRefresh({
+            data: {
+                reservations: [{ ...pending, status: 'Canceled' }],
+                pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+            },
+        });
+    });
+
+    // Assert
+    expect(buttons(CANCEL_PENDING)).toHaveLength(0);
+    expect(message).toHaveFocus();
+});
+
+test('focuses the same reservation details when its cancel action expires while the dialog is open (#361)', async () => {
+    // Arrange
+    answer([paid, pending]);
+    renderList();
+    const actions = await screen.findAllByRole('button', { name: CANCEL_PENDING });
+    const opener = actions.find((button) => button.closest('tr'));
+    const row = opener.closest('tr');
+    opener.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole('alertdialog');
+    const keep = within(dialog).getByRole('button', { name: 'Conservar reserva' });
+    expect(keep).toHaveFocus();
+
+    // Act
+    await wait(10 * MINUTE + 100);
+    expect(opener).not.toBeInTheDocument();
+    expect(keep).toHaveFocus();
+    fireEvent.click(keep);
+
+    // Assert
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: DETAIL_PENDING })).toHaveFocus();
+});

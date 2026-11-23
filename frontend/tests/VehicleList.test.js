@@ -165,3 +165,19 @@ test('the message gets the focus again when a second vehicle selected as default
     await waitFor(() => expect(screen.queryByText(otherVehicle.plate)).not.toBeInTheDocument());
     expect(screen.getByText('Vehículo no encontrado')).toHaveFocus();
 });
+
+test('focuses the vehicle list heading after deleting the last vehicle (#361)', async () => {
+    // Arrange
+    const user = userEvent.setup();
+    deleteVehicle.mockResolvedValueOnce({ data: {} });
+    renderVehicleList();
+
+    // Act
+    await confirmDeleteOf(user, vehicle.plate);
+
+    // Assert
+    expect(deleteVehicle).toHaveBeenCalledWith(vehicle.id);
+    expect(await screen.findByText('Aún no tienes vehículos registrados.')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Mis vehículos' })).toHaveFocus();
+});

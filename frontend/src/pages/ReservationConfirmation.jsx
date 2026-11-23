@@ -863,6 +863,7 @@ export default function ReservationConfirmation() {
             </div>
 
             <CancelReservationDialog
+                fallbackFocusRef={statusRef}
                 reservation={cancelOpen ? reservation : null}
                 onClose={handleCancelClose}
                 onCancelled={handleCancelled}

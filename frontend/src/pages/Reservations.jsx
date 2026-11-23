@@ -243,7 +243,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                 <button
                     type="button"
                     ref={trackExpiringAction}
-                    onClick={() => onCancel(reservation)}
+                    onClick={() => onCancel(reservation, detailRef.current)}
                     aria-label={`Cancelar la ${which}`}
                     className={`${base} border-danger text-danger hover:bg-danger-soft`}
                 >
@@ -327,6 +327,7 @@ export default function Reservations() {
     // stay in the finish dialog and when it was opened. The message shown
     // after either action (HU-16 AC-06, HU-27 AC-09).
     const [cancelTarget, setCancelTarget] = useState(null);
+    const cancelFallbackRef = useRef(null);
     const [finishTarget, setFinishTarget] = useState(null);
     // HU-28: the stay in the extend dialog and when it was opened.
     const [extendTarget, setExtendTarget] = useState(null);
@@ -417,7 +418,10 @@ export default function Reservations() {
     const handleViewDetails = (id) => navigate(`/reservations/${id}`);
     const handlePay = (id) => navigate(`/reservations/${id}/payment`);
     // HU-16
-    const handleCancel = (reservation) => setCancelTarget(reservation);
+    const handleCancel = (reservation, detailButton) => {
+        cancelFallbackRef.current = detailButton;
+        setCancelTarget(reservation);
+    };
     const handleCancelClose = ({ stale }) => {
         setCancelTarget(null);
         // The reservation changed since the list was loaded (e.g. it started):
@@ -775,6 +779,7 @@ text-center text-caption font-medium text-white"
                 )}
             </div>
             <CancelReservationDialog
+                fallbackFocusRef={cancelFallbackRef}
                 reservation={cancelTarget}
                 onClose={handleCancelClose}
                 onCancelled={handleCancelled}

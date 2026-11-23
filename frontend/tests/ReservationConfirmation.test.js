@@ -172,3 +172,24 @@ describe('Keyboard focus when the reservation countdown ends (#361)', () => {
         expect(screen.getByText('Expirada')).toHaveFocus();
     });
 });
+
+test('focuses the expired status after closing a cancellation dialog opened before expiry (#361)', async () => {
+    // Arrange
+    answer();
+    renderScreen();
+    const opener = await screen.findByRole('button', { name: 'Cancelar reserva' });
+    opener.focus();
+    await act(async () => { opener.click(); });
+    const keep = screen.getByRole('button', { name: 'Conservar reserva' });
+    expect(keep).toHaveFocus();
+
+    // Act
+    await wait(10 * MINUTE);
+    expect(opener).not.toBeInTheDocument();
+    expect(keep).toHaveFocus();
+    await act(async () => { keep.click(); });
+
+    // Assert
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByText('Expirada')).toHaveFocus();
+});
