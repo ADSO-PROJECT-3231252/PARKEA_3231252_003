@@ -188,7 +188,7 @@ export default function Register() {
                     <form onSubmit={handleSubmit} noValidate className="space-y-1.5">
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="documentType" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="documentType" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Tipo de documento
                                 </label>
                                 <select
@@ -205,7 +205,7 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="documentNumber" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="documentNumber" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Número de documento
                                 </label>
                                 <input
@@ -292,7 +292,7 @@ export default function Register() {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="password" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="password" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Contraseña
                                 </label>
                                 <div className="relative">
@@ -331,7 +331,7 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="confirmPassword" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="confirmPassword" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Confirmar contraseña
                                 </label>
                                 <div className="relative">

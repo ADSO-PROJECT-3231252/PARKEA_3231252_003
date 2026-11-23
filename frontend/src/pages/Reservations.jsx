@@ -264,7 +264,8 @@ function PageButton({ children, ...props }) {
             className="min-w-9 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-caption
 text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600
 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200
-disabled:hover:text-neutral-900"
+disabled:hover:text-neutral-900 aria-disabled:cursor-not-allowed aria-disabled:opacity-50
+aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
             {...props}
         >
             {children}
@@ -296,6 +297,9 @@ export default function Reservations() {
     const [error, setError] = useState(false);
     // Bumped by "Reintentar" to re-run the fetch with the same filter/page.
     const [reloadKey, setReloadKey] = useState(0);
+    // #311: the list is replaced by a loading state, so after a page change the focus goes to the range text
+    const rangeRef = useRef(null);
+    const focusRangeAfterLoad = useRef(false);
     // Time of the last load, used to decide which reservations already started.
     // Set from the fetch callback, never during render.
     const [now, setNow] = useState(null);
@@ -382,6 +386,7 @@ export default function Reservations() {
         navigate({ search: params.toString(), hash }, { replace: true });
     };
     const goToPage = (target) => {
+        focusRangeAfterLoad.current = true;
         setResultMessage('');
         startLoading();
         setPage(target);
@@ -440,6 +445,12 @@ export default function Reservations() {
     const isFiltered = statusFilter !== 'All';
     const isEmpty = !loading && !error && reservations.length === 0;
     const showList = !loading && !error && reservations.length > 0;
+
+    useEffect(() => {
+        if (loading) return;
+        if (showList && focusRangeAfterLoad.current) rangeRef.current?.focus();
+        focusRangeAfterLoad.current = false;
+    }, [loading, showList]);
     const firstShown = (page - 1) * PAGE_SIZE + 1;
     const lastShown = firstShown + reservations.length - 1;
     return (
@@ -696,7 +707,7 @@ p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                             Los montos estimados pueden variar según el tiempo real de uso.
                         </p>
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-caption text-neutral-600" aria-live="polite">
+                            <p ref={rangeRef} tabIndex={-1} className="text-caption text-neutral-600 focus:outline-none" aria-live="polite">
                                 Mostrando {firstShown}–{lastShown} de {pagination.total} reservas
                             </p>
                             {/* AC-10 */}
@@ -739,8 +750,10 @@ text-center text-caption font-medium text-white"
                                         ),
                                     )}
                                     <PageButton
-                                        onClick={() => goToPage(page + 1)}
-                                        disabled={page === pagination.totalPages}
+                                        onClick={() => {
+                                            if (page < pagination.totalPages) goToPage(page + 1);
+                                        }}
+                                        aria-disabled={page === pagination.totalPages || undefined}
                                     >
                                         Siguiente
                                     </PageButton>

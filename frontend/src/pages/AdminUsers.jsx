@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Users,
     UserCheck,
@@ -283,8 +283,18 @@ export default function AdminUsers() {
         setPage(1);
     };
 
+    // #311: the list is replaced by a loading state, so after a page change the focus goes to the range text
+    const rangeRef = useRef(null);
+    const focusRangeAfterLoad = useRef(false);
+    useEffect(() => {
+        if (loading) return;
+        if (!error && users.length > 0 && focusRangeAfterLoad.current) rangeRef.current?.focus();
+        focusRangeAfterLoad.current = false;
+    }, [loading, error, users.length]);
+
     const goToPage = (target) => {
         if (target === page) return;
+        focusRangeAfterLoad.current = true;
         startLoading();
         setPage(target);
     };
@@ -368,7 +378,8 @@ export default function AdminUsers() {
     const visibleLogs = logsExpanded ? logs : logs.slice(0, VISIBLE_LOGS);
     const pageButton =
         'flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 ' +
-        'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
+        'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ' +
+        'aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent';
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -446,7 +457,7 @@ export default function AdminUsers() {
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Ej. Juan Pérez, juan@mail.com o 1020304050"
+                            placeholder="Nombre, correo o documento"
                             className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                         />
                         {search && (
@@ -631,7 +642,7 @@ export default function AdminUsers() {
 
                         {/* AC-15: pagination */}
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
-                            <p className="text-caption text-neutral-600">
+                            <p ref={rangeRef} tabIndex={-1} className="text-caption text-neutral-600 focus:outline-none">
                                 Mostrando {rangeStart} a {rangeEnd} de {pagination.total} usuarios
                             </p>
                             <nav aria-label="Paginación de usuarios" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
@@ -673,8 +684,10 @@ export default function AdminUsers() {
                                 )}
                                 <button
                                     type="button"
-                                    onClick={() => goToPage(page + 1)}
-                                    disabled={page === pagination.totalPages}
+                                    onClick={() => {
+                                        if (page < pagination.totalPages) goToPage(page + 1);
+                                    }}
+                                    aria-disabled={page === pagination.totalPages || undefined}
                                     aria-label="Página siguiente"
                                     className={pageButton}
                                 >

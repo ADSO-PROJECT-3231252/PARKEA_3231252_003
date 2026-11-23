@@ -263,7 +263,8 @@ export default function AdminZones() {
 
     const pageButton =
         'flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
-        'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent sm:px-2.5';
+        'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent ' +
+        'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent sm:px-2.5';
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -307,7 +308,7 @@ export default function AdminZones() {
                         type="text"
                         value={search}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Buscar por nombre o dirección…"
+                        placeholder="Nombre o dirección…"
                         aria-label="Buscar zona por nombre o dirección"
                         className="w-full rounded-md border border-neutral-200 bg-white py-2.5 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                     />
@@ -489,8 +490,10 @@ export default function AdminZones() {
                                 )}
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
+                                    onClick={() => {
+                                        if (currentPage < totalPages) setPage(currentPage + 1);
+                                    }}
+                                    aria-disabled={currentPage === totalPages || undefined}
                                     className={pageButton}
                                 >
                                     <span className="sr-only sm:not-sr-only">Siguiente</span>
