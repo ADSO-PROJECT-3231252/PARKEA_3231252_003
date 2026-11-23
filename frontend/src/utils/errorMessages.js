@@ -73,6 +73,7 @@ const errorMessages = {
     EXTENSION_NOT_LATER: 'La nueva hora de salida debe ser posterior a la actual',
     EXTENSION_TOO_LONG: 'La estadía no puede durar más de 24 horas desde la entrada',
     RESERVATION_CHANGED: 'Esta reserva cambió mientras la ampliabas, por ejemplo desde otra pestaña. No se cobró nada en este intento. Revisa la reserva e intenta de nuevo',
+    SPOT_RESERVED_LATER: 'Tu cupo tiene otra reserva más tarde, así que no se puede ampliar hasta esa hora. Elige una hora de salida más temprana',
 
     // Payments
     INVALID_PAYMENT_METHOD: 'Método de pago inválido',
