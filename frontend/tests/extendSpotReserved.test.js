@@ -101,6 +101,26 @@ describe('Paying an extension that reaches the next reservation of the spot (#37
         expect(screen.getByRole('button', { name: `Ampliar hasta las ${timeInName(FREE_UNTIL)}` })).toBeEnabled();
     });
 
+    test('changing the payment method after it keeps the message and the way on', async () => {
+        // Arrange
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        extendStay.mockRejectedValueOnce(spotReservedLater(FREE_UNTIL));
+        renderPayment(colombia('18:00'));
+        await screen.findByText('Ampliar estadía');
+        await pay(user, 12000);
+
+        // Act: the other payment method
+        await user.click(screen.getByRole('radio', { name: /PSE/ }));
+
+        // Assert: the payment button stays disabled, so its reason and the
+        // way on stay too
+        expect(payButton(12000)).toBeDisabled();
+        expect(screen.getByRole('alert')).toHaveTextContent(
+            `Tu cupo tiene otra reserva más tarde. Puedes ampliar hasta las ${time(FREE_UNTIL)}`,
+        );
+        expect(screen.getByRole('button', { name: `Ampliar hasta las ${timeInName(FREE_UNTIL)}` })).toBeEnabled();
+    });
+
     test('extending until then shows the new exit and amount, and pays them', async () => {
         // Arrange
         const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
@@ -249,5 +269,56 @@ describe('Switching to an open stay when the spot has a later reservation (#375)
         expect(screen.queryByLabelText('Nueva hora de salida')).not.toBeInTheDocument();
         expect(screen.getByRole('alertdialog')).not.toHaveAccessibleDescription(/Puedes ampliarla/);
         expect(screen.getByRole('button', { name: 'Continuar al pago' })).toBeDisabled();
+    });
+});
+
+describe('Changing the payment method after the answer (#375)', () => {
+    test('after another code that stops the extension, the message stays', async () => {
+        // Arrange: the stay changed meanwhile, for example in another tab
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        extendStay.mockRejectedValueOnce({ response: { status: 409, data: { code: 'RESERVATION_CHANGED', message: '…' } } });
+        renderPayment(colombia('14:00'));
+        await screen.findByText('Ampliar estadía');
+        await pay(user, 4000);
+
+        // Act
+        await user.click(screen.getByRole('radio', { name: /PSE/ }));
+
+        // Assert
+        expect(payButton(4000)).toBeDisabled();
+        expect(screen.getByRole('alert')).toHaveTextContent('Esta reserva cambió mientras la ampliabas');
+        expect(screen.getByRole('button', { name: 'Volver a la reserva' })).toBeInTheDocument();
+    });
+
+    test('after a declined payment, the message goes away to try again', async () => {
+        // Arrange
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        extendStay.mockRejectedValueOnce({ response: { status: 402, data: { code: 'PAYMENT_DECLINED', message: '…' } } });
+        renderPayment(colombia('14:00'));
+        await screen.findByText('Ampliar estadía');
+        await pay(user, 4000);
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+
+        // Act
+        await user.click(screen.getByRole('radio', { name: /PSE/ }));
+
+        // Assert
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(payButton(4000)).toBeEnabled();
+    });
+
+    test('after an approved payment, the message stays until the screen changes', async () => {
+        // Arrange
+        const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+        extendStay.mockResolvedValueOnce({ data: {} });
+        renderPayment(colombia('14:00'));
+        await screen.findByText('Ampliar estadía');
+        await pay(user, 4000);
+
+        // Act
+        await user.click(screen.getByRole('radio', { name: /PSE/ }));
+
+        // Assert
+        expect(screen.getByRole('status')).toHaveTextContent('Pago aprobado. Estadía ampliada');
     });
 });

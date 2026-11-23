@@ -574,7 +574,11 @@ export default function PayReservation() {
                                                 checked={selected}
                                                 onChange={() => {
                                                     setMethod(value);
-                                                    setMessage(null);
+                                                    // An approved payment, and an extension that cannot
+                                                    // go on, keep their message: the payment button stays
+                                                    // disabled, and the message says why and gives the
+                                                    // way on (#375)
+                                                    if (!approved && !extendBlocked) setMessage(null);
                                                 }}
                                                 className="h-6 w-6 shrink-0 accent-parkea-600"
                                             />
