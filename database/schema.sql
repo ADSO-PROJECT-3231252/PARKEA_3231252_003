@@ -1,6 +1,6 @@
 -- PARKEA (SIGMUI) — Official database schema
--- Mirrors the Sequelize migrations in backend/src/migrations (26 migrations,
--- up to 20261112090100-create-zone-schedules). The application's
+-- Mirrors the Sequelize migrations in backend/src/migrations (29 migrations,
+-- up to 20261122100200-remove-zone-available-slots). The application's
 -- database is created with those migrations and seeders (see README); this
 -- file is the readable reference of the same design. The CHECK constraints
 -- below document rules that the backend also validates.
@@ -74,6 +74,8 @@ CREATE TABLE vehicles (
 -- Zones are never deleted: they are deactivated with is_active = FALSE
 -- open_24h: TRUE for a zone open 24 hours, FALSE when its hours are in
 -- zone_schedules (HU-29). Zones created before HU-29 are open 24 hours
+-- The free spots are not stored: they depend on the hours asked, and the API
+-- calculates them from the reservations (#373)
 CREATE TABLE zones (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     name VARCHAR(100) NOT NULL,
@@ -81,7 +83,6 @@ CREATE TABLE zones (
     latitude DECIMAL(10,7),
     longitude DECIMAL(10,7),
     total_slots INT NOT NULL DEFAULT 0,
-    available_slots INT NOT NULL CHECK (available_slots >= 0),
     hourly_rate DECIMAL(10,2) NOT NULL CHECK (hourly_rate > 0),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     open_24h BOOLEAN NOT NULL DEFAULT TRUE
@@ -114,12 +115,14 @@ CREATE TABLE zone_schedules (
 -- One row per physical spot. Created automatically (1..total_slots) when a
 -- zone is created, and adjusted when its capacity changes. Spots are never
 -- deleted — a spot that no longer fits the zone's capacity is Disabled
--- instead, so reservation history keeps its reference intact.
+-- instead, so reservation history keeps its reference intact. A spot is
+-- taken only for the hours of its reservations (#373), so its status only
+-- says whether it can be reserved.
 CREATE TABLE parking_spots (
     id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
     zone_id VARCHAR(36) NOT NULL,
     spot_number INT NOT NULL,
-    status ENUM('Available', 'Occupied', 'Disabled') NOT NULL DEFAULT 'Available',
+    status ENUM('Available', 'Disabled') NOT NULL DEFAULT 'Available',
     UNIQUE KEY parking_spots_zone_spot_unique (zone_id, spot_number),
     FOREIGN KEY (zone_id) REFERENCES zones(id) ON DELETE CASCADE
 );
@@ -132,6 +135,10 @@ CREATE TABLE parking_spots (
 -- applied_hourly_rate freezes the zone rate at booking time, so later rate
 -- changes never alter the price of an existing reservation
 -- hold_expires_at: an unpaid reservation expires and releases its spot (HU-26)
+-- A reservation holds its spot only for its hours, while it is Active or
+-- Pending with its 15 minutes still running; the index finds the
+-- reservations of a spot by status and time, and it is also the index of
+-- the foreign key of parking_spot_id (#373)
 -- open_ended: a stay without a chosen exit time (HU-27). Its end_time keeps a
 -- provisional value until the stay ends: entry + 24 h, or the closing time of
 -- that day when the zone is not open 24 hours (HU-29). This flag is what
@@ -159,7 +166,8 @@ CREATE TABLE reservations (
     CONSTRAINT reservations_vehicle_id_fk FOREIGN KEY (vehicle_id)
         REFERENCES vehicles(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT reservations_parking_spot_id_fk FOREIGN KEY (parking_spot_id)
-        REFERENCES parking_spots(id) ON DELETE RESTRICT
+        REFERENCES parking_spots(id) ON DELETE RESTRICT,
+    KEY reservations_spot_status_times_idx (parking_spot_id, status, start_time, end_time)
 );
 
 -- 8. Table: payments

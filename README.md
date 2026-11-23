@@ -140,16 +140,19 @@ PARKEA_3231252_003/
 │   │   ├── 📁 controllers/   # Business logic (one per module)
 │   │   ├── 📁 jobs/          # Background jobs (reservation expiration and finalization)
 │   │   ├── 📁 middlewares/   # Auth, attempt limits (rateLimit.js) and express-validator rules (*.validator.js)
-│   │   ├── 📁 migrations/    # 26 Sequelize migrations: they create the database
+│   │   ├── 📁 migrations/    # 29 Sequelize migrations: they create the database
 │   │   ├── 📁 models/        # Sequelize models (11 tables)
 │   │   ├── 📁 routes/        # API route definitions
 │   │   ├── 📁 seeders/       # Demo data: roles, zones and the primary administrator
+│   │   ├── 📁 services/      # Rules shared by controllers (availability.js: the free spots of a zone for some hours)
 │   │   └── 📁 utils/         # Helpers (mailer and email layout, link and session tokens, simulated payment, stay pricing, zone hours, validation)
 │   ├── 📁 tests/             # Jest + Supertest tests (npm test)
+│   │   └── 📁 integration/   # Tests against a MySQL database (npm run test:integration)
 │   ├── .env.example
 │   ├── .sequelizerc          # Paths used by sequelize-cli
 │   ├── API_REFERENCE.md      # Every endpoint with its rules and error codes
 │   ├── eslint.config.js
+│   ├── jest.integration.config.js  # Jest config of the integration tests
 │   └── package.json
 │
 ├── 📁 frontend/
@@ -257,7 +260,7 @@ npx sequelize-cli db:migrate
 npx sequelize-cli db:seed:all
 ```
 
-> The 26 migrations create the 11 tables: roles, users, vehicles, zones, zone_schedules, parking_spots, reservations, payments, password_reset_tokens, email_verification_tokens and admin_action_logs.
+> The 29 migrations create the 11 tables: roles, users, vehicles, zones, zone_schedules, parking_spots, reservations, payments, password_reset_tokens, email_verification_tokens and admin_action_logs.
 > The seeders add the `admin` and `user` roles, 4 demo zones open 24 hours with their parking spots, and the primary administrator `admin@parkea.com`, already verified (its password is set in `src/seeders/20260808234824-demo-primary-admin.js`).
 > A new account must confirm its email before signing in. On your computer the email arrives in your Mailtrap inbox, so fill in the `MAILTRAP_*` variables (see Environment Variables).
 
@@ -305,8 +308,12 @@ Never commit a `.env` file: only `.env.example` goes to the repository.
 PORT=3000
 NODE_ENV=development
 
-# Database (the only database setting the code reads)
+# Database (the only database setting the API reads)
 DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/parkea_db
+
+# Only for the integration tests (npm run test:integration): a database
+# whose name ends in _test, because the tests delete it and build it again
+TEST_DATABASE_URL=mysql://USER:PASSWORD@localhost:3306/parkea_test
 
 # JWT
 JWT_SECRET=change_this_to_a_long_random_secret
@@ -328,6 +335,7 @@ MAILTRAP_PASS=your_mailtrap_password
 | `PORT` | Port of the API (default 3000) |
 | `NODE_ENV` | Sequelize environment (default `development`) |
 | `DATABASE_URL` | MySQL connection, used by the server and by sequelize-cli |
+| `TEST_DATABASE_URL` | MySQL database of the integration tests only. Its name must end in `_test`: the tests delete it and build it again with the migrations and the seeders. Not needed to run the project or `npm test` |
 | `JWT_SECRET` / `JWT_EXPIRES_IN` | Signing and lifetime of the session token (default 1h) |
 | `FRONTEND_URL` | Origin allowed by CORS, and address of the links in the emails (default `http://localhost:5173`) |
 | `MAILTRAP_*` | SMTP account for the verification and password recovery emails. On your computer, the Mailtrap sandbox: without it a new account cannot be confirmed. The published site uses Resend with the same names (see [docs/deployment.md](docs/deployment.md)) |
@@ -352,6 +360,7 @@ VITE_API_URL=http://localhost:3000/api
 | Production | `npm start` | Plain Node |
 | Lint | `npm run lint` | ESLint |
 | Tests | `npm test` | Jest + Supertest, no MySQL needed |
+| Integration tests | `npm run test:integration` | Jest + Supertest against MySQL, on the database of `TEST_DATABASE_URL` (it is deleted and built again) |
 
 ### Database (run inside `backend/`)
 | Task | Command |
@@ -391,7 +400,7 @@ Base URL: `http://localhost:3000/api`. **Public**: no token. **Authenticated**: 
 | Vehicles | `PUT /vehicles/:id`, `PATCH /vehicles/:id/default` | User | HU-11, HU-12 |
 | Vehicles | `DELETE /vehicles/:id` (soft delete) | User | HU-13 |
 | Zones | `GET /zones`, `GET /zones/:id` (with the opening hours) | Public | HU-09, HU-29 |
-| Zones | `GET /zones/all`, `GET /zones/:id/spots` | Admin | HU-19 |
+| Zones | `GET /zones/all` | Admin | HU-19 |
 | Zones | `POST /zones`, `PUT /zones/:id` (with the opening hours) | Admin | HU-20, HU-21, HU-29 |
 | Zones | `PATCH /zones/:id/toggle` | Admin | HU-19 |
 | Reservations | `POST /reservations` (inside the opening hours; with `openEnded: true` for a stay without an exit time) | User | HU-14, HU-27, HU-29 |
@@ -582,7 +591,7 @@ The work is managed with Scrum on the **PARKEA - Sprint Board** (Projects tab of
 | Task | Priority | Status |
 |------|----------|--------|
 | Integrate `backend` and `frontend` into `develop` | High | Done at the end of every sprint: `v0.1` (Sprint 1) and `v0.2` (Sprint 2) |
-| Automated testing (unit + integration) | High | In progress: Jest + Supertest in the backend since Sprint 1 and Jest + React Testing Library in the frontend since Sprint 2. At the end of Sprint 2: 105 backend tests and 77 frontend tests |
+| Automated testing (unit + integration) | High | In progress: Jest + Supertest in the backend since Sprint 1 and Jest + React Testing Library in the frontend since Sprint 2. At the end of Sprint 2: 105 backend tests and 77 frontend tests. Since #373 the backend also has integration tests against MySQL (`npm run test:integration`) |
 | Server/cloud deployment | Low | Done: published on Azure (App Service + Azure Database for MySQL), see [docs/deployment.md](docs/deployment.md). It runs `integration/sprint-2` |
 | Performance measurement | Medium | SRS requires < 3s with 50 concurrent users. Not against the published site: its free plan has 60 CPU minutes a day |
 | API documentation (Swagger/OpenAPI) | Medium | Today the reference is the endpoint table above and [backend/API_REFERENCE.md](backend/API_REFERENCE.md) |
