@@ -1,12 +1,10 @@
-// HU-31: the vehicle types of the zones against a real MySQL database. Until
-// the API takes the types, every zone has the car type, with the spots and
-// the rate of the zone, and all its spots are car spots (AC-15). The
-// migrations of the types can be undone and done again on a database with
-// zones, spots and reservations.
+// HU-31: the car type of the zones against a real MySQL database: the demo
+// zones and the zones created and edited with cars only keep the car type
+// with their spots and rate, and all their spots are car spots (AC-15). The
+// migrations are in vehicleTypeMigrations.test.js, and the other types in
+// zonesByVehicleType.test.js.
 const request = require('supertest');
 const { sequelize, Zona } = require('../../src/models');
-const zoneTypes = require('../../src/migrations/20261124100000-create-zone-vehicle-types');
-const spotType = require('../../src/migrations/20261124100100-add-vehicle-type-to-parking-spots');
 const { app, inMinutes, unique, createUser, adminToken, createZone, reserve } = require('./helpers');
 
 const run = (sql, replacements) => sequelize.query(sql, { replacements });
@@ -99,8 +97,8 @@ describe('The car type of every zone (HU-31)', () => {
         expect(await typesOf(zona.id)).toEqual([{ vehicleType: 'car', totalSlots: 2, hourlyRate: 2000, isAccepting: 1 }]);
     });
 
-    test('a zone that lost its car type (written by hand) gets it again when it is edited', async () => {
-        // Arrange: a zone of its own, without spots or types, as a script would write it
+    test('a zone without types or spots (written by hand) gets them when it is edited', async () => {
+        // Arrange: a zone of its own, as a script would write it
         const zona = await Zona.create({ name: `Zona ${unique()}`, address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961, totalSlots: 2, hourlyRate: 2000 });
 
         // Act
@@ -109,95 +107,6 @@ describe('The car type of every zone (HU-31)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(await typesOf(zona.id)).toEqual([{ vehicleType: 'car', totalSlots: 2, hourlyRate: 2200, isAccepting: 1 }]);
-    });
-});
-
-describe('Undoing and doing again the migrations of the types (HU-31)', () => {
-    const queryInterface = sequelize.getQueryInterface();
-    let zona;
-
-    beforeAll(async () => {
-        // A zone with a reservation and a disabled spot, on top of the zones
-        // of the seeders and of the other tests
-        zona = await createZone(3);
-        await edit(zona, { totalSlots: 2, hourlyRate: 2000 });
-        const cuenta = await createUser();
-        const res = await reserve(cuenta, zona, inMinutes(60).toISOString(), inMinutes(120).toISOString());
-        if (res.status !== 201) throw new Error(`Not reserved: ${res.status} ${JSON.stringify(res.body)}`);
-    });
-
-    test('down refuses while a zone has another type, and changes nothing', async () => {
-        // Arrange
-        await run("INSERT INTO zone_vehicle_types (id, zone_id, vehicle_type, total_slots, hourly_rate) VALUES (UUID(), :zona, 'truck', 1, 5000)", { zona: zona.id });
-        await run("INSERT INTO parking_spots (id, zone_id, vehicle_type, spot_number, status) VALUES (UUID(), :zona, 'truck', 1, 'Available')", { zona: zona.id });
-
-        // Act + Assert
-        await expect(spotType.down(queryInterface)).rejects.toThrow('1 spot(s) are not car spots');
-        await run("DELETE FROM parking_spots WHERE zone_id = :zona AND vehicle_type = 'truck'", { zona: zona.id });
-        await expect(zoneTypes.down(queryInterface)).rejects.toThrow('1 zone type(s) are not car');
-        await run("DELETE FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type = 'truck'", { zona: zona.id });
-        expect(await spotsOf(zona.id)).toEqual(['car 1 Available', 'car 2 Available', 'car 3 Disabled']);
-    });
-
-    test('down and up again leave the same types, spots and indexes, and the zones keep working', async () => {
-        // Arrange: every type and every spot, before
-        const [typesBefore] = await run('SELECT zone_id, vehicle_type, total_slots, hourly_rate, is_accepting FROM zone_vehicle_types ORDER BY zone_id, vehicle_type');
-        const [spotsBefore] = await run('SELECT id, zone_id, vehicle_type, spot_number, status FROM parking_spots ORDER BY id');
-        const [indexesBefore] = await run(`
-            SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns_
-            FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('parking_spots', 'zone_vehicle_types')
-            GROUP BY TABLE_NAME, INDEX_NAME, NON_UNIQUE ORDER BY TABLE_NAME, INDEX_NAME
-        `);
-        const [constraintsBefore] = await run(`
-            SELECT TABLE_NAME, CONSTRAINT_NAME, CONSTRAINT_TYPE FROM information_schema.TABLE_CONSTRAINTS
-            WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME IN ('parking_spots', 'zone_vehicle_types')
-            ORDER BY TABLE_NAME, CONSTRAINT_NAME
-        `);
-
-        // Act: down
-        await spotType.down(queryInterface);
-        await zoneTypes.down(queryInterface);
-        const [[afterDown]] = await run(`
-            SELECT (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zone_vehicle_types') AS tables_,
-                (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'parking_spots' AND COLUMN_NAME = 'vehicle_type') AS columns_,
-                (SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND INDEX_NAME = 'parking_spots_zone_spot_unique') AS oldIndex
-        `);
-        // ...and up again
-        await zoneTypes.up(queryInterface, sequelize.constructor);
-        await spotType.up(queryInterface, sequelize.constructor);
-
-        // Assert
-        expect(afterDown).toEqual({ tables_: 0, columns_: 0, oldIndex: 1 });
-        const [typesAfter] = await run('SELECT zone_id, vehicle_type, total_slots, hourly_rate, is_accepting FROM zone_vehicle_types ORDER BY zone_id, vehicle_type');
-        const [spotsAfter] = await run('SELECT id, zone_id, vehicle_type, spot_number, status FROM parking_spots ORDER BY id');
-        const [indexesAfter] = await run(`
-            SELECT TABLE_NAME, INDEX_NAME, NON_UNIQUE, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns_
-            FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('parking_spots', 'zone_vehicle_types')
-            GROUP BY TABLE_NAME, INDEX_NAME, NON_UNIQUE ORDER BY TABLE_NAME, INDEX_NAME
-        `);
-        const [constraintsAfter] = await run(`
-            SELECT TABLE_NAME, CONSTRAINT_NAME, CONSTRAINT_TYPE FROM information_schema.TABLE_CONSTRAINTS
-            WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME IN ('parking_spots', 'zone_vehicle_types')
-            ORDER BY TABLE_NAME, CONSTRAINT_NAME
-        `);
-        // The types that were there come back the same. A zone that had
-        // none (written by hand by another test) gets its car type too.
-        const hadTypes = new Set(typesBefore.map((row) => row.zone_id));
-        expect(typesAfter.filter((row) => hadTypes.has(row.zone_id))).toEqual(typesBefore);
-        const [withoutTheirCarType] = await run(`
-            SELECT z.id FROM zones AS z LEFT JOIN zone_vehicle_types AS t ON t.zone_id = z.id AND t.vehicle_type = 'car'
-            WHERE t.id IS NULL OR t.total_slots <> z.total_slots OR t.hourly_rate <> z.hourly_rate
-        `);
-        expect(withoutTheirCarType).toEqual([]);
-        expect(spotsAfter).toEqual(spotsBefore);
-        expect(indexesAfter).toEqual(indexesBefore);
-        expect(constraintsAfter).toEqual(constraintsBefore);
-
-        // A new reservation and a new zone work as before
-        const cuenta = await createUser();
-        const res = await reserve(cuenta, zona, inMinutes(60).toISOString(), inMinutes(120).toISOString());
-        expect(res.status).toBe(201);
-        expect(res.body.reservation.spotNumber).toBe(2);
-        expect(await typesOf((await createZone(1)).id)).toEqual([{ vehicleType: 'car', totalSlots: 1, hourlyRate: 2000, isAccepting: 1 }]);
+        expect(await spotsOf(zona.id)).toEqual(['car 1 Available', 'car 2 Available']);
     });
 });

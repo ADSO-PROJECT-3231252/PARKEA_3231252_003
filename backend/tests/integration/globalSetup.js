@@ -24,11 +24,11 @@ function testDatabaseUrl() {
     return url;
 }
 
-// One command of sequelize-cli against the test database. Its output is
-// shown only if it fails.
-function sequelizeCli(command, url) {
+// One command of sequelize-cli against the test database, with its `args`.
+// Its output is shown only if it fails.
+function sequelizeCli(command, url, args = []) {
     try {
-        execFileSync(process.execPath, [SEQUELIZE_CLI, command], {
+        execFileSync(process.execPath, [SEQUELIZE_CLI, command, ...args], {
             cwd: BACKEND,
             // #370: the demo administrator, whatever backend/.env says
             env: {
@@ -54,3 +54,4 @@ module.exports = () => {
 };
 
 module.exports.testDatabaseUrl = testDatabaseUrl;
+module.exports.sequelizeCli = sequelizeCli;
