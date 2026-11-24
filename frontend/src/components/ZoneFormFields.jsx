@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Info } from 'lucide-react';
 import { ZONE_LIMITS, onlyDigits, cleanCoordinate } from '../utils/zoneForm';
 import ZoneScheduleFields from './ZoneScheduleFields';
+import Field from './ZoneField';
 
 // Leaflet is only downloaded when a zone form opens (like the zones map in
 // HU-25), so it doesn't add weight to every other page.
@@ -20,31 +21,6 @@ function MapUnavailable() {
 
 const inputClass = (hasError) =>
     `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
-
-// Label, input and one line under it: the hint, or the error in its place.
-// The input gets aria-describedby with whichever line is showing.
-function Field({ id, label, hint, error, children }) {
-    const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
-    return (
-        <div>
-            <label htmlFor={id} className="block text-label text-neutral-900">
-                {label} <span className="text-danger" aria-hidden="true">*</span>
-            </label>
-            <div className="mt-1">{children({ 'aria-describedby': describedBy, 'aria-invalid': Boolean(error) })}</div>
-            {error ? (
-                <p id={`${id}-error`} role="alert" className="mt-1 text-caption text-danger">
-                    {error}
-                </p>
-            ) : (
-                hint && (
-                    <p id={`${id}-hint`} className="mt-1 text-caption text-neutral-600">
-                        {hint}
-                    </p>
-                )
-            )}
-        </div>
-    );
-}
 
 // Fields of the zone form, shared by create (HU-20) and edit (HU-21).
 // zoneForm is what useZoneForm returns; hints has the line under the name,
