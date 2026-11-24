@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { isValidEmail, isNotEmpty, normalizePhone } from '../utils/validators';
+import { isValidEmail, isNotEmpty, isValidPassword, normalizePhone, PASSWORD_MESSAGE } from '../utils/validators';
 import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { register } from '../services/authService';
 import logo from '../assets/logo.webp';
@@ -30,7 +30,7 @@ const SERVER_FIELD_MESSAGES = {
     documentNumber: 'El documento solo debe contener letras y números.',
     fullName: NAME_RULE_MESSAGE,
     email: 'Ingresa un correo válido.',
-    password: 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.',
+    password: PASSWORD_MESSAGE,
     confirmPassword: 'Las contraseñas no coinciden.',
     phone: PHONE_RULE_MESSAGE,
 };
@@ -91,14 +91,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.password)) {
             newErrors.password = 'La contraseña es obligatoria.';
-        } else if (
-            form.password.length < 8 ||
-            form.password.length > 20 ||
-            !/[A-Z]/.test(form.password) ||
-            !/[0-9]/.test(form.password) ||
-            !/[^A-Za-z0-9]/.test(form.password)
-        ) {
-            newErrors.password = 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+        } else if (!isValidPassword(form.password)) {
+            newErrors.password = PASSWORD_MESSAGE;
         }
 
         if (!isNotEmpty(form.confirmPassword)) {
@@ -164,7 +158,7 @@ export default function Register() {
         <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-3">
             <title>Crear cuenta | PARKEA</title>
             <div className="w-full max-w-5xl bg-white rounded-lg shadow-sm border border-neutral-200 flex flex-col md:flex-row overflow-hidden">
-                {/* Columna del formulario */}
+                {/* Form column */}
                 <div className="flex-1 px-5 py-4">
                     <div className="flex flex-col items-center mb-1">
                         <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
@@ -372,7 +366,7 @@ export default function Register() {
 
                         {!errors.password && !errors.confirmPassword && (
                             <p id="password-hint" className="-mt-1 text-caption text-neutral-600">
-                                Entre 8 y 20 caracteres, una mayúscula, un número y un carácter especial.
+                                {PASSWORD_MESSAGE}
                             </p>
                         )}
 
@@ -417,7 +411,7 @@ export default function Register() {
                         </p>
                     </form>
                 </div>
-                {/* Columna decorativa — se oculta en móvil (AC-04) */}
+                {/* Decorative column, hidden on phones (AC-04) */}
                 <div className="hidden md:flex md:w-[380px] flex-col items-center justify-center gap-4 bg-parkea-50 p-6 text-center">
                     <DecorativeImage src={carImage} minWidth="48rem" className="w-full max-w-[280px] object-contain" />
                     <h2 className="font-display text-subtitle text-neutral-900">

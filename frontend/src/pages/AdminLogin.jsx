@@ -62,8 +62,8 @@ export default function AdminLogin() {
                 loginUser(data.token, data.user);
             });
         } catch (err) {
-            // AC-06: NOT_ADMIN_ACCOUNT revela el motivo a propósito,
-            // a diferencia de las credenciales inválidas
+            // AC-06: NOT_ADMIN_ACCOUNT tells the reason on purpose, unlike
+            // the invalid credentials
             const code = err.response?.data?.code;
             setServerError(translateError(code));
         } finally {
