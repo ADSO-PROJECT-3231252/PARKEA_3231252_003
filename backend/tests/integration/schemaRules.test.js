@@ -11,6 +11,9 @@ const { app, inMinutes, createUser, createZone, reserve } = require('./helpers')
 const CHECK_VIOLATED = 3819;
 const CANNOT_BE_NULL = 1048;
 const NO_DEFAULT_VALUE = 1364;
+const DUPLICATE_ENTRY = 1062;
+const NO_PARENT_ROW = 1452;
+const NOT_A_VALUE_OF_THE_ENUM = 1265;
 
 const run = (sql, replacements) => sequelize.query(sql, { replacements });
 
@@ -44,7 +47,7 @@ describe('Checks, indexes and required columns of the database (#372)', () => {
         pagoId = (await Pago.findOne({ where: { reservationId: reservaId } })).id;
     });
 
-    test('after db:migrate the database lists the six checks', async () => {
+    test('after db:migrate the database lists the eight checks', async () => {
         // Act
         const [rows] = await run(`
             SELECT CONSTRAINT_NAME AS name FROM information_schema.CHECK_CONSTRAINTS
@@ -58,6 +61,8 @@ describe('Checks, indexes and required columns of the database (#372)', () => {
             'zone_schedules_open_30_minutes',
             'zone_schedules_times_in_day',
             'zone_schedules_whole_minutes',
+            'zone_vehicle_types_hourly_rate_positive',
+            'zone_vehicle_types_total_slots_range',
             'zones_hourly_rate_positive',
         ]);
     });
@@ -205,5 +210,83 @@ describe('Checks, indexes and required columns of the database (#372)', () => {
     afterAll(async () => {
         // The reservation of this file is not left for the next files
         await Reserva.update({ status: 'Cancelled' }, { where: { id: reservaId } });
+    });
+});
+
+describe('The vehicle types of the zones in the database (HU-31)', () => {
+    let zona;
+
+    // A type of the zone of this block, by SQL
+    const addType = (vehicleType, totalSlots = 5, hourlyRate = 3000) => errnoOf(
+        'INSERT INTO zone_vehicle_types (id, zone_id, vehicle_type, total_slots, hourly_rate) VALUES (UUID(), :zona, :vehicleType, :totalSlots, :hourlyRate)',
+        { zona: zona.id, vehicleType, totalSlots, hourlyRate }
+    );
+
+    beforeAll(async () => {
+        // A zone of 2 spots, created through the API
+        zona = await createZone(2);
+    });
+
+    afterEach(async () => {
+        // The types of each test do not stay for the next one
+        await run("DELETE FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type <> 'car'", { zona: zona.id });
+    });
+
+    test.each([
+        ['no spots', 0, 3000],
+        ['more than 500 spots', 501, 3000],
+        ['a rate of 0', 5, 0],
+        ['a negative rate', 5, -3000],
+    ])('a type with %s fails', async (_case, totalSlots, hourlyRate) => {
+        expect(await addType('truck', totalSlots, hourlyRate)).toBe(CHECK_VIOLATED);
+    });
+
+    test('the limits of the spots and the rate of a type are allowed', async () => {
+        expect(await addType('truck', 1, 0.01)).toBeNull();
+        expect(await errnoOf("UPDATE zone_vehicle_types SET total_slots = 500 WHERE zone_id = :zona AND vehicle_type = 'truck'", { zona: zona.id })).toBeNull();
+    });
+
+    test('a type is taken unless it is turned off', async () => {
+        // Act
+        await addType('truck');
+        const [[row]] = await run("SELECT is_accepting AS accepting FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type = 'truck'", { zona: zona.id });
+
+        // Assert
+        expect(row.accepting).toBe(1);
+    });
+
+    test('a zone has each type only once', async () => {
+        expect(await addType('truck')).toBeNull();
+        expect(await addType('truck')).toBe(DUPLICATE_ENTRY);
+    });
+
+    test('a type that does not exist fails', async () => {
+        expect(await addType('bicycle')).toBe(NOT_A_VALUE_OF_THE_ENUM);
+    });
+
+    test('a type of a zone that does not exist fails', async () => {
+        // Act
+        const errno = await errnoOf(
+            "INSERT INTO zone_vehicle_types (id, zone_id, vehicle_type, total_slots, hourly_rate) VALUES (UUID(), UUID(), 'car', 5, 3000)"
+        );
+
+        // Assert
+        expect(errno).toBe(NO_PARENT_ROW);
+    });
+
+    test('removing a zone removes its spots and its types', async () => {
+        // Arrange: a zone of its own, with no reservations, and a second type
+        const otra = await createZone(3);
+        await run("INSERT INTO zone_vehicle_types (id, zone_id, vehicle_type, total_slots, hourly_rate) VALUES (UUID(), :zona, 'truck', 1, 5000)", { zona: otra.id });
+
+        // Act
+        await run('DELETE FROM zones WHERE id = :zona', { zona: otra.id });
+        const [[left]] = await run(`
+            SELECT (SELECT COUNT(*) FROM parking_spots WHERE zone_id = :zona) AS spots,
+                (SELECT COUNT(*) FROM zone_vehicle_types WHERE zone_id = :zona) AS types
+        `, { zona: otra.id });
+
+        // Assert
+        expect(left).toEqual({ spots: 0, types: 0 });
     });
 });
