@@ -66,11 +66,12 @@ function freeFromNow(now) {
 }
 
 // HU-14: the free spot with the lowest number for a stay from `start` to
-// `end`, or null when none is free. The caller holds the lock of the zone, so
-// no other reservation of the zone can be saved meanwhile.
-function firstFreeSpot(zoneId, start, end, { transaction, now = new Date() } = {}) {
+// `end`, or null when none is free. HU-31: a spot of the type of the vehicle.
+// The caller holds the lock of the zone, so no other reservation of the zone
+// can be saved meanwhile.
+function firstFreeSpot(zoneId, vehicleType, start, end, { transaction, now = new Date() } = {}) {
     return ParkingSpot.findOne({
-        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(start, end, now)] },
+        where: { zoneId, vehicleType, status: ENABLED, [Op.and]: [freeBetween(start, end, now)] },
         order: [['spotNumber', 'ASC']],
         transaction,
     });

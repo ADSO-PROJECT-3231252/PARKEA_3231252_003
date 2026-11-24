@@ -10,6 +10,7 @@ const { safeRollback } = require('../utils/transaction');
 const { STAY_MAX_MS, checkStayTimes, outsideHoursError } = require('../utils/stayRequest');
 const availability = require('../services/availability');
 const { pendingBalance } = require('../services/accountOpenItems');
+const { acceptedType } = require('../services/zoneVehicleTypes');
 
 const MAX_PENDING_RESERVATIONS = 2;
 
@@ -29,7 +30,9 @@ function fueraDeHorario(res, hours) {
 // if that read fails, the answer still says it was created, with the saved
 // reservation, and the error goes to the log, instead of a 500 for a
 // reservation that exists.
-async function responderReservaCreada(res, reserva) {
+// HU-31: with the type of its spot (spotVehicleType), which is the type of
+// the vehicle it was made for.
+async function responderReservaCreada(res, reserva, spotVehicleType) {
     let reservaCompleta = null;
     try {
         reservaCompleta = await Reserva.findByPk(reserva.id, {
@@ -41,7 +44,9 @@ async function responderReservaCreada(res, reserva) {
     } catch (error) {
         console.error(`The reservation ${reserva.id} was saved, but reading it again failed:`, error);
     }
-    return res.status(201).json({ message: 'Reservation created successfully', reservation: reservaCompleta ?? reserva });
+    const enviada = reservaCompleta ?? reserva;
+    const datos = typeof enviada.toJSON === 'function' ? enviada.toJSON() : enviada;
+    return res.status(201).json({ message: 'Reservation created successfully', reservation: { ...datos, spotVehicleType } });
 }
 
 // HU-14: Reserve a Spot
@@ -62,6 +67,7 @@ async function crear(req, res, next) {
 
     const t = await sequelize.transaction();
     let reserva;
+    let tipoDelCupo;
     try {
         // The dates, the 48 hours in advance and the duration, with the same
         // rules as GET /zones/:id/availability (#375, utils/stayRequest.js).
@@ -135,14 +141,24 @@ async function crear(req, res, next) {
             return res.status(409).json({ code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' });
         }
 
+        // HU-31 (AC-12): the zone must take reservations for the type of the
+        // vehicle, and the reservation gets a spot and the rate of that
+        // type. The types of a zone only change with the lock of the zone
+        // (updateZona), which this request holds, so they are as they are now.
+        const aceptado = await acceptedType(zoneId, vehiculo.vehicleType, { transaction: t });
+        if (aceptado.error) {
+            await t.rollback();
+            return res.status(aceptado.error.status).json(aceptado.error.body);
+        }
+
         // A user can hold at most MAX_PENDING_RESERVATIONS unpaid reservations
         // at the same time, because each one keeps a spot for 15 minutes. The
         // count goes after the locks of the user and the zone: the second of
         // two requests at the same time waits at the lock of the user and then
-        // counts the reservation the first one created. It is also the first
-        // plain read of the transaction, and in MySQL that read fixes what the
-        // transaction sees, so before the lock of the zone it would hide the
-        // reservations that other people save while this one waits there.
+        // counts the reservation the first one created. Like the read of the
+        // types, it goes after the lock of the zone: in MySQL the first plain
+        // read fixes what the transaction sees, so before that lock it would
+        // hide the reservations that other people save while this one waits.
         // A Pending one whose 15 minutes ended counts as expired, even if the
         // job has not marked it yet (#347), so it does not take a place either.
         // That is decided with the time after the locks, not with `now`: a
@@ -207,13 +223,15 @@ async function crear(req, res, next) {
         // holds in these hours, with 10 minutes before and after. A spot is
         // taken only for the hours of its reservations, so a reservation for
         // tomorrow leaves its spot free for today. An open stay holds it
-        // until its provisional exit time.
-        const cupo = await availability.firstFreeSpot(zoneId, start, end, { transaction: t, now: availabilityTime });
+        // until its provisional exit time. HU-31: a spot of the type of the
+        // vehicle.
+        const cupo = await availability.firstFreeSpot(zoneId, vehiculo.vehicleType, start, end, { transaction: t, now: availabilityTime });
 
         if (!cupo) {
             await t.rollback();
             return res.status(409).json({ code: ErrorCodes.NO_SPOTS_AVAILABLE, message: 'This spot is no longer available. Please select another zone or time.' });
         }
+        tipoDelCupo = cupo.vehicleType;
 
         const holdExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes from now
 
@@ -227,7 +245,9 @@ async function crear(req, res, next) {
             endTime: end,
             status: 'Pending',
             holdExpiresAt,
-            appliedHourlyRate: zona.hourlyRate,
+            // HU-31 (AC-06): the rate of the type of the vehicle, which the
+            // reservation keeps for its payment, extensions and finish
+            appliedHourlyRate: aceptado.tipo.hourlyRate,
             openEnded: isOpenStay,
         }, { transaction: t });
 
@@ -239,7 +259,7 @@ async function crear(req, res, next) {
 
     // #371: out of the try, so an error after the commit never tries to undo
     // a reservation that is already saved
-    return responderReservaCreada(res, reserva);
+    return responderReservaCreada(res, reserva, tipoDelCupo);
 }
 
 // HU-27: the amounts of an open stay, as the screens show them. Before the

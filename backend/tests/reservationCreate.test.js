@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Vehiculo, Zona, ZoneSchedule, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
+const { Usuario, Vehiculo, Zona, ZoneSchedule, ZoneVehicleType, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // The where of a reservation that holds its spot at `now`, the rule of the
@@ -42,13 +42,17 @@ let findOverlap;
 let countPending;
 let claimSpot;
 let createReservation;
+let findTypes;
 let zona;
 let spot;
+
+// HU-31: the types a zone accepts, as the model gives them
+const zoneTypes = (...items) => items.map(([vehicleType, hourlyRate, isAccepting = true]) => ZoneVehicleType.build({ zoneId: ZONE_ID, vehicleType, totalSlots: 10, hourlyRate, isAccepting }));
 
 // A zone open 24 hours, read with its (empty) schedule
 function openZone(values = {}) {
     const built = Zona.build(
-        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, hourlyRate: '2500.00', isActive: true, open24h: true, schedules: [], ...values },
+        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', isActive: true, open24h: true, schedules: [], ...values },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
     // Spied on only to check that the zone does not change (#373)
@@ -57,10 +61,12 @@ function openZone(values = {}) {
 }
 
 // Everything goes well unless a test changes one of these answers. `pending`
-// is how many reservations in Pending the user already has.
-function arrange({ vehiculo = { id: VEHICLE_ID }, zone = openZone(), balance = null, overlap = null, freeSpot = true, pending = 0 } = {}) {
+// is how many reservations in Pending the user already has. HU-31: the
+// vehicle is a car, and the zone accepts cars at $2500 an hour.
+function arrange({ vehiculo = { id: VEHICLE_ID, vehicleType: 'car' }, zone = openZone(), types = zoneTypes(['car', '2500.00']), balance = null, overlap = null, freeSpot = true, pending = 0 } = {}) {
     zona = zone;
-    spot = freeSpot ? { id: SPOT_ID, spotNumber: 7, update: jest.fn() } : null;
+    spot = freeSpot ? { id: SPOT_ID, spotNumber: 7, vehicleType: vehiculo?.vehicleType, update: jest.fn() } : null;
+    findTypes = jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue(types);
     lockVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(vehiculo);
     readZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
     findBalance = jest.spyOn(Pago, 'findOne').mockResolvedValue(balance);
@@ -367,7 +373,7 @@ describe('What a new reservation needs (HU-14)', () => {
         // the hours with 10 minutes before and after
         const options = claimSpot.mock.calls[0][0];
         expect(options).toMatchObject({ order: [['spotNumber', 'ASC']], transaction });
-        expect(options.where).toMatchObject({ zoneId: ZONE_ID, status: { [Op.ne]: 'Disabled' } });
+        expect(options.where).toMatchObject({ zoneId: ZONE_ID, vehicleType: 'car', status: { [Op.ne]: 'Disabled' } });
         const sql = options.where[Op.and][0].val;
         expect(sql).toContain("r.start_time < '2026-11-16 17:10:00'");
         expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
@@ -385,8 +391,80 @@ describe('What a new reservation needs (HU-14)', () => {
     });
 });
 
+describe('The vehicle type of a new reservation (HU-31)', () => {
+    test('a vehicle of a type the zone does not accept answers 409 VEHICLE_TYPE_NOT_ACCEPTED with the types it accepts, in order', async () => {
+        // Arrange: a motorcycle, in a zone of trucks and cars
+        arrange({ vehiculo: { id: VEHICLE_ID, vehicleType: 'motorcycle' }, types: zoneTypes(['truck', '9000.00'], ['car', '2500.00']) });
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body).toEqual({
+            code: 'VEHICLE_TYPE_NOT_ACCEPTED',
+            message: 'This zone does not accept this type of vehicle',
+            vehicleType: 'motorcycle',
+            acceptedTypes: ['car', 'truck'],
+        });
+        expect(claimSpot).not.toHaveBeenCalled();
+        expectNothingSaved();
+    });
+
+    test('a zone with no type that takes reservations answers 409 VEHICLE_TYPE_NOT_ACCEPTED with no types', async () => {
+        // Arrange
+        arrange({ types: [] });
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body).toMatchObject({ code: 'VEHICLE_TYPE_NOT_ACCEPTED', vehicleType: 'car', acceptedTypes: [] });
+        expectNothingSaved();
+    });
+
+    test('only the types that take reservations count, read in the transaction after the lock of the zone', async () => {
+        // Act
+        await book();
+
+        // Assert: a type turned off keeps its reservations but takes no new ones
+        expect(findTypes).toHaveBeenCalledWith({ where: { zoneId: ZONE_ID, isAccepting: true }, transaction });
+        expect(readZone.mock.invocationCallOrder[0]).toBeLessThan(findTypes.mock.invocationCallOrder[0]);
+        expect(findTypes.mock.invocationCallOrder[0]).toBeLessThan(countPending.mock.invocationCallOrder[0]);
+    });
+
+    test('a motorcycle gets a motorcycle spot and the rate of the motorcycles, not the one of the cars', async () => {
+        // Arrange
+        arrange({ vehiculo: { id: VEHICLE_ID, vehicleType: 'motorcycle' }, types: zoneTypes(['car', '2500.00'], ['motorcycle', '1200.00']) });
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(201);
+        expect(claimSpot.mock.calls[0][0].where).toMatchObject({ zoneId: ZONE_ID, vehicleType: 'motorcycle' });
+        expect(createReservation.mock.calls[0][0]).toMatchObject({ parkingSpotId: SPOT_ID, appliedHourlyRate: '1200.00' });
+        expect(res.body.reservation.spotVehicleType).toBe('motorcycle');
+    });
+
+    test('with no free spot of its type, it answers 409 NO_SPOTS_AVAILABLE even if other types have free spots', async () => {
+        // Arrange: the search only looks at the spots of the type
+        arrange({ vehiculo: { id: VEHICLE_ID, vehicleType: 'truck' }, types: zoneTypes(['car', '2500.00'], ['truck', '9000.00']), freeSpot: false });
+
+        // Act
+        const res = await book();
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe('NO_SPOTS_AVAILABLE');
+        expect(claimSpot.mock.calls[0][0].where.vehicleType).toBe('truck');
+        expectNothingSaved();
+    });
+});
+
 describe('Saving a new reservation (HU-14)', () => {
-    test('it is created as Pending, with 15 minutes to pay and the rate of the zone at that moment', async () => {
+    test('it is created as Pending, with 15 minutes to pay and the rate of its vehicle type at that moment', async () => {
         // Act
         const res = await book();
 
@@ -416,10 +494,10 @@ describe('Saving a new reservation (HU-14)', () => {
         // Act
         const res = await book();
 
-        // Assert
+        // Assert: with the type of its spot (HU-31)
         expect(res.status).toBe(201);
         expect(readAgain).toHaveBeenCalledWith(RESERVATION_ID, { include: [{ model: Zona, as: 'zone' }, { model: Vehiculo, as: 'vehicle' }] });
-        expect(res.body.reservation).toEqual(withDetails);
+        expect(res.body.reservation).toEqual({ ...withDetails, spotVehicleType: 'car' });
     });
 
     test('the reservation keeps its spot, and neither the spot nor the zone change (#373)', async () => {

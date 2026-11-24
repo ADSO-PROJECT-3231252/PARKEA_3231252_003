@@ -5,7 +5,7 @@ const { Op } = require('sequelize');
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL). What the SQL finds on a real database is checked in
 // tests/integration.
-const { Usuario, Vehiculo, Zona, ZoneSchedule, ParkingSpot, Pago, Reserva, sequelize } = require('../src/models');
+const { Usuario, Vehiculo, Zona, ZoneSchedule, ZoneVehicleType, ParkingSpot, Pago, Reserva, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // #375: GET /api/zones/:id/availability says how many spots of a zone are
@@ -176,7 +176,9 @@ describe('The times are checked like in POST /reservations (#375)', () => {
     // The session and everything a reservation needs, with no free spot
     function everythingButASpot() {
         jest.spyOn(Usuario, 'findByPk').mockResolvedValue({ id: USER_ID, isActive: true, passwordVersion: 0, roleId: 'role-user', role: { name: 'user' } });
-        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID });
+        // A car, in a zone that takes cars (HU-31)
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID, vehicleType: 'car' });
+        jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue([ZoneVehicleType.build({ zoneId: ZONE_ID, vehicleType: 'car', totalSlots: 10, hourlyRate: '2000.00', isAccepting: true })]);
         jest.spyOn(Reserva, 'count').mockResolvedValue(0);
         jest.spyOn(Pago, 'findOne').mockResolvedValue(null);
         jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);

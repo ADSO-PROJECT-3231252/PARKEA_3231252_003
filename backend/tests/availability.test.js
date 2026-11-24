@@ -36,19 +36,19 @@ describe('The rules of availability (#373)', () => {
         });
     });
 
-    test('the free spot is taken among the enabled spots of the zone, the lowest number first', async () => {
+    test('the free spot is taken among the enabled spots of the type of the vehicle, the lowest number first', async () => {
         // Arrange
         const spot = { id: 'spot-3', spotNumber: 3 };
         jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue(spot);
         const transaction = {};
 
         // Act
-        const found = await availability.firstFreeSpot(ZONE_ID, at('15:00'), at('16:00'), { transaction, now: NOW });
+        const found = await availability.firstFreeSpot(ZONE_ID, 'motorcycle', at('15:00'), at('16:00'), { transaction, now: NOW });
 
         // Assert
         expect(found).toBe(spot);
         const options = ParkingSpot.findOne.mock.calls[0][0];
-        expect(options.where).toMatchObject({ zoneId: ZONE_ID, status: { [Op.ne]: 'Disabled' } });
+        expect(options.where).toMatchObject({ zoneId: ZONE_ID, vehicleType: 'motorcycle', status: { [Op.ne]: 'Disabled' } });
         expect(options.order).toEqual([['spotNumber', 'ASC']]);
         expect(options.transaction).toBe(transaction);
     });
@@ -58,7 +58,7 @@ describe('The rules of availability (#373)', () => {
         jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue(null);
 
         // Act
-        await availability.firstFreeSpot(ZONE_ID, at('15:00'), at('16:00'), { now: NOW });
+        await availability.firstFreeSpot(ZONE_ID, 'car', at('15:00'), at('16:00'), { now: NOW });
 
         // Assert: the stay of 15:00 to 16:00 needs its spot from 14:50 to 16:10
         const sql = sqlOf(ParkingSpot.findOne.mock.calls[0][0].where);
@@ -74,7 +74,7 @@ describe('The rules of availability (#373)', () => {
         jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue(null);
 
         // Act
-        await availability.firstFreeSpot(ZONE_ID, at('15:00'), at('16:00'), { now: NOW });
+        await availability.firstFreeSpot(ZONE_ID, 'car', at('15:00'), at('16:00'), { now: NOW });
 
         // Assert: Finished counts with the same times, with no deadline
         const sql = sqlOf(ParkingSpot.findOne.mock.calls[0][0].where);
