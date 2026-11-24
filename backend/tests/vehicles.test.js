@@ -573,11 +573,26 @@ describe('Editing a vehicle (HU-12)', () => {
         jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
 
         // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Chevrolet', model: 'Onix', color: 'Blanco', plate: 'ZZZ999', isDefault: true });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(actual.update).toHaveBeenCalledWith({ vehicleType: 'car', brand: 'Chevrolet', model: 'Onix', color: 'Blanco', visualDescription: undefined });
+    });
+
+    test('a new type is saved too, and the plate and the default are never changed', async () => {
+        // Arrange: no reservation (HU-31)
+        const actual = vehicle();
+        actual.update.mockResolvedValue(actual);
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue(actual);
+        jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);
+
+        // Act
         const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'truck', brand: 'Chevrolet', model: 'NHR', color: 'Blanco', plate: 'ZZZ999', isDefault: true });
 
         // Assert
         expect(res.status).toBe(200);
-        expect(actual.update).toHaveBeenCalledWith({ vehicleType: 'truck', brand: 'Chevrolet', model: 'NHR', color: 'Blanco', visualDescription: undefined });
+        expect(actual.update).toHaveBeenCalledWith({ vehicleType: 'truck', brand: 'Chevrolet', model: 'NHR', color: 'Blanco', visualDescription: undefined }, { transaction });
     });
 
     // #234: the same rule as when registering
@@ -687,5 +702,114 @@ describe('Editing a vehicle (HU-12)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(actual.update).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Mazda', model: 'Citroën', color: 'Gris plata' }));
+    });
+});
+
+// HU-31 AC-13: a reservation has a spot of the type of its vehicle, so the
+// type of a vehicle with a Pending or Active reservation cannot change
+describe('Changing the type of a vehicle (HU-31)', () => {
+    let readVehicle;
+    let findActiveReservation;
+    const TO_TRUCK = { vehicleType: 'truck', brand: 'Chevrolet', model: 'NHR', color: 'Blanco' };
+
+    beforeEach(() => {
+        readVehicle = jest.spyOn(Vehiculo, 'findOne');
+        findActiveReservation = jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);
+    });
+
+    test('with a Pending or Active reservation it answers 409 VEHICLE_HAS_ACTIVE_RESERVATION and saves nothing', async () => {
+        // Arrange
+        const first = vehicle();
+        const actual = vehicle();
+        readVehicle.mockResolvedValueOnce(first).mockResolvedValueOnce(actual);
+        findActiveReservation.mockResolvedValue({ id: 'reservation-1' });
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, TO_TRUCK);
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body).toEqual({
+            code: 'VEHICLE_HAS_ACTIVE_RESERVATION',
+            message: 'This vehicle has an active reservation. Its type can change when the reservation ends or is cancelled.',
+        });
+        expect(findActiveReservation).toHaveBeenCalledWith({ where: { vehicleId: VEHICLE_ID, status: ['Pending', 'Active'] }, transaction });
+        expect(first.update).not.toHaveBeenCalled();
+        expect(actual.update).not.toHaveBeenCalled();
+    });
+
+    test('the reservations are checked with the lock of the user held, the same lock crear takes first', async () => {
+        // Arrange
+        const actual = vehicle();
+        actual.update.mockResolvedValue(actual);
+        readVehicle.mockResolvedValueOnce(vehicle()).mockResolvedValueOnce(actual);
+
+        // Act
+        await send('put', `/api/vehicles/${VEHICLE_ID}`, TO_TRUCK);
+
+        // Assert: the vehicle is read again after the lock
+        const lock = userLockCall();
+        expect(lock).toBeGreaterThanOrEqual(0);
+        expect(lockUser.mock.calls[lock]).toEqual([USER_ID, { attributes: ['id'], transaction, lock: 'UPDATE' }]);
+        expect(lockUser.mock.invocationCallOrder[lock]).toBeLessThan(readVehicle.mock.invocationCallOrder[1]);
+        expect(readVehicle.mock.calls[1][0]).toEqual({ where: { id: VEHICLE_ID, userId: USER_ID }, transaction });
+        expect(readVehicle.mock.invocationCallOrder[1]).toBeLessThan(findActiveReservation.mock.invocationCallOrder[0]);
+    });
+
+    test('without reservations the new type is saved in the transaction, and the answer has the saved vehicle', async () => {
+        // Arrange
+        const actual = vehicle();
+        actual.update.mockResolvedValue({ id: VEHICLE_ID, vehicleType: 'truck' });
+        readVehicle.mockResolvedValueOnce(vehicle()).mockResolvedValueOnce(actual);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, TO_TRUCK);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ message: 'Vehicle updated successfully', vehicle: { id: VEHICLE_ID, vehicleType: 'truck' } });
+        expect(actual.update).toHaveBeenCalledWith({ ...TO_TRUCK, visualDescription: undefined }, { transaction });
+    });
+
+    test('with the same type the other data is saved even with a reservation, without looking for it', async () => {
+        // Arrange
+        const actual = vehicle();
+        readVehicle.mockResolvedValue(actual);
+        findActiveReservation.mockResolvedValue({ id: 'reservation-1' });
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'car', brand: 'Mazda', model: 'CX-30', color: 'Gris' });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(findActiveReservation).not.toHaveBeenCalled();
+        expect(sequelize.transaction).not.toHaveBeenCalled();
+        expect(actual.update).toHaveBeenCalledWith({ vehicleType: 'car', brand: 'Mazda', model: 'CX-30', color: 'Gris', visualDescription: undefined });
+    });
+
+    test('a vehicle deleted while it waited for the lock answers 404 VEHICLE_NOT_FOUND', async () => {
+        // Arrange
+        readVehicle.mockResolvedValueOnce(vehicle()).mockResolvedValueOnce(null);
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, TO_TRUCK);
+
+        // Assert
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe('VEHICLE_NOT_FOUND');
+        expect(findActiveReservation).not.toHaveBeenCalled();
+    });
+
+    test('the plate must still match the new type, before anything is locked (HU-12, AC-05)', async () => {
+        // Arrange: a car plate cannot be a motorcycle
+        readVehicle.mockResolvedValue(vehicle());
+
+        // Act
+        const res = await send('put', `/api/vehicles/${VEHICLE_ID}`, { vehicleType: 'motorcycle', brand: 'Yamaha', model: 'FZ', color: 'Azul' });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body.code).toBe('INVALID_PLATE_FORMAT');
+        expect(sequelize.transaction).not.toHaveBeenCalled();
     });
 });
