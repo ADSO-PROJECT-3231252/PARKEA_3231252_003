@@ -158,22 +158,37 @@ describe('A spot of a vehicle type (HU-31)', () => {
     });
 });
 
-describe('The free spots of several zones (#373)', () => {
-    test('are counted in one query, for the hours asked', async () => {
-        // Arrange: two zones of 3 spots; the first has one taken now and one
-        // taken tomorrow
-        const centro = await createZone(3);
+describe('The free spots of several zones (#373, HU-31)', () => {
+    test('are counted for each type of each zone in one query, for the hours asked', async () => {
+        // Arrange: Centro has 3 cars and 2 motorcycles, with one car taken
+        // now and one tomorrow, and a motorcycle taken tomorrow; Norte has 3
+        // cars
+        const centro = await mixedZone(3, 2);
         const norte = await createZone(3);
         await hold(centro, 1, -30, 60);
         await hold(centro, 2, 24 * 60, 25 * 60);
+        await hold(centro, 1, 24 * 60, 25 * 60, { vehicleType: 'motorcycle' });
 
         // Act
-        const now = await availability.freeSpotsByZone([centro.id, norte.id], inMinutes(1), inMinutes(31));
-        const tomorrow = await availability.freeSpotsByZone([centro.id, norte.id], inMinutes(24 * 60), inMinutes(25 * 60));
+        const key = availability.typeKey;
+        const now = await availability.freeSpotsByZoneAndType([centro.id, norte.id], inMinutes(1), inMinutes(31));
+        const tomorrow = await availability.freeSpotsByZoneAndType([centro.id, norte.id], inMinutes(24 * 60), inMinutes(25 * 60));
 
         // Assert
-        expect(now).toEqual(new Map([[centro.id, 2], [norte.id, 3]]));
-        expect(tomorrow).toEqual(new Map([[centro.id, 2], [norte.id, 3]]));
+        expect(now).toEqual(new Map([[key(centro.id, 'car'), 2], [key(centro.id, 'motorcycle'), 2], [key(norte.id, 'car'), 3]]));
+        expect(tomorrow).toEqual(new Map([[key(centro.id, 'car'), 2], [key(centro.id, 'motorcycle'), 1], [key(norte.id, 'car'), 3]]));
+    });
+
+    test('a type with all its spots taken is missing', async () => {
+        // Arrange
+        const zona = await mixedZone(1, 1);
+        await hold(zona, 1, -30, 60, { vehicleType: 'motorcycle' });
+
+        // Act
+        const free = await availability.freeSpotsByZoneAndType([zona.id], inMinutes(1), inMinutes(31));
+
+        // Assert
+        expect(free).toEqual(new Map([[availability.typeKey(zona.id, 'car'), 1]]));
     });
 
     test('availableSlots is the number free for 30 minutes from now', async () => {
@@ -184,9 +199,7 @@ describe('The free spots of several zones (#373)', () => {
         await hold(zona, 2, 24 * 60, 25 * 60);
 
         // Act and assert
-        expect(await availability.availableNow(zona.id)).toBe(2);
-        await availability.withAvailableSlots([zona]);
-        expect(zona.toJSON().availableSlots).toBe(2);
+        expect(await availability.availableNowByZoneAndType([zona.id])).toEqual(new Map([[availability.typeKey(zona.id, 'car'), 2]]));
     });
 });
 
@@ -221,7 +234,7 @@ describe('The spots in use (HU-21, #373)', () => {
         await hold(zona, 3, 60, 120, { status: 'Pending', holdExpiresAt: inMinutes(-1) });
 
         // Act
-        const inUse = await availability.spotsInUse(zona.id);
+        const inUse = await availability.spotsOfTypeInUse(zona.id, 'car');
         const byZone = await availability.spotsInUseByZone([zona.id]);
         const canBeDisabled = await ParkingSpot.findAll({
             where: { zoneId: zona.id, [Op.and]: [availability.freeFromNow(new Date())] },

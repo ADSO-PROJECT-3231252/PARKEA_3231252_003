@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js). What the
 // SQL finds on a real database is checked in tests/integration.
-const { ParkingSpot, Reserva, Zona } = require('../src/models');
+const { ParkingSpot, Reserva } = require('../src/models');
 const availability = require('../src/services/availability');
 
 // "Now" is Monday 2026-11-16 at 8:00 a. m. in Colombia (13:00 UTC)
@@ -82,44 +82,6 @@ describe('The rules of availability (#373)', () => {
         expect(sql).toContain("r.end_time > '2026-11-16 14:50:00'");
     });
 
-    test('the free spots of several zones are counted in one query, and a zone with none has 0', async () => {
-        // Arrange
-        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: ZONE_ID, free: '4' }]);
-
-        // Act
-        const free = await availability.freeSpotsByZone([ZONE_ID, OTHER_ZONE_ID], at('15:00'), at('16:00'), { now: NOW });
-
-        // Assert
-        expect(free).toEqual(new Map([[ZONE_ID, 4], [OTHER_ZONE_ID, 0]]));
-        expect(ParkingSpot.findAll).toHaveBeenCalledTimes(1);
-        const options = ParkingSpot.findAll.mock.calls[0][0];
-        expect(options.where).toMatchObject({ zoneId: [ZONE_ID, OTHER_ZONE_ID], status: { [Op.ne]: 'Disabled' } });
-        expect(options.group).toEqual(['zoneId']);
-    });
-
-    test('without zones there is nothing to ask', async () => {
-        // Arrange
-        jest.spyOn(ParkingSpot, 'findAll');
-
-        // Act and assert
-        await expect(availability.freeSpotsByZone([], at('15:00'), at('16:00'))).resolves.toEqual(new Map());
-        expect(ParkingSpot.findAll).not.toHaveBeenCalled();
-    });
-
-    test('availableSlots of a zone counts its spots free from now for 30 minutes', async () => {
-        // Arrange
-        jest.spyOn(ParkingSpot, 'count').mockResolvedValue(7);
-
-        // Act
-        const free = await availability.availableNow(ZONE_ID, { now: NOW });
-
-        // Assert: from 13:00 to 13:30, so from 12:50 to 13:40 with the margin
-        expect(free).toBe(7);
-        const sql = sqlOf(ParkingSpot.count.mock.calls[0][0].where);
-        expect(sql).toContain("r.start_time < '2026-11-16 13:40:00'");
-        expect(sql).toContain("r.end_time > '2026-11-16 12:50:00'");
-    });
-
     test('the free spots of a type of a zone for some hours are its enabled spots with no reservation in them, with the margin (#375, HU-31)', async () => {
         // Arrange
         const transaction = { id: 't' };
@@ -141,22 +103,6 @@ describe('The rules of availability (#373)', () => {
         expect(sql).toContain("r.end_time > '2026-11-16 19:50:00'");
         expect(sql).toContain("r.status = 'Finished'");
         expect(sql).toContain("r.hold_expires_at > '2026-11-16 13:00:00'");
-    });
-
-    test('each zone gets its availableSlots, and the API sends it', async () => {
-        // Arrange
-        const centro = Zona.build({ id: ZONE_ID, name: 'Centro', totalSlots: 10 });
-        const norte = Zona.build({ id: OTHER_ZONE_ID, name: 'Norte', totalSlots: 5 });
-        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: OTHER_ZONE_ID, free: 2 }]);
-
-        // Act
-        await availability.withAvailableSlots([centro, norte], { now: NOW });
-
-        // Assert: from 13:00 to 13:30
-        expect(centro.toJSON().availableSlots).toBe(0);
-        expect(norte.toJSON().availableSlots).toBe(2);
-        const sql = sqlOf(ParkingSpot.findAll.mock.calls[0][0].where);
-        expect(sql).toContain("r.start_time < '2026-11-16 13:40:00'");
     });
 
     test('the next reservation of the same spot is looked for in the added time, without the stay itself', async () => {
@@ -234,21 +180,6 @@ describe('The rules of availability (#373)', () => {
         // Act and assert
         expect(await availability.spotFreeUntil({ id: 'stay', parkingSpotId: 'spot-1', endTime: at('16:00') }, latest, { now: NOW })).toBeNull();
         expect(Reserva.findOne).not.toHaveBeenCalled();
-    });
-
-    test('the spots in use are the different spots with a reservation that holds them from now on', async () => {
-        // Arrange
-        jest.spyOn(Reserva, 'count').mockResolvedValue(3);
-
-        // Act
-        const inUse = await availability.spotsInUse(ZONE_ID, { now: NOW });
-
-        // Assert
-        expect(inUse).toBe(3);
-        const options = Reserva.count.mock.calls[0][0];
-        expect(options.where).toMatchObject({ zoneId: ZONE_ID, parkingSpotId: { [Op.ne]: null }, endTime: { [Op.gt]: NOW } });
-        expect(options.where[Op.and]).toEqual([availability.holdsItsSpot(NOW)]);
-        expect(options).toMatchObject({ distinct: true, col: 'parkingSpotId' });
     });
 
     test('the spots in use of several zones are counted in one query, and a zone with none has 0', async () => {

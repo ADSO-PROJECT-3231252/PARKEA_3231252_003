@@ -77,27 +77,6 @@ function firstFreeSpot(zoneId, vehicleType, start, end, { transaction, now = new
     });
 }
 
-// How many spots of each zone are free from `from` to `to`, in one query for
-// all of them: a Map from the id of each zone to its number (0 when none)
-async function freeSpotsByZone(zoneIds, from, to, { transaction, now = new Date() } = {}) {
-    const free = new Map(zoneIds.map((id) => [id, 0]));
-    if (zoneIds.length === 0) return free;
-    const rows = await ParkingSpot.findAll({
-        attributes: ['zoneId', [fn('COUNT', col('ParkingSpot.id')), 'free']],
-        where: { zoneId: zoneIds, status: ENABLED, [Op.and]: [freeBetween(from, to, now)] },
-        group: ['zoneId'],
-        raw: true,
-        transaction,
-    });
-    for (const row of rows) free.set(row.zoneId, Number(row.free));
-    return free;
-}
-
-// `availableSlots` of each zone: the spots free for the shortest stay from now
-function availableNowByZone(zoneIds, { transaction, now = new Date() } = {}) {
-    return freeSpotsByZone(zoneIds, now, plus(now, MIN_STAY_MS), { transaction, now });
-}
-
 // #375: how many spots of one zone are free from `from` to `to`: the spots
 // that POST /reservations could give to a stay with those hours. HU-31: of
 // one vehicle type, like the spot it gives
@@ -108,19 +87,12 @@ function freeSpotsBetween(zoneId, vehicleType, from, to, { transaction, now = ne
     });
 }
 
-// `availableSlots` of one zone
-function availableNow(zoneId, { transaction, now = new Date() } = {}) {
-    return ParkingSpot.count({
-        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(now, plus(now, MIN_STAY_MS), now)] },
-        transaction,
-    });
-}
-
 // HU-31: the key of one vehicle type of one zone in the Maps below
 const typeKey = (zoneId, vehicleType) => `${zoneId}:${vehicleType}`;
 
-// HU-31: freeSpotsByZone, for each vehicle type of each zone: a Map from
-// typeKey(zone, type) to its number (a type with no free spot is missing)
+// HU-31: how many spots of each vehicle type of each zone are free from
+// `from` to `to`, in one query for all of them: a Map from typeKey(zone,
+// type) to its number (a type with no free spot is missing)
 async function freeSpotsByZoneAndType(zoneIds, from, to, { transaction, now = new Date() } = {}) {
     const free = new Map();
     if (zoneIds.length === 0) return free;
@@ -138,14 +110,6 @@ async function freeSpotsByZoneAndType(zoneIds, from, to, { transaction, now = ne
 // HU-31: `availableSlots` of each vehicle type of each zone
 function availableNowByZoneAndType(zoneIds, { transaction, now = new Date() } = {}) {
     return freeSpotsByZoneAndType(zoneIds, now, plus(now, MIN_STAY_MS), { transaction, now });
-}
-
-// Adds `availableSlots` to each zone, as the API sends it (Zona.toJSON keeps
-// it), with one query for all of them
-async function withAvailableSlots(zonas, { transaction, now = new Date() } = {}) {
-    const free = await availableNowByZone(zonas.map((zona) => zona.id), { transaction, now });
-    for (const zona of zonas) zona.setDataValue('availableSlots', free.get(zona.id));
-    return zonas;
 }
 
 // HU-28: the first other reservation that holds the spot of `reserva` from
@@ -183,18 +147,8 @@ async function spotFreeUntil(reserva, latest, { transaction, now = new Date() } 
     return holder ? freeUntil(holder) : null;
 }
 
-// HU-21: how many spots of the zone hold a reservation from now on
-function spotsInUse(zoneId, { transaction, now = new Date() } = {}) {
-    return Reserva.count({
-        where: { zoneId, parkingSpotId: { [Op.ne]: null }, endTime: { [Op.gt]: now }, [Op.and]: [holdsItsSpot(now)] },
-        distinct: true,
-        col: 'parkingSpotId',
-        transaction,
-    });
-}
-
-// The same for several zones, in one query: a Map from the id of each zone to
-// its number (0 when none)
+// HU-21: how many spots of each zone hold a reservation from now on, in one
+// query: a Map from the id of each zone to its number (0 when none)
 async function spotsInUseByZone(zoneIds, { transaction, now = new Date() } = {}) {
     const inUse = new Map(zoneIds.map((id) => [id, 0]));
     if (zoneIds.length === 0) return inUse;
@@ -209,7 +163,7 @@ async function spotsInUseByZone(zoneIds, { transaction, now = new Date() } = {})
     return inUse;
 }
 
-// HU-31: spotsInUse for each vehicle type of each zone, and how many
+// HU-31: the spots in use of each vehicle type of each zone, and how many
 // reservations hold those spots from now on: a Map from typeKey(zone, type)
 // to { spots, reservations } (a type with none is missing)
 async function inUseByZoneAndType(zoneIds, { transaction, now = new Date() } = {}) {
@@ -255,11 +209,7 @@ module.exports = {
     holdsItsSpot,
     freeFromNow,
     firstFreeSpot,
-    freeSpotsByZone,
     freeSpotsBetween,
-    availableNowByZone,
-    availableNow,
-    withAvailableSlots,
     typeKey,
     freeSpotsByZoneAndType,
     availableNowByZoneAndType,
@@ -268,6 +218,5 @@ module.exports = {
     nextHolderOfSpot,
     freeUntil,
     spotFreeUntil,
-    spotsInUse,
     spotsInUseByZone,
 };
