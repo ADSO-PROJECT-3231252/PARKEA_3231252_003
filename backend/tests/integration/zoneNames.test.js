@@ -14,10 +14,12 @@ const zoneBody = (name, totalSlots = 1) => ({
     vehicleTypes: [{ vehicleType: 'car', totalSlots, hourlyRate: 2000 }],
     open24h: true,
 });
-// The same zone, as the columns of the model
+// The same zone, as the columns of the model: a zone has no spots or rate of
+// its own, they are the ones of its types
 const zoneRow = (name) => {
-    const { vehicleTypes: [car], ...zone } = zoneBody(name);
-    return { ...zone, totalSlots: car.totalSlots, hourlyRate: car.hourlyRate };
+    const zone = zoneBody(name);
+    delete zone.vehicleTypes;
+    return zone;
 };
 
 async function send(method, path, body) {

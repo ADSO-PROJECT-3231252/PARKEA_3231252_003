@@ -27,7 +27,7 @@ let disableSpots;
 // reservation from now on, `free` spots can be disabled, and 6 spots are
 // free now
 function arrange({ inUse = 0, free = [] } = {}) {
-    zona = Zona.build({ id: ZONE_ID, ...ZONE, totalSlots: 10, hourlyRate: '2000.00', isActive: true, schedules: [] }, { include: [{ model: ZoneSchedule, as: 'schedules' }] });
+    zona = Zona.build({ id: ZONE_ID, ...ZONE, isActive: true, schedules: [] }, { include: [{ model: ZoneSchedule, as: 'schedules' }] });
     jest.spyOn(zona, 'update').mockResolvedValue(zona);
     jest.spyOn(zona, 'reload').mockResolvedValue(zona);
     jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);

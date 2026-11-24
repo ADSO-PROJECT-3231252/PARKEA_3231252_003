@@ -25,7 +25,7 @@ const token = jwt.sign({ id: USER_ID, email: 'laura@correo.test', rol: 'user' },
 function zone({ open24h = true } = {}) {
     const schedules = open24h ? [] : [{ dayOfWeek: 1, opensAt: '06:00:00', closesAt: '20:00:00' }];
     return Zona.build(
-        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, hourlyRate: '2000.00', isActive: true, open24h, schedules },
+        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', isActive: true, open24h, schedules },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
 }
