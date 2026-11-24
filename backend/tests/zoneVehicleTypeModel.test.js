@@ -115,3 +115,18 @@ describe('The vehicle type of a spot (HU-31)', () => {
         expect(errors).toEqual(['vehicleType']);
     });
 });
+
+describe('A zone sent by the API (HU-31)', () => {
+    test('has no rate of its own: each vehicle type has its rate', () => {
+        // Arrange
+        const zona = Zona.build({ id: ZONE_ID, name: 'Centro', totalSlots: 10, hourlyRate: '2000.00' });
+
+        // Act
+        const sent = zona.toJSON();
+
+        // Assert
+        expect(sent).not.toHaveProperty('hourlyRate');
+        expect(sent).toMatchObject({ id: ZONE_ID, name: 'Centro', totalSlots: 10 });
+        expect(zona.hourlyRate).toBe('2000.00');
+    });
+});
