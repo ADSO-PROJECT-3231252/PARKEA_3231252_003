@@ -8,6 +8,9 @@ module.exports = (sequelize, DataTypes) => {
       Zona.hasMany(models.ParkingSpot, { foreignKey: 'zoneId', as: 'parkingSpots' });
       // HU-29: the hours of each day, only for a zone that is not open 24 hours
       Zona.hasMany(models.ZoneSchedule, { foreignKey: 'zoneId', as: 'schedules' });
+      // HU-31: the vehicle types the zone accepts, with the spots and the
+      // rate of each one
+      Zona.hasMany(models.ZoneVehicleType, { foreignKey: 'zoneId', as: 'vehicleTypes' });
     }
 
     // HU-29: the API sends the hours as `schedule`, one item for each day the

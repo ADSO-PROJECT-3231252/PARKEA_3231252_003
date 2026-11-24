@@ -1,7 +1,7 @@
 // HU-31: the model of the vehicle types of a zone. Only the rules of the
 // model: the checks of the database are in
 // tests/integration/schemaRules.test.js.
-const { ZoneVehicleType, Vehiculo } = require('../src/models');
+const { Zona, ZoneVehicleType, Vehiculo } = require('../src/models');
 const { VEHICLE_TYPES } = require('../src/constants/vehicleTypes');
 
 const ZONE_ID = '22222222-2222-4222-8222-222222222222';
@@ -80,5 +80,17 @@ describe('A vehicle type of a zone (HU-31)', () => {
             hourlyRate: 'hourly_rate',
             isAccepting: 'is_accepting',
         });
+    });
+
+    test('belongs to its zone, and a zone has its types as vehicleTypes', () => {
+        // Act
+        const ofZone = Zona.associations.vehicleTypes;
+        const ofType = ZoneVehicleType.associations.zone;
+
+        // Assert
+        expect(ofZone).toMatchObject({ associationType: 'HasMany', foreignKey: 'zoneId' });
+        expect(ofZone.target).toBe(ZoneVehicleType);
+        expect(ofType).toMatchObject({ associationType: 'BelongsTo', foreignKey: 'zoneId' });
+        expect(ofType.target).toBe(Zona);
     });
 });
