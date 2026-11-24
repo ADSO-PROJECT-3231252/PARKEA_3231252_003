@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Zona, ParkingSpot, ZoneSchedule, sequelize } = require('../models');
+const { Zona, ParkingSpot, ZoneSchedule, ZoneVehicleType, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { scheduleErrors, checkStay } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
@@ -187,6 +187,16 @@ async function createZona(req, res, next) {
     }, { transaction: t });
     await ZoneSchedule.bulkCreate(filasHorario(zona.id, req.body), { transaction: t });
 
+    // HU-31: until the API takes the vehicle types, a zone has the car type,
+    // with the spots and the rate of the zone
+    await ZoneVehicleType.create({
+      zoneId: zona.id,
+      vehicleType: 'car',
+      totalSlots,
+      hourlyRate,
+      isAccepting: true,
+    }, { transaction: t });
+
     const spots = Array.from({ length: totalSlots }, (_, i) => ({
       zoneId: zona.id,
       spotNumber: i + 1,
@@ -240,6 +250,15 @@ async function updateZona(req, res, next) {
     if (mismoNombre) {
       await t.rollback();
       return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
+    }
+
+    // HU-31: the car type keeps the spots and the rate of the zone. A zone
+    // that lost it (written by hand in the database) gets it again.
+    const tipoCarro = await ZoneVehicleType.findOne({ where: { zoneId: id, vehicleType: 'car' }, transaction: t });
+    if (tipoCarro) {
+      await tipoCarro.update({ totalSlots, hourlyRate }, { transaction: t });
+    } else {
+      await ZoneVehicleType.create({ zoneId: id, vehicleType: 'car', totalSlots, hourlyRate, isAccepting: true }, { transaction: t });
     }
 
     const ahora = new Date();
