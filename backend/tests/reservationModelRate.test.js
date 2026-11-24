@@ -1,6 +1,7 @@
-// #372: a reservation saves the rate of its zone. The model has no default
-// for it, so Sequelize never fills in 0.00 and a reservation without its rate
-// fails instead of charging nothing (the database has no default either:
+// #372: a reservation saves its rate (HU-31: the one of the type of its
+// vehicle in its zone). The model has no default for it, so Sequelize never
+// fills in 0.00 and a reservation without its rate fails instead of charging
+// nothing (the database has no default either:
 // tests/integration/schemaRules.test.js).
 const { Reserva } = require('../src/models');
 
