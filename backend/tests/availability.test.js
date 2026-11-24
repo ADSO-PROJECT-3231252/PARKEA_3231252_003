@@ -275,3 +275,104 @@ describe('The rules of availability (#373)', () => {
         expect(sql).not.toContain('Finished');
     });
 });
+
+describe('The free spots and the spots in use of each vehicle type (HU-31)', () => {
+    test('a type of a zone is written as zone:type', () => {
+        expect(availability.typeKey(ZONE_ID, 'motorcycle')).toBe(`${ZONE_ID}:motorcycle`);
+    });
+
+    test('the free spots of each type of each zone are counted in one query, grouped by zone and type', async () => {
+        // Arrange
+        const findAll = jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([
+            { zoneId: ZONE_ID, vehicleType: 'car', free: '4' },
+            { zoneId: ZONE_ID, vehicleType: 'motorcycle', free: '2' },
+            { zoneId: OTHER_ZONE_ID, vehicleType: 'car', free: '7' },
+        ]);
+
+        // Act
+        const free = await availability.freeSpotsByZoneAndType([ZONE_ID, OTHER_ZONE_ID], at('14:00'), at('15:00'), { now: NOW });
+
+        // Assert: as numbers, and a type with none free is missing
+        expect(free).toEqual(new Map([
+            [`${ZONE_ID}:car`, 4],
+            [`${ZONE_ID}:motorcycle`, 2],
+            [`${OTHER_ZONE_ID}:car`, 7],
+        ]));
+        expect(findAll).toHaveBeenCalledTimes(1);
+        const [options] = findAll.mock.calls[0];
+        expect(options.group).toEqual(['zoneId', 'vehicleType']);
+        expect(options.where).toMatchObject({ zoneId: [ZONE_ID, OTHER_ZONE_ID], status: { [Op.ne]: 'Disabled' } });
+        expect(sqlOf(options.where)).toContain("r.start_time < '2026-11-16 15:10:00'");
+        expect(sqlOf(options.where)).toContain("r.end_time > '2026-11-16 13:50:00'");
+    });
+
+    test('availableSlots of each type is for the shortest stay from now', async () => {
+        // Arrange
+        const findAll = jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([]);
+
+        // Act
+        await availability.availableNowByZoneAndType([ZONE_ID], { now: NOW });
+
+        // Assert: 13:00 to 13:30, with the 10 minutes on each side
+        const sql = sqlOf(findAll.mock.calls[0][0].where);
+        expect(sql).toContain("r.start_time < '2026-11-16 13:40:00'");
+        expect(sql).toContain("r.end_time > '2026-11-16 12:50:00'");
+    });
+
+    test.each([
+        ['the free spots', () => availability.freeSpotsByZoneAndType([], NOW, NOW), ParkingSpot],
+        ['the spots in use', () => availability.inUseByZoneAndType([]), Reserva],
+    ])('without zones, %s ask nothing', async (_case, count, Model) => {
+        // Arrange
+        const findAll = jest.spyOn(Model, 'findAll');
+
+        // Act
+        const result = await count();
+
+        // Assert
+        expect(result).toEqual(new Map());
+        expect(findAll).not.toHaveBeenCalled();
+    });
+
+    test('the spots in use and the open reservations of each type are counted in one query, by the type of their spot', async () => {
+        // Arrange: 3 reservations in 2 car spots
+        const findAll = jest.spyOn(Reserva, 'findAll').mockResolvedValue([{ zoneId: ZONE_ID, vehicleType: 'car', spots: '2', reservations: '3' }]);
+
+        // Act
+        const inUse = await availability.inUseByZoneAndType([ZONE_ID], { now: NOW });
+
+        // Assert
+        expect(inUse).toEqual(new Map([[`${ZONE_ID}:car`, { spots: 2, reservations: 3 }]]));
+        const [options] = findAll.mock.calls[0];
+        // Each spot once, and each reservation
+        expect(JSON.stringify(options.attributes)).toBe(JSON.stringify([
+            'zoneId',
+            [{ col: 'parkingSpot.vehicle_type' }, 'vehicleType'],
+            [{ fn: 'COUNT', args: [{ fn: 'DISTINCT', args: [{ col: 'Reserva.parking_spot_id' }] }] }, 'spots'],
+            [{ fn: 'COUNT', args: [{ col: 'Reserva.id' }] }, 'reservations'],
+        ]));
+        expect(options.include).toEqual([expect.objectContaining({ model: ParkingSpot, as: 'parkingSpot', attributes: [] })]);
+        expect(options.group).toEqual(['zoneId', 'parkingSpot.vehicle_type']);
+        expect(options.where).toEqual({
+            zoneId: [ZONE_ID],
+            parkingSpotId: { [Op.ne]: null },
+            endTime: { [Op.gt]: NOW },
+            [Op.and]: [availability.holdsItsSpot(NOW)],
+        });
+    });
+
+    test('the spots of one type in use count each spot once, only among the spots of that type', async () => {
+        // Arrange
+        const count = jest.spyOn(Reserva, 'count').mockResolvedValue(2);
+
+        // Act
+        const inUse = await availability.spotsOfTypeInUse(ZONE_ID, 'truck', { now: NOW });
+
+        // Assert
+        expect(inUse).toBe(2);
+        const [options] = count.mock.calls[0];
+        expect(options).toMatchObject({ distinct: true, col: 'parking_spot_id' });
+        expect(options.include).toEqual([expect.objectContaining({ model: ParkingSpot, as: 'parkingSpot', attributes: [], where: { vehicleType: 'truck' } })]);
+        expect(options.where).toMatchObject({ zoneId: ZONE_ID, parkingSpotId: { [Op.ne]: null }, endTime: { [Op.gt]: NOW } });
+    });
+});
