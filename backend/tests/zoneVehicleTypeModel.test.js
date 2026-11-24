@@ -1,7 +1,7 @@
-// HU-31: the model of the vehicle types of a zone. Only the rules of the
-// model: the checks of the database are in
-// tests/integration/schemaRules.test.js.
-const { Zona, ZoneVehicleType, Vehiculo } = require('../src/models');
+// HU-31: the models of the vehicle types of a zone and of the type of a spot.
+// Only the rules of the models: the checks and the foreign key of the
+// database are in tests/integration/schemaRules.test.js.
+const { Zona, ZoneVehicleType, ParkingSpot, Vehiculo } = require('../src/models');
 const { VEHICLE_TYPES } = require('../src/constants/vehicleTypes');
 
 const ZONE_ID = '22222222-2222-4222-8222-222222222222';
@@ -92,5 +92,26 @@ describe('A vehicle type of a zone (HU-31)', () => {
         expect(ofZone.target).toBe(ZoneVehicleType);
         expect(ofType).toMatchObject({ associationType: 'BelongsTo', foreignKey: 'zoneId' });
         expect(ofType.target).toBe(Zona);
+    });
+});
+
+describe('The vehicle type of a spot (HU-31)', () => {
+    test('is required and is one of the types of PARKEA', () => {
+        // Act
+        const attribute = ParkingSpot.getAttributes().vehicleType;
+
+        // Assert
+        expect(attribute).toMatchObject({ field: 'vehicle_type', allowNull: false, values: VEHICLE_TYPES });
+    });
+
+    test.each([
+        ['a type that does not exist', 'bicycle'],
+        ['no type', null],
+    ])('a spot with %s is not valid', async (_case, vehicleType) => {
+        // Act
+        const errors = await ParkingSpot.build({ zoneId: ZONE_ID, vehicleType, spotNumber: 1 }).validate().then(() => [], (error) => error.errors.map((item) => item.path));
+
+        // Assert
+        expect(errors).toEqual(['vehicleType']);
     });
 });
