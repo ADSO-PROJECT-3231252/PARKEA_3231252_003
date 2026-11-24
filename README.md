@@ -608,7 +608,7 @@ The work is managed with Scrum on the **PARKEA - Sprint Board** (Projects tab of
 |------|----------|--------|
 | Integrate `backend` and `frontend` into `develop` | High | Done at the end of every sprint: `v0.1` (Sprint 1) and `v0.2` (Sprint 2) |
 | Automated testing (unit + integration) | High | In progress: Jest + Supertest in the backend since Sprint 1 and Jest + React Testing Library in the frontend since Sprint 2. At the end of Sprint 2: 105 backend tests and 77 frontend tests. Since #373 the backend also has integration tests against MySQL (`npm run test:integration`) |
-| Server/cloud deployment | Low | Done: published on Azure (App Service + Azure Database for MySQL), see [docs/deployment.md](docs/deployment.md). It runs `integration/sprint-2` |
+| Server/cloud deployment | Low | Done: published on Azure (App Service + Azure Database for MySQL), see [docs/deployment.md](docs/deployment.md). It runs `integration/sprint-3``.
 | Performance measurement | Medium | SRS requires < 3s with 50 concurrent users. Not against the published site: its free plan has 60 CPU minutes a day |
 | API documentation (Swagger/OpenAPI) | Medium | Today the reference is the endpoint table above and [backend/API_REFERENCE.md](backend/API_REFERENCE.md) |
 
