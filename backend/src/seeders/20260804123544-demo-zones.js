@@ -48,6 +48,17 @@ module.exports = {
 
     await queryInterface.bulkInsert('zones', zonas);
 
+    // HU-31: each zone accepts cars, with its spots and its rate, as
+    // createZona() does. The spots belong to that type.
+    await queryInterface.bulkInsert('zone_vehicle_types', zonas.map((zona) => ({
+      id: uuidv4(),
+      zone_id: zona.id,
+      vehicle_type: 'car',
+      total_slots: zona.total_slots,
+      hourly_rate: zona.hourly_rate,
+      is_accepting: true,
+    })));
+
     // Generate one physical parking spot per slot for each zone,
     // same as createZona() does for zones created through the API
     const spots = [];
@@ -76,6 +87,8 @@ module.exports = {
 
     if (zoneIds.length > 0) {
       await queryInterface.bulkDelete('parking_spots', { zone_id: { [Op.in]: zoneIds } }, {});
+      // HU-31: after the spots, which must belong to a type of their zone
+      await queryInterface.bulkDelete('zone_vehicle_types', { zone_id: { [Op.in]: zoneIds } }, {});
     }
     await queryInterface.bulkDelete('zones', { name: { [Op.in]: zoneNames } }, {});
   },
