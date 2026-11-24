@@ -1,7 +1,7 @@
 import { isNotEmpty, REQUIRED_MESSAGE } from './validators';
 import { translateError } from './errorMessages';
 import { DAYS, MIN_OPEN_MINUTES, minutesOf } from './zoneHours';
-import { VEHICLE_TYPES } from './vehicleTypes';
+import { VEHICLE_TYPES, vehicleTypePlural } from './vehicleTypes';
 
 // Rules of the zone form, shared by create (HU-20) and edit (HU-21).
 // They mirror validarZona in the backend (zona.controller.js), so most
@@ -9,6 +9,7 @@ import { VEHICLE_TYPES } from './vehicleTypes';
 export const ZONE_LIMITS = {
     name: 100,
     address: 255,
+    // HU-31: the spots of a type, and of all the types of the zone together
     maxSlots: 500,
     // hourly_rate is DECIMAL(10, 2): up to 8 whole digits
     rateDigits: 8,
@@ -24,8 +25,9 @@ export const typeField = (type, name) => `${type}.${name}`;
 
 // Order of the fields on screen: the first one with an error gets the focus.
 export const ZONE_FIELDS = [
-    'name', 'address', 'totalSlots', 'hourlyRate', 'latitude', 'longitude',
-    'open24h', 'schedule', ...DAYS.map(dayField),
+    'name', 'address', 'vehicleTypes',
+    ...VEHICLE_TYPES.flatMap((type) => [typeField(type, 'totalSlots'), typeField(type, 'hourlyRate')]),
+    'latitude', 'longitude', 'open24h', 'schedule', ...DAYS.map(dayField),
 ];
 
 // HU-31 AC-01: one entry per vehicle type, none checked. A type keeps its
@@ -60,8 +62,6 @@ export const emptyWeek = () => DAYS.map((day) => ({ day, open: true, opensAt: ''
 export const EMPTY_ZONE_FORM = {
     name: '',
     address: '',
-    totalSlots: '',
-    hourlyRate: '',
     // HU-31: { car: { checked, totalSlots, hourlyRate }, motorcycle, truck }
     vehicleTypes: emptyVehicleTypes(),
     latitude: '',
@@ -154,14 +154,14 @@ export function typesToForm(types) {
 // become text; String(Number()) drops the zeros the DB adds ("4.8284000",
 // "2500.00") but keeps every decimal, so saving without changes moves nothing.
 // HU-29 AC-01: the current choice of hours is shown; the days a custom
-// schedule does not list are closed.
-export function zoneToForm(zone) {
+// schedule does not list are closed. HU-31: `types` replaces the types of
+// the zone when the administrator list has them (with the ones turned off).
+export function zoneToForm(zone, types = zone.vehicleTypes) {
     const custom = zone.open24h === false;
     return {
         name: zone.name ?? '',
         address: zone.address ?? '',
-        totalSlots: String(zone.totalSlots ?? ''),
-        hourlyRate: zone.hourlyRate == null ? '' : String(Number(zone.hourlyRate)),
+        vehicleTypes: typesToForm(types),
         latitude: zone.latitude == null ? '' : String(Number(zone.latitude)),
         longitude: zone.longitude == null ? '' : String(Number(zone.longitude)),
         open24h: typeof zone.open24h === 'boolean' ? zone.open24h : null,
@@ -188,12 +188,12 @@ export const VEHICLE_TYPE_MESSAGES = {
 export const tooManySlotsError = (total) =>
     `La zona puede tener máximo ${ZONE_LIMITS.maxSlots} cupos entre todos los tipos. Ahora suma ${total}.`;
 
-// HU-21 AC-03: the capacity can't go below the spots taken by Pending or
-// Active reservations. Same text whether the form or the API catches it.
-export function capacityInUseError(spotsInUse) {
-    return spotsInUse === 1
-        ? 'Hay 1 cupo en uso por una reserva pendiente o activa. La capacidad no puede ser menor.'
-        : `Hay ${spotsInUse} cupos en uso por reservas pendientes o activas. La capacidad no puede ser menor.`;
+// HU-21 AC-03 and HU-31 AC-04: the spots of a type can't go below the ones
+// that hold a Pending or Active reservation. Same text whether the form or
+// the API catches it: "Mínimo 4: hay 4 cupos de motos con reservas".
+export function capacityInUseError(spotsInUse, type) {
+    const spots = spotsInUse === 1 ? 'hay 1 cupo' : `hay ${spotsInUse} cupos`;
+    return `Mínimo ${spotsInUse}: ${spots} de ${vehicleTypePlural(type)} con reservas pendientes o activas.`;
 }
 
 // Returns the coordinates as numbers when both are valid and inside Colombia,
@@ -223,31 +223,53 @@ export function validateZoneCoordinates(latitude, longitude) {
     return errors;
 }
 
+// HU-31 AC-02: the errors of the vehicle types. spotsInUse has the spots in
+// use of each type ({ motorcycle: 4 }), only known when editing (AC-04).
+function vehicleTypeErrors(form, spotsInUse) {
+    const errors = {};
+    const checked = checkedTypes(form);
+    if (checked.length === 0) {
+        errors.vehicleTypes = VEHICLE_TYPE_MESSAGES.noType;
+        return errors;
+    }
+
+    let total = 0;
+    let allValid = true;
+    for (const type of checked) {
+        const { totalSlots, hourlyRate } = form.vehicleTypes[type];
+        const slots = Number(totalSlots);
+        if (!isNotEmpty(totalSlots)) {
+            errors[typeField(type, 'totalSlots')] = REQUIRED_MESSAGE;
+            allValid = false;
+        } else if (!Number.isInteger(slots) || slots < 1 || slots > ZONE_LIMITS.maxSlots) {
+            errors[typeField(type, 'totalSlots')] = VEHICLE_TYPE_MESSAGES.slots;
+            allValid = false;
+        } else if (slots < (spotsInUse[type] ?? 0)) {
+            errors[typeField(type, 'totalSlots')] = capacityInUseError(spotsInUse[type], type);
+        } else {
+            total += slots;
+        }
+
+        // HU-20 AC-04 (#316): every type charges for its hours
+        if (!isNotEmpty(hourlyRate)) {
+            errors[typeField(type, 'hourlyRate')] = REQUIRED_MESSAGE;
+        } else if (Number(hourlyRate) <= 0) {
+            errors[typeField(type, 'hourlyRate')] = VEHICLE_TYPE_MESSAGES.rate;
+        }
+    }
+    if (allValid && total > ZONE_LIMITS.maxSlots) errors.vehicleTypes = tooManySlotsError(total);
+    return errors;
+}
+
 // HU-20 AC-01 to AC-06: one message per field, or none when the field is
-// valid. spotsInUse (HU-21 AC-03) is only known when editing.
-export function validateZoneForm(form, { spotsInUse = 0 } = {}) {
+// valid. spotsInUse (HU-21 AC-03, HU-31 AC-04) is only known when editing.
+export function validateZoneForm(form, { spotsInUse = {} } = {}) {
     const errors = {};
 
     if (!isNotEmpty(form.name)) errors.name = REQUIRED_MESSAGE;
     if (!isNotEmpty(form.address)) errors.address = REQUIRED_MESSAGE;
 
-    if (!isNotEmpty(form.totalSlots)) {
-        errors.totalSlots = REQUIRED_MESSAGE;
-    } else {
-        const slots = Number(form.totalSlots);
-        if (!Number.isInteger(slots) || slots < 1 || slots > ZONE_LIMITS.maxSlots) {
-            errors.totalSlots = `La capacidad debe ser un número entero entre 1 y ${ZONE_LIMITS.maxSlots}.`;
-        } else if (slots < spotsInUse) {
-            errors.totalSlots = capacityInUseError(spotsInUse);
-        }
-    }
-
-    if (!isNotEmpty(form.hourlyRate)) {
-        errors.hourlyRate = REQUIRED_MESSAGE;
-    } else if (Number(form.hourlyRate) <= 0) {
-        // HU-20 AC-04 (#316): every zone charges for its hours
-        errors.hourlyRate = 'La tarifa por hora debe ser mayor que $ 0.';
-    }
+    Object.assign(errors, vehicleTypeErrors(form, spotsInUse));
 
     Object.assign(errors, validateZoneCoordinates(form.latitude, form.longitude));
 
@@ -272,8 +294,12 @@ export function buildZonePayload(form) {
     return {
         name: form.name.trim(),
         address: form.address.trim(),
-        totalSlots: Number(form.totalSlots),
-        hourlyRate: Number(form.hourlyRate),
+        // HU-31: the checked types only; a type that is not sent is turned off
+        vehicleTypes: checkedTypes(form).map((vehicleType) => ({
+            vehicleType,
+            totalSlots: Number(form.vehicleTypes[vehicleType].totalSlots),
+            hourlyRate: Number(form.vehicleTypes[vehicleType].hourlyRate),
+        })),
         latitude: Number(Number(form.latitude).toFixed(7)),
         longitude: Number(Number(form.longitude).toFixed(7)),
         // HU-29: the open days only; a day that is not sent is closed
@@ -286,35 +312,53 @@ export function buildZonePayload(form) {
 
 const FIELD_BY_CODE = {
     ZONE_NAME_TAKEN: ['name'],
-    INVALID_CAPACITY: ['totalSlots'],
-    NEGATIVE_VALUE: ['hourlyRate'],
     INVALID_COORDINATES: ['latitude', 'longitude'],
     COORDINATES_OUTSIDE_COLOMBIA: ['latitude', 'longitude'],
-    CAPACITY_BELOW_IN_USE: ['totalSlots'],
-    INSUFFICIENT_AVAILABLE_SPOTS: ['totalSlots'],
 };
 
 const VALIDATION_MESSAGES = {
     name: `El nombre puede tener máximo ${ZONE_LIMITS.name} caracteres.`,
     address: `La dirección puede tener máximo ${ZONE_LIMITS.address} caracteres.`,
-    hourlyRate: 'Ingresa una tarifa válida en pesos.',
+    vehicleTypes: VEHICLE_TYPE_MESSAGES.fromApi,
 };
+
+// HU-31 AC-02: "vehicleTypes[1].totalSlots" is the spots of the second type
+// sent, which buildZonePayload sends in the order of checkedTypes
+const TYPE_PATH = /^vehicleTypes\[(\d+)\](?:\.(\w+))?$/;
+const TYPE_PATH_MESSAGES = { totalSlots: VEHICLE_TYPE_MESSAGES.slots, hourlyRate: VEHICLE_TYPE_MESSAGES.rateFromApi };
+
+// HU-31 AC-04: the spots of one type could not be lowered
+function capacityFields(data) {
+    if (!VEHICLE_TYPES.includes(data.vehicleType)) return { vehicleTypes: translateError(data.code) };
+    const field = typeField(data.vehicleType, 'totalSlots');
+    if (data.code === 'CAPACITY_BELOW_IN_USE' && Number.isInteger(data.spotsInUse)) {
+        return { [field]: capacityInUseError(data.spotsInUse, data.vehicleType) };
+    }
+    return { [field]: translateError(data.code) };
+}
 
 // HU-20 AC-02 / AC-11: errors returned by the API go under their field when
 // there is one. Returns { fields } for those, or { general } for anything else.
-export function mapZoneApiError(err) {
+// `form` is the form that was sent, to find the type of "vehicleTypes[1]".
+export function mapZoneApiError(err, form) {
     const data = err.response?.data ?? {};
-    const fields = {};
+    let fields = {};
 
     if (FIELD_BY_CODE[data.code]) {
         for (const field of FIELD_BY_CODE[data.code]) fields[field] = translateError(data.code);
-        // HU-21 AC-03: the message says how many spots are in use
-        if (data.code === 'CAPACITY_BELOW_IN_USE' && Number.isInteger(data.spotsInUse)) {
-            fields.totalSlots = capacityInUseError(data.spotsInUse);
-        }
+    } else if (data.code === 'CAPACITY_BELOW_IN_USE' || data.code === 'INSUFFICIENT_AVAILABLE_SPOTS') {
+        fields = capacityFields(data);
     } else if (data.code === 'VALIDATION_ERROR' && Array.isArray(data.errors)) {
+        const sent = form ? checkedTypes(form) : [];
         for (const { path, day } of data.errors) {
             if (VALIDATION_MESSAGES[path]) fields[path] = VALIDATION_MESSAGES[path];
+            const typePath = TYPE_PATH.exec(path ?? '');
+            if (typePath) {
+                const type = sent[Number(typePath[1])];
+                const message = TYPE_PATH_MESSAGES[typePath[2]];
+                if (type && message) fields[typeField(type, typePath[2])] = message;
+                else fields.vehicleTypes = VEHICLE_TYPE_MESSAGES.fromApi;
+            }
             // HU-29 AC-02: an error about one day goes next to that day
             if (path === 'open24h') fields.open24h = SCHEDULE_MESSAGES.choose;
             if (path === 'schedule') {
