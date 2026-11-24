@@ -1,7 +1,8 @@
-// HU-31: the car type of the zones against a real MySQL database: the demo
-// zones and the zones created and edited with cars only keep the car type
-// with their spots and rate, and all their spots are car spots (AC-15). The
-// migrations are in vehicleTypeMigrations.test.js, and the other types in
+// HU-31: the vehicle types of the zones against a real MySQL database: the
+// demo zones have their types with their spots (AC-16), and the zones created
+// and edited with cars only keep the car type with its spots and rate, and
+// all their spots are car spots (AC-15). The migrations are in
+// vehicleTypeMigrations.test.js, and the other types in
 // zonesByVehicleType.test.js.
 const request = require('supertest');
 const { sequelize, Zona } = require('../../src/models');
@@ -42,19 +43,40 @@ async function edit(zona, { totalSlots, hourlyRate }) {
         });
 }
 
-describe('The car type of every zone (HU-31)', () => {
-    test('each demo zone of the seeders has the car type, with its spots and its rate, and only car spots', async () => {
+// The spots of a type, numbered from 1 and enabled, as spotsOf gives them
+const spotsOfType = (vehicleType, totalSlots) => Array.from({ length: totalSlots }, (_, i) => `${vehicleType} ${i + 1} Available`);
+
+describe('The vehicle types of the demo zones (HU-31, AC-16)', () => {
+    test.each([
+        ['Centro', [['car', 30, 2000], ['motorcycle', 12, 1000]]],
+        ['Parque Olaya', [['car', 18, 2500]]],
+        ['La Popa', [['car', 24, 1800], ['motorcycle', 8, 900], ['truck', 4, 5000]]],
+        ['Av. Simón Bolívar', [['car', 45, 1500], ['truck', 6, 4500]]],
+    ])('%s has its types, taking reservations, with the spots of each one numbered from 1', async (name, tipos) => {
         // Arrange
-        const zonas = await Zona.findAll({ where: { name: ['Centro', 'Parque Olaya', 'La Popa', 'Av. Simón Bolívar'] } });
+        const zona = await Zona.findOne({ where: { name } });
 
         // Assert
-        expect(zonas).toHaveLength(4);
-        for (const zona of zonas) {
-            expect(await typesOf(zona.id)).toEqual([{ vehicleType: 'car', totalSlots: zona.totalSlots, hourlyRate: Number(zona.hourlyRate), isAccepting: 1 }]);
-            const spots = await spotsOf(zona.id);
-            expect(spots).toEqual(Array.from({ length: zona.totalSlots }, (_, i) => `car ${i + 1} Available`));
-        }
+        expect(await typesOf(zona.id)).toEqual(tipos.map(([vehicleType, totalSlots, hourlyRate]) => ({ vehicleType, totalSlots, hourlyRate, isAccepting: 1 })));
+        expect(await spotsOf(zona.id)).toEqual(tipos.flatMap(([vehicleType, totalSlots]) => spotsOfType(vehicleType, totalSlots)));
     });
+
+    test('the API sends them with their types, and the user sees the sums of the types', async () => {
+        // Act
+        const res = await request(app).get('/api/zones');
+
+        // Assert
+        const laPopa = res.body.zones.find((zona) => zona.name === 'La Popa');
+        expect(laPopa).toMatchObject({ totalSlots: 36, availableSlots: 36 });
+        expect(laPopa.vehicleTypes).toEqual([
+            { vehicleType: 'car', totalSlots: 24, availableSlots: 24, hourlyRate: 1800 },
+            { vehicleType: 'motorcycle', totalSlots: 8, availableSlots: 8, hourlyRate: 900 },
+            { vehicleType: 'truck', totalSlots: 4, availableSlots: 4, hourlyRate: 5000 },
+        ]);
+    });
+});
+
+describe('The car type of a zone with cars only (HU-31)', () => {
 
     test('a zone created through the API has the car type and car spots numbered from 1', async () => {
         // Act
