@@ -7,7 +7,7 @@ const { Usuario, Zona, ZoneSchedule, ZoneVehicleType, ParkingSpot, Reserva, sequ
 const app = require('../src/app');
 
 // HU-31: until the API takes the vehicle types, every zone has the car type,
-// with the spots and the rate of the zone.
+// with the spots and the rate of the zone, and all its spots are car spots.
 // "Now" is Monday 2026-11-16 at 8:00 a. m. in Colombia (13:00 UTC).
 const NOW = new Date('2026-11-16T13:00:00Z');
 const ADMIN_ID = '99999999-9999-4999-8999-999999999999';
@@ -31,9 +31,9 @@ function arrangeCreation() {
 }
 
 // A zone of 10 spots, read with a lock. `carType` is its car type (null
-// when the zone does not have it), and `inUse` spots hold a reservation
-// from now on.
-function arrangeEdition({ carType = { update: jest.fn().mockResolvedValue({}) }, inUse = 0 } = {}) {
+// when the zone does not have it), `inUse` spots hold a reservation from now
+// on, and the highest number of its car spots is `highestNumber`.
+function arrangeEdition({ carType = { update: jest.fn().mockResolvedValue({}) }, inUse = 0, highestNumber = 10 } = {}) {
     const zona = Zona.build({ id: ZONE_ID, ...ZONE, isActive: true, schedules: [] }, { include: [{ model: ZoneSchedule, as: 'schedules' }] });
     jest.spyOn(zona, 'update').mockResolvedValue(zona);
     jest.spyOn(zona, 'reload').mockResolvedValue(zona);
@@ -43,7 +43,7 @@ function arrangeEdition({ carType = { update: jest.fn().mockResolvedValue({}) },
     jest.spyOn(Reserva, 'count').mockResolvedValue(inUse);
     // No spot was disabled before, so a bigger zone gets new spots
     jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([]);
-    jest.spyOn(ParkingSpot, 'max').mockResolvedValue(10);
+    jest.spyOn(ParkingSpot, 'max').mockResolvedValue(highestNumber);
     jest.spyOn(ParkingSpot, 'count').mockResolvedValue(10);
     jest.spyOn(ZoneSchedule, 'destroy').mockResolvedValue(0);
     jest.spyOn(ZoneSchedule, 'bulkCreate').mockResolvedValue([]);
@@ -85,6 +85,23 @@ describe('Creating a zone gives it the car type (HU-31)', () => {
         );
         expect(createType.mock.invocationCallOrder[0]).toBeLessThan(createSpots.mock.invocationCallOrder[0]);
         expect(transaction.commit).toHaveBeenCalled();
+    });
+
+    test('every spot is a car spot, numbered from 1', async () => {
+        // Arrange
+        arrangeCreation();
+
+        // Act
+        await create({ totalSlots: 3 });
+
+        // Assert
+        const [spots, options] = createSpots.mock.calls[0];
+        expect(spots).toEqual([
+            { zoneId: ZONE_ID, vehicleType: 'car', spotNumber: 1, status: 'Available' },
+            { zoneId: ZONE_ID, vehicleType: 'car', spotNumber: 2, status: 'Available' },
+            { zoneId: ZONE_ID, vehicleType: 'car', spotNumber: 3, status: 'Available' },
+        ]);
+        expect(options).toEqual({ transaction });
     });
 
     test('when its spots fail, nothing is saved: neither the zone nor its car type', async () => {
@@ -147,6 +164,22 @@ describe('Editing a zone keeps its car type (HU-31)', () => {
             { zoneId: ZONE_ID, vehicleType: 'car', totalSlots: 10, hourlyRate: 2500, isAccepting: true },
             { transaction },
         );
+    });
+
+    test('the new spots of a bigger zone are car spots, after the highest number of its car spots', async () => {
+        // Arrange
+        arrangeEdition({ highestNumber: 10 });
+
+        // Act
+        const res = await edit({ totalSlots: 12 });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(ParkingSpot.max).toHaveBeenCalledWith('spotNumber', { where: { zoneId: ZONE_ID, vehicleType: 'car' }, transaction });
+        expect(createSpots).toHaveBeenCalledWith([
+            { zoneId: ZONE_ID, vehicleType: 'car', spotNumber: 11, status: 'Available' },
+            { zoneId: ZONE_ID, vehicleType: 'car', spotNumber: 12, status: 'Available' },
+        ], { transaction });
     });
 
     test('a reduction that is refused saves nothing, the car type included', async () => {

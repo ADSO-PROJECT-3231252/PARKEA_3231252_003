@@ -187,8 +187,9 @@ async function createZona(req, res, next) {
     }, { transaction: t });
     await ZoneSchedule.bulkCreate(filasHorario(zona.id, req.body), { transaction: t });
 
-    // HU-31: until the API takes the vehicle types, a zone has the car type,
-    // with the spots and the rate of the zone
+    // HU-31: the spots of a zone belong to one of its vehicle types. Until
+    // the API takes the types, a zone has the car type, with the spots and
+    // the rate of the zone, and all its spots are car spots.
     await ZoneVehicleType.create({
       zoneId: zona.id,
       vehicleType: 'car',
@@ -199,6 +200,7 @@ async function createZona(req, res, next) {
 
     const spots = Array.from({ length: totalSlots }, (_, i) => ({
       zoneId: zona.id,
+      vehicleType: 'car',
       spotNumber: i + 1,
       status: 'Available',
     }));
@@ -252,8 +254,9 @@ async function updateZona(req, res, next) {
       return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
     }
 
-    // HU-31: the car type keeps the spots and the rate of the zone. A zone
-    // that lost it (written by hand in the database) gets it again.
+    // HU-31: the car type keeps the spots and the rate of the zone. It goes
+    // before the spots, which must belong to it. A zone that lost it (written
+    // by hand in the database) gets it again.
     const tipoCarro = await ZoneVehicleType.findOne({ where: { zoneId: id, vehicleType: 'car' }, transaction: t });
     if (tipoCarro) {
       await tipoCarro.update({ totalSlots, hourlyRate }, { transaction: t });
@@ -314,11 +317,13 @@ async function updateZona(req, res, next) {
         );
       }
 
+      // HU-31: the numbers are per type, and every spot is a car spot
       const faltan = delta - deshabilitados.length;
       if (faltan > 0) {
-        const mayorNumero = (await ParkingSpot.max('spotNumber', { where: { zoneId: id }, transaction: t })) || 0;
+        const mayorNumero = (await ParkingSpot.max('spotNumber', { where: { zoneId: id, vehicleType: 'car' }, transaction: t })) || 0;
         const nuevos = Array.from({ length: faltan }, (_, i) => ({
           zoneId: id,
+          vehicleType: 'car',
           spotNumber: mayorNumero + i + 1,
           status: 'Available',
         }));
