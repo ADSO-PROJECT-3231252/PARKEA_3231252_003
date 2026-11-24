@@ -113,6 +113,8 @@ export default function Register() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
 
@@ -182,7 +184,7 @@ export default function Register() {
                     <form onSubmit={handleSubmit} noValidate className="space-y-1.5">
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="documentType" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="documentType" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Tipo de documento
                                 </label>
                                 <select
@@ -199,7 +201,7 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="documentNumber" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="documentNumber" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Número de documento
                                 </label>
                                 <input
@@ -286,7 +288,7 @@ export default function Register() {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="password" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="password" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Contraseña
                                 </label>
                                 <div className="relative">
@@ -325,7 +327,7 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="confirmPassword" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="confirmPassword" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Confirmar contraseña
                                 </label>
                                 <div className="relative">
@@ -397,8 +399,8 @@ export default function Register() {
 
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+                            aria-disabled={loading || undefined}
+                            className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                         >
                             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
                         </button>

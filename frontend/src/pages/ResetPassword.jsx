@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 import { isNotEmpty, isValidPassword, PASSWORD_MESSAGE } from '../utils/validators';
@@ -16,6 +16,12 @@ export default function ResetPassword() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [tokenInvalid, setTokenInvalid] = useState(false);
+    // #311: a link the server rejects replaces the form with its message, so
+    // the focus goes to the message instead of being lost with the button
+    const invalidRef = useRef(null);
+    useEffect(() => {
+        if (tokenInvalid) invalidRef.current?.focus();
+    }, [tokenInvalid]);
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
@@ -39,6 +45,8 @@ export default function ResetPassword() {
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
         setLoading(true);
@@ -79,8 +87,10 @@ p-8 text-center"
                 >
                     <h1 className="sr-only">Enlace no válido</h1>
                     <p
+                        ref={invalidRef}
+                        tabIndex={-1}
                         role="alert"
-                        className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 mb-4"
+                        className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 mb-4 focus:outline-none"
                     >
                         {translateError('RESET_TOKEN_INVALID')}
                     </p>
@@ -230,10 +240,10 @@ hover:text-neutral-700"
                     </div>
                     <button
                         type="submit"
-                        disabled={loading}
+                        aria-disabled={loading || undefined}
                         className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2.5
 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2
-focus:ring-parkea-600 transition disabled:opacity-60"
+focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                     >
                         {loading ? 'Guardando...' : 'Guardar nueva contraseña'}
                     </button>

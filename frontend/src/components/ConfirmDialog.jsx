@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 // Generic accessible confirmation modal -- no portal needed, since nothing
 // in the project uses transformed ancestors that would break position:
@@ -29,6 +30,8 @@ export default function ConfirmDialog({
     // and the effect below must not run again because of it: that would move
     // the focus back to the cancel button while the user is choosing an option.
     const onCancelRef = useRef(onCancel);
+
+    useBodyScrollLock(open);
 
     useEffect(() => {
         onCancelRef.current = onCancel;

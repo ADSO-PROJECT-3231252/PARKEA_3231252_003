@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Users,
     UserCheck,
@@ -106,10 +106,10 @@ function UserActions({ user, reason, onAction, reasonClassName = 'max-w-[190px]'
                     aria-label={`Cuenta activa de ${user.fullName}`}
                     onClick={() => onAction('status', user)}
                     disabled={locked}
-                    className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${user.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-300 bg-neutral-300'}`}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${user.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-300 bg-neutral-300'}`}
                 >
                     <span
-                        className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${user.isActive ? 'translate-x-4' : 'translate-x-0'}`}
+                        className={`absolute left-0.5 top-0.5 size-4.5 rounded-full bg-white shadow-sm transition-transform ${user.isActive ? 'translate-x-5' : 'translate-x-0'}`}
                         aria-hidden="true"
                     />
                 </button>
@@ -135,6 +135,8 @@ export default function AdminUsers() {
 
     // ----- Filters and pagination (AC-04, AC-15) -----
     const [search, setSearch] = useState('');
+    // #311: the clear button disappears with the text, so the focus goes back to the search box
+    const searchRef = useRef(null);
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [role, setRole] = useState('');
     const [status, setStatus] = useState('');
@@ -283,8 +285,18 @@ export default function AdminUsers() {
         setPage(1);
     };
 
+    // #311: the list is replaced by a loading state, so after a page change the focus goes to the range text
+    const rangeRef = useRef(null);
+    const focusRangeAfterLoad = useRef(false);
+    useEffect(() => {
+        if (loading) return;
+        if (!error && users.length > 0 && focusRangeAfterLoad.current) rangeRef.current?.focus();
+        focusRangeAfterLoad.current = false;
+    }, [loading, error, users.length]);
+
     const goToPage = (target) => {
         if (target === page) return;
+        focusRangeAfterLoad.current = true;
         startLoading();
         setPage(target);
     };
@@ -368,7 +380,7 @@ export default function AdminUsers() {
     const visibleLogs = logsExpanded ? logs : logs.slice(0, VISIBLE_LOGS);
     const pageButton =
         'flex h-7 w-7 items-center justify-center rounded-md text-neutral-600 hover:bg-neutral-100 ' +
-        'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent';
+        'aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:bg-transparent';
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -442,19 +454,23 @@ export default function AdminUsers() {
                             aria-hidden="true"
                         />
                         <input
+                            ref={searchRef}
                             id="user-search"
                             type="text"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Ej. Juan Pérez, juan@mail.com o 1020304050"
+                            placeholder="Buscar usuario…"
                             className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                         />
                         {search && (
                             <button
                                 type="button"
-                                onClick={() => setSearch('')}
+                                onClick={() => {
+                                    setSearch('');
+                                    searchRef.current?.focus();
+                                }}
                                 aria-label="Limpiar búsqueda"
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
+                                className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-neutral-600 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
                             >
                                 <X className="h-4 w-4" aria-hidden="true" />
                             </button>
@@ -493,9 +509,12 @@ export default function AdminUsers() {
                 </div>
                 <button
                     type="button"
-                    onClick={handleClearFilters}
-                    disabled={!hasActiveFilters}
-                    className="flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => {
+                        // #311: aria-disabled instead of disabled, so the focus stays on it once the filters are clear
+                        if (hasActiveFilters) handleClearFilters();
+                    }}
+                    aria-disabled={!hasActiveFilters || undefined}
+                    className="flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-300"
                 >
                     <Filter className="h-4 w-4 text-parkea-600" aria-hidden="true" />
                     Limpiar filtros
@@ -631,14 +650,14 @@ export default function AdminUsers() {
 
                         {/* AC-15: pagination */}
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3">
-                            <p className="text-caption text-neutral-600">
+                            <p ref={rangeRef} tabIndex={-1} className="text-caption text-neutral-600 focus:outline-none">
                                 Mostrando {rangeStart} a {rangeEnd} de {pagination.total} usuarios
                             </p>
                             <nav aria-label="Paginación de usuarios" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
                                     onClick={() => goToPage(1)}
-                                    disabled={page === 1}
+                                    aria-disabled={page === 1 || undefined}
                                     aria-label="Primera página"
                                     className={`${pageButton} max-sm:hidden`}
                                 >
@@ -646,8 +665,10 @@ export default function AdminUsers() {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => goToPage(page - 1)}
-                                    disabled={page === 1}
+                                    onClick={() => {
+                                        if (page > 1) goToPage(page - 1);
+                                    }}
+                                    aria-disabled={page === 1 || undefined}
                                     aria-label="Página anterior"
                                     className={pageButton}
                                 >
@@ -673,8 +694,10 @@ export default function AdminUsers() {
                                 )}
                                 <button
                                     type="button"
-                                    onClick={() => goToPage(page + 1)}
-                                    disabled={page === pagination.totalPages}
+                                    onClick={() => {
+                                        if (page < pagination.totalPages) goToPage(page + 1);
+                                    }}
+                                    aria-disabled={page === pagination.totalPages || undefined}
                                     aria-label="Página siguiente"
                                     className={pageButton}
                                 >
@@ -683,7 +706,7 @@ export default function AdminUsers() {
                                 <button
                                     type="button"
                                     onClick={() => goToPage(pagination.totalPages)}
-                                    disabled={page === pagination.totalPages}
+                                    aria-disabled={page === pagination.totalPages || undefined}
                                     aria-label="Última página"
                                     className={`${pageButton} max-sm:hidden`}
                                 >

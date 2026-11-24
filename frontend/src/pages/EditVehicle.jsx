@@ -153,9 +153,10 @@ export default function EditVehicle() {
         return (
             <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
                 <title>Editar vehículo | PARKEA</title>
+                <h1 className="text-title font-display uppercase text-neutral-900">Editar vehículo</h1>
                 <div
                     role="alert"
-                    className={`flex flex-col items-start gap-3 rounded-lg border
+                    className={`mt-6 flex flex-col items-start gap-3 rounded-lg border
 border-danger-soft bg-danger-soft p-5`}
                 >
                     <p className="flex items-center gap-2 text-body text-danger">

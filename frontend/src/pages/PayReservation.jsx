@@ -783,8 +783,6 @@ export default function PayReservation() {
                                         </span>
                                     </p>
                                 )}
-                                <p className="mt-3 text-label font-medium text-warning">Entorno de prueba</p>
-                                <p className="text-caption text-warning">Este es un entorno de prueba. Ningún pago real será procesado.</p>
                             </div>
                         )}
                     </div>
@@ -856,11 +854,6 @@ export default function PayReservation() {
                     </button>
                 </div>
             </form>
-
-            <p className="mt-8 flex items-center justify-center gap-1.5 border-t border-neutral-200 pt-4 text-center text-caption text-neutral-600">
-                <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                Este es un entorno de prueba. Ningún pago real será procesado.
-            </p>
 
             {processing && <ProcessingOverlay amount={total} />}
         </div>

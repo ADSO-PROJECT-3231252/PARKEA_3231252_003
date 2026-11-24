@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -102,6 +102,8 @@ export default function Zones() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [search, setSearch] = useState('');
+    // #311: the clear button disappears with the text, so the focus goes back to the search box
+    const searchRef = useRef(null);
     const [page, setPage] = useState(1);
 
     // HU-25: list and map share this screen, so the search is kept when the
@@ -166,6 +168,7 @@ export default function Zones() {
     const handleClearSearch = () => {
         setSearch('');
         setPage(1);
+        searchRef.current?.focus();
     };
 
     // AC-08: if the map can't load, explain it and fall back to the list.
@@ -231,11 +234,12 @@ export default function Zones() {
                     Buscar zonas por nombre
                 </label>
                 <input
+                    ref={searchRef}
                     id="zone-search"
                     type="text"
                     value={search}
                     onChange={handleSearchChange}
-                    placeholder="Buscar por nombre de zona..."
+                    placeholder="Buscar por nombre…"
                     className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                 />
                 {search && (
@@ -243,7 +247,7 @@ export default function Zones() {
                         type="button"
                         onClick={handleClearSearch}
                         aria-label="Limpiar búsqueda"
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                        className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-neutral-600 hover:text-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
                     >
                         <X className="h-4 w-4" aria-hidden="true" />
                     </button>
@@ -346,10 +350,12 @@ export default function Zones() {
                             >
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage - 1)}
-                                    disabled={currentPage === 1}
+                                    onClick={() => {
+                                        if (currentPage > 1) setPage(currentPage - 1);
+                                    }}
+                                    aria-disabled={currentPage === 1 || undefined}
                                     aria-label="Página anterior"
-                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
                                 >
                                     <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                                     Anterior
@@ -359,10 +365,12 @@ export default function Zones() {
                                 </span>
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
+                                    onClick={() => {
+                                        if (currentPage < totalPages) setPage(currentPage + 1);
+                                    }}
+                                    aria-disabled={currentPage === totalPages || undefined}
                                     aria-label="Página siguiente"
-                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
                                 >
                                     Siguiente
                                     <ChevronRight className="h-4 w-4" aria-hidden="true" />

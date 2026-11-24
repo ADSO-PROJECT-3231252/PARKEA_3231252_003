@@ -67,10 +67,10 @@ function ZoneActions({ zone, onToggle }) {
                 aria-checked={zone.isActive}
                 aria-label={`Zona activa: ${zone.name}`}
                 onClick={() => onToggle(zone)}
-                className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600 focus-visible:ring-offset-2 ${zone.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-500 bg-neutral-500'}`}
+                className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600 focus-visible:ring-offset-2 ${zone.isActive ? 'border-parkea-600 bg-parkea-600' : 'border-neutral-500 bg-neutral-500'}`}
             >
                 <span
-                    className={`absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${zone.isActive ? 'translate-x-4' : 'translate-x-0'}`}
+                    className={`absolute left-0.5 top-0.5 size-4.5 rounded-full bg-white shadow-sm transition-transform ${zone.isActive ? 'translate-x-5' : 'translate-x-0'}`}
                     aria-hidden="true"
                 />
             </button>
@@ -101,6 +101,8 @@ export default function AdminZones() {
 
     // AC-03: search by name or address and filter by status
     const [search, setSearch] = useState('');
+    // #311: the clear button disappears with the text, so the focus goes back to the search box
+    const searchRef = useRef(null);
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
 
@@ -263,7 +265,7 @@ export default function AdminZones() {
 
     const pageButton =
         'flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-caption text-neutral-700 transition-colors hover:bg-neutral-50 ' +
-        'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent sm:px-2.5';
+        'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent sm:px-2.5';
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -304,19 +306,23 @@ export default function AdminZones() {
                         aria-hidden="true"
                     />
                     <input
+                        ref={searchRef}
                         type="text"
                         value={search}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        placeholder="Buscar por nombre o dirección…"
+                        placeholder="Nombre o dirección…"
                         aria-label="Buscar zona por nombre o dirección"
                         className="w-full rounded-md border border-neutral-200 bg-white py-2.5 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                     />
                     {search && (
                         <button
                             type="button"
-                            onClick={() => handleSearchChange('')}
+                            onClick={() => {
+                                handleSearchChange('');
+                                searchRef.current?.focus();
+                            }}
                             aria-label="Limpiar búsqueda"
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-900"
+                            className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-neutral-600 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
                         >
                             <X className="h-4 w-4" aria-hidden="true" />
                         </button>
@@ -462,8 +468,10 @@ export default function AdminZones() {
                             <nav aria-label="Paginación de zonas" className="flex flex-wrap items-center gap-0.5 sm:gap-1">
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage - 1)}
-                                    disabled={currentPage === 1}
+                                    onClick={() => {
+                                        if (currentPage > 1) setPage(currentPage - 1);
+                                    }}
+                                    aria-disabled={currentPage === 1 || undefined}
                                     className={pageButton}
                                 >
                                     <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
@@ -489,8 +497,10 @@ export default function AdminZones() {
                                 )}
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
+                                    onClick={() => {
+                                        if (currentPage < totalPages) setPage(currentPage + 1);
+                                    }}
+                                    aria-disabled={currentPage === totalPages || undefined}
                                     className={pageButton}
                                 >
                                     <span className="sr-only sm:not-sr-only">Siguiente</span>
