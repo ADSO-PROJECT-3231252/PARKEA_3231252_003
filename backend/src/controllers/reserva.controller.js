@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Reserva, Zona, Vehiculo, Pago, Usuario, ZoneSchedule } = require('../models');
+const { Reserva, Zona, Vehiculo, Pago, Usuario, ZoneSchedule, ParkingSpot } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { provisionalEndTime, openStayCharge, paidBeforeBalance, firstPaymentAmount, extensionCharge } = require('../utils/stayPricing');
@@ -11,6 +11,12 @@ const { STAY_MAX_MS, checkStayTimes, outsideHoursError } = require('../utils/sta
 const availability = require('../services/availability');
 const { pendingBalance } = require('../services/accountOpenItems');
 const { acceptedType } = require('../services/zoneVehicleTypes');
+
+// HU-31: the type of the spot of a reservation, which the screens show with
+// its number ("Cupo 3 · Moto"). Read with the reservation; a spot never
+// changes its type.
+const CON_TIPO_DE_CUPO = { model: ParkingSpot, as: 'parkingSpot', attributes: ['vehicleType'] };
+const tipoDeCupo = (reserva) => reserva.parkingSpot?.vehicleType ?? null;
 
 const MAX_PENDING_RESERVATIONS = 2;
 
@@ -345,6 +351,7 @@ async function obtenerConfirmacion(req, res, next) {
                 { model: Zona, as: 'zone', include: [CON_HORARIO] },
                 { model: Vehiculo, as: 'vehicle', paranoid: false },
                 { model: Pago, as: 'payments', attributes: ['amount', 'paymentStatus', 'type'] },
+                CON_TIPO_DE_CUPO,
             ],
         });
 
@@ -369,6 +376,7 @@ async function obtenerConfirmacion(req, res, next) {
                 id: reserva.id,
                 status: reserva.status,
                 spotNumber: reserva.spotNumber,
+                spotVehicleType: tipoDeCupo(reserva),
                 startTime: reserva.startTime,
                 endTime: sinSalidaAun ? null : reserva.endTime,
                 durationHours: duracionMostrada,
@@ -381,7 +389,6 @@ async function obtenerConfirmacion(req, res, next) {
                     id: reserva.zone.id,
                     name: reserva.zone.name,
                     address: reserva.zone.address,
-                    hourlyRate: reserva.zone.hourlyRate,
                     latitude: reserva.zone.latitude,
                     longitude: reserva.zone.longitude,
                 },
@@ -743,6 +750,7 @@ async function misReservas(req, res, next) {
                 { model: Zona, as: 'zone', attributes: ['id', 'name', 'address', 'open24h'], include: [CON_HORARIO] },
                 { model: Vehiculo, as: 'vehicle', paranoid: false, attributes: ['id', 'plate', 'brand', 'model', 'color'] },
                 { model: Pago, as: 'payments', attributes: ['amount', 'paymentStatus', 'type'] },
+                CON_TIPO_DE_CUPO,
             ],
         });
 
@@ -786,6 +794,7 @@ async function misReservas(req, res, next) {
                 id: r.id,
                 status: r.status,
                 spotNumber: r.spotNumber,
+                spotVehicleType: tipoDeCupo(r),
                 startTime: r.startTime,
                 endTime: sinSalidaAun ? null : r.endTime,
                 // #347: the end of the 15 minutes to pay a Pending reservation,
