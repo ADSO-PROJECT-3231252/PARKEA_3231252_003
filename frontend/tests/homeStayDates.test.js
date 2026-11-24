@@ -4,19 +4,17 @@ import Home from '../src/pages/Home';
 import { AuthProvider } from '../src/context/AuthContext';
 import { getReservations } from '../src/services/reservationService';
 import { getZones } from '../src/services/zoneService';
-import { formatDate, formatTime } from '../src/utils/format';
 
 // The screen does not call the real API
 jest.mock('../src/services/reservationService', () => ({ getReservations: jest.fn() }));
 jest.mock('../src/services/zoneService', () => ({ getZones: jest.fn() }));
 
 // #357: the "Reservas" card and the "Historial" list of the home say the day
-// of the exit when a stay ends on another day. The stays are built in the
-// local time of the computer, the time the screen shows, `days` from today.
-function localAt(days, hours, minutes = 0) {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + days, hours, minutes).toISOString();
-}
+// of the exit when a stay ends on another day, in Colombia time (UTC-5),
+// whatever the time zone of the computer. "Now" is Monday 2026-11-16 at
+// 10:00 a. m. in Colombia (15:00 UTC), and the stays are fixed instants, so
+// the texts are the same in any time zone.
+const NOW = new Date('2026-11-16T15:00:00.000Z');
 
 const reservation = (id, zoneName, status, startTime, endTime) => ({
     id,
@@ -49,15 +47,12 @@ const renderHome = () => render(
 // The card of a heading ("Reservas" or "Historial"), so each check looks only inside it
 const card = async (title) => (await screen.findByRole('heading', { name: title })).parentElement.parentElement;
 
-// The text as a person reads it (the matchers turn the non-breaking spaces into spaces)
-const time = (iso) => formatTime(iso);
-// The day of a time, with the year only when the other end of the stay is in
-// another year (a test that runs on December 31 or on January 1)
-const dayOf = (iso, other) => (new Date(iso).getFullYear() === new Date(other).getFullYear()
-    ? formatDate(iso).replace(/ de \d{4}$/, '')
-    : formatDate(iso));
-
 beforeEach(() => {
+    // Only the date is fixed; the timers of the screen run as always
+    jest.useFakeTimers({
+        now: NOW,
+        doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'queueMicrotask', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback', 'performance', 'hrtime'],
+    });
     localStorage.clear();
     localStorage.setItem('token', 'test-token');
     localStorage.setItem('user', JSON.stringify({ id: 'user-1', fullName: 'Laura Gómez', role: 'user' }));
@@ -65,61 +60,66 @@ beforeEach(() => {
     getZones.mockReset().mockResolvedValue({ data: { zones: [] } });
 });
 
-describe('The dates of a stay that ends on another day, on the home (#357)', () => {
-    test('the card of a stay that crosses midnight says the day of the exit', async () => {
-        // Arrange: tomorrow from 10:00 p. m. to 1:30 a. m. of the next day
-        const start = localAt(1, 22);
-        const end = localAt(2, 1, 30);
-        answerLikeTheApi([reservation('night', 'Zona Noche', 'Active', start, end)]);
+afterEach(() => {
+    jest.useRealTimers();
+});
+
+describe('The dates of a stay that ends on another day, on the home, in Colombia time (#357)', () => {
+    test.each([
+        // 04:30 to 05:30 UTC of the 17th: in UTC it does not cross midnight
+        ['crosses midnight only in Colombia', '2026-11-17T04:30:00.000Z', '2026-11-17T05:30:00.000Z', '16 de nov de 2026', '11:30 p. m. – 17 de nov, 12:30 a. m.'],
+        // 23:00 UTC of the 16th to 01:00 UTC of the 17th: only UTC crosses it
+        ['crosses midnight only in UTC', '2026-11-16T23:00:00.000Z', '2026-11-17T01:00:00.000Z', '16 de nov de 2026', '06:00 p. m. – 08:00 p. m.'],
+        ['ends in the next year', '2027-01-01T04:00:00.000Z', '2027-01-01T05:30:00.000Z', '31 de dic de 2026', '11:00 p. m. – 01 de ene de 2027, 12:30 a. m.'],
+    ])('the card of a stay that %s shows the day of the entry and the hours in Colombia', async (_case, start, end, day, hours) => {
+        // Arrange
+        answerLikeTheApi([reservation('next', 'Zona Noche', 'Active', start, end)]);
 
         // Act
         renderHome();
         const reservas = await card('Reservas');
 
-        // Assert: the day of the entry stays on top, and the exit says its own day
+        // Assert
         expect(await within(reservas).findByText('Zona Noche')).toBeInTheDocument();
-        expect(within(reservas).getByText(formatDate(start))).toBeInTheDocument();
-        expect(within(reservas).getByText(`${time(start)} – ${dayOf(end, start)}, ${time(end)}`)).toBeInTheDocument();
+        expect(within(reservas).getByText(day)).toBeInTheDocument();
+        expect(within(reservas).getByText(hours)).toBeInTheDocument();
     });
 
-    test('the card of a stay on one day looks as before', async () => {
-        // Arrange: tomorrow from 10:00 a. m. to 12:00 p. m.
-        const start = localAt(1, 10);
-        const end = localAt(1, 12);
-        answerLikeTheApi([reservation('day', 'Zona Día', 'Active', start, end)]);
+    test('an open stay shows the day and the time of its entry in Colombia, with no exit time', async () => {
+        // Arrange: it started at 4:30 a. m. in Colombia, 09:30 UTC
+        answerLikeTheApi([reservation('open', 'Zona Abierta', 'Active', '2026-11-16T09:30:00.000Z', null)]);
 
         // Act
         renderHome();
         const reservas = await card('Reservas');
 
         // Assert
-        expect(await within(reservas).findByText('Zona Día')).toBeInTheDocument();
-        expect(within(reservas).getByText(formatDate(start))).toBeInTheDocument();
-        expect(within(reservas).getByText(`${time(start)} – ${time(end)}`)).toBeInTheDocument();
+        expect(await within(reservas).findByText('04:30 a. m. · Sin hora de salida')).toBeInTheDocument();
+        expect(within(reservas).getByText('16 de nov de 2026')).toBeInTheDocument();
     });
 
-    test('an open stay with no exit time yet still says so', async () => {
-        // Arrange: it started one hour ago
-        const start = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-        answerLikeTheApi([reservation('open', 'Zona Abierta', 'Active', start, null)]);
+    test('an open stay that started late at night in Colombia shows that day, not the one of UTC', async () => {
+        // Arrange: 11:00 p. m. of the 15th in Colombia, 04:00 UTC of the 16th
+        answerLikeTheApi([reservation('open', 'Zona Abierta', 'Active', '2026-11-16T04:00:00.000Z', null)]);
 
         // Act
         renderHome();
         const reservas = await card('Reservas');
 
         // Assert
-        expect(await within(reservas).findByText(`${time(start)} · Sin hora de salida`)).toBeInTheDocument();
+        expect(await within(reservas).findByText('11:00 p. m. · Sin hora de salida')).toBeInTheDocument();
+        expect(within(reservas).getByText('15 de nov de 2026')).toBeInTheDocument();
     });
 
-    test('the history gives each time its day when a stay crossed midnight, and keeps the others as before', async () => {
-        // Arrange: two days ago from 10:00 p. m. to 2:15 a. m., and three days ago from 9:00 to 11:00 a. m.
-        const nightStart = localAt(-2, 22);
-        const nightEnd = localAt(-1, 2, 15);
-        const dayStart = localAt(-3, 9);
-        const dayEnd = localAt(-3, 11);
+    test('the history gives each time its day when a stay crossed midnight in Colombia, and keeps the others in one line', async () => {
+        // Arrange: three finished stays
         answerLikeTheApi([
-            reservation('night', 'Zona Noche', 'Finished', nightStart, nightEnd),
-            reservation('day', 'Zona Día', 'Finished', dayStart, dayEnd),
+            // 11:30 p. m. of the 14th to 12:30 a. m. of the 15th in Colombia
+            reservation('night', 'Zona Noche', 'Finished', '2026-11-15T04:30:00.000Z', '2026-11-15T05:30:00.000Z'),
+            // 6:00 to 8:00 p. m. of the 14th in Colombia (midnight only in UTC)
+            reservation('evening', 'Zona Tarde', 'Finished', '2026-11-14T23:00:00.000Z', '2026-11-15T01:00:00.000Z'),
+            // 9:00 to 11:00 a. m. of the 14th in Colombia
+            reservation('day', 'Zona Día', 'Finished', '2026-11-14T14:00:00.000Z', '2026-11-14T16:00:00.000Z'),
         ]);
 
         // Act
@@ -128,9 +128,8 @@ describe('The dates of a stay that ends on another day, on the home (#357)', () 
 
         // Assert
         expect(await within(historial).findByText('Zona Noche')).toBeInTheDocument();
-        expect(within(historial).getByText(
-            `${dayOf(nightStart, nightEnd)}, ${time(nightStart)} – ${dayOf(nightEnd, nightStart)}, ${time(nightEnd)}`,
-        )).toBeInTheDocument();
-        expect(within(historial).getByText(`${formatDate(dayStart)} · ${time(dayStart)} – ${time(dayEnd)}`)).toBeInTheDocument();
+        expect(within(historial).getByText('14 de nov, 11:30 p. m. – 15 de nov, 12:30 a. m.')).toBeInTheDocument();
+        expect(within(historial).getByText('14 de nov de 2026 · 06:00 p. m. – 08:00 p. m.')).toBeInTheDocument();
+        expect(within(historial).getByText('14 de nov de 2026 · 09:00 a. m. – 11:00 a. m.')).toBeInTheDocument();
     });
 });

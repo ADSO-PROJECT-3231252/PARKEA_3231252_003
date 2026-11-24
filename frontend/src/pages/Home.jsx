@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { getReservations } from '../services/reservationService';
-import { formatDate, formatTime, formatCurrency, formatStay, formatStayHours, keepTogether } from '../utils/format';
+import { COLOMBIA_TIME_ZONE, formatDate, formatTime, formatCurrency, formatStay, formatStayHours, keepTogether } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import DecorativeImage from '../components/DecorativeImage';
 import Reveal from '../components/Reveal';
@@ -326,7 +326,8 @@ function AuthenticatedHome({ user }) {
 
                             <p className="mt-2 flex items-center gap-1 text-body font-medium text-neutral-900">
                                 <Calendar className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
-                                {formatDate(currentReservation.startTime)}
+                                {/* #357: the day in Colombia, like the hours below */}
+                                {formatDate(currentReservation.startTime, COLOMBIA_TIME_ZONE)}
                             </p>
 
                             <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pl-[18px]">
@@ -335,7 +336,7 @@ function AuthenticatedHome({ user }) {
                                         #357: an exit on another day says its date too. */}
                                     {currentReservation.endTime
                                         ? formatStayHours(currentReservation.startTime, currentReservation.endTime)
-                                        : `${keepTogether(formatTime(currentReservation.startTime))} · Sin hora de salida`}
+                                        : `${keepTogether(formatTime(currentReservation.startTime, COLOMBIA_TIME_ZONE))} · Sin hora de salida`}
                                 </p>
                                 <p className="shrink-0 font-mono text-label text-neutral-600">
                                     Cupo N.º {currentReservation.spotNumber}

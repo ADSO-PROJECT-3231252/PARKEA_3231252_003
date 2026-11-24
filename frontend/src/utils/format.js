@@ -8,19 +8,26 @@ export function getInitials(fullName) {
         .join('');
 }
 
-export function formatDate(isoString) {
+// #357: the time zone of Colombia, for the screens that must show its day
+// whatever the time zone of the computer
+export const COLOMBIA_TIME_ZONE = 'America/Bogota';
+
+// `timeZone` is optional: without it, the time zone of the browser
+export function formatDate(isoString, timeZone) {
     return new Date(isoString).toLocaleDateString('es-CO', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
+        timeZone,
     });
 }
 
-export function formatTime(isoString) {
+export function formatTime(isoString, timeZone) {
     return new Date(isoString).toLocaleTimeString('es-CO', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
+        timeZone,
     });
 }
 
@@ -67,20 +74,25 @@ export function formatDateTime(isoString) {
 // spaces made non-breaking so a line never splits it (HU-28 dialogs).
 export const keepTogether = (text) => String(text).replace(/ /g, '\u00a0');
 
-// #357: the date of formatDate ("16 de nov de 2026") that never splits across
-// two lines, except before its year ("16 de nov" and "de 2026" in a narrow
+// #357: the dates and times of a stay are in Colombia time (the hours of the
+// zones are too), so a stay looks the same on any computer
+const dateOf = (isoString) => formatDate(isoString, COLOMBIA_TIME_ZONE);
+const timeOf = (isoString) => keepTogether(formatTime(isoString, COLOMBIA_TIME_ZONE));
+
+// #357: the date of a stay ("16 de nov de 2026") that never splits across two
+// lines, except before its year ("16 de nov" and "de 2026" in a narrow
 // column). Without the year: "16 de nov", with the same day ("01 de dic").
 function dayAndMonth(isoString, withYear) {
-    const date = keepTogether(formatDate(isoString));
+    const date = keepTogether(dateOf(isoString));
     if (withYear) return date.replace(/\u00a0(?=de\u00a0\d{4}$)/, ' ');
     return date.replace(/\u00a0de\u00a0\d{4}$/, '');
 }
 
-const yearOf = (isoString) => new Date(isoString).getFullYear();
+// The year of a date in Colombia: the last 4 digits of "16 de nov de 2026"
+const yearOf = (isoString) => dateOf(isoString).slice(-4);
 
-// #357: the exit is on another day than the entry, in the time zone the
-// dates are shown in (the one of the browser: in Colombia, Colombia time)
-export const endsAnotherDay = (startIso, endIso) => formatDate(startIso) !== formatDate(endIso);
+// #357: the exit is on another day than the entry, in Colombia time
+export const endsAnotherDay = (startIso, endIso) => dateOf(startIso) !== dateOf(endIso);
 
 // #357: the dash between the entry and the exit. It stays with the entry, so
 // a line that breaks there never starts with it.
@@ -92,11 +104,10 @@ const RANGE_DASH = '\u00a0– ';
 // is another year). A time never splits across two lines; the line can only
 // break after the dash, after the comma and before a year.
 export function formatStayHours(startIso, endIso) {
-    const exitTime = keepTogether(formatTime(endIso));
     const exit = endsAnotherDay(startIso, endIso)
-        ? `${dayAndMonth(endIso, yearOf(endIso) !== yearOf(startIso))}, ${exitTime}`
-        : exitTime;
-    return `${keepTogether(formatTime(startIso))}${RANGE_DASH}${exit}`;
+        ? `${dayAndMonth(endIso, yearOf(endIso) !== yearOf(startIso))}, ${timeOf(endIso)}`
+        : timeOf(endIso);
+    return `${timeOf(startIso)}${RANGE_DASH}${exit}`;
 }
 
 // #357: a stay in one line, with its day: "16 de nov de 2026 · 01:08 p. m. –
@@ -108,6 +119,6 @@ export function formatStay(startIso, endIso) {
         return `${dayAndMonth(startIso, true)} · ${formatStayHours(startIso, endIso)}`;
     }
     const withYear = yearOf(endIso) !== yearOf(startIso);
-    const at = (isoString) => `${dayAndMonth(isoString, withYear)}, ${keepTogether(formatTime(isoString))}`;
+    const at = (isoString) => `${dayAndMonth(isoString, withYear)}, ${timeOf(isoString)}`;
     return `${at(startIso)}${RANGE_DASH}${at(endIso)}`;
 }
