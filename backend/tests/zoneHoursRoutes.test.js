@@ -4,7 +4,7 @@ const availability = require('../src/services/availability');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Zona, ZoneSchedule, ParkingSpot, Reserva, sequelize } = require('../src/models');
+const { Usuario, Zona, ZoneSchedule, ZoneVehicleType, ParkingSpot, Reserva, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // HU-29: POST and PUT /zones check the opening hours before touching the
@@ -45,6 +45,9 @@ beforeEach(() => {
     deleteHours = jest.spyOn(ZoneSchedule, 'destroy').mockResolvedValue(0);
     jest.spyOn(ParkingSpot, 'bulkCreate').mockResolvedValue([]);
     jest.spyOn(Zona, 'findOne').mockResolvedValue(null);
+    // HU-31: the car type of a zone, created with it and kept when it is edited
+    jest.spyOn(ZoneVehicleType, 'create').mockResolvedValue({});
+    jest.spyOn(ZoneVehicleType, 'findOne').mockResolvedValue({ update: jest.fn() });
 });
 
 afterEach(() => {

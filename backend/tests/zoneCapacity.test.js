@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Zona, ZoneSchedule, ParkingSpot, Reserva, sequelize } = require('../src/models');
+const { Usuario, Zona, ZoneSchedule, ZoneVehicleType, ParkingSpot, Reserva, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // HU-20, HU-21 and #373: the capacity of a zone and its free spots when it is
@@ -45,6 +45,9 @@ beforeEach(() => {
     jest.spyOn(sequelize, 'transaction').mockResolvedValue(transaction);
     // The session of the administrator (auth middleware)
     jest.spyOn(Usuario, 'findByPk').mockResolvedValue({ id: ADMIN_ID, isActive: true, passwordVersion: 0, role: { name: 'admin' } });
+    // HU-31: the car type of a zone, created with it and kept when it is edited
+    jest.spyOn(ZoneVehicleType, 'create').mockResolvedValue({});
+    jest.spyOn(ZoneVehicleType, 'findOne').mockResolvedValue({ update: jest.fn() });
 });
 
 afterEach(() => {

@@ -5,7 +5,7 @@ const { DatabaseError } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Vehiculo, Zona, ZoneSchedule, Reserva, ParkingSpot, Pago, sequelize } = require('../src/models');
+const { Usuario, Vehiculo, Zona, ZoneSchedule, ZoneVehicleType, Reserva, ParkingSpot, Pago, sequelize } = require('../src/models');
 const app = require('../src/app');
 const { safeRollback } = require('../src/utils/transaction');
 const { expirarReservasVencidas } = require('../src/jobs/expirar-reservas.job');
@@ -77,6 +77,9 @@ beforeEach(() => {
     transaction = fakeTransaction();
     jest.spyOn(sequelize, 'transaction').mockResolvedValue(transaction);
     jest.spyOn(Usuario, 'findByPk').mockImplementation(async (id) => session(id));
+    // HU-31: the car type of a zone, created with it and kept when it is edited
+    jest.spyOn(ZoneVehicleType, 'create').mockResolvedValue({});
+    jest.spyOn(ZoneVehicleType, 'findOne').mockResolvedValue({ update: jest.fn() });
     logged = [];
     jest.spyOn(console, 'error').mockImplementation((...args) => {
         // What console.error writes: the text, or the error as Node prints it
