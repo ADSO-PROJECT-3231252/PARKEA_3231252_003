@@ -1,10 +1,11 @@
-// HU-31: the guards of the migration of the vehicle types of the zones. It
+// HU-31: the guards of the two migrations of the vehicle types. Each one
 // counts the rows that would stop it before changing anything, and up and
 // down can run again after a failure halfway (MySQL does not undo the
 // statements of a migration that fails). The real ALTERs run on MySQL in
 // tests/integration/schemaRules.test.js.
 const { DataTypes } = require('sequelize');
 const zoneTypes = require('../src/migrations/20261124100000-create-zone-vehicle-types');
+const spotType = require('../src/migrations/20261124100100-add-vehicle-type-to-parking-spots');
 
 // A queryInterface that answers as a database in a given state, and writes
 // every change it is asked for in `changes`, in order:
@@ -165,6 +166,145 @@ describe('The migration of the vehicle types of the zones (HU-31)', () => {
 
         // Act
         await zoneTypes.down(db);
+
+        // Assert
+        expect(db.changes).toEqual([]);
+    });
+});
+
+describe('The migration of the vehicle type of the spots (HU-31)', () => {
+    const BEFORE = { indexes: { parking_spots: ['PRIMARY', 'parking_spots_zone_spot_unique'] } };
+    const AFTER = {
+        column: { type: "ENUM('car','motorcycle','truck')", defaultValue: 'car' },
+        indexes: { parking_spots: ['PRIMARY', 'parking_spots_zone_type_spot_unique'] },
+        foreignKey: true,
+    };
+
+    test('every spot becomes a car spot, numbered per type, of a type of its zone', async () => {
+        // Arrange
+        const db = fakeDatabase(BEFORE);
+
+        // Act
+        await spotType.up(db, Sequelize);
+
+        // Assert: the new index before the old one goes, and the foreign key last
+        expect(namesOf(db.changes)).toEqual([
+            'addColumn parking_spots',
+            'addIndex parking_spots',
+            'removeIndex parking_spots',
+            'ALTER TABLE parking_spots ADD',
+        ]);
+        const [, , column, definition] = db.changes[0];
+        expect(column).toBe('vehicle_type');
+        expect(definition.type.values).toEqual(['car', 'motorcycle', 'truck']);
+        expect(definition).toMatchObject({ allowNull: false, defaultValue: 'car', after: 'zone_id' });
+        expect(db.changes[1].slice(2)).toEqual([['zone_id', 'vehicle_type', 'spot_number'], { name: 'parking_spots_zone_type_spot_unique', unique: true }]);
+        expect(db.changes[2][2]).toBe('parking_spots_zone_spot_unique');
+        expect(db.changes[3][1]).toBe(
+            'ALTER TABLE parking_spots ADD CONSTRAINT parking_spots_zone_vehicle_type_fk '
+            + 'FOREIGN KEY (zone_id, vehicle_type) REFERENCES zone_vehicle_types (zone_id, vehicle_type) '
+            + 'ON DELETE RESTRICT ON UPDATE RESTRICT',
+        );
+    });
+
+    test('stops before any change when a zone with spots has no car type', async () => {
+        // Arrange: a single zone, the smallest number that must stop it
+        const db = fakeDatabase({ ...BEFORE, count: { 'FROM parking_spots AS s': 1 } });
+
+        // Act + Assert
+        await expect(spotType.up(db, Sequelize)).rejects.toThrow('1 zone(s) with spots have no car type in zone_vehicle_types: undo 20261124100000 and migrate again to give it to them, nothing was changed');
+        expect(db.changes).toEqual([]);
+    });
+
+    test('the guard looks for the car type of the zone of each spot', async () => {
+        // Arrange
+        const db = fakeDatabase(BEFORE);
+
+        // Act
+        await spotType.up(db, Sequelize);
+
+        // Assert
+        const guard = db.sequelize.query.mock.calls[0][0].replace(/\s+/g, ' ').trim();
+        expect(guard).toBe(
+            'SELECT COUNT(DISTINCT s.zone_id) AS total FROM parking_spots AS s WHERE NOT EXISTS ( '
+            + "SELECT 1 FROM zone_vehicle_types AS t WHERE t.zone_id = s.zone_id AND t.vehicle_type = 'car' )",
+        );
+    });
+
+    test('after a failure halfway, up does only what is missing', async () => {
+        // Arrange: the column and the new index were added
+        const db = fakeDatabase({
+            column: AFTER.column,
+            indexes: { parking_spots: ['PRIMARY', 'parking_spots_zone_spot_unique', 'parking_spots_zone_type_spot_unique'] },
+        });
+
+        // Act
+        await spotType.up(db, Sequelize);
+
+        // Assert
+        expect(namesOf(db.changes)).toEqual(['removeIndex parking_spots', 'ALTER TABLE parking_spots ADD']);
+    });
+
+    test('up again when everything is there changes nothing', async () => {
+        // Arrange
+        const db = fakeDatabase(AFTER);
+
+        // Act
+        await spotType.up(db, Sequelize);
+
+        // Assert
+        expect(db.changes).toEqual([]);
+    });
+
+    test('down goes back to one numbering per zone: the foreign key first, the old index before the new one goes, and the column last', async () => {
+        // Arrange
+        const db = fakeDatabase(AFTER);
+
+        // Act
+        await spotType.down(db);
+
+        // Assert
+        expect(namesOf(db.changes)).toEqual([
+            'ALTER TABLE parking_spots DROP',
+            'addIndex parking_spots',
+            'removeIndex parking_spots',
+            'removeColumn parking_spots',
+        ]);
+        expect(db.changes[0][1]).toBe('ALTER TABLE parking_spots DROP FOREIGN KEY parking_spots_zone_vehicle_type_fk');
+        expect(db.changes[1].slice(2)).toEqual([['zone_id', 'spot_number'], { name: 'parking_spots_zone_spot_unique', unique: true }]);
+        expect(db.changes[2][2]).toBe('parking_spots_zone_type_spot_unique');
+        expect(db.changes[3][2]).toBe('vehicle_type');
+    });
+
+    test('down stops before any change when a spot is not a car spot', async () => {
+        // Arrange
+        const db = fakeDatabase({ ...AFTER, count: { "FROM parking_spots WHERE vehicle_type <> 'car'": 1 } });
+
+        // Act + Assert
+        await expect(spotType.down(db)).rejects.toThrow('1 spot(s) are not car spots: remove them before undoing this migration, nothing was changed');
+        expect(db.changes).toEqual([]);
+    });
+
+    test('after a failure halfway, down does only what is missing', async () => {
+        // Arrange: the foreign key is gone and the old index is back
+        const db = fakeDatabase({
+            column: AFTER.column,
+            indexes: { parking_spots: ['PRIMARY', 'parking_spots_zone_spot_unique', 'parking_spots_zone_type_spot_unique'] },
+        });
+
+        // Act
+        await spotType.down(db);
+
+        // Assert
+        expect(namesOf(db.changes)).toEqual(['removeIndex parking_spots', 'removeColumn parking_spots']);
+    });
+
+    test('down does nothing when the column is already gone', async () => {
+        // Arrange
+        const db = fakeDatabase(BEFORE);
+
+        // Act
+        await spotType.down(db);
 
         // Assert
         expect(db.changes).toEqual([]);
