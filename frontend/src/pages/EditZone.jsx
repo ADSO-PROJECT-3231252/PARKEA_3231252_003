@@ -4,7 +4,7 @@ import { X, Save, Power, PowerOff, AlertCircle, RefreshCw, ArrowLeft, CheckCircl
 import { getZone, getAllZones, updateZone, toggleZone } from '../services/zoneService';
 import { translateError } from '../utils/errorMessages';
 import { formatCurrency } from '../utils/format';
-import { getZoneToggleDialog, getZoneToggleSuccess } from '../utils/zones';
+import { getZoneToggleDialog, getZoneToggleSuccess, getTypesOffDialog } from '../utils/zones';
 import { VEHICLE_TYPES, vehicleTypePlural } from '../utils/vehicleTypes';
 import { ZONE_LIMITS, zoneToForm, validateZoneForm, buildZonePayload } from '../utils/zoneForm';
 import useZoneForm from '../hooks/useZoneForm';
@@ -136,9 +136,12 @@ function EditZoneForm({ initialZone, adminTypes, activeReservations }) {
     const [zone, setZone] = useState(initialZone);
     const [original] = useState(() => zoneToForm(initialZone, adminTypes ?? initialZone.vehicleTypes));
     const [spotsInUse, setSpotsInUse] = useState(() => countsOf(adminTypes, 'spotsInUse'));
+    const [openReservations] = useState(() => (adminTypes ? countsOf(adminTypes, 'openReservations') : null));
     const zoneForm = useZoneForm(original);
     const { form, setServerError, showErrors, showApiError } = zoneForm;
     const [saving, setSaving] = useState(false);
+    // AC-05: the confirmation before saving a zone whose types were unchecked
+    const [typesDialog, setTypesDialog] = useState(null);
 
     // AC-07: activate or deactivate, with the HU-19 confirmation
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -153,6 +156,9 @@ function EditZoneForm({ initialZone, adminTypes, activeReservations }) {
         return before.checked && now.checked && now.hourlyRate !== '' && Number(now.hourlyRate) !== Number(before.hourlyRate);
     });
 
+    // HU-31 AC-05: the types that took reservations and are now unchecked
+    const turnedOff = VEHICLE_TYPES.filter((type) => original.vehicleTypes[type].checked && !form.vehicleTypes[type].checked);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (saving || toggling) return;
@@ -165,6 +171,20 @@ function EditZoneForm({ initialZone, adminTypes, activeReservations }) {
             return;
         }
 
+        if (turnedOff.length > 0) {
+            setTypesDialog(
+                getTypesOffDialog(
+                    zone.name,
+                    turnedOff.map((type) => ({ type, openReservations: openReservations ? (openReservations[type] ?? 0) : null })),
+                ),
+            );
+            return;
+        }
+        save();
+    };
+
+    const save = async () => {
+        setTypesDialog(null);
         setSaving(true);
         try {
             const { data } = await updateZone(zone.id, buildZonePayload(form));
@@ -274,6 +294,18 @@ function EditZoneForm({ initialZone, adminTypes, activeReservations }) {
                     </div>
                 </div>
             </form>
+
+            {/* HU-31 AC-05: the types that stop taking reservations */}
+            <ConfirmDialog
+                open={Boolean(typesDialog)}
+                variant={typesDialog?.variant}
+                title={typesDialog?.title}
+                message={typesDialog?.message}
+                confirmLabel={typesDialog?.confirmLabel}
+                cancelLabel="Cancelar"
+                onConfirm={save}
+                onCancel={() => setTypesDialog(null)}
+            />
 
             <ConfirmDialog
                 open={dialogOpen}

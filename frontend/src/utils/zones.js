@@ -1,3 +1,5 @@
+import { vehicleTypePlural } from './vehicleTypes';
+
 // Availability state shared by the zone list (HU-09) and the Home zone widget.
 // Returns the state key plus its label; each screen applies its own styles.
 export function getZoneAvailability(availableSlots, totalSlots) {
@@ -41,4 +43,40 @@ export function getZoneToggleSuccess(zone) {
     return zone.isActive
         ? `La zona ${zone.name} fue activada y vuelve a aparecer en la lista pública.`
         : `La zona ${zone.name} fue desactivada. Ya no aparece en la lista pública ni acepta reservas nuevas.`;
+}
+
+// "motos", "motos y camiones", "carros, motos y camiones"
+export function joinTypes(types) {
+    const names = types.map(vehicleTypePlural);
+    return names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} y ${names.at(-1)}`;
+}
+
+// HU-31 AC-05: the confirmation before saving a zone whose types were
+// unchecked. `turnedOff` has each type with its open reservations, or null
+// when the number is unknown. Like a deactivated zone, the type takes no new
+// reservations and the open ones stay valid.
+export function getTypesOffDialog(zoneName, turnedOff) {
+    const types = turnedOff.map(({ type }) => type);
+    let message = `La zona ${zoneName} no aceptará reservas nuevas de ${joinTypes(types)}.`;
+    const known = turnedOff.every(({ openReservations }) => Number.isInteger(openReservations));
+    if (!known) {
+        message += ' Si tiene reservas pendientes o activas de ese tipo, seguirán válidas hasta que terminen.';
+    } else {
+        const open = turnedOff.filter(({ openReservations }) => openReservations > 0);
+        if (open.length > 0) {
+            const parts = open.map(({ type, openReservations }) =>
+                `${openReservations} ${openReservations === 1 ? 'reserva' : 'reservas'} de ${vehicleTypePlural(type)}`);
+            const total = open.reduce((sum, { openReservations }) => sum + openReservations, 0);
+            message += ` Tiene ${parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}`} ${total === 1 ? 'pendiente o activa, que seguirá válida' : 'pendientes o activas, que seguirán válidas'} hasta que ${total === 1 ? 'termine' : 'terminen'}.`;
+        }
+    }
+    message += types.length === 1
+        ? ' Sus cupos y su tarifa se conservan si lo vuelves a marcar.'
+        : ' Sus cupos y sus tarifas se conservan si los vuelves a marcar.';
+    return {
+        title: `Dejar de recibir ${joinTypes(types)}`,
+        message,
+        confirmLabel: 'Guardar cambios',
+        variant: 'danger',
+    };
 }
