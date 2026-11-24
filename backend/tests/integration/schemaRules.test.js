@@ -13,6 +13,7 @@ const CANNOT_BE_NULL = 1048;
 const NO_DEFAULT_VALUE = 1364;
 const DUPLICATE_ENTRY = 1062;
 const NO_PARENT_ROW = 1452;
+const PARENT_ROW_IN_USE = 1451;
 const NOT_A_VALUE_OF_THE_ENUM = 1265;
 
 const run = (sql, replacements) => sequelize.query(sql, { replacements });
@@ -213,7 +214,7 @@ describe('Checks, indexes and required columns of the database (#372)', () => {
     });
 });
 
-describe('The vehicle types of the zones in the database (HU-31)', () => {
+describe('The vehicle types of the zones and of the spots in the database (HU-31)', () => {
     let zona;
 
     // A type of the zone of this block, by SQL
@@ -221,14 +222,21 @@ describe('The vehicle types of the zones in the database (HU-31)', () => {
         'INSERT INTO zone_vehicle_types (id, zone_id, vehicle_type, total_slots, hourly_rate) VALUES (UUID(), :zona, :vehicleType, :totalSlots, :hourlyRate)',
         { zona: zona.id, vehicleType, totalSlots, hourlyRate }
     );
+    // A spot of the zone of this block, by SQL
+    const addSpot = (vehicleType, spotNumber) => errnoOf(
+        "INSERT INTO parking_spots (id, zone_id, vehicle_type, spot_number, status) VALUES (UUID(), :zona, :vehicleType, :spotNumber, 'Available')",
+        { zona: zona.id, vehicleType, spotNumber }
+    );
 
     beforeAll(async () => {
-        // A zone of 2 spots, created through the API
+        // A zone of 2 spots, created through the API: its car type and its
+        // car spots 1 and 2
         zona = await createZone(2);
     });
 
     afterEach(async () => {
-        // The types of each test do not stay for the next one
+        // Only the car type and the car spots of the API stay
+        await run("DELETE FROM parking_spots WHERE zone_id = :zona AND vehicle_type <> 'car'", { zona: zona.id });
         await run("DELETE FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type <> 'car'", { zona: zona.id });
     });
 
@@ -272,6 +280,50 @@ describe('The vehicle types of the zones in the database (HU-31)', () => {
 
         // Assert
         expect(errno).toBe(NO_PARENT_ROW);
+    });
+
+    test('a spot of a type that its zone does not have fails', async () => {
+        expect(await addSpot('motorcycle', 1)).toBe(NO_PARENT_ROW);
+    });
+
+    test('the spots are numbered per type: a motorcycle spot 1 next to the car spot 1, but only one of each', async () => {
+        // Arrange
+        await addType('motorcycle');
+
+        // Act + Assert
+        expect(await addSpot('motorcycle', 1)).toBeNull();
+        expect(await addSpot('motorcycle', 1)).toBe(DUPLICATE_ENTRY);
+        expect(await addSpot('car', 1)).toBe(DUPLICATE_ENTRY);
+    });
+
+    test('a type that has spots cannot be removed: it is turned off instead', async () => {
+        // Arrange
+        await addType('motorcycle');
+        await addSpot('motorcycle', 1);
+
+        // Act
+        const errno = await errnoOf("DELETE FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type = 'motorcycle'", { zona: zona.id });
+
+        // Assert
+        expect(errno).toBe(PARENT_ROW_IN_USE);
+    });
+
+    test('the type of a spot cannot become one that its zone does not have', async () => {
+        // Act
+        const errno = await errnoOf("UPDATE parking_spots SET vehicle_type = 'truck' WHERE zone_id = :zona AND spot_number = 2", { zona: zona.id });
+
+        // Assert
+        expect(errno).toBe(NO_PARENT_ROW);
+    });
+
+    test('a spot written without its type is a car spot', async () => {
+        // Act: like the seeders, which do not say it yet
+        await run("INSERT INTO parking_spots (id, zone_id, spot_number, status) VALUES (UUID(), :zona, 3, 'Disabled')", { zona: zona.id });
+        const [[spot]] = await run('SELECT vehicle_type AS vehicleType FROM parking_spots WHERE zone_id = :zona AND spot_number = 3', { zona: zona.id });
+        await run('DELETE FROM parking_spots WHERE zone_id = :zona AND spot_number = 3', { zona: zona.id });
+
+        // Assert
+        expect(spot.vehicleType).toBe('car');
     });
 
     test('removing a zone removes its spots and its types', async () => {
