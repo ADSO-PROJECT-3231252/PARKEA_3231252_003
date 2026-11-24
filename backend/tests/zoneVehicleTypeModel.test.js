@@ -1,0 +1,84 @@
+// HU-31: the model of the vehicle types of a zone. Only the rules of the
+// model: the checks of the database are in
+// tests/integration/schemaRules.test.js.
+const { ZoneVehicleType, Vehiculo } = require('../src/models');
+const { VEHICLE_TYPES } = require('../src/constants/vehicleTypes');
+
+const ZONE_ID = '22222222-2222-4222-8222-222222222222';
+const VALID = { zoneId: ZONE_ID, vehicleType: 'motorcycle', totalSlots: 10, hourlyRate: 1500 };
+
+// The attributes that break a rule of the model, or [] when it is valid
+async function invalidFields(values) {
+    try {
+        await ZoneVehicleType.build({ ...VALID, ...values }).validate();
+        return [];
+    } catch (error) {
+        return error.errors.map((item) => item.path);
+    }
+}
+
+describe('The vehicle types of PARKEA (HU-31)', () => {
+    test('are car, motorcycle and truck, in that order', () => {
+        expect(VEHICLE_TYPES).toEqual(['car', 'motorcycle', 'truck']);
+    });
+
+    test('are the same types a vehicle can have', () => {
+        expect(Vehiculo.getAttributes().vehicleType.values).toEqual(VEHICLE_TYPES);
+    });
+
+    test('cannot be changed by the code that uses them', () => {
+        expect(Object.isFrozen(VEHICLE_TYPES)).toBe(true);
+    });
+});
+
+describe('A vehicle type of a zone (HU-31)', () => {
+    test('with its spots and its rate is valid, and it takes reservations unless it is turned off', async () => {
+        // Act
+        const tipo = ZoneVehicleType.build(VALID);
+
+        // Assert
+        expect(await invalidFields({})).toEqual([]);
+        expect(tipo.isAccepting).toBe(true);
+    });
+
+    test.each(VEHICLE_TYPES)('the type %s is allowed', async (vehicleType) => {
+        expect(await invalidFields({ vehicleType })).toEqual([]);
+    });
+
+    test.each([
+        ['a type that does not exist', { vehicleType: 'bicycle' }, 'vehicleType'],
+        ['no type', { vehicleType: null }, 'vehicleType'],
+        ['no spots', { totalSlots: 0 }, 'totalSlots'],
+        ['more than 500 spots', { totalSlots: 501 }, 'totalSlots'],
+        ['spots that are not whole', { totalSlots: 1.5 }, 'totalSlots'],
+        ['a rate of 0', { hourlyRate: 0 }, 'hourlyRate'],
+        ['a negative rate', { hourlyRate: -1500 }, 'hourlyRate'],
+        ['no zone', { zoneId: null }, 'zoneId'],
+    ])('%s is not valid', async (_case, values, field) => {
+        expect(await invalidFields(values)).toEqual([field]);
+    });
+
+    test.each([
+        ['1 spot', { totalSlots: 1 }],
+        ['500 spots', { totalSlots: 500 }],
+        ['a rate of one cent', { hourlyRate: 0.01 }],
+    ])('the limit of %s is valid', async (_case, values) => {
+        expect(await invalidFields(values)).toEqual([]);
+    });
+
+    test('uses the columns of zone_vehicle_types', () => {
+        // Act
+        const attributes = ZoneVehicleType.getAttributes();
+
+        // Assert
+        expect(ZoneVehicleType.getTableName()).toBe('zone_vehicle_types');
+        expect(Object.fromEntries(Object.entries(attributes).map(([name, attribute]) => [name, attribute.field]))).toEqual({
+            id: 'id',
+            zoneId: 'zone_id',
+            vehicleType: 'vehicle_type',
+            totalSlots: 'total_slots',
+            hourlyRate: 'hourly_rate',
+            isAccepting: 'is_accepting',
+        });
+    });
+});
