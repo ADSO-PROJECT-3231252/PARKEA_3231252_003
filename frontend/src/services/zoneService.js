@@ -3,6 +3,13 @@ import api from './api';
 export const getZones = () => api.get('/zones');
 export const getZone = (id) => api.get(`/zones/${id}`);
 
+// #375: how many spots of the zone are free for some hours, with the same
+// values as POST /reservations: { startTime, endTime }, or { startTime,
+// openEnded: true } for a stay without an exit time. `signal` cancels the
+// request when the hours change again before it answers.
+export const getAvailabilityForHours = (id, hours, { signal } = {}) =>
+    api.get(`/zones/${id}/availability`, { params: hours, signal });
+
 // HU-19: admin list with active and inactive zones, and the activate/deactivate toggle
 export const getAllZones = () => api.get('/zones/all');
 export const toggleZone = (id, isActive) => api.patch(`/zones/${id}/toggle`, { isActive });

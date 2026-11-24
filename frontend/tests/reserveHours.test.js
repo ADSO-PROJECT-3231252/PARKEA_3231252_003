@@ -8,7 +8,8 @@ import { createReservation } from '../src/services/reservationService';
 import { dayName } from '../src/utils/zoneHours';
 
 // The screen does not call the real API
-jest.mock('../src/services/zoneService', () => ({ getZone: jest.fn() }));
+// #375: the free spots for the chosen hours never answer here
+jest.mock('../src/services/zoneService', () => ({ getZone: jest.fn(), getAvailabilityForHours: jest.fn(() => new Promise(() => {})) }));
 jest.mock('../src/services/vehicleService', () => ({ getVehicles: jest.fn() }));
 jest.mock('../src/services/reservationService', () => ({ createReservation: jest.fn() }));
 

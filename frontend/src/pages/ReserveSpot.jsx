@@ -17,6 +17,8 @@ import {
 import { getZone } from '../services/zoneService';
 import { getVehicles } from '../services/vehicleService';
 import { createReservation } from '../services/reservationService';
+import { useSpotsForHours } from '../hooks/useSpotsForHours';
+import SpotsForHours from '../components/SpotsForHours';
 import { formatCurrency, formatDuration } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { isNotEmpty, REQUIRED_MESSAGE } from '../utils/validators';
@@ -227,6 +229,21 @@ export default function ReserveSpot() {
     const startOpening = zone && !zone.open24h && startDateTime && !startHoursProblem ? openingOfDay(zone, startDateTime) : null;
     const startDayNote = startOpening ? hoursSentence({ day: startOpening.day, ...startOpening.hours }) : null;
 
+    // #375: the free spots for the chosen hours, asked once they are valid as
+    // they would be sent (the duration and the hours of the zone; the entry
+    // in the past or too far ahead is checked when it asks, since it depends
+    // on the time). It only informs: the API decides when the form is sent.
+    let hoursToAsk = null;
+    if (zone && startDateTime && !startHoursProblem) {
+        const minutes = hasValidRange ? Math.round((endDateTime - startDateTime) / 60000) : 0;
+        if (form.openEnded) {
+            hoursToAsk = { startTime: startDateTime.toISOString(), openEnded: true };
+        } else if (minutes >= MIN_DURATION_MINUTES && minutes <= MAX_DURATION_MINUTES && !endHoursProblem) {
+            hoursToAsk = { startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
+        }
+    }
+    const spots = useSpotsForHours(zoneId, hoursToAsk);
+
     const validate = () => {
         const newErrors = {};
         const now = new Date();
@@ -301,6 +318,9 @@ export default function ReserveSpot() {
                     start: hoursErrorMessage(code, err.response.data.hours) ?? translateError(code),
                 }));
             } else {
+                // #375: the room was taken meanwhile, so the line under the
+                // hours asks again
+                if (code === 'NO_SPOTS_AVAILABLE') spots.refresh();
                 // NO_SPOTS_AVAILABLE (AC-14), ZONE_NOT_FOUND, ZONE_INACTIVE,
                 // MISSING_REQUIRED_FIELDS, PENDING_BALANCE (HU-27 AC-11),
                 // TOO_MANY_PENDING_RESERVATIONS (#299), or any other error shown in the banner.
@@ -613,6 +633,9 @@ export default function ReserveSpot() {
                             )}
                         </div>
                     )}
+
+                    {/* #375: whether there is room for those hours, next to them */}
+                    <SpotsForHours spots={spots} openEnded={form.openEnded} className="-mt-3" />
 
                     {/* AC-09/AC-10: real-time duration + cost, hidden until the range is valid */}
                     {showSummary && (
