@@ -25,6 +25,8 @@ const errorMessages = {
     CANNOT_MODIFY_SELF: 'No puedes realizar esta acción sobre tu propia cuenta',
     PRIMARY_ADMIN_PROTECTED: 'El administrador principal no puede modificarse',
     MIN_ONE_ADMIN_REQUIRED: 'El sistema debe conservar al menos un administrador activo',
+    // #348: an account with something open cannot change its role or be deactivated
+    USER_HAS_OPEN_RESERVATIONS: 'Este usuario tiene reservas pendientes o activas, o un saldo por pagar. Espera a que se resuelvan para cambiar su rol o desactivarlo',
     INVALID_ROLE: 'Rol inválido',
     INVALID_RANGE: 'El rango de fechas no es válido',
 

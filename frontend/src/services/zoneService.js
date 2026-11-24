@@ -12,7 +12,7 @@ export const getAvailabilityForHours = (id, hours, { signal } = {}) =>
 
 // HU-19: admin list with active and inactive zones, and the activate/deactivate toggle
 export const getAllZones = () => api.get('/zones/all');
-export const toggleZone = (id) => api.patch(`/zones/${id}/toggle`);
+export const toggleZone = (id, isActive) => api.patch(`/zones/${id}/toggle`, { isActive });
 
 // HU-20: create a zone (admin)
 export const createZone = (zone) => api.post('/zones', zone);

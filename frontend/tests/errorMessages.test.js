@@ -14,6 +14,7 @@ describe('translateError', () => {
 
     test.each([
         ['EMAIL_ALREADY_REGISTERED', 'Este correo ya está registrado'],
+        ['USER_HAS_OPEN_RESERVATIONS', 'Este usuario tiene reservas pendientes o activas, o un saldo por pagar. Espera a que se resuelvan para cambiar su rol o desactivarlo'],
         ['VEHICLE_HAS_ACTIVE_RESERVATION', 'Este vehículo tiene una reserva activa. Cancélala antes de eliminarlo'],
         ['TOO_MANY_REQUESTS', 'Hiciste demasiados intentos. Espera unos minutos e intenta de nuevo'],
         ['NO_SPOTS_AVAILABLE', 'Este cupo ya no está disponible. Elige otra zona u horario'],

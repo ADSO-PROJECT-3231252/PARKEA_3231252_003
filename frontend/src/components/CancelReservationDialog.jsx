@@ -36,7 +36,7 @@ function formatRange(startIso, endIso) {
 // reservation: the one to cancel, or null when the dialog is closed.
 // onClose({ stale }): the user kept the reservation; stale = reload the screen.
 // onCancelled(message): cancelled; message is the AC-06 confirmation text.
-export default function CancelReservationDialog({ reservation, onClose, onCancelled }) {
+export default function CancelReservationDialog({ reservation, onClose, onCancelled, fallbackFocusRef }) {
     const [cancelling, setCancelling] = useState(false);
     const [error, setError] = useState('');
     const [stale, setStale] = useState(false);
@@ -84,6 +84,7 @@ export default function CancelReservationDialog({ reservation, onClose, onCancel
 
     return (
         <ConfirmDialog
+            fallbackFocusRef={fallbackFocusRef}
             open={Boolean(reservation)}
             variant="danger"
             title="Cancelar reserva"

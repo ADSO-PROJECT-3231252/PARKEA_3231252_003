@@ -161,9 +161,11 @@ export default function AdminPanel() {
 
     // AC-09: alerts are best-effort context, not a section on its own — a
     // failure here shouldn't block the rest of the dashboard or show an error.
+    // Only the full-zone alerts are shown: the panel only knows how to write
+    // that sentence, with the zone name the backend sends (#313).
     const loadAlerts = useCallback(() => {
         getDashboardAlerts()
-            .then((res) => setAlerts(res.data.alerts))
+            .then((res) => setAlerts(res.data.alerts.filter((alert) => alert.type === 'zone_full')))
             .catch(() => setAlerts([]));
     }, []);
 
@@ -248,17 +250,15 @@ export default function AdminPanel() {
                                 aria-hidden="true"
                             />
                                 <p className="break-words text-body text-neutral-900">
-                                    {alert.message}
+                                    {`La zona "${alert.zoneName}" ha alcanzado su capacidad máxima.`}
                                 </p>
                             </div>
-                            {alert.type === 'zone_full' && (
-                                <Link
-                                    to="/admin/zones"
-                                    className="inline-flex min-h-6 shrink-0 items-center text-label text-warning underline hover:text-neutral-900"
-                                >
-                                    Ver zonas
-                                </Link>
-                            )}
+                            <Link
+                                to="/admin/zones"
+                                className="inline-flex min-h-6 shrink-0 items-center text-label text-warning underline hover:text-neutral-900"
+                            >
+                                Ver zonas
+                            </Link>
                         </div>
                     ))}
                 </div>

@@ -1,7 +1,7 @@
 import { getInitials } from '../utils/format';
 import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, Info, Calendar, Save } from 'lucide-react';
-import { isNotEmpty, normalizePhone } from '../utils/validators';
+import { isNotEmpty, isValidPassword, normalizePhone, PASSWORD_MESSAGE } from '../utils/validators';
 import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { getProfile, updateProfile, changePassword } from '../services/userService';
 import { translateError } from '../utils/errorMessages';
@@ -110,14 +110,8 @@ export default function Profile() {
         }
         if (!isNotEmpty(pwForm.newPassword)) {
             errors.newPassword = 'La nueva contraseña es obligatoria.';
-        } else if (
-            pwForm.newPassword.length < 8 ||
-            pwForm.newPassword.length > 20 ||
-            !/[A-Z]/.test(pwForm.newPassword) ||
-            !/[0-9]/.test(pwForm.newPassword) ||
-            !/[^A-Za-z0-9]/.test(pwForm.newPassword)
-        ) {
-            errors.newPassword = 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+        } else if (!isValidPassword(pwForm.newPassword)) {
+            errors.newPassword = PASSWORD_MESSAGE;
         }
         if (!isNotEmpty(pwForm.confirmNewPassword)) {
             errors.confirmNewPassword = 'Confirma tu nueva contraseña.';
@@ -446,7 +440,7 @@ export default function Profile() {
                                 </p>
                             ) : (
                                 <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
-                                    Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
+                                    {PASSWORD_MESSAGE}
                                 </p>
                             )}
                         </div>

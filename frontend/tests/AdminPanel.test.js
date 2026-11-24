@@ -75,7 +75,7 @@ const recentPayments = [
     payment('p4', 'Refunded'),
 ];
 
-function answer({ zones = reservationsByZone } = {}) {
+function answer({ zones = reservationsByZone, alerts = [] } = {}) {
     getDashboardMetrics.mockResolvedValue({
         data: { metrics: { activeReservations: 1, revenue: 4000, activeZones: 7, registeredUsers: 3 } },
     });
@@ -83,7 +83,7 @@ function answer({ zones = reservationsByZone } = {}) {
     getZoneOccupancy.mockResolvedValue({ data: { occupancy } });
     getPaymentsStatus.mockResolvedValue({ data: { paymentStatus: { Paid: 3, Pending: 1, Cancelled: 0, Refunded: 2 } } });
     getRecentPayments.mockResolvedValue({ data: { recentPayments } });
-    getDashboardAlerts.mockResolvedValue({ data: { alerts: [] } });
+    getDashboardAlerts.mockResolvedValue({ data: { alerts } });
 }
 
 const renderPanel = () => render(
@@ -249,5 +249,39 @@ describe('"Ocupación por zona" (#309)', () => {
         const name = await within(box).findByText(LONG_NAME);
         expect(name).toHaveClass('min-w-0', 'break-words');
         expect(name).not.toHaveClass('truncate');
+    });
+});
+
+// #313: the backend sends the zone of a full-zone alert, and the panel writes
+// the sentence in Spanish
+describe('The alerts of the panel (#313)', () => {
+    test('a full zone is named by the zoneName the backend sends', async () => {
+        // Arrange
+        answer({ alerts: [{ type: 'zone_full', severity: 'warning', zoneId: 'zone-1', zoneName: 'Norte' }] });
+
+        // Act
+        renderPanel();
+
+        // Assert
+        const alert = await screen.findByText('La zona "Norte" ha alcanzado su capacidad máxima.');
+        expect(alert.closest('[role="alert"]')).toHaveTextContent('Ver zonas');
+    });
+
+    test('an alert of another type is not written as a full zone', async () => {
+        // Arrange: a type the panel does not know, next to a full zone
+        answer({
+            alerts: [
+                { type: 'zone_full', severity: 'warning', zoneId: 'zone-1', zoneName: 'Norte' },
+                { type: 'something_else', severity: 'warning', zoneId: 'zone-2' },
+            ],
+        });
+
+        // Act
+        renderPanel();
+        await screen.findByText('La zona "Norte" ha alcanzado su capacidad máxima.');
+
+        // Assert: only the full zone is shown, never "undefined"
+        expect(screen.getAllByText(/ha alcanzado su capacidad máxima/)).toHaveLength(1);
+        expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
     });
 });

@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock } from 'lucide-react';
-import { isNotEmpty } from '../utils/validators';
+import { isNotEmpty, isValidPassword, PASSWORD_MESSAGE } from '../utils/validators';
 import { resetPassword } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
 import logo from '../assets/logo.webp';
-const PASSWORD_RULE = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/;
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
@@ -27,9 +26,8 @@ export default function ResetPassword() {
         const newErrors = {};
         if (!isNotEmpty(form.newPassword)) {
             newErrors.newPassword = 'La nueva contraseña es obligatoria.';
-        } else if (!PASSWORD_RULE.test(form.newPassword)) {
-            newErrors.newPassword =
-                'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+        } else if (!isValidPassword(form.newPassword)) {
+            newErrors.newPassword = PASSWORD_MESSAGE;
         }
         if (!isNotEmpty(form.confirmNewPassword)) {
             newErrors.confirmNewPassword = 'Confirma tu nueva contraseña.';
@@ -176,7 +174,7 @@ hover:text-neutral-700"
                             </p>
                         ) : (
                             <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
-                                Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
+                                {PASSWORD_MESSAGE}
                             </p>
                         )}
                     </div>

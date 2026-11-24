@@ -243,7 +243,7 @@ export default function AdminZones() {
         setConfirming(true);
         setActionError('');
         try {
-            const { data } = await toggleZone(pendingZone.id);
+            const { data } = await toggleZone(pendingZone.id, !pendingZone.isActive);
             // Keep the table on screen: only the changed zone is replaced, and
             // activeReservations (not returned by the toggle) is kept.
             setZones((prev) => prev.map((z) => (z.id === data.zone.id ? { ...z, ...data.zone } : z)));
