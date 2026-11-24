@@ -1,6 +1,9 @@
 // Availability state shared by the zone list (HU-09) and the Home zone widget.
 // Returns the state key plus its label; each screen applies its own styles.
-export function getZoneAvailability(availableSlots, totalSlots) {
+export function getZoneAvailability(availableSlots, totalSlots, isActive = true) {
+    if (isActive === false) {
+        return { state: 'inactive', text: 'No disponible' };
+    }
     if (availableSlots === 0) {
         return { state: 'full', text: 'Llena' };
     }

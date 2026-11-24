@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { getZone } from '../services/zoneService';
 import { getVehicles } from '../services/vehicleService';
-import { createReservation } from '../services/reservationService';
+import { createReservation, hasPendingBalance } from '../services/reservationService';
 import { useSpotsForHours } from '../hooks/useSpotsForHours';
 import SpotsForHours from '../components/SpotsForHours';
 import { formatCurrency, formatDuration } from '../utils/format';
@@ -42,6 +42,7 @@ const BADGE_CLASSES = {
     full: 'bg-danger-soft text-danger',
     almost: 'bg-warning-soft text-warning',
     available: 'bg-parkea-50 text-parkea-600',
+    inactive: 'bg-danger-soft text-danger',
 };
 
 const MAX_ADVANCE_HOURS = 48; // AC-19
@@ -122,6 +123,23 @@ export default function ReserveSpot() {
     const [errors, setErrors] = useState({});
     const [serverErrorCode, setServerErrorCode] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [pendingBalance, setPendingBalance] = useState(false);
+
+    useEffect(() => {
+        let active = true;
+
+        async function checkBalance() {
+            try {
+                const hasBalance = await hasPendingBalance();
+                if (active) setPendingBalance(hasBalance);
+            } catch {
+                // The reservation endpoint still checks the balance on submit.
+            }
+        }
+
+        checkBalance();
+        return () => { active = false; };
+    }, []);
 
     const fetchZone = useCallback(() => {
         getZone(zoneId)
@@ -285,6 +303,7 @@ export default function ReserveSpot() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (zone.isActive === false) return;
         setServerErrorCode('');
         if (!validate()) return;
 
@@ -375,7 +394,7 @@ export default function ReserveSpot() {
         );
     }
 
-    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
+    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots, zone.isActive);
 
     // AC-04: no vehicles at all block the flow entirely, don't render the form.
     if (!vehiclesError && vehicles.length === 0) {
@@ -449,6 +468,21 @@ export default function ReserveSpot() {
             </div>
 
             <ZoneHours zone={zone} />
+
+            {zone.isActive === false && (
+                <p role="alert" className="mt-6 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
+                    {translateError('ZONE_INACTIVE')}
+                </p>
+            )}
+
+            {pendingBalance && serverErrorCode !== 'PENDING_BALANCE' && (
+                <div role="alert" className="mt-6 flex flex-col items-start gap-2 rounded-md bg-danger-soft px-3 py-2">
+                    <p className="text-body text-danger">{translateError('PENDING_BALANCE')}</p>
+                    <Link to="/reservations" className="text-caption font-medium text-danger underline">
+                        Ver mis reservas
+                    </Link>
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
                 <h3 className="text-body font-medium text-neutral-900">Información de la reserva</h3>
@@ -715,7 +749,7 @@ export default function ReserveSpot() {
                     </button>
                     <button
                         type="submit"
-                        disabled={submitting}
+                        disabled={submitting || zone.isActive === false}
                         className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         <CalendarCheck className="h-4 w-4" aria-hidden="true" />
