@@ -45,6 +45,8 @@ module.exports = {
     CAPACITY_BELOW_IN_USE: 'CAPACITY_BELOW_IN_USE',
     INSUFFICIENT_AVAILABLE_SPOTS: 'INSUFFICIENT_AVAILABLE_SPOTS',
     ZONE_INACTIVE: 'ZONE_INACTIVE',
+    // HU-31: the zone does not take reservations for the type of the vehicle
+    VEHICLE_TYPE_NOT_ACCEPTED: 'VEHICLE_TYPE_NOT_ACCEPTED',
 
     // Reservations
     INVALID_DATE: 'INVALID_DATE',

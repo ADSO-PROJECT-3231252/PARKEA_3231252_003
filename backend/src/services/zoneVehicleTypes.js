@@ -8,6 +8,7 @@
 //   openReservations (the reservations that hold its spots from now on)
 const { ZoneVehicleType } = require('../models');
 const { VEHICLE_TYPES } = require('../constants/vehicleTypes');
+const ErrorCodes = require('../constants/errorCodes');
 const availability = require('./availability');
 
 const order = (tipo) => VEHICLE_TYPES.indexOf(tipo.vehicleType);
@@ -53,4 +54,25 @@ async function withVehicleTypes(zonas, { transaction, now = new Date(), forAdmin
     return zonas;
 }
 
-module.exports = { withVehicleTypes };
+// HU-31 (AC-12): the type `vehicleType` of the zone, when it takes
+// reservations, or the error to answer: 409 VEHICLE_TYPE_NOT_ACCEPTED with the
+// types the zone accepts, so the screen can say which. The same for a
+// reservation and for its free spots before sending it (#375).
+async function acceptedType(zoneId, vehicleType, { transaction } = {}) {
+    const tipos = await ZoneVehicleType.findAll({ where: { zoneId, isAccepting: true }, transaction });
+    const tipo = tipos.find((item) => item.vehicleType === vehicleType);
+    if (tipo) return { tipo };
+    return {
+        error: {
+            status: 409,
+            body: {
+                code: ErrorCodes.VEHICLE_TYPE_NOT_ACCEPTED,
+                message: 'This zone does not accept this type of vehicle',
+                vehicleType,
+                acceptedTypes: tipos.sort((a, b) => order(a) - order(b)).map((item) => item.vehicleType),
+            },
+        },
+    };
+}
+
+module.exports = { withVehicleTypes, acceptedType };

@@ -1,16 +1,17 @@
-// HU-31: the vehicle types of the zones as the API sends them
-// (services/zoneVehicleTypes.js). The counts are replaced by spies: their
-// queries are tested in availability.test.js and on MySQL.
+// HU-31: the vehicle types of the zones as the API sends them, and the type a
+// zone takes reservations for (services/zoneVehicleTypes.js). The counts are
+// replaced by spies: their queries are tested in availability.test.js and on
+// MySQL.
 const { Zona, ZoneVehicleType } = require('../src/models');
 const availability = require('../src/services/availability');
-const { withVehicleTypes } = require('../src/services/zoneVehicleTypes');
+const { withVehicleTypes, acceptedType } = require('../src/services/zoneVehicleTypes');
 
 const NOW = new Date('2026-11-16T13:00:00Z');
 const CENTRO = '22222222-2222-4222-8222-222222222222';
 const NORTE = '55555555-5555-4555-8555-555555555555';
 const TRANSACTION = { id: 'zone-reads' };
 
-const zone = (id) => Zona.build({ id, name: id === CENTRO ? 'Centro' : 'Norte', totalSlots: 99, hourlyRate: '2000.00' });
+const zone = (id) => Zona.build({ id, name: id === CENTRO ? 'Centro' : 'Norte' });
 // [zoneId, vehicleType, totalSlots, hourlyRate, isAccepting], as the model gives them
 const rows = (...items) => items.map(([zoneId, vehicleType, totalSlots, hourlyRate, isAccepting = true]) => ZoneVehicleType.build({ zoneId, vehicleType, totalSlots, hourlyRate, isAccepting }));
 
@@ -66,8 +67,8 @@ describe('The vehicle types of the zones, as the API sends them (HU-31)', () => 
         await withVehicleTypes([centro, norte], { transaction: TRANSACTION, now: NOW });
 
         // Assert
-        expect([centro.totalSlots, centro.get('availableSlots')]).toEqual([14, 6]);
-        expect([norte.totalSlots, norte.get('availableSlots')]).toEqual([5, 5]);
+        expect([centro.get('totalSlots'), centro.get('availableSlots')]).toEqual([14, 6]);
+        expect([norte.get('totalSlots'), norte.get('availableSlots')]).toEqual([5, 5]);
     });
 
     test('for the user, it asks only the types that take reservations, and no spots in use', async () => {
@@ -111,7 +112,7 @@ describe('The vehicle types of the zones, as the API sends them (HU-31)', () => 
         await withVehicleTypes([centro], { forAdmin: true });
 
         // Assert
-        expect([centro.totalSlots, centro.get('availableSlots')]).toEqual([14, 6]);
+        expect([centro.get('totalSlots'), centro.get('availableSlots')]).toEqual([14, 6]);
     });
 
     test('a zone without types has none, and no spots', async () => {
@@ -124,7 +125,7 @@ describe('The vehicle types of the zones, as the API sends them (HU-31)', () => 
 
         // Assert
         expect(otra.get('vehicleTypes')).toEqual([]);
-        expect([otra.totalSlots, otra.get('availableSlots')]).toEqual([0, 0]);
+        expect([otra.get('totalSlots'), otra.get('availableSlots')]).toEqual([0, 0]);
     });
 
     test('without zones it asks nothing', async () => {
@@ -147,5 +148,64 @@ describe('The vehicle types of the zones, as the API sends them (HU-31)', () => 
 
         // Act + Assert
         expect(await withVehicleTypes(zonas)).toBe(zonas);
+    });
+});
+
+describe('The type a zone takes reservations for (HU-31, AC-12)', () => {
+    // The types of Centro that take reservations, as the model gives them
+    const accepting = (...items) => jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue(rows(...items.map((item) => [CENTRO, ...item])));
+
+    test('a type the zone accepts is given with its spots and its rate', async () => {
+        // Arrange
+        accepting(['car', 10, '2500.00'], ['motorcycle', 4, '1500.00']);
+
+        // Act
+        const { tipo, error } = await acceptedType(CENTRO, 'motorcycle', { transaction: TRANSACTION });
+
+        // Assert
+        expect(error).toBeUndefined();
+        expect(tipo).toMatchObject({ vehicleType: 'motorcycle', totalSlots: 4, hourlyRate: '1500.00' });
+    });
+
+    test('only the types of the zone that take reservations are read, in the transaction', async () => {
+        // Arrange
+        const findTypes = accepting(['car', 10, '2500.00']);
+
+        // Act
+        await acceptedType(CENTRO, 'car', { transaction: TRANSACTION });
+
+        // Assert
+        expect(findTypes).toHaveBeenCalledWith({ where: { zoneId: CENTRO, isAccepting: true }, transaction: TRANSACTION });
+    });
+
+    test('another type gives 409 VEHICLE_TYPE_NOT_ACCEPTED with the types the zone accepts, in the order car, motorcycle, truck', async () => {
+        // Arrange
+        accepting(['truck', 2, '9000.00'], ['car', 10, '2500.00']);
+
+        // Act
+        const { tipo, error } = await acceptedType(CENTRO, 'motorcycle');
+
+        // Assert
+        expect(tipo).toBeUndefined();
+        expect(error).toEqual({
+            status: 409,
+            body: {
+                code: 'VEHICLE_TYPE_NOT_ACCEPTED',
+                message: 'This zone does not accept this type of vehicle',
+                vehicleType: 'motorcycle',
+                acceptedTypes: ['car', 'truck'],
+            },
+        });
+    });
+
+    test('a zone with no type that takes reservations accepts none', async () => {
+        // Arrange
+        accepting();
+
+        // Act
+        const { error } = await acceptedType(CENTRO, 'car');
+
+        // Assert
+        expect(error.body).toMatchObject({ code: 'VEHICLE_TYPE_NOT_ACCEPTED', acceptedTypes: [] });
     });
 });
