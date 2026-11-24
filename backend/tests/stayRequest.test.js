@@ -55,9 +55,9 @@ describe('checkStayTimes (HU-14, #375)', () => {
         expect(codeOf(checkStayTimes({ startTime: at(ms), endTime: at(ms + HOUR) }, NOW))).toBe('START_TIME_IN_PAST');
     });
 
-    test('an entry up to 48 hours ahead is accepted, and one minute later answers RESERVATION_TOO_FAR_AHEAD', () => {
+    test('an entry up to 48 hours ahead is accepted, and one millisecond later answers RESERVATION_TOO_FAR_AHEAD', () => {
         expect(codeOf(checkStayTimes({ startTime: at(48 * HOUR), endTime: at(49 * HOUR) }, NOW))).toBe('no error');
-        expect(codeOf(checkStayTimes({ startTime: at(48 * HOUR + MINUTE), endTime: at(49 * HOUR) }, NOW))).toBe('RESERVATION_TOO_FAR_AHEAD');
+        expect(codeOf(checkStayTimes({ startTime: at(48 * HOUR + 1), endTime: at(49 * HOUR) }, NOW))).toBe('RESERVATION_TOO_FAR_AHEAD');
     });
 
     test.each([
@@ -68,10 +68,10 @@ describe('checkStayTimes (HU-14, #375)', () => {
     });
 
     test.each([
-        ['29 minutes', 'INVALID_DURATION', 29 * MINUTE],
+        ['30 minutes less a millisecond', 'INVALID_DURATION', 30 * MINUTE - 1],
         ['30 minutes', 'no error', 30 * MINUTE],
         ['24 hours', 'no error', 24 * HOUR],
-        ['24 hours and a minute', 'INVALID_DURATION', 24 * HOUR + MINUTE],
+        ['24 hours and a millisecond', 'INVALID_DURATION', 24 * HOUR + 1],
     ])('a stay of %s gives %s', (_case, code, duration) => {
         expect(codeOf(checkStayTimes({ startTime: at(HOUR), endTime: at(HOUR + duration) }, NOW))).toBe(code);
     });
