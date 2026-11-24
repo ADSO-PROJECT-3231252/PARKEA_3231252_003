@@ -55,7 +55,7 @@ function resultMessage(result, rate, zoneName) {
 // onFinished(message): ended; message is the result to show on the screen.
 export default function FinishStayDialog({ reservation, hourlyRate, openedAt, onClose, onFinished }) {
     const [charge, setCharge] = useState(() =>
-        openStayCharge(reservation.startTime, hourlyRate, openedAt, paidBeforeEnd(reservation, hourlyRate))
+        openStayCharge(reservation.startTime, hourlyRate, openedAt, paidBeforeEnd(reservation, hourlyRate), reservation.latestEndTime)
     );
     const [finishing, setFinishing] = useState(false);
     const [error, setError] = useState('');

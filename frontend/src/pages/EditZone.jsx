@@ -31,13 +31,26 @@ function PageTitle({ zone }) {
 
 const plural = (n, one, many) => (n === 1 ? one : many);
 
-// Loads the zone and, apart, how many of its spots are in use. That number
-// only comes in the admin list (/zones/all), so if that request fails the form
-// still opens: the backend checks the capacity anyway (AC-03).
+// #373: how many spots of the zone hold a reservation from now on, as the
+// admin list (/zones/all) sends it. A spot with several reservations at
+// different hours counts once, so it is not the number of reservations
+// (activeReservations), which is only used while the API does not send
+// spotsInUse yet. null when unknown.
+function spotsInUseOf(listed) {
+    if (!listed) return null;
+    const inUse = Number.isInteger(listed.spotsInUse) ? listed.spotsInUse : listed.activeReservations;
+    return Number(inUse) || 0;
+}
+
+// Loads the zone and, apart, how many of its spots are in use and how many
+// reservations it has. Those numbers only come in the admin list
+// (/zones/all), so if that request fails the form still opens: the backend
+// checks the capacity anyway (AC-03).
 export default function EditZone() {
     const { id } = useParams();
     const [zone, setZone] = useState(null);
     const [spotsInUse, setSpotsInUse] = useState(null);
+    const [activeReservations, setActiveReservations] = useState(null);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null); // null | 'not_found' | 'generic'
 
@@ -51,7 +64,8 @@ export default function EditZone() {
                 }
                 setZone(one.value.data.zone);
                 const listed = all.status === 'fulfilled' ? all.value.data.zones.find((z) => z.id === id) : null;
-                setSpotsInUse(listed ? Number(listed.activeReservations) || 0 : null);
+                setSpotsInUse(spotsInUseOf(listed));
+                setActiveReservations(listed ? Number(listed.activeReservations) || 0 : null);
                 setFetchError(null);
             })
             .finally(() => setLoading(false));
@@ -115,10 +129,10 @@ export default function EditZone() {
         );
     }
 
-    return <EditZoneForm initialZone={zone} initialSpotsInUse={spotsInUse} />;
+    return <EditZoneForm initialZone={zone} initialSpotsInUse={spotsInUse} activeReservations={activeReservations} />;
 }
 
-function EditZoneForm({ initialZone, initialSpotsInUse }) {
+function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
     const navigate = useNavigate();
     // The zone as saved: the form may hold changes not saved yet
     const [zone, setZone] = useState(initialZone);
@@ -182,7 +196,7 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
         setToggling(true);
         setToggleError('');
         try {
-            const { data } = await toggleZone(zone.id);
+            const { data } = await toggleZone(zone.id, !zone.isActive);
             // Only the status changes: what was typed in the form stays there
             setZone((prev) => ({ ...prev, isActive: data.zone.isActive }));
             setToggleMessage(getZoneToggleSuccess(data.zone));
@@ -218,9 +232,12 @@ function EditZoneForm({ initialZone, initialSpotsInUse }) {
                 : rateChanged
                   ? `Las reservas nuevas pagarán ${formatCurrency(rate)} por hora. Las que ya existen mantienen ${formatCurrency(original.hourlyRate)}.`
                   : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
+        // HU-29 AC-07: new hours do not move the reservations already made
+        schedule: 'Si cambias el horario, aplica a las reservas y ampliaciones nuevas. Las reservas que ya existen no cambian.',
     };
 
-    const dialog = getZoneToggleDialog({ ...zone, activeReservations: spotsInUse });
+    // HU-19 AC-08: the warning counts reservations, not spots
+    const dialog = getZoneToggleDialog({ ...zone, activeReservations });
 
     return (
         <div className={PAGE_CLASS}>

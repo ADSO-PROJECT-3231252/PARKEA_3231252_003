@@ -9,6 +9,9 @@ const PLATE_FORMATS = {
     motorcycle: /^[A-Z]{3}[0-9]{2}[A-Z]$/,
 };
 
+// A user can have at most this many active vehicles at the same time
+const MAX_ACTIVE_VEHICLES = 5;
+
 function plateMatchesType(plate, vehicleType) {
     const regex = PLATE_FORMATS[vehicleType];
     return regex ? regex.test(plate.toUpperCase()) : false;
@@ -46,23 +49,31 @@ async function registrar(req, res, next) {
 
         // Counting and creating happen in one transaction that holds the user's
         // row locked. Without it, two simultaneous requests from the same user
-        // both count 0 vehicles and both become the default (HU-10, AC-09).
-        // The second request waits at the lock and then counts the first one.
-        const vehiculo = await sequelize.transaction(async (t) => {
+        // both count 0 vehicles and both become the default (HU-10, AC-09), or
+        // both count 4 vehicles and both register the sixth one. The second
+        // request waits at the lock and then counts the first one. The count
+        // only has the active vehicles: the model is paranoid, so a deleted
+        // vehicle is left out. The transaction returns the vehicle, or the
+        // error code to answer with.
+        const resultado = await sequelize.transaction(async (t) => {
             const usuario = await Usuario.findByPk(userId, {
                 attributes: ['id'],
                 transaction: t,
                 lock: t.LOCK.UPDATE,
             });
             if (!usuario) {
-                return null;
+                return { fallo: ErrorCodes.USER_NOT_FOUND };
+            }
+
+            const cantidadExistente = await Vehiculo.count({ where: { userId }, transaction: t });
+            if (cantidadExistente >= MAX_ACTIVE_VEHICLES) {
+                return { fallo: ErrorCodes.VEHICLE_LIMIT_REACHED };
             }
 
             // First vehicle for this user is automatically the default (HU-10, AC-09)
-            const cantidadExistente = await Vehiculo.count({ where: { userId }, transaction: t });
             const isDefault = cantidadExistente === 0;
 
-            return Vehiculo.create({
+            const creado = await Vehiculo.create({
                 plate: plate.toUpperCase(),
                 vehicleType,
                 brand,
@@ -72,15 +83,22 @@ async function registrar(req, res, next) {
                 isDefault,
                 userId,
             }, { transaction: t });
+            return { vehiculo: creado };
         });
 
-        if (!vehiculo) {
+        if (resultado.fallo === ErrorCodes.USER_NOT_FOUND) {
             return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+        if (resultado.fallo === ErrorCodes.VEHICLE_LIMIT_REACHED) {
+            return res.status(409).json({
+                code: ErrorCodes.VEHICLE_LIMIT_REACHED,
+                message: `You can have at most ${MAX_ACTIVE_VEHICLES} active vehicles. Delete one before registering another`,
+            });
         }
 
         return res.status(201).json({
             message: 'Vehicle registered successfully',
-            vehicle: vehiculo,
+            vehicle: resultado.vehiculo,
         });
     } catch (error) {
         if (error instanceof UniqueConstraintError) {

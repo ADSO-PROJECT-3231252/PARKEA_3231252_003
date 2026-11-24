@@ -20,7 +20,7 @@ import { formatCountdown, formatCurrency, formatDate, formatDuration, formatTime
 import { translateError } from '../utils/errorMessages';
 import { RESERVATION_STATUS } from '../utils/reservationStatus';
 import { hoursLabel, pendingBalanceOf } from '../utils/openStay';
-import { EXTEND_FINAL_CODES, extendErrorMessage, extensionCharge, extensionProblem } from '../utils/extendStay';
+import { EXTEND_FINAL_CODES, extendErrorMessage, extensionCharge, extensionProblem, spotFreeUntil, untilText } from '../utils/extendStay';
 
 // Values the backend expects in paymentMethod (pago.controller.js).
 const METHOD_CARD = 'card';
@@ -216,7 +216,7 @@ export default function PayReservation() {
     const navigate = useNavigate();
     // HU-28: "Ampliar estadía" opens this screen with the new exit time and
     // the exit time the user saw (?extendTo=&from=).
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const extendTo = searchParams.get('extendTo');
     const extendFrom = searchParams.get('from');
     const isExtension = extendTo !== null;
@@ -239,6 +239,11 @@ export default function PayReservation() {
     const [expiredByServer, setExpiredByServer] = useState(false);
     // HU-28: the extension can no longer go on (see EXTEND_FINAL_CODES).
     const [extendBlocked, setExtendBlocked] = useState(false);
+    // #373: until when the spot is free, when the chosen exit time reached
+    // another reservation of the spot (SPOT_RESERVED_LATER)
+    const [spotFreeUntilAt, setSpotFreeUntilAt] = useState(null);
+    const payButtonRef = useRef(null);
+    const focusPayRef = useRef(false);
     const [message, setMessage] = useState(null); // { type: 'error' | 'success', text }
     const messageRef = useRef(null);
     const expiredRef = useRef(null);
@@ -283,6 +288,14 @@ export default function PayReservation() {
         if (message) messageRef.current?.focus();
     }, [message]);
 
+    // #373: after choosing the time the spot is free, the payment button
+    // (with the new amount) is next
+    useEffect(() => {
+        if (!focusPayRef.current) return;
+        focusPayRef.current = false;
+        payButtonRef.current?.focus();
+    }, [extendTo]);
+
     // Same when the backend says the hold already expired (not when the
     // countdown ends, so the user is not pulled away from what they type).
     useEffect(() => {
@@ -297,6 +310,16 @@ export default function PayReservation() {
 
     // AC-09: back to the confirmation without touching the reservation.
     const goToConfirmation = () => navigate(`/reservations/${id}`);
+
+    // #373: the same extension, up to the time the spot is free. Nothing was
+    // charged, so the new amount is shown and paid with the same button.
+    const extendUntilFree = () => {
+        setSearchParams({ extendTo: spotFreeUntilAt, from: extendFrom }, { replace: true });
+        setSpotFreeUntilAt(null);
+        setExtendBlocked(false);
+        setMessage(null);
+        focusPayRef.current = true;
+    };
 
     const handleCardChange = (e) => {
         const { name, value } = e.target;
@@ -402,6 +425,10 @@ export default function PayReservation() {
     const statusInfo = RESERVATION_STATUS[reservation.status] ?? RESERVATION_STATUS.Pending;
     // HU-27: an open stay has no exit time until it ends.
     const hasExit = Boolean(reservation.endTime);
+    // HU-29 AC-04: when an open stay ends by itself at the latest
+    const openExitText = reservation.latestEndTime
+        ? `Sin hora de salida (termina a más tardar el ${formatDate(reservation.latestEndTime)}, ${formatTime(reservation.latestEndTime)})`
+        : 'Sin hora de salida (máximo 24 horas)';
     const remainingMs = holdExpiresAt && now !== null ? new Date(holdExpiresAt).getTime() - now : null;
     const isTimeUp = expiredByServer || (remainingMs !== null && remainingMs <= 0);
     const payDisabled = processing || approved || isTimeUp || extendBlocked;
@@ -461,8 +488,13 @@ export default function PayReservation() {
         if (isExtension) {
             // HU-28: nothing was charged. A declined payment can be tried
             // again; after the other codes the extension cannot go on.
+            const data = result.reason.response?.data;
             if (EXTEND_FINAL_CODES.includes(code)) setExtendBlocked(true);
-            setMessage({ type: 'error', text: extendErrorMessage(code) });
+            if (code === 'SPOT_RESERVED_LATER') setSpotFreeUntilAt(spotFreeUntil(data?.freeUntil, extendFrom));
+            setMessage({
+                type: 'error',
+                text: extendErrorMessage(code, false, data?.hours, { freeUntil: data?.freeUntil, from: extendFrom }),
+            });
             return;
         }
         if (code === 'NO_PENDING_BALANCE') {
@@ -542,9 +574,13 @@ export default function PayReservation() {
                                                 checked={selected}
                                                 onChange={() => {
                                                     setMethod(value);
-                                                    setMessage(null);
+                                                    // An approved payment, and an extension that cannot
+                                                    // go on, keep their message: the payment button stays
+                                                    // disabled, and the message says why and gives the
+                                                    // way on (#375)
+                                                    if (!approved && !extendBlocked) setMessage(null);
                                                 }}
-                                                className="mt-1 h-4 w-4 shrink-0 accent-parkea-600"
+                                                className="h-6 w-6 shrink-0 accent-parkea-600"
                                             />
                                             <span className="min-w-0">
                                                 <span className="flex items-center gap-2 text-label font-medium text-neutral-900">
@@ -669,7 +705,7 @@ export default function PayReservation() {
                                         <SummaryItem label="Fecha y hora de salida">
                                             {hasExit
                                                 ? `${formatDate(reservation.endTime)}, ${formatTime(reservation.endTime)}`
-                                                : 'Sin hora de salida (máximo 24 horas)'}
+                                                : openExitText}
                                         </SummaryItem>
                                         <SummaryItem label="Duración">
                                             {hasExit
@@ -747,8 +783,6 @@ export default function PayReservation() {
                                         </span>
                                     </p>
                                 )}
-                                <p className="mt-3 text-label font-medium text-warning">Entorno de prueba</p>
-                                <p className="text-caption text-warning">Este es un entorno de prueba. Ningún pago real será procesado.</p>
                             </div>
                         )}
                     </div>
@@ -771,6 +805,12 @@ export default function PayReservation() {
                         )}
                         {message.text}
                     </p>
+                )}
+                {/* #373: the way on after SPOT_RESERVED_LATER */}
+                {message?.type === 'error' && spotFreeUntilAt && (
+                    <button type="button" onClick={extendUntilFree} className={`mt-3 ${OUTLINE_BUTTON_SM}`}>
+                        Ampliar hasta {untilText(spotFreeUntilAt, extendFrom)}
+                    </button>
                 )}
                 {/* HU-26 AC-06 and AC-09: expired, with a link to book again */}
                 {isTimeUp && !message && (
@@ -803,6 +843,7 @@ export default function PayReservation() {
                         {extendBlocked ? 'Volver a la reserva' : 'Cancelar pago'}
                     </button>
                     <button
+                        ref={payButtonRef}
                         type="submit"
                         disabled={payDisabled}
                         className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2.5 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
@@ -813,11 +854,6 @@ export default function PayReservation() {
                     </button>
                 </div>
             </form>
-
-            <p className="mt-8 flex items-center justify-center gap-1.5 border-t border-neutral-200 pt-4 text-center text-caption text-neutral-600">
-                <Info className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                Este es un entorno de prueba. Ningún pago real será procesado.
-            </p>
 
             {processing && <ProcessingOverlay amount={total} />}
         </div>

@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
-import logo from '../assets/logo.png';
+import { startTransition, useState, useEffect } from 'react';
+import logo from '../assets/logo.webp';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { login } from '../services/authService';
 import { useAuth } from '../hooks/useAuth';
 import { Eye, EyeOff, Shield } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
+import { takeExpiredSessionReturn } from '../utils/expiredSessionReturn';
+import ResendEmailButton from '../components/ResendEmailButton';
 
 // Confirmation messages handed over by other screens through router state.
 const FLASH_MESSAGES = {
-    registered: 'Registro completado. Por favor inicia sesión.',
     passwordReset: 'Tu contraseña fue actualizada. Por favor inicia sesión.',
 };
 
@@ -20,11 +21,14 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
+    // HU-30 (AC-04): the email of an account that is not verified yet, for
+    // the "Reenviar correo" action
+    const [unverifiedEmail, setUnverifiedEmail] = useState('');
+
     const { loginUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
     const [flash, setFlash] = useState(() => {
-        if (location.state?.registered) return FLASH_MESSAGES.registered;
         if (location.state?.passwordReset) return FLASH_MESSAGES.passwordReset;
         return '';
     });
@@ -46,6 +50,9 @@ export default function Login() {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
+        // HU-30: "Reenviar correo" belongs to the email that was just tried,
+        // so it goes away when the email changes
+        if (name === 'email') setUnverifiedEmail('');
     };
 
     const validate = () => {
@@ -64,22 +71,35 @@ export default function Login() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
+        setUnverifiedEmail('');
         if (!validate()) return;
 
         setLoading(true);
         try {
             const { data } = await login(form);
-            loginUser(data.token, data.user);
+            // #307: the screen where the session of this same account expired
+            const savedReturn = takeExpiredSessionReturn(data.user.id);
             // An admin returning from a regular-user route would land on a screen that
             // isn't theirs, so admins always go to their dashboard unless they were
             // actually headed somewhere under /admin.
-            const from = location.state?.from;
+            const from = location.state?.from || (sessionExpired ? savedReturn : null);
             const isAdmin = data.user.role === 'admin';
-            navigate(isAdmin && !from?.startsWith('/admin') ? '/admin/dashboard' : from || '/');
+            // #307: GuestRoute sends a signed-in account away from /login. navigate()
+            // runs as a low-priority transition, so with loginUser() done apart React
+            // would first render /login with the user, and GuestRoute would send it to
+            // the home before the navigate to `from` takes effect. In the same
+            // transition both apply in one render, as in handleLogout of Header.jsx.
+            startTransition(() => {
+                navigate(isAdmin && !from?.startsWith('/admin') ? '/admin/dashboard' : from || '/');
+                loginUser(data.token, data.user);
+            });
         } catch (err) {
             const code = err.response?.data?.code;
             setServerError(translateError(code));
+            if (code === 'EMAIL_NOT_VERIFIED') setUnverifiedEmail(form.email.trim());
         } finally {
             setLoading(false);
         }
@@ -127,6 +147,7 @@ export default function Login() {
                             {serverError}
                         </p>
                     )}
+                    {unverifiedEmail && <ResendEmailButton email={unverifiedEmail} />}
 
                     <div>
                         <label htmlFor="email" className="block font-sans text-label text-neutral-700 mb-1">
@@ -136,12 +157,14 @@ export default function Login() {
                             id="email"
                             name="email"
                             type="email"
+                            autoComplete="username"
+                            aria-required="true"
                             placeholder="Ej: correo@ejemplo.com"
                             value={form.email}
                             onChange={handleChange}
                             aria-invalid={Boolean(errors.email)}
                             aria-describedby={errors.email ? 'email-error' : undefined}
-                            className={`w-full rounded-md border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
+                            className={`w-full rounded-md border px-3 py-2.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
                                 }`}
                         />
                         {errors.email && (
@@ -160,19 +183,21 @@ export default function Login() {
                                 id="password"
                                 name="password"
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="current-password"
+                                aria-required="true"
                                 placeholder="Ingresa tu contraseña"
                                 value={form.password}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.password)}
                                 aria-describedby={errors.password ? 'password-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-2.5 pr-10 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.password ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-2.5 pr-10 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.password ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600 hover:text-neutral-700"
                             >
                                 {showPassword ? (
                                     <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -190,8 +215,8 @@ export default function Login() {
 
                     <button
                         type="submit"
-                        disabled={loading}
-                        className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+                        aria-disabled={loading || undefined}
+                        className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                     >
                         {loading ? 'Ingresando...' : 'Iniciar sesión'}
                     </button>
@@ -210,6 +235,7 @@ export default function Login() {
 
                     <Link
                         to="/admin/login"
+                        state={{ sessionExpired, from: location.state?.from }}
                         className="flex items-center justify-center gap-2 text-label text-parkea-700 hover:text-parkea-800"
                     >
                         <span className="flex items-center justify-center w-6 h-6 rounded-full bg-parkea-50">

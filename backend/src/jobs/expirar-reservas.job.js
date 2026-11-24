@@ -1,7 +1,8 @@
 const { Op } = require('sequelize');
-const { sequelize, Reserva, Zona, ParkingSpot } = require('../models');
+const { sequelize, Reserva } = require('../models');
+const { safeRollback } = require('../utils/transaction');
 
-const INTERVALO_MS = 60 * 1000; // corre cada minuto
+const INTERVALO_MS = 60 * 1000; // runs every minute
 
 async function expirarReservasVencidas() {
     const ahora = new Date();
@@ -16,7 +17,7 @@ async function expirarReservasVencidas() {
     for (const reserva of vencidas) {
         const t = await sequelize.transaction();
         try {
-            // Vuelve a leer con lock, por si otro ciclo ya la procesó mientras tanto
+            // Read it again with a lock, in case another run already processed it in the meantime
             const reservaActual = await Reserva.findOne({
                 where: { id: reserva.id, status: 'Pending' },
                 transaction: t,
@@ -28,36 +29,22 @@ async function expirarReservasVencidas() {
                 continue;
             }
 
-            // Release the physical spot, not just the zone counter
-            if (reservaActual.parkingSpotId) {
-                const cupo = await ParkingSpot.findByPk(reservaActual.parkingSpotId, {
-                    transaction: t,
-                    lock: t.LOCK.UPDATE,
-                });
-                if (cupo && cupo.status === 'Occupied') {
-                    await cupo.update({ status: 'Available' }, { transaction: t });
-                }
-            }
-
+            // #373: the reservation stopped holding its spot when its 15
+            // minutes ended (#347), so marking it Expired is the only change:
+            // no spot or counter of the zone is changed
             await reservaActual.update({ status: 'Expired' }, { transaction: t });
 
-            const zona = await Zona.findByPk(reservaActual.zoneId, {
-                transaction: t,
-                lock: t.LOCK.UPDATE,
-            });
-            await zona.increment('availableSlots', { by: 1, transaction: t });
-
             await t.commit();
-            console.log(`[expirar-reservas] Reserva ${reservaActual.id} expirada, cupo liberado en "${zona.name}"`);
+            console.log(`[expirar-reservas] Reservation ${reservaActual.id} expired`);
         } catch (error) {
-            await t.rollback();
-            console.error(`[expirar-reservas] Error procesando reserva ${reserva.id}:`, error);
+            await safeRollback(t);
+            console.error(`[expirar-reservas] Error processing reservation ${reserva.id}:`, error);
         }
     }
 }
 
 function iniciarJobExpiracion() {
-    console.log('[expirar-reservas] Job de expiración iniciado (revisa cada 60s)');
+    console.log('[expirar-reservas] Expiration job started (runs every 60s)');
     // If the database stops answering, the error is logged and the next run
     // tries again; without the catch, Node stops the whole API
     setInterval(() => {

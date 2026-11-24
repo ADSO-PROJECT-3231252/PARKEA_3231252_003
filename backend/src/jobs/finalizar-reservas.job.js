@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
-const { sequelize, Reserva, Zona, ParkingSpot, Pago } = require('../models');
+const { sequelize, Reserva, Pago } = require('../models');
 const { openStayCharge, paidBeforeBalance } = require('../utils/stayPricing');
+const { safeRollback } = require('../utils/transaction');
 
 const INTERVALO_MS = 60 * 1000; // runs every minute, just like the expiration job
 
@@ -17,9 +18,11 @@ async function finalizarReservasVencidas() {
     for (const reserva of vencidas) {
         const t = await sequelize.transaction();
         try {
-            // Read it again using lock, in case another thread has already processed it in the meantime
+            // Read it again with a lock, in case another run already processed it in the meantime.
+            // #373: an extension saved meanwhile moved its exit time, so the
+            // exit time is checked again too: then it is not finished yet
             const reservaActual = await Reserva.findOne({
-                where: { id: reserva.id, status: 'Active' },
+                where: { id: reserva.id, status: 'Active', endTime: { [Op.lt]: ahora } },
                 transaction: t,
                 lock: t.LOCK.UPDATE,
             });
@@ -29,26 +32,17 @@ async function finalizarReservasVencidas() {
                 continue;
             }
 
-            // Release the physical spot — this is the whole point of this job:
-            // without it, a finished (but never re-checked) reservation would
-            // keep its spot Occupied forever
-            if (reservaActual.parkingSpotId) {
-                const cupo = await ParkingSpot.findByPk(reservaActual.parkingSpotId, {
-                    transaction: t,
-                    lock: t.LOCK.UPDATE,
-                });
-                if (cupo && cupo.status === 'Occupied') {
-                    await cupo.update({ status: 'Available' }, { transaction: t });
-                }
-            }
-
+            // #373: the spot is free from the exit time whether this job ran
+            // or not, so no spot or counter of the zone is changed: the job
+            // marks the reservation Finished and charges an open stay
             await reservaActual.update({ status: 'Finished' }, { transaction: t });
 
-            // HU-27 AC-10: an open stay not finished within 24 hours closes here.
-            // Its exit time is already entry + 24 h; 24 hours are charged and
-            // what was not paid yet stays as a pending balance. What it paid
-            // before is the first hour, or more if it was extended before
-            // switching to an open stay (HU-28).
+            // HU-27 AC-10: an open stay not finished in time closes here. Its
+            // exit time is already entry + 24 h, or the closing time of its
+            // zone (HU-29 AC-04); the hours up to it are charged and what was
+            // not paid yet stays as a pending balance. What it paid before is
+            // the first hour, or more if it was extended before switching to
+            // an open stay (HU-28).
             if (reservaActual.openEnded) {
                 const pagos = await Pago.findAll({ where: { reservationId: reservaActual.id }, transaction: t });
                 const cobro = openStayCharge(reservaActual, reservaActual.endTime, paidBeforeBalance(reservaActual, pagos));
@@ -62,23 +56,17 @@ async function finalizarReservasVencidas() {
                 }
             }
 
-            const zona = await Zona.findByPk(reservaActual.zoneId, {
-                transaction: t,
-                lock: t.LOCK.UPDATE,
-            });
-            await zona.increment('availableSlots', { by: 1, transaction: t });
-
             await t.commit();
-            console.log(`[finalizar-reservas] Reserva ${reservaActual.id} finalizada, cupo liberado en "${zona.name}"`);
+            console.log(`[finalizar-reservas] Reservation ${reservaActual.id} finished`);
         } catch (error) {
-            await t.rollback();
-            console.error(`[finalizar-reservas] Error procesando reserva ${reserva.id}:`, error);
+            await safeRollback(t);
+            console.error(`[finalizar-reservas] Error processing reservation ${reserva.id}:`, error);
         }
     }
 }
 
 function iniciarJobFinalizacion() {
-    console.log('[finalizar-reservas] Job de finalización iniciado (revisa cada 60s)');
+    console.log('[finalizar-reservas] Finish job started (runs every 60s)');
     // If the database stops answering, the error is logged and the next run
     // tries again; without the catch, Node stops the whole API
     setInterval(() => {

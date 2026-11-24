@@ -7,5 +7,6 @@ router.post('/register', registerLimiter, validateRegister, register);
 router.post('/login', loginLimiter, validateLogin, login);
 router.post('/login-admin', loginLimiter, validateLogin, loginAdmin);
 router.use('/', require('./passwordReset.routes'));
+router.use('/', require('./emailVerification.routes'));
 
 module.exports = router;

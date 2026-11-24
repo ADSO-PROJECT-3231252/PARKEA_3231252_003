@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Car,
@@ -153,7 +153,17 @@ export default function VehicleList() {
     const [error, setError] = useState(false);
     const [page, setPage] = useState(1);
     const [settingDefaultId, setSettingDefaultId] = useState(null);
-    const [setDefaultError, setSetDefaultError] = useState('');
+    // #307: the error of an action on the page (setting the default vehicle,
+    // or deleting one that no longer exists). The message gets the focus,
+    // because the button that was pressed can disappear with its vehicle, and
+    // on a phone the message is above. Each action clears it first, so the
+    // same message shown again also gets the focus.
+    const [pageError, setPageError] = useState('');
+    const headingRef = useRef(null);
+    const pageErrorRef = useRef(null);
+    useEffect(() => {
+        if (pageError) pageErrorRef.current?.focus();
+    }, [pageError]);
 
     // HU-13: delete confirmation dialog state. deleteTarget holds the whole
     // vehicle object (not just the id) so the dialog can show its brand/model/
@@ -205,11 +215,15 @@ export default function VehicleList() {
     // (AC-07/AC-08 ordering is already handled server-side, see vehicleService).
     const handleSetDefault = (id) => {
         setSettingDefaultId(id);
-        setSetDefaultError('');
+        setPageError('');
         setDefaultVehicle(id)
             .then(() => fetchVehicles())
             .catch((err) => {
-                setSetDefaultError(translateError(err.response?.data?.code));
+                const code = err.response?.data?.code;
+                setPageError(translateError(code));
+                if (code === 'VEHICLE_NOT_FOUND') {
+                    fetchVehicles();
+                }
             })
             .finally(() => setSettingDefaultId(null));
     };
@@ -236,11 +250,14 @@ export default function VehicleList() {
         if (!deleteTarget) return;
         setDeleting(true);
         setDeleteError('');
+        setPageError('');
         deleteVehicle(deleteTarget.id)
             .then(() => {
                 // AC-05: no full page reload -- closing the dialog and
                 // re-fetching updates the list and the reassigned default
                 // (if any) in place.
+                // Remove the confirmed deletion before the dialog restores focus.
+                setVehicles((list) => list.filter((vehicle) => vehicle.id !== deleteTarget.id));
                 setDeleteTarget(null);
                 setFlash(FLASH_MESSAGES.vehicleDeleted);
                 fetchVehicles();
@@ -251,7 +268,17 @@ export default function VehicleList() {
                 // the action they just took. VEHICLE_HAS_ACTIVE_RESERVATION
                 // already has its own message in errorMessages.js; anything
                 // else falls back to translateError's generic message.
-                setDeleteError(translateError(err.response?.data?.code));
+                const code = err.response?.data?.code;
+                if (code === 'VEHICLE_NOT_FOUND') {
+                    // #307: another device already deleted it, so there is
+                    // nothing left to confirm: close the dialog and say it on
+                    // the page (the message gets the focus) while the list loads
+                    setDeleteTarget(null);
+                    setPageError(translateError(code));
+                    fetchVehicles();
+                    return;
+                }
+                setDeleteError(translateError(code));
             })
             .finally(() => setDeleting(false));
     };
@@ -265,7 +292,9 @@ export default function VehicleList() {
             <title>Mis vehículos | PARKEA</title>
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-title font-display uppercase text-neutral-900">Mis vehículos</h1>
+                    <h1 ref={headingRef} tabIndex={-1} className="text-title font-display uppercase text-neutral-900">
+                        Mis vehículos
+                    </h1>
                     <p className="mt-1 text-body text-neutral-600">
                         Administra los vehículos que tienes registrados para tus reservas.
                     </p>
@@ -287,9 +316,9 @@ export default function VehicleList() {
                 </p>
             )}
 
-            {setDefaultError && (
-                <p role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
-                    {setDefaultError}
+            {pageError && (
+                <p ref={pageErrorRef} tabIndex={-1} role="alert" className="mt-4 rounded-md bg-danger-soft px-3 py-2 text-body text-danger focus:outline-none">
+                    {pageError}
                 </p>
             )}
 
@@ -350,10 +379,12 @@ export default function VehicleList() {
                             <nav aria-label="Paginación de vehículos" className="mt-6 flex items-center justify-center gap-4">
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage - 1)}
-                                    disabled={currentPage === 1}
+                                    onClick={() => {
+                                        if (currentPage > 1) setPage(currentPage - 1);
+                                    }}
+                                    aria-disabled={currentPage === 1 || undefined}
                                     aria-label="Página anterior"
-                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
                                 >
                                     <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                                     Anterior
@@ -363,10 +394,12 @@ export default function VehicleList() {
                                 </span>
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
+                                    onClick={() => {
+                                        if (currentPage < totalPages) setPage(currentPage + 1);
+                                    }}
+                                    aria-disabled={currentPage === totalPages || undefined}
                                     aria-label="Página siguiente"
-                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
                                 >
                                     Siguiente
                                     <ChevronRight className="h-4 w-4" aria-hidden="true" />
@@ -384,6 +417,7 @@ export default function VehicleList() {
 
             <ConfirmDialog
                 open={Boolean(deleteTarget)}
+                fallbackFocusRef={headingRef}
                 variant="danger"
                 title="Eliminar vehículo"
                 message={

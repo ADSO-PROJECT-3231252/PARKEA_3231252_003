@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { isValidEmail, isNotEmpty, isValidPhone, normalizePhone } from '../utils/validators';
+import { isValidEmail, isNotEmpty, isValidPassword, normalizePhone, PASSWORD_MESSAGE } from '../utils/validators';
+import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { register } from '../services/authService';
-import logo from '../assets/logo.png';
-import carImage from '../assets/car_register.png';
+import logo from '../assets/logo.webp';
+import carImage from '../assets/car_register.webp';
+import DecorativeImage from '../components/DecorativeImage';
 import { Eye, EyeOff } from 'lucide-react';
 import { translateError } from '../utils/errorMessages';
 
@@ -17,7 +19,6 @@ const DOCUMENT_TYPES = [
 // Length limits agreed with the team. The inputs enforce them with maxLength.
 const MAX_LENGTH = {
     documentNumber: 15,
-    fullName: 70,
     email: 100,
 };
 
@@ -27,12 +28,14 @@ const MAX_LENGTH = {
 // to fix instead of seeing only the general message.
 const SERVER_FIELD_MESSAGES = {
     documentNumber: 'El documento solo debe contener letras y números.',
-    fullName: 'Revisa el nombre completo.',
+    fullName: NAME_RULE_MESSAGE,
     email: 'Ingresa un correo válido.',
-    password: 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.',
+    password: PASSWORD_MESSAGE,
     confirmPassword: 'Las contraseñas no coinciden.',
-    phone: 'El teléfono debe tener 10 dígitos y solo números.',
+    phone: PHONE_RULE_MESSAGE,
 };
+
+const EMAIL_TAKEN = translateError('EMAIL_ALREADY_REGISTERED');
 
 export default function Register() {
     const [form, setForm] = useState({
@@ -76,6 +79,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.fullName)) {
             newErrors.fullName = 'El nombre completo es obligatorio.';
+        } else if (!isValidName(form.fullName)) {
+            newErrors.fullName = NAME_RULE_MESSAGE;
         }
 
         if (!isNotEmpty(form.email)) {
@@ -86,14 +91,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.password)) {
             newErrors.password = 'La contraseña es obligatoria.';
-        } else if (
-            form.password.length < 8 ||
-            form.password.length > 20 ||
-            !/[A-Z]/.test(form.password) ||
-            !/[0-9]/.test(form.password) ||
-            !/[^A-Za-z0-9]/.test(form.password)
-        ) {
-            newErrors.password = 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+        } else if (!isValidPassword(form.password)) {
+            newErrors.password = PASSWORD_MESSAGE;
         }
 
         if (!isNotEmpty(form.confirmPassword)) {
@@ -104,8 +103,8 @@ export default function Register() {
 
         if (!isNotEmpty(form.phone)) {
             newErrors.phone = 'El teléfono es obligatorio.';
-        } else if (!isValidPhone(form.phone)) {
-            newErrors.phone = 'El teléfono debe tener 10 dígitos y solo números.';
+        } else if (!isValidPhone(normalizePhone(form.phone))) {
+            newErrors.phone = PHONE_RULE_MESSAGE;
         }
 
         setErrors(newErrors);
@@ -114,6 +113,8 @@ export default function Register() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
 
@@ -128,7 +129,9 @@ export default function Register() {
                 password: form.password,
                 confirmPassword: form.confirmPassword,
             });
-            navigate('/login', { state: { registered: true } });
+            // HU-30 (AC-01): the account is not verified yet, so the next
+            // screen asks to open the email instead of signing in
+            navigate('/verify-email/sent', { state: { email: form.email.trim() } });
         } catch (err) {
             const code = err.response?.data?.code;
 
@@ -157,7 +160,7 @@ export default function Register() {
         <main className="min-h-screen flex items-center justify-center bg-neutral-50 px-4 py-3">
             <title>Crear cuenta | PARKEA</title>
             <div className="w-full max-w-5xl bg-white rounded-lg shadow-sm border border-neutral-200 flex flex-col md:flex-row overflow-hidden">
-                {/* Columna del formulario */}
+                {/* Form column */}
                 <div className="flex-1 px-5 py-4">
                     <div className="flex flex-col items-center mb-1">
                         <img src={logo} alt="PARKEA" className="h-15 w-auto object-contain" />
@@ -181,7 +184,7 @@ export default function Register() {
                     <form onSubmit={handleSubmit} noValidate className="space-y-1.5">
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="documentType" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="documentType" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Tipo de documento
                                 </label>
                                 <select
@@ -198,7 +201,7 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="documentNumber" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="documentNumber" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Número de documento
                                 </label>
                                 <input
@@ -206,12 +209,13 @@ export default function Register() {
                                     name="documentNumber"
                                     maxLength={MAX_LENGTH.documentNumber}
                                     type="text"
+                                    aria-required="true"
                                     placeholder="1234567890"
                                     value={form.documentNumber}
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.documentNumber)}
                                     aria-describedby={errors.documentNumber ? 'documentNumber-error' : undefined}
-                                    className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.documentNumber ? 'border-danger' : 'border-neutral-200'
+                                    className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.documentNumber ? 'border-danger' : 'border-neutral-200'
                                         }`}
                                 />
                                 {errors.documentNumber && (
@@ -229,14 +233,15 @@ export default function Register() {
                             <input
                                 id="fullName"
                                 name="fullName"
-                                maxLength={MAX_LENGTH.fullName}
                                 type="text"
+                                autoComplete="name"
+                                aria-required="true"
                                 placeholder="Ej. Juan Pérez"
                                 value={form.fullName}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.fullName)}
                                 aria-describedby={errors.fullName ? 'fullName-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.fullName ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.fullName ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.fullName && (
@@ -255,12 +260,14 @@ export default function Register() {
                                 name="email"
                                 maxLength={MAX_LENGTH.email}
                                 type="email"
+                                autoComplete="email"
+                                aria-required="true"
                                 placeholder="ejemplo@correo.com"
                                 value={form.email}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.email)}
                                 aria-describedby={errors.email ? 'email-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.email && (
@@ -268,11 +275,20 @@ export default function Register() {
                                     {errors.email}
                                 </p>
                             )}
+                            {/* HU-30: the email may belong to an account that is still waiting to be confirmed */}
+                            {errors.email === EMAIL_TAKEN && (
+                                <p className="mt-0.5 text-caption text-neutral-600">
+                                    ¿Aún no confirmas tu correo?{' '}
+                                    <Link to="/verify-email/resend" className="text-parkea-600 underline hover:text-parkea-700">
+                                        Pide un nuevo enlace
+                                    </Link>
+                                </p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label htmlFor="password" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="password" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Contraseña
                                 </label>
                                 <div className="relative">
@@ -280,6 +296,8 @@ export default function Register() {
                                         id="password"
                                         name="password"
                                         type={showPassword ? 'text' : 'password'}
+                                        autoComplete="new-password"
+                                        aria-required="true"
                                         maxLength={20}
                                         value={form.password}
                                         onChange={handleChange}
@@ -292,7 +310,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowPassword((v) => !v)}
                                         aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -309,7 +327,7 @@ export default function Register() {
                             </div>
 
                             <div>
-                                <label htmlFor="confirmPassword" className="block font-sans text-label text-neutral-700 mb-0.5">
+                                <label htmlFor="confirmPassword" className="flex min-h-10 items-end font-sans text-label text-neutral-700 mb-0.5 sm:min-h-0 sm:block">
                                     Confirmar contraseña
                                 </label>
                                 <div className="relative">
@@ -317,6 +335,8 @@ export default function Register() {
                                         id="confirmPassword"
                                         name="confirmPassword"
                                         type={showConfirmPassword ? 'text' : 'password'}
+                                        autoComplete="new-password"
+                                        aria-required="true"
                                         maxLength={20}
                                         value={form.confirmPassword}
                                         onChange={handleChange}
@@ -329,7 +349,7 @@ export default function Register() {
                                         type="button"
                                         onClick={() => setShowConfirmPassword((v) => !v)}
                                         aria-label={showConfirmPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600 hover:text-neutral-700"
                                     >
                                         {showConfirmPassword ? (
                                             <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -348,7 +368,7 @@ export default function Register() {
 
                         {!errors.password && !errors.confirmPassword && (
                             <p id="password-hint" className="-mt-1 text-caption text-neutral-600">
-                                Entre 8 y 20 caracteres, una mayúscula, un número y un carácter especial.
+                                {PASSWORD_MESSAGE}
                             </p>
                         )}
 
@@ -360,12 +380,14 @@ export default function Register() {
                                 id="phone"
                                 name="phone"
                                 type="tel"
+                                autoComplete="tel"
+                                aria-required="true"
                                 placeholder="300 123 4567"
                                 value={form.phone}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.phone)}
                                 aria-describedby={errors.phone ? 'phone-error' : undefined}
-                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.phone ? 'border-danger' : 'border-neutral-200'
+                                className={`w-full rounded-md border px-3 py-1.5 font-sans text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.phone ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             />
                             {errors.phone && (
@@ -377,8 +399,8 @@ export default function Register() {
 
                         <button
                             type="submit"
-                            disabled={loading}
-                            className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+                            aria-disabled={loading || undefined}
+                            className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                         >
                             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
                         </button>
@@ -391,9 +413,9 @@ export default function Register() {
                         </p>
                     </form>
                 </div>
-                {/* Columna decorativa — se oculta en móvil (AC-04) */}
+                {/* Decorative column, hidden on phones (AC-04) */}
                 <div className="hidden md:flex md:w-[380px] flex-col items-center justify-center gap-4 bg-parkea-50 p-6 text-center">
-                    <img src={carImage} alt="" className="w-full max-w-[280px] object-contain" />
+                    <DecorativeImage src={carImage} minWidth="48rem" className="w-full max-w-[280px] object-contain" />
                     <h2 className="font-display text-subtitle text-neutral-900">
                         Reserva tu espacio al instante
                     </h2>

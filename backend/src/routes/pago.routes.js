@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { crearPago, pagarSaldo } = require('../controllers/pago.controller');
-const { verificarToken } = require('../middlewares/auth.middleware');
+const { verificarToken, verificarRol } = require('../middlewares/auth.middleware');
 
-router.post('/:reservationId', verificarToken, crearPago);
+// #316: only user accounts pay reservations; an administrator gets 403 FORBIDDEN_ROLE
+const soloUsuarios = [verificarToken, verificarRol('user')];
+
+router.post('/:reservationId', soloUsuarios, crearPago);
 
 // HU-27: pay the balance of a finished open stay
-router.post('/:reservationId/balance', verificarToken, pagarSaldo);
+router.post('/:reservationId/balance', soloUsuarios, pagarSaldo);
 
 module.exports = router;

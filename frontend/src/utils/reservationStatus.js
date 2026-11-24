@@ -42,10 +42,49 @@ export const FALLBACK_STATUS = {
     border: 'border-l-neutral-400',
 };
 
-// HU-16 AC-01/AC-04/AC-05: a reservation can be cancelled while it is Pending
-// or Active (already paid) and its start time has not passed. The backend
-// applies the same rule; this only decides whether the button is shown.
-export const canCancelReservation = (reservation, now) =>
-    ['Pending', 'Active'].includes(reservation.status) &&
-    now !== null &&
-    new Date(reservation.startTime).getTime() > now;
+// #347: a Pending reservation has 15 minutes to be paid. When they end it
+// counts as expired for everything, even if it still says Pending: the
+// backend job only marks it Expired once a minute. The backend applies the
+// same rule (at that very moment included). Without holdExpiresAt the
+// screen cannot know, so the backend decides.
+export const holdHasEnded = (reservation, now) =>
+    reservation.status === 'Pending' &&
+    Boolean(reservation.holdExpiresAt) &&
+    new Date(reservation.holdExpiresAt).getTime() <= now;
+
+// #347: the status a screen shows. From 00:00 a Pending reservation already
+// counts as expired, before the job marks it Expired.
+export const shownStatus = (reservation, now) => (holdHasEnded(reservation, now) ? 'Expired' : reservation.status);
+
+// HU-17 (#347): "Pagar" and "Ir al pago" are shown for a Pending reservation
+// while its 15 minutes to pay last.
+export const canPayReservation = (reservation, now) =>
+    now !== null && reservation.status === 'Pending' && !holdHasEnded(reservation, now);
+
+// HU-16 AC-01/AC-04/AC-05 (#316): a Pending reservation was not paid, so it
+// can be cancelled while it waits for its payment, even after its start
+// time, but only while its 15 minutes to pay last (#347). An Active one
+// (already paid) only before its start time. The backend applies the same
+// rule; this only decides whether the button is shown.
+export const canCancelReservation = (reservation, now) => {
+    if (now === null) return false;
+    if (reservation.status === 'Pending') return !holdHasEnded(reservation, now);
+    return reservation.status === 'Active' && new Date(reservation.startTime).getTime() > now;
+};
+
+// #347: the next moment a reservation of the list changes by itself, so a
+// screen can update without loading the page: the end of the 15 minutes to
+// pay of a Pending one, the start of a confirmed one (it goes from next to
+// running) and the end of one that runs (an open stay has no end time yet).
+// Infinity when none of them changes with time.
+export const nextReservationChange = (reservations, now) =>
+    reservations
+        .flatMap((r) => {
+            if (r.status === 'Pending') return [r.holdExpiresAt];
+            if (r.status === 'Active') return [r.startTime, r.endTime];
+            return [];
+        })
+        // A missing date gives 0 or NaN, which never counts
+        .map((value) => new Date(value).getTime())
+        .filter((ms) => ms > now)
+        .reduce((min, ms) => Math.min(min, ms), Infinity);

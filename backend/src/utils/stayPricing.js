@@ -1,6 +1,7 @@
 // HU-27: how an open stay is charged. Shared by the reservations controller,
-// the payments controller and the job that closes stays after 24 hours, so
-// the amount is always calculated the same way.
+// the payments controller and the job that closes stays at their exit time
+// (24 hours, or the closing time of the zone, HU-29), so the amount is always
+// calculated the same way. The first payment of every reservation too (#373).
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -23,14 +24,17 @@ function provisionalEndTime(startTime) {
 }
 
 // What an open stay costs if it ends at `endTime` (never later than 24 hours
-// after the entry). `paid` is what the reservation already paid before the
-// stay ends: the first hour for a stay booked without an exit time (AC-03),
-// or more for a reservation switched to an open stay (HU-28 AC-07). What was
-// paid is never refunded, so the total is at least `paid`, and the balance is
-// the rest.
+// after the entry, nor than its saved exit time: in a zone that is not open
+// 24 hours that is the closing time, HU-29 AC-04). `paid` is what the
+// reservation already paid before the stay ends: the first hour for a stay
+// booked without an exit time (AC-03), or more for a reservation switched to
+// an open stay (HU-28 AC-07). What was paid is never refunded, so the total is
+// at least `paid`, and the balance is the rest.
 function openStayCharge(reserva, endTime = new Date(), paid = Number(reserva.appliedHourlyRate)) {
     const start = new Date(reserva.startTime);
-    const cappedEnd = new Date(Math.min(new Date(endTime).getTime(), start.getTime() + MAX_OPEN_STAY_MS));
+    const limits = [new Date(endTime).getTime(), start.getTime() + MAX_OPEN_STAY_MS];
+    if (reserva.endTime) limits.push(new Date(reserva.endTime).getTime());
+    const cappedEnd = new Date(Math.min(...limits));
     const rate = Number(reserva.appliedHourlyRate);
     const hours = chargedHours(start, cappedEnd);
     const alreadyPaid = money(Number(paid));
@@ -56,6 +60,15 @@ function paidBeforeBalance(reserva, payments = []) {
     return money(approved.reduce((sum, p) => sum + Number(p.amount), 0));
 }
 
+// HU-17: the first payment of a reservation, at its stored rate: the time of
+// its stay (half an hour costs half the rate), or the first hour of an open
+// stay (HU-27 AC-03). The payment, the confirmation and the list of
+// reservations use it, so they always show the same amount (#373).
+function firstPaymentAmount(reserva) {
+    const hours = reserva.openEnded ? 1 : (new Date(reserva.endTime) - new Date(reserva.startTime)) / HOUR_MS;
+    return money(hours * Number(reserva.appliedHourlyRate));
+}
+
 // HU-28 AC-06: extending the exit time charges every started hour of the
 // extra time at the reservation's stored rate. 20 minutes are 1 hour.
 function extensionCharge(reserva, fromEndTime, toEndTime) {
@@ -63,4 +76,4 @@ function extensionCharge(reserva, fromEndTime, toEndTime) {
     return { hours, amount: money(hours * Number(reserva.appliedHourlyRate)) };
 }
 
-module.exports = { chargedHours, provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge, MAX_OPEN_STAY_MS };
+module.exports = { chargedHours, provisionalEndTime, openStayCharge, paidBeforeBalance, firstPaymentAmount, extensionCharge, MAX_OPEN_STAY_MS };

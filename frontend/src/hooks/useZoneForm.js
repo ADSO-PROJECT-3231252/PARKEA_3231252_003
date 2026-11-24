@@ -5,8 +5,11 @@ import {
     parseCoordinatePair,
     formatCoordinate,
     getValidPosition,
+    validateZoneCoordinates,
     mapZoneApiError,
+    dayField,
 } from '../utils/zoneForm';
+import { DAYS } from '../utils/zoneHours';
 
 // State of the zone form, shared by create (HU-20) and edit (HU-21): the
 // values, the error of each field, the error that has no field, and the link
@@ -43,9 +46,55 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
         });
     }, []);
 
+    const revalidateCoordinateErrors = (latitude, longitude) => {
+        setErrors((prev) => {
+            if (!prev.latitude && !prev.longitude) return prev;
+
+            const next = { ...prev };
+            delete next.latitude;
+            delete next.longitude;
+            return { ...next, ...validateZoneCoordinates(latitude, longitude) };
+        });
+    };
+
     const setField = (name, value) => {
         setForm((prev) => ({ ...prev, [name]: value }));
-        clearErrors(name);
+
+        if (name !== 'latitude' && name !== 'longitude') {
+            clearErrors(name);
+            return;
+        }
+
+        const latitude = name === 'latitude' ? value : form.latitude;
+        const longitude = name === 'longitude' ? value : form.longitude;
+        revalidateCoordinateErrors(latitude, longitude);
+    };
+
+    // HU-29 AC-01: "Abierta 24 horas" (true) or "Horario personalizado" (false)
+    const setOpen24h = (value) => {
+        setForm((prev) => ({ ...prev, open24h: value }));
+        clearErrors('open24h', 'schedule', ...DAYS.map(dayField));
+    };
+
+    // HU-29 AC-02: changes one day of the schedule (open, opensAt, closesAt)
+    const setDay = (day, changes) => {
+        setForm((prev) => ({
+            ...prev,
+            schedule: prev.schedule.map((row) => (row.day === day ? { ...row, ...changes } : row)),
+        }));
+        clearErrors('schedule', dayField(day));
+    };
+
+    // HU-29 AC-02: the hours of one day go to every day, all of them open
+    const applyToAll = (day) => {
+        setForm((prev) => {
+            const source = prev.schedule.find((row) => row.day === day);
+            return {
+                ...prev,
+                schedule: prev.schedule.map((row) => ({ ...row, open: true, opensAt: source.opensAt, closesAt: source.closesAt })),
+            };
+        });
+        clearErrors('schedule', ...DAYS.map(dayField));
     };
 
     // HU-20 AC-05: a click on the map (or dragging the pin) fills both coordinates.
@@ -64,7 +113,7 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
         if (!pair) return;
         e.preventDefault();
         setForm((prev) => ({ ...prev, ...pair }));
-        clearErrors('latitude', 'longitude');
+        revalidateCoordinateErrors(pair.latitude, pair.longitude);
         setFocusKey((k) => k + 1);
     };
 
@@ -101,6 +150,9 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
         position,
         serverErrorRef,
         setField,
+        setOpen24h,
+        setDay,
+        applyToAll,
         handlePick,
         handleCoordinatePaste,
         confirmCoordinates,

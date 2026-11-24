@@ -1,14 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Lock, ArrowLeft } from 'lucide-react';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { forgotPassword } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
-import logo from '../assets/logo.png';
+import logo from '../assets/logo.webp';
 export default function ForgotPassword() {
     const [email, setEmail] = useState('');
     const [errors, setErrors] = useState({});
     const [sent, setSent] = useState(false);
+    // #311: the form disappears when the message appears, so the focus goes to the message
+    const sentRef = useRef(null);
+    useEffect(() => {
+        if (sent) sentRef.current?.focus();
+    }, [sent]);
     const [loading, setLoading] = useState(false);
     const [serverError, setServerError] = useState('');
     const handleChange = (e) => {
@@ -28,6 +33,8 @@ export default function ForgotPassword() {
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
         setLoading(true);
@@ -80,8 +87,10 @@ export default function ForgotPassword() {
                 </div>
                 {sent ? (
                     <p
+                        ref={sentRef}
+                        tabIndex={-1}
                         role="status"
-                        className="text-caption text-parkea-700 bg-parkea-50 rounded-md px-3 py-2 text-center"
+                        className="text-caption text-parkea-700 bg-parkea-50 rounded-md px-3 py-2 text-center focus:outline-none"
                     >
                         Si existe una cuenta con ese correo, te hemos enviado un enlace de recuperación.
                     </p>
@@ -111,13 +120,15 @@ export default function ForgotPassword() {
                                     id="email"
                                     name="email"
                                     type="email"
+                                    autoComplete="email"
+                                    aria-required="true"
                                     placeholder="Ej: correo@ejemplo.com"
                                     value={email}
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.email)}
                                     aria-describedby={errors.email ? 'email-error' : undefined}
                                     className={`w-full rounded-md border px-3 py-2.5 font-sans text-body
-text-neutral-900 placeholder:text-neutral-400 focus:outline-none
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none
 focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-neutral-200'}`}
                                 />
                                 {errors.email && (
@@ -132,10 +143,10 @@ focus:ring-2 focus:ring-parkea-600 ${errors.email ? 'border-danger' : 'border-ne
                             </div>
                             <button
                                 type="submit"
-                                disabled={loading}
+                                aria-disabled={loading || undefined}
                                 className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium
 py-2.5 hover:bg-parkea-700 focus:outline-none focus:ring-2
-focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
+focus:ring-offset-2 focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                             >
                                 {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
                             </button>
@@ -150,7 +161,7 @@ focus:ring-offset-2 focus:ring-parkea-600 transition disabled:opacity-60"
                 <div className="text-center">
                     <Link
                         to="/login"
-                        className="inline-flex items-center gap-1 text-caption text-parkea-600 underline
+                        className="inline-flex min-h-6 items-center gap-1 text-caption text-parkea-600 underline
 hover:text-parkea-700"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />

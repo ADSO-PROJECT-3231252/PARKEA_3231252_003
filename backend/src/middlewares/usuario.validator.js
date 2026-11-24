@@ -1,22 +1,24 @@
 const { body, validationResult } = require('express-validator');
 const ErrorCodes = require('../constants/errorCodes');
 const { isTextOrMissing } = require('../utils/validation');
+const { normalizeName, isValidName, isValidPhone } = require('../utils/personRules');
 
 const validarEditarPerfil = [
-    // Ambos campos son opcionales aca porque el frontend solo envia el que
-    // realmente cambio (nombre o telefono). .optional() solo se salta la
-    // cadena cuando la clave no viene en el request; un string vacio explicito
-    // sigue fallando notEmpty(), asi que "" no sirve para borrar el nombre.
+    // Both fields are optional here because the frontend only sends the one
+    // that changed (name or phone). .optional() only skips the chain when the
+    // key is missing from the request; an explicit empty string still fails
+    // notEmpty(), so "" cannot be used to erase the name.
     body('fullName')
         .optional()
         .custom(isTextOrMissing).withMessage('Full name must be text').bail()
-        .trim()
-        .notEmpty().withMessage('Full name is required')
-        .isLength({ max: 70 }).withMessage('Full name must be at most 70 characters'),
+        .customSanitizer(normalizeName)
+        .notEmpty().withMessage('Full name is required').bail()
+        .custom(isValidName).withMessage('Full name must have 2 to 70 characters: letters joined by one space, hyphen or apostrophe'),
     body('phone')
         .optional()
         .custom(isTextOrMissing).withMessage('Phone must be text').bail()
-        .matches(/^[0-9]{10}$/).withMessage('Phone must be exactly 10 digits'),
+        .trim()
+        .custom(isValidPhone).withMessage('Phone must be a Colombian mobile number: 10 digits starting with 3'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {

@@ -16,3 +16,4 @@ React 19 + Vite + Tailwind CSS.
 - `src/hooks/` — custom hooks
 - `src/services/` — API calls (axios)
 - `src/routes/` — route definitions and route guards
+- `public/server.cjs` — serves the build in Azure with the security headers; Vite copies it into `dist` (see `docs/deployment.md` in `develop`)

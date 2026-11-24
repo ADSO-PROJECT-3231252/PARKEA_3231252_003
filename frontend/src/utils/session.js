@@ -28,8 +28,9 @@ export function clearSavedSession() {
 }
 
 // Returns { ...user, token } when a good session is saved, and null when there
-// is none or it is broken (a broken one is also cleared).
-export function readSavedSession() {
+// is none or it is broken. A broken one is also cleared, unless clearBroken is
+// false: another tab may be in the middle of saving its two items (#307).
+export function readSavedSession({ clearBroken = true } = {}) {
     let token;
     let storedUser;
     try {
@@ -52,7 +53,7 @@ export function readSavedSession() {
     }
 
     if (!isUsableUser(user)) {
-        clearSavedSession();
+        if (clearBroken) clearSavedSession();
         return null;
     }
     return { ...user, token };

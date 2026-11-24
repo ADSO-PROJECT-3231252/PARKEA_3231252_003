@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { startTransition, useState } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, ShieldCheck, UserRound, ArrowLeft } from 'lucide-react';
 import { isValidEmail, isNotEmpty } from '../utils/validators';
 import { loginAdmin } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
 import { useAuth } from '../hooks/useAuth';
-import logo from '../assets/logo.png';
+import { takeExpiredSessionReturn } from '../utils/expiredSessionReturn';
+import logo from '../assets/logo.webp';
 
 export default function AdminLogin() {
     const [form, setForm] = useState({ email: '', password: '' });
@@ -16,6 +17,9 @@ export default function AdminLogin() {
 
     const { loginUser } = useAuth();
     const navigate = useNavigate();
+    // #307: sent by "Iniciar sesión como administrador" of the user login
+    const { state } = useLocation();
+    const sessionExpired = state?.sessionExpired === true;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -41,17 +45,27 @@ export default function AdminLogin() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
 
         setLoading(true);
         try {
             const { data } = await loginAdmin(form);
-            loginUser(data.token, data.user);
-            navigate('/admin/dashboard');
+            const savedReturn = takeExpiredSessionReturn(data.user.id);
+            // #307: the admin screen it was sent away from, or the one where its
+            // session expired, like Login.jsx. Any other screen is not of an
+            // administrator, so it starts on its dashboard.
+            const from = state?.from || (sessionExpired ? savedReturn : null);
+            const destination = from?.startsWith('/admin/') ? from : '/admin/dashboard';
+            startTransition(() => {
+                navigate(destination);
+                loginUser(data.token, data.user);
+            });
         } catch (err) {
-            // AC-06: NOT_ADMIN_ACCOUNT revela el motivo a propósito,
-            // a diferencia de las credenciales inválidas
+            // AC-06: NOT_ADMIN_ACCOUNT tells the reason on purpose, unlike
+            // the invalid credentials
             const code = err.response?.data?.code;
             setServerError(translateError(code));
         } finally {
@@ -107,13 +121,15 @@ export default function AdminLogin() {
                                 id="email"
                                 name="email"
                                 type="email"
+                                autoComplete="username"
+                                aria-required="true"
                                 placeholder="Ej: administrador@parkea.gov.co"
                                 value={form.email}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.email)}
                                 aria-describedby={errors.email ? 'email-error' : undefined}
                                 className={`w-full rounded-md border px-3 py-2.5 font-sans text-body
-                                    text-neutral-900 placeholder:text-neutral-400 focus:outline-none
+                                    text-neutral-900 placeholder:text-neutral-500 focus:outline-none
                                     focus:ring-2 focus:ring-parkea-600 ${errors.email
                                         ? 'border-danger'
                                         : 'border-neutral-200'
@@ -135,13 +151,16 @@ export default function AdminLogin() {
                                     id="password"
                                     name="password"
                                     type={showPassword ? 'text' : 'password'}
+                                    autoComplete="current-password"
+                                    aria-required="true"
                                     placeholder="Ingresa tu contraseña"
                                     value={form.password}
                                     onChange={handleChange}
                                     aria-invalid={Boolean(errors.password)}
                                     aria-describedby={errors.password ? 'password-error' : undefined}
                                     className={`w-full rounded-md border px-3 py-2.5 pr-9 font-sans text-body
-                                        text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600
+                                        text-neutral-900 placeholder:text-neutral-500 focus:outline-none
+                                        focus:ring-2 focus:ring-parkea-600
                                         ${errors.password
                                             ? 'border-danger'
                                             : 'border-neutral-200'
@@ -151,7 +170,7 @@ export default function AdminLogin() {
                                     type="button"
                                     onClick={() => setShowPassword((v) => !v)}
                                     aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showPassword ? (
@@ -170,18 +189,19 @@ export default function AdminLogin() {
 
                         <button
                             type="submit"
-                            disabled={loading}
+                            aria-disabled={loading || undefined}
                             className="w-full rounded-md bg-parkea-700 text-white font-sans font-medium py-2.5
                                 hover:bg-parkea-800 focus:outline-none focus:ring-2 focus:ring-offset-2
-                                focus:ring-parkea-700 transition disabled:opacity-60"
+                                focus:ring-parkea-700 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-700"
                         >
                             {loading ? 'Ingresando...' : 'Iniciar sesión'}
                         </button>
 
                         <div className="text-center">
                             <Link
-                                to="/login"
-                                className="inline-flex items-center gap-1 text-caption text-parkea-600 underline
+                                to={sessionExpired ? '/login?expired=1' : '/login'}
+                                state={{ from: state?.from }}
+                                className="inline-flex min-h-6 items-center gap-1 text-caption text-parkea-600 underline
                                     hover:text-parkea-700"
                             >
                                 <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />

@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getInitials } from '../utils/format';
-import logo from '../assets/logo.png';
-import logoMark from '../assets/logo-mark.png';
+import logo from '../assets/logo.webp';
+import logoMark from '../assets/logo-mark.webp';
 
 const NAV_ITEMS_USER = [
     { to: '/', label: 'Inicio', icon: Home, end: true },
@@ -181,7 +181,9 @@ export default function Header() {
                                     onClick={() => setMenuOpen((open) => !open)}
                                     aria-haspopup="true"
                                     aria-expanded={menuOpen}
-                                    aria-label="Abrir menú de usuario"
+                                    // #311 (WCAG 2.5.3): the name starts with the initials the
+                                    // button shows, so a person using voice control can say them
+                                    aria-label={`${getInitials(user.fullName)}, abrir menú de usuario`}
                                     className={`flex items-center gap-1 rounded-full ${FOCUS_RING}`}
                                 >
                                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-parkea-600 text-label text-white">

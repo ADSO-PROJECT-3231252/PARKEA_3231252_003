@@ -1,4 +1,4 @@
-const { chargedHours, provisionalEndTime, openStayCharge, paidBeforeBalance, extensionCharge } = require('../src/utils/stayPricing');
+const { chargedHours, provisionalEndTime, openStayCharge, paidBeforeBalance, firstPaymentAmount, extensionCharge } = require('../src/utils/stayPricing');
 
 // HU-27: open stays are charged per started hour, with the first hour as the
 // minimum and 24 hours as the maximum.
@@ -7,14 +7,14 @@ const after = (minutes) => new Date(START.getTime() + minutes * 60 * 1000);
 
 describe('chargedHours: every started hour counts (AC-07, AC-08)', () => {
     test.each([
-        ['1 minute', 1, 1],
-        ['59 minutes', 59, 1],
-        ['exactly 60 minutes', 60, 1],
-        ['61 minutes', 61, 2],
-        ['1 hour and 59 minutes', 119, 2],
-        ['exactly 2 hours', 120, 2],
-        ['23 hours and 1 minute', 23 * 60 + 1, 24],
-    ])('%s is charged as %i hour(s)', (_label, minutes, hours) => {
+        { label: '1 minute', minutes: 1, hours: 1 },
+        { label: '59 minutes', minutes: 59, hours: 1 },
+        { label: 'exactly 60 minutes', minutes: 60, hours: 1 },
+        { label: '61 minutes', minutes: 61, hours: 2 },
+        { label: '1 hour and 59 minutes', minutes: 119, hours: 2 },
+        { label: 'exactly 2 hours', minutes: 120, hours: 2 },
+        { label: '23 hours and 1 minute', minutes: 23 * 60 + 1, hours: 24 },
+    ])('$label is charged as $hours hour(s)', ({ minutes, hours }) => {
         // Act
         const result = chargedHours(START, after(minutes));
 
@@ -75,6 +75,38 @@ describe('openStayCharge', () => {
 
         // Assert
         expect(charge).toMatchObject({ chargedHours: 3, total: 4501.65, balance: 3001.1 });
+    });
+});
+
+// HU-29 (AC-04): in a zone that is not open 24 hours an open stay is saved
+// with the closing time as its exit time, and it is never charged past it
+describe('openStayCharge stops at the saved exit time (HU-29 AC-04)', () => {
+    // Entry at 08:00 UTC, the zone closes 3 hours later
+    const reserva = { startTime: START, endTime: after(180), appliedHourlyRate: '2500.00' };
+
+    test('finished after the closing time, it is charged up to the closing time', () => {
+        // Act
+        const charge = openStayCharge(reserva, after(200));
+
+        // Assert
+        expect(charge).toMatchObject({ usedMinutes: 180, chargedHours: 3, total: 7500, balance: 5000 });
+        expect(charge.endTime).toEqual(after(180));
+    });
+
+    test('finished before the closing time, it is charged up to that moment', () => {
+        // Act
+        const charge = openStayCharge(reserva, after(70));
+
+        // Assert
+        expect(charge).toMatchObject({ usedMinutes: 70, chargedHours: 2, total: 5000 });
+    });
+
+    test('without a saved exit time it keeps the 24-hour limit', () => {
+        // Act
+        const charge = openStayCharge({ startTime: START, appliedHourlyRate: '2500.00' }, after(30 * 60));
+
+        // Assert
+        expect(charge.chargedHours).toBe(24);
     });
 });
 
@@ -143,15 +175,40 @@ describe('paidBeforeBalance (HU-28)', () => {
     });
 });
 
+describe('firstPaymentAmount: the first payment of a reservation (HU-17, #373)', () => {
+    const reservation = (minutes, values = {}) => ({ startTime: START, endTime: after(minutes), appliedHourlyRate: '2500.00', openEnded: false, ...values });
+
+    test.each([
+        { label: '30 minutes', minutes: 30, amount: 1250 },
+        { label: '2 hours', minutes: 120, amount: 5000 },
+        { label: '1 hour and 20 minutes', minutes: 80, amount: 3333.33 },
+        { label: '24 hours', minutes: 24 * 60, amount: 60000 },
+    ])('$label cost the time of the stay at the stored rate: $ $amount', ({ minutes, amount }) => {
+        // Act
+        const result = firstPaymentAmount(reservation(minutes));
+
+        // Assert
+        expect(result).toBe(amount);
+    });
+
+    test('an open stay pays its first hour, whatever its provisional exit time (HU-27 AC-03)', () => {
+        // Act
+        const result = firstPaymentAmount(reservation(24 * 60, { openEnded: true }));
+
+        // Assert
+        expect(result).toBe(2500);
+    });
+});
+
 describe('extensionCharge: every started hour of the extra time (HU-28 AC-06)', () => {
     const reserva = { startTime: START, appliedHourlyRate: '1500.55' };
 
     test.each([
-        ['20 minutes', 20, 1, 1500.55],
-        ['exactly 1 hour', 60, 1, 1500.55],
-        ['1 hour and 1 minute', 61, 2, 3001.1],
-        ['5 hours', 300, 5, 7502.75],
-    ])('%s more is charged as %i hour(s)', (_label, minutes, hours, amount) => {
+        { label: '20 minutes', minutes: 20, hours: 1, amount: 1500.55 },
+        { label: 'exactly 1 hour', minutes: 60, hours: 1, amount: 1500.55 },
+        { label: '1 hour and 1 minute', minutes: 61, hours: 2, amount: 3001.1 },
+        { label: '5 hours', minutes: 300, hours: 5, amount: 7502.75 },
+    ])('$label more is charged as $hours hour(s)', ({ minutes, hours, amount }) => {
         // Act
         const charge = extensionCharge(reserva, after(120), after(120 + minutes));
 
