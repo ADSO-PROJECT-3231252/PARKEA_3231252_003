@@ -2,14 +2,16 @@
 // on the published site: it is migrated up to the last migration before
 // them, it gets zones, spots (one of them disabled) and a reservation as they
 // were, and then the migrations of HU-31 are done, undone and done again
-// (AC-15). A database of its own, because the other tests add zones with
-// other types, which the migrations cannot undo.
+// (AC-15). One of them makes the spots of a type go with it, so a zone can
+// always be removed. A database of its own, because the other tests add
+// zones with other types, which the migrations cannot undo.
 const { Sequelize } = require('sequelize');
 const { testDatabaseUrl, sequelizeCli } = require('./globalSetup');
 
 // The last migration before HU-31, and the first one of HU-31
 const BEFORE_HU31 = '20261123100200-require-api-required-columns.js';
 const FIRST_OF_HU31 = '20261124100000-create-zone-vehicle-types.js';
+const CASCADE = '20261124100150-remove-spots-with-their-zone-type.js';
 
 // The address of the test database, with another name that also ends in _test
 function ownDatabaseUrl() {
@@ -33,6 +35,10 @@ async function schema() {
     }
     return out;
 }
+
+// The foreign key of a spot to the type of its zone, as MySQL writes it
+const typeForeignKey = (onDelete) => `CONSTRAINT \`parking_spots_zone_vehicle_type_fk\` FOREIGN KEY (\`zone_id\`, \`vehicle_type\`) REFERENCES \`zone_vehicle_types\` (\`zone_id\`, \`vehicle_type\`) ON DELETE ${onDelete} ON UPDATE RESTRICT`;
+const spotsTable = async () => (await schema()).find((table) => table.startsWith('CREATE TABLE `parking_spots`'));
 
 // The data of the tables that the migrations touch
 const data = async () => ({
@@ -103,6 +109,11 @@ describe('The migrations of the vehicle types on a database with data (HU-31, AC
         expect(now.reservations).toEqual(before.data.reservations);
     }, 120000);
 
+    test('the spots of a type go with it', async () => {
+        // Assert
+        expect(await spotsTable()).toContain(typeForeignKey('CASCADE'));
+    });
+
     test('undoing them leaves the schema and the data exactly as before', async () => {
         // Act
         sequelizeCli('db:migrate:undo:all', URL_, ['--to', FIRST_OF_HU31]);
@@ -121,6 +132,14 @@ describe('The migrations of the vehicle types on a database with data (HU-31, AC
         expect(await rows('SELECT zone_id, vehicle_type, total_slots, hourly_rate, is_accepting FROM zone_vehicle_types ORDER BY zone_id')).toEqual(after.types);
     }, 120000);
 
+    test('undoing the one of the cascade gives the spots of a type back their RESTRICT', async () => {
+        // Act
+        sequelizeCli('db:migrate:undo', URL_);
+
+        // Assert
+        expect(await spotsTable()).toContain(typeForeignKey('RESTRICT'));
+    }, 120000);
+
     test('undoing them refuses while a zone has another type, and changes nothing', async () => {
         // Arrange: Zona B also takes motorcycles, with one spot
         await run("INSERT INTO zone_vehicle_types (id, zone_id, vehicle_type, total_slots, hourly_rate) VALUES (UUID(), :b, 'motorcycle', 1, 1000)", { b: ZONE_B });
@@ -130,5 +149,21 @@ describe('The migrations of the vehicle types on a database with data (HU-31, AC
         // Act + Assert
         expect(() => sequelizeCli('db:migrate:undo:all', URL_, ['--to', FIRST_OF_HU31])).toThrow('1 spot(s) are not car spots: remove them before undoing this migration, nothing was changed');
         expect(await schema()).toEqual(schemaBefore);
+    }, 120000);
+
+    test('the one of the cascade can run again after a failure halfway, and refuses a spot of a type its zone does not have', async () => {
+        // Arrange: the foreign key was removed, as by a failure halfway, and
+        // meanwhile Zona B got a truck spot without the truck type
+        await run('ALTER TABLE parking_spots DROP FOREIGN KEY parking_spots_zone_vehicle_type_fk');
+        await run("INSERT INTO parking_spots (id, zone_id, vehicle_type, spot_number, status) VALUES ('50000000-0000-4000-8000-0000000000bt', :b, 'truck', 1, 'Available')", { b: ZONE_B });
+
+        // Act + Assert
+        expect(() => sequelizeCli('db:migrate', URL_, ['--to', CASCADE])).toThrow('1 spot(s) have a vehicle type that their zone does not have in zone_vehicle_types: fix them before this migration');
+        expect(await spotsTable()).not.toContain('parking_spots_zone_vehicle_type_fk');
+
+        // Without that spot it puts the foreign key back
+        await run("DELETE FROM parking_spots WHERE id = '50000000-0000-4000-8000-0000000000bt'");
+        sequelizeCli('db:migrate', URL_, ['--to', CASCADE]);
+        expect(await spotsTable()).toContain(typeForeignKey('CASCADE'));
     }, 120000);
 });

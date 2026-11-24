@@ -296,16 +296,30 @@ describe('The vehicle types of the zones and of the spots in the database (HU-31
         expect(await addSpot('car', 1)).toBe(DUPLICATE_ENTRY);
     });
 
-    test('a type that has spots cannot be removed: it is turned off instead', async () => {
-        // Arrange
+    test('removing a type removes its spots, but not while one of them has a reservation: the API turns it off instead', async () => {
+        // Arrange: motorcycles with 2 spots, and trucks with 1 spot that a
+        // cancelled reservation keeps
+        const cuenta = await createUser();
         await addType('motorcycle');
         await addSpot('motorcycle', 1);
+        await addSpot('motorcycle', 2);
+        await addType('truck');
+        await addSpot('truck', 1);
+        await run(`INSERT INTO reservations (id, user_id, zone_id, vehicle_id, start_time, end_time, spot_number, status, parking_spot_id, open_ended, applied_hourly_rate)
+            SELECT UUID(), :usuario, :zona, :vehiculo, UTC_TIMESTAMP() + INTERVAL 1 HOUR, UTC_TIMESTAMP() + INTERVAL 2 HOUR, 1, 'Cancelled', s.id, 0, 3000
+            FROM parking_spots AS s WHERE s.zone_id = :zona AND s.vehicle_type = 'truck'`, { usuario: cuenta.usuario.id, vehiculo: cuenta.vehiculo.id, zona: zona.id });
+        const spotsOf = async (vehicleType) => (await run('SELECT COUNT(*) AS total FROM parking_spots WHERE zone_id = :zona AND vehicle_type = :vehicleType', { zona: zona.id, vehicleType }))[0][0].total;
 
         // Act
-        const errno = await errnoOf("DELETE FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type = 'motorcycle'", { zona: zona.id });
+        const motorcycles = await errnoOf("DELETE FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type = 'motorcycle'", { zona: zona.id });
+        const trucks = await errnoOf("DELETE FROM zone_vehicle_types WHERE zone_id = :zona AND vehicle_type = 'truck'", { zona: zona.id });
+        const left = { motorcycle: await spotsOf('motorcycle'), truck: await spotsOf('truck') };
+        await run("DELETE FROM reservations WHERE zone_id = :zona AND status = 'Cancelled'", { zona: zona.id });
 
         // Assert
-        expect(errno).toBe(PARENT_ROW_IN_USE);
+        expect(motorcycles).toBeNull();
+        expect(trucks).toBe(PARENT_ROW_IN_USE);
+        expect(left).toEqual({ motorcycle: 0, truck: 1 });
     });
 
     test('the type of a spot cannot become one that its zone does not have', async () => {
@@ -324,6 +338,21 @@ describe('The vehicle types of the zones and of the spots in the database (HU-31
 
         // Assert
         expect(spot.vehicleType).toBe('car');
+    });
+
+    test('the spots and the types of a zone go with it, and the spots of a type with their type, so the order of the cascades does not matter', async () => {
+        // Act
+        const [rules] = await run(`
+            SELECT CONSTRAINT_NAME AS name, DELETE_RULE AS onDelete FROM information_schema.REFERENTIAL_CONSTRAINTS
+            WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME IN ('parking_spots', 'zone_vehicle_types') ORDER BY CONSTRAINT_NAME
+        `);
+
+        // Assert: MySQL can remove the types of a zone before its spots
+        expect(rules).toEqual([
+            { name: 'parking_spots_ibfk_1', onDelete: 'CASCADE' },
+            { name: 'parking_spots_zone_vehicle_type_fk', onDelete: 'CASCADE' },
+            { name: 'zone_vehicle_types_ibfk_1', onDelete: 'CASCADE' },
+        ]);
     });
 
     test('removing a zone removes its spots and its types', async () => {
