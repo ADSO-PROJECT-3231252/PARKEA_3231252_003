@@ -14,7 +14,7 @@ const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
 
 // The share of the spots of a zone that is free now (#373). HU-31: of the
 // vehicle types it accepts (withVehicleTypes)
-const shareFree = (zona) => (zona.totalSlots > 0 ? zona.get('availableSlots') / zona.totalSlots : 0);
+const shareFree = (zona) => (zona.get('totalSlots') > 0 ? zona.get('availableSlots') / zona.get('totalSlots') : 0);
 
 // #373: the zones and their free spots are read in one transaction, so all
 // the reads see the same moment (REPEATABLE READ): a capacity changed between
@@ -136,13 +136,6 @@ function conCuentas(zona, cuentas) {
   return zona;
 }
 
-// HU-31: until the reservations take the rate of the type of their vehicle,
-// zones.hourly_rate keeps the rate of its first type (the cars, when it has
-// them: vehicleTypesOf sorts them), and zones.total_slots the spots of the
-// types it accepts
-const tarifaDeLaZona = (tipos) => tipos[0].hourlyRate;
-const cuposDeLaZona = (tipos) => tipos.reduce((sum, tipo) => sum + tipo.totalSlots, 0);
-
 // HU-21 for one vehicle type (HU-31): its spots go from `desde` to `hasta`.
 // A reduction disables the spots with no reservation from now on, the
 // highest numbers first, and cannot go below the spots in use. An increase
@@ -254,8 +247,6 @@ async function createZona(req, res, next) {
       address,
       latitude,
       longitude,
-      totalSlots: cuposDeLaZona(tipos),
-      hourlyRate: tarifaDeLaZona(tipos),
       open24h: req.body.open24h,
     }, { transaction: t });
     await ZoneSchedule.bulkCreate(filasHorario(zona.id, req.body), { transaction: t });
@@ -363,8 +354,6 @@ async function updateZona(req, res, next) {
       address,
       latitude,
       longitude,
-      totalSlots: cuposDeLaZona(tipos),
-      hourlyRate: tarifaDeLaZona(tipos),
       open24h: req.body.open24h,
     }, { transaction: t });
 

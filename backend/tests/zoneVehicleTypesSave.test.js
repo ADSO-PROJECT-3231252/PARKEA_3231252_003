@@ -53,7 +53,7 @@ function arrangeCreation() {
 // `disabled` to the numbers of its disabled spots. The highest number of
 // each type is `highest`.
 function arrangeEdition(rows, { inUse = {}, free = {}, disabled = {}, highest = {} } = {}) {
-    const zona = Zona.build({ id: ZONE_ID, ...ZONE, totalSlots: 10, hourlyRate: '2000.00', isActive: true, schedules: [] }, { include: [{ model: ZoneSchedule, as: 'schedules' }] });
+    const zona = Zona.build({ id: ZONE_ID, ...ZONE, isActive: true, schedules: [] }, { include: [{ model: ZoneSchedule, as: 'schedules' }] });
     jest.spyOn(zona, 'update').mockImplementation(async (values) => zona.set(values));
     jest.spyOn(zona, 'reload').mockResolvedValue(zona);
     jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
@@ -127,19 +127,16 @@ describe('Creating a zone with its vehicle types (HU-31, AC-01 to AC-03)', () =>
         ], { transaction });
     });
 
-    test.each([
-        ['with cars, the rate of the cars', [type('truck', 2, 9000), type('car', 10, 2500)], 2500],
-        ['without cars, the rate of its first type', [type('truck', 2, 9000), type('motorcycle', 4, 1500)], 1500],
-    ])('the zone keeps the sum of the spots and, %s', async (_case, vehicleTypes, hourlyRate) => {
+    test('the zone is saved without spots or a rate of its own: they are the ones of its types', async () => {
         // Arrange
         arrangeCreation();
 
         // Act
-        await create(vehicleTypes);
+        await create([type('truck', 2, 9000), type('car', 10, 2500)]);
 
         // Assert
         const [values] = Zona.create.mock.calls[0];
-        expect(values).toMatchObject({ totalSlots: vehicleTypes.reduce((sum, t) => sum + t.totalSlots, 0), hourlyRate });
+        expect(Object.keys(values).sort()).toEqual(['address', 'latitude', 'longitude', 'name', 'open24h']);
     });
 
     test('answers 201 with the types counted in the transaction, as the administrator sees them', async () => {
@@ -304,15 +301,17 @@ describe('Editing the vehicle types of a zone (HU-31, AC-04 and AC-05)', () => {
         expect(transaction.commit).not.toHaveBeenCalled();
     });
 
-    test('the zone keeps the sum of the spots of the types it accepts, and the rate of its cars', async () => {
+    test('the zone is saved without spots or a rate of its own: they are the ones of its types', async () => {
         // Arrange
         const zona = arrangeEdition([row('car', 10, '2500.00'), row('truck', 2, '9000.00')], { free: { car: [10, 9] } });
 
         // Act
         await edit([type('car', 8, 2800), type('motorcycle', 3, 1500)]);
 
-        // Assert: the trucks are turned off and do not count
-        expect(zona.update).toHaveBeenCalledWith(expect.objectContaining({ totalSlots: 11, hourlyRate: 2800 }), { transaction });
+        // Assert
+        const [values, options] = zona.update.mock.calls[0];
+        expect(Object.keys(values).sort()).toEqual(['address', 'latitude', 'longitude', 'name', 'open24h']);
+        expect(options).toEqual({ transaction });
     });
 
     test('answers 200 with every type, the ones turned off included, counted in the transaction', async () => {

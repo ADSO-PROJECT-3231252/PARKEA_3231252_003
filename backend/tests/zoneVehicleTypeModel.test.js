@@ -116,17 +116,27 @@ describe('The vehicle type of a spot (HU-31)', () => {
     });
 });
 
-describe('A zone sent by the API (HU-31)', () => {
-    test('has no rate of its own: each vehicle type has its rate', () => {
+describe('A zone (HU-31)', () => {
+    test('has no spots or rate of its own: each vehicle type has its spots and its rate', () => {
+        // Act
+        const attributes = Object.keys(Zona.getAttributes());
+
+        // Assert
+        expect(attributes).not.toContain('totalSlots');
+        expect(attributes).not.toContain('hourlyRate');
+    });
+
+    test('is sent with the spots and the types that the API adds to it', () => {
         // Arrange
-        const zona = Zona.build({ id: ZONE_ID, name: 'Centro', totalSlots: 10, hourlyRate: '2000.00' });
+        const zona = Zona.build({ id: ZONE_ID, name: 'Centro' });
+        zona.setDataValue('vehicleTypes', [{ vehicleType: 'car', totalSlots: 10, availableSlots: 4, hourlyRate: 2000 }]);
+        zona.setDataValue('totalSlots', 10);
 
         // Act
         const sent = zona.toJSON();
 
         // Assert
+        expect(sent).toMatchObject({ id: ZONE_ID, name: 'Centro', totalSlots: 10, vehicleTypes: [{ vehicleType: 'car', hourlyRate: 2000 }] });
         expect(sent).not.toHaveProperty('hourlyRate');
-        expect(sent).toMatchObject({ id: ZONE_ID, name: 'Centro', totalSlots: 10 });
-        expect(zona.hourlyRate).toBe('2000.00');
     });
 });

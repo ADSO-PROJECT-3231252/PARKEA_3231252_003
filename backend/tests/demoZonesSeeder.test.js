@@ -55,7 +55,7 @@ describe('The demo zones of the seeders (HU-31)', () => {
         expect(new Set(tipos.map((item) => item.id)).size).toBe(8);
     });
 
-    test('until the last migration of HU-31, a zone keeps the spots of all its types and the rate of its first type', async () => {
+    test('a zone is written without spots or a rate of its own: they are the ones of its types', async () => {
         // Arrange
         const queryInterface = fakeQueryInterface();
 
@@ -63,13 +63,9 @@ describe('The demo zones of the seeders (HU-31)', () => {
         await seeder.up(queryInterface);
 
         // Assert
-        const zonas = rowsOf(queryInterface.calls, 'zones');
-        expect(zonas.map((zona) => [zona.name, zona.total_slots, zona.hourly_rate])).toEqual([
-            ['Centro', 42, 2000],
-            ['Parque Olaya', 18, 2500],
-            ['La Popa', 36, 1800],
-            ['Av. Simón Bolívar', 51, 1500],
-        ]);
+        for (const zona of rowsOf(queryInterface.calls, 'zones')) {
+            expect(Object.keys(zona).sort()).toEqual(['address', 'id', 'is_active', 'latitude', 'longitude', 'name']);
+        }
     });
 
     test('the types go after their zones and before the spots, which belong to them', async () => {

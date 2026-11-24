@@ -20,10 +20,15 @@ const adminToken = jwt.sign({ id: ADMIN_ID, email: 'admin@parkea.com', rol: 'adm
 const TRANSACTION = { id: 'zone-reads' };
 const asAdmin = (req) => req.set('Authorization', `Bearer ${adminToken}`);
 
-// A zone as the model gives it, read with its hours
+// The car spots of each zone of a test: the zone has no spots of its own,
+// only its types (HU-31)
+const carSpots = new Map();
+
+// A zone as the model gives it, read with its hours, and its car spots
 function zone(id, name, totalSlots) {
+    carSpots.set(id, totalSlots);
     return Zona.build(
-        { id, name, address: 'Calle 1', totalSlots, hourlyRate: '2000.00', isActive: true, open24h: true, schedules: [] },
+        { id, name, address: 'Calle 1', isActive: true, open24h: true, schedules: [] },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
 }
@@ -37,7 +42,7 @@ function vehicleTypes(...rows) {
 }
 
 // The car type of each zone, with all its spots
-const carsOf = (...zones) => vehicleTypes(...zones.map((z) => [z.id, 'car', z.totalSlots]));
+const carsOf = (...zones) => vehicleTypes(...zones.map((z) => [z.id, 'car', carSpots.get(z.id)]));
 
 beforeEach(() => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask'] });

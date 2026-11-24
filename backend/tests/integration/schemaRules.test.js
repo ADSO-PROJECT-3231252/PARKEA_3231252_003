@@ -48,7 +48,7 @@ describe('Checks, indexes and required columns of the database (#372)', () => {
         pagoId = (await Pago.findOne({ where: { reservationId: reservaId } })).id;
     });
 
-    test('after db:migrate the database lists the eight checks', async () => {
+    test('after db:migrate the database lists the seven checks', async () => {
         // Act
         const [rows] = await run(`
             SELECT CONSTRAINT_NAME AS name FROM information_schema.CHECK_CONSTRAINTS
@@ -64,23 +64,17 @@ describe('Checks, indexes and required columns of the database (#372)', () => {
             'zone_schedules_whole_minutes',
             'zone_vehicle_types_hourly_rate_positive',
             'zone_vehicle_types_total_slots_range',
-            'zones_hourly_rate_positive',
         ]);
     });
 
-    test.each([
-        ['a negative payment', 'UPDATE payments SET amount = -0.01 WHERE id = :pago'],
-        ['a zone that charges nothing', 'UPDATE zones SET hourly_rate = 0 WHERE id = :zona'],
-        ['a negative rate', 'UPDATE zones SET hourly_rate = -2000 WHERE id = :zona'],
-    ])('an UPDATE by SQL with %s fails', async (_case, sql) => {
-        expect(await errnoOf(sql, { pago: pagoId, zona: zona.id })).toBe(CHECK_VIOLATED);
+    test('an UPDATE by SQL with a negative payment fails', async () => {
+        expect(await errnoOf('UPDATE payments SET amount = -0.01 WHERE id = :pago', { pago: pagoId })).toBe(CHECK_VIOLATED);
     });
 
-    test('the limits of the amount and the rate are allowed', async () => {
-        // A payment of 0 and a rate of one cent follow the rules
-        await run('UPDATE payments SET amount = 0 WHERE id = :pago', { pago: pagoId });
-        await run('UPDATE zones SET hourly_rate = 0.01 WHERE id = :zona', { zona: zona.id });
-        await run('UPDATE zones SET hourly_rate = 2000 WHERE id = :zona', { zona: zona.id });
+    test('the limit of the amount is allowed', async () => {
+        // A payment of 0 follows the rules. HU-31: the rates are the ones of
+        // the vehicle types, checked in the block of the types
+        expect(await errnoOf('UPDATE payments SET amount = 0 WHERE id = :pago', { pago: pagoId })).toBeNull();
     });
 
     const schedule = (day, opensAt, closesAt) => errnoOf(
@@ -330,14 +324,37 @@ describe('The vehicle types of the zones and of the spots in the database (HU-31
         expect(errno).toBe(NO_PARENT_ROW);
     });
 
-    test('a spot written without its type is a car spot', async () => {
-        // Act: like the seeders, which do not say it yet
-        await run("INSERT INTO parking_spots (id, zone_id, spot_number, status) VALUES (UUID(), :zona, 3, 'Disabled')", { zona: zona.id });
+    test('a spot written without its type has no default in the table, and MySQL makes it a car spot, which a zone without cars refuses', async () => {
+        // Arrange: a zone of motorcycles only
+        const motos = await createZone(1, { vehicleTypes: [{ vehicleType: 'motorcycle', totalSlots: 1, hourlyRate: 1000 }] });
+        const withoutType = (zoneId) => errnoOf("INSERT INTO parking_spots (id, zone_id, spot_number, status) VALUES (UUID(), :zona, 3, 'Disabled')", { zona: zoneId });
+
+        // Act
+        const [[column]] = await run(`
+            SELECT COLUMN_DEFAULT AS defaultValue FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'parking_spots' AND COLUMN_NAME = 'vehicle_type'
+        `);
+        const inMotorcycles = await withoutType(motos.id);
+        const inCars = await withoutType(zona.id);
         const [[spot]] = await run('SELECT vehicle_type AS vehicleType FROM parking_spots WHERE zone_id = :zona AND spot_number = 3', { zona: zona.id });
         await run('DELETE FROM parking_spots WHERE zone_id = :zona AND spot_number = 3', { zona: zona.id });
 
-        // Assert
+        // Assert: an ENUM NOT NULL takes its first value when it is left out
+        expect(column.defaultValue).toBeNull();
+        expect(inMotorcycles).toBe(NO_PARENT_ROW);
+        expect(inCars).toBeNull();
         expect(spot.vehicleType).toBe('car');
+    });
+
+    test('a zone has no spots or rate of its own: they are the ones of its types', async () => {
+        // Act
+        const [columns] = await run(`
+            SELECT COLUMN_NAME AS name FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'zones' ORDER BY ORDINAL_POSITION
+        `);
+
+        // Assert
+        expect(columns.map((column) => column.name)).toEqual(['id', 'name', 'address', 'latitude', 'longitude', 'is_active', 'open_24h']);
     });
 
     test('the spots and the types of a zone go with it, and the spots of a type with their type, so the order of the cascades does not matter', async () => {

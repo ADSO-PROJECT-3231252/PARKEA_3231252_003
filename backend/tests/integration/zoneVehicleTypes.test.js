@@ -121,7 +121,7 @@ describe('The car type of a zone with cars only (HU-31)', () => {
 
     test('a zone without types or spots (written by hand) gets them when it is edited', async () => {
         // Arrange: a zone of its own, as a script would write it
-        const zona = await Zona.create({ name: `Zona ${unique()}`, address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961, totalSlots: 2, hourlyRate: 2000 });
+        const zona = await Zona.create({ name: `Zona ${unique()}`, address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961 });
 
         // Act
         const res = await edit(zona, { totalSlots: 2, hourlyRate: 2200 });

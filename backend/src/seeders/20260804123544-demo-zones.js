@@ -44,14 +44,15 @@ module.exports = {
       },
     ];
 
-    // Until the last migration of HU-31, a zone also keeps the spots of all
-    // its types and the rate of its first type, as createZona() does
-    await queryInterface.bulkInsert('zones', zonas.map(({ tipos, ...zona }) => ({
-      ...zona,
-      total_slots: tipos.reduce((sum, [, totalSlots]) => sum + totalSlots, 0),
-      hourly_rate: tipos[0][2],
-    })));
+    // The zones, without their types: a zone has no spots or rate of its own
+    await queryInterface.bulkInsert('zones', zonas.map((zona) => {
+      const fila = { ...zona };
+      delete fila.tipos;
+      return fila;
+    }));
 
+    // The types go after their zones and before the spots, which must
+    // belong to one of them
     await queryInterface.bulkInsert('zone_vehicle_types', zonas.flatMap((zona) => zona.tipos.map(([vehicleType, totalSlots, hourlyRate]) => ({
       id: uuidv4(),
       zone_id: zona.id,
