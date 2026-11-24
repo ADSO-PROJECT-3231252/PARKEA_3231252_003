@@ -54,11 +54,14 @@ function buildIcon(name, availableSlots, totalSlots) {
     });
 }
 
-// AC-04/AC-05: summary shown when a marker is opened.
+// AC-04/AC-05: summary shown when a marker is opened. #373: a zone with no
+// room now can still be reserved for other hours, so "Reservar" is never
+// blocked; the summary only says that there is no room now.
 function ZoneSummary({ zone, availability, onReserve }) {
     const map = useMap();
     const reserveRef = useRef(null);
-    const full = availability.state === 'full';
+    const fullNow = availability.state === 'full';
+    const noteId = `full-now-${zone.id}`;
 
     // AC-10: the summary is rendered only once it opens, so focus is moved
     // here (not in Leaflet's popupopen event, which fires before it exists).
@@ -109,7 +112,7 @@ function ZoneSummary({ zone, availability, onReserve }) {
                     <Users className="h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
                     <span>
                         <span className="font-mono tabular-nums">{zone.availableSlots}</span> de{' '}
-                        <span className="font-mono tabular-nums">{zone.totalSlots}</span> cupos disponibles
+                        <span className="font-mono tabular-nums">{zone.totalSlots}</span> cupos libres ahora
                     </span>
                 </span>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-caption font-medium ${BADGE_CLASSES[availability.state]}`}>
@@ -132,19 +135,15 @@ function ZoneSummary({ zone, availability, onReserve }) {
                 type="button"
                 data-reserve
                 onClick={() => onReserve(zone)}
-                aria-label={full ? `Sin cupos disponibles en ${zone.name}` : `Reservar en ${zone.name}`}
-                aria-disabled={full || undefined}
-                aria-describedby={full ? `full-${zone.id}` : undefined}
-                className={`mt-4 w-full rounded-md px-4 py-2.5 text-label font-medium transition-colors ${full
-                    ? 'cursor-not-allowed bg-neutral-200 text-neutral-700'
-                    : 'bg-parkea-600 text-white hover:bg-parkea-700'
-                    }`}
+                aria-label={`Reservar en ${zone.name}`}
+                aria-describedby={fullNow ? noteId : undefined}
+                className="mt-4 w-full rounded-md bg-parkea-600 px-4 py-2.5 text-label font-medium text-white transition-colors hover:bg-parkea-700"
             >
-                {full ? 'Sin cupos disponibles' : 'Reservar'}
+                Reservar
             </button>
-            {full && (
-                <p id={`full-${zone.id}`} className="mt-2 text-center text-caption text-neutral-600">
-                    Esta zona no tiene cupos en este momento, así que no se puede reservar.
+            {fullNow && (
+                <p id={noteId} className="mt-2 text-center text-caption text-neutral-600">
+                    No hay cupos en este momento, pero puedes reservar para otro horario.
                 </p>
             )}
         </div>
@@ -306,7 +305,7 @@ export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
                             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-danger" aria-hidden="true">
                                 <Ban className="h-2.5 w-2.5 text-white" aria-hidden="true" />
                             </span>
-                            Llena (sin cupos)
+                            Llena (sin cupos ahora)
                         </li>
                     </ul>
                 </div>

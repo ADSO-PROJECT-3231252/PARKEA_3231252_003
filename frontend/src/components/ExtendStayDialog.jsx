@@ -5,7 +5,7 @@ import { extendStay } from '../services/reservationService';
 import { translateError } from '../utils/errorMessages';
 import { formatCurrency, formatDate, formatTime, keepTogether } from '../utils/format';
 import { hoursLabel } from '../utils/openStay';
-import { extendErrorMessage, extendLimitMs, extensionCharge, extensionOptions, formatAddedTime, limitedByClosing } from '../utils/extendStay';
+import { extendErrorMessage, extendLimitMs, extensionCharge, extensionOptions, formatAddedTime, limitedByClosing, spotFreeUntil, untilText } from '../utils/extendStay';
 
 // Value of the "Tiempo indefinido" option; the others are the new exit times.
 const OPEN_STAY = 'open';
@@ -86,7 +86,11 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
     const navigate = useNavigate();
     // The screen behind may have been loaded before the exit time passed.
     const exitPassed = new Date(reservation.endTime).getTime() <= openedAt;
-    const [options] = useState(() => (exitPassed ? [] : extensionOptions(reservation)));
+    // #373: set when switching to an open stay answered SPOT_RESERVED_LATER:
+    // the spot has another reservation later. 'none' when it is not free
+    // after the current exit time, or the time until it is free.
+    const [spotLimit, setSpotLimit] = useState(null);
+    const [options, setOptions] = useState(() => (exitPassed ? [] : extensionOptions(reservation)));
     const [choice, setChoice] = useState(() => options[0] ?? '');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState(() => (exitPassed ? translateError('EXIT_TIME_PASSED') : ''));
@@ -95,11 +99,15 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
     const zoneName = reservation.zone?.name ?? 'la zona';
     const toOpenStay = choice === OPEN_STAY;
     const exitText = `el ${formatDate(reservation.endTime)} a las ${timeOf(reservation.endTime)}`;
-    // HU-29: up to 24 hours, or up to the closing time of the zone
-    const howFar = limitedByClosing(reservation) ? `${limitText(reservation)}, ` : 'hasta 24 horas desde la entrada ';
-    const message = exitPassed
-        ? sentence(`Tu salida era ${exitText}`)
-        : `${sentence(`Tu salida actual es ${exitText}`)} Puedes ampliarla ${howFar}y conservas el mismo cupo (${reservation.spotNumber}).`;
+    // HU-29: up to 24 hours, or up to the closing time of the zone. #373: or
+    // until the next reservation of the spot.
+    let howFar = limitedByClosing(reservation) ? `${limitText(reservation)}, ` : 'hasta 24 horas desde la entrada ';
+    if (spotLimit && spotLimit !== 'none') {
+        howFar = `hasta ${untilText(spotLimit, reservation.endTime)}, porque después tu cupo tiene otra reserva, `;
+    }
+    let message = `${sentence(`Tu salida actual es ${exitText}`)} Puedes ampliarla ${howFar}y conservas el mismo cupo (${reservation.spotNumber}).`;
+    if (exitPassed) message = sentence(`Tu salida era ${exitText}`);
+    else if (spotLimit === 'none') message = sentence(`Tu salida actual es ${exitText}`);
 
     const handleClose = () => {
         if (saving) return;
@@ -130,9 +138,19 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
                 )
             )
             .catch((err) => {
-                const code = err.response?.data?.code;
-                setError(extendErrorMessage(code, true, err.response?.data?.hours));
+                const data = err.response?.data;
+                const code = data?.code;
+                setError(extendErrorMessage(code, true, data?.hours, { freeUntil: data?.freeUntil, from: reservation.endTime }));
                 if (STALE_CODES.includes(code)) setStale(true);
+                if (code === 'SPOT_RESERVED_LATER') {
+                    // #373: only the exit times before the next reservation
+                    // of the spot are left, and no open stay
+                    const until = spotFreeUntil(data?.freeUntil, reservation.endTime);
+                    const left = until ? extensionOptions(reservation, until) : [];
+                    setSpotLimit(until ?? 'none');
+                    setOptions(left);
+                    setChoice(left[0] ?? '');
+                }
             })
             .finally(() => setSaving(false));
     };
@@ -146,12 +164,12 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
             confirmLabel={toOpenStay ? 'Cambiar a tiempo indefinido' : 'Continuar al pago'}
             cancelLabel="Volver"
             confirming={saving}
-            confirmDisabled={stale}
+            confirmDisabled={stale || !choice}
             error={error}
             onConfirm={handleConfirm}
             onCancel={handleClose}
         >
-            {!exitPassed && (
+            {!exitPassed && spotLimit !== 'none' && (
                 <>
                     <label htmlFor="extend-choice" className="block text-label text-neutral-700">
                         Nueva hora de salida
@@ -173,9 +191,11 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
                             </optgroup>
                         ))}
                         {/* AC-02/AC-07 */}
-                        <optgroup label="Sin hora de salida">
-                            <option value={OPEN_STAY}>Tiempo indefinido</option>
-                        </optgroup>
+                        {!spotLimit && (
+                            <optgroup label="Sin hora de salida">
+                                <option value={OPEN_STAY}>Tiempo indefinido</option>
+                            </optgroup>
+                        )}
                     </select>
                     <p aria-live="polite" className="mt-2 text-caption text-neutral-600">
                         {choiceSummary(choice, reservation, hourlyRate, paid)}

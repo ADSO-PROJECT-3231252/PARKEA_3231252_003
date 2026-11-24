@@ -31,9 +31,13 @@ const BADGE_CLASSES = {
     available: 'bg-parkea-50 text-parkea-600',
 };
 
+// #373: availableSlots is the room now (the spots free for the next 30
+// minutes). A zone with none now can still be reserved for other hours, so
+// "Reservar" is never blocked: the reserve screen and the API decide.
 function ZoneCard({ zone, onReserve }) {
     const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
-    const full = zone.availableSlots === 0;
+    const fullNow = availability.state === 'full';
+    const noteId = `full-now-${zone.id}`;
 
     return (
         <div className="@container flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
@@ -61,7 +65,7 @@ function ZoneCard({ zone, onReserve }) {
                     <span className="font-mono tabular-nums">{zone.availableSlots}</span>
                     <span className="text-neutral-600">de</span>
                     <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                    <span className="text-caption text-neutral-600">cupos disponibles</span>
+                    <span className="text-caption text-neutral-600">cupos libres ahora</span>
                 </span>
                 <span className="flex flex-col @sm:items-end">
                     <span className="text-caption text-neutral-600">Tarifa por hora</span>
@@ -75,16 +79,17 @@ function ZoneCard({ zone, onReserve }) {
             <button
                 type="button"
                 onClick={() => onReserve(zone)}
-                aria-disabled={full || undefined}
-                aria-label={full ? `Reservar en ${zone.name} (no disponible: esta zona no tiene cupos)` : `Reservar en ${zone.name}`}
-                title={full ? 'Esta zona no tiene cupos disponibles' : undefined}
-                className={`mt-4 w-full rounded-md px-4 py-2 text-label font-medium transition-colors ${full
-                    ? 'cursor-not-allowed bg-neutral-200 text-neutral-600'
-                    : 'bg-parkea-600 text-white hover:bg-parkea-700'
-                    }`}
+                aria-label={`Reservar en ${zone.name}`}
+                aria-describedby={fullNow ? noteId : undefined}
+                className="mt-4 w-full rounded-md bg-parkea-600 px-4 py-2 text-label font-medium text-white transition-colors hover:bg-parkea-700"
             >
-                {full ? 'Sin cupos disponibles' : 'Reservar'}
+                Reservar
             </button>
+            {fullNow && (
+                <p id={noteId} className="mt-2 text-center text-caption text-neutral-600">
+                    No hay cupos en este momento, pero puedes reservar para otro horario.
+                </p>
+            )}
         </div>
     );
 }
@@ -172,7 +177,6 @@ export default function Zones() {
     const showList = () => setSearchParams({});
 
     const handleReserve = (zone) => {
-        if (zone.availableSlots === 0) return;
         if (!user) {
             navigate('/login', { state: { from: `/reserve/${zone.id}` } });
             return;

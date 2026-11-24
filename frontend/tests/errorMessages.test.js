@@ -24,6 +24,7 @@ describe('translateError', () => {
         ['ZONE_CLOSED_THAT_DAY', 'Esta zona no abre ese día'],
         ['TOO_MANY_PENDING_RESERVATIONS', 'Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra'],
         ['VEHICLE_LIMIT_REACHED', 'Alcanzaste el máximo de 5 vehículos activos. Elimina uno antes de registrar otro'],
+        ['SPOT_RESERVED_LATER', 'Tu cupo tiene otra reserva más tarde, así que no se puede ampliar hasta esa hora. Elige una hora de salida más temprana'],
     ])('translates %s', (code, text) => {
         expect(translateError(code)).toBe(text);
     });
