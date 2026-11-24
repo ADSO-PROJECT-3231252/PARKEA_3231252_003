@@ -120,19 +120,20 @@ describe('The rules of availability (#373)', () => {
         expect(sql).toContain("r.end_time > '2026-11-16 12:50:00'");
     });
 
-    test('the free spots of a zone for some hours are its enabled spots with no reservation in them, with the margin (#375)', async () => {
+    test('the free spots of a type of a zone for some hours are its enabled spots with no reservation in them, with the margin (#375, HU-31)', async () => {
         // Arrange
         const transaction = { id: 't' };
         jest.spyOn(ParkingSpot, 'count').mockResolvedValue(3);
 
         // Act: today from 3:00 to 5:00 p. m. in Colombia
-        const free = await availability.freeSpotsBetween(ZONE_ID, at('20:00'), at('22:00'), { transaction, now: NOW });
+        const free = await availability.freeSpotsBetween(ZONE_ID, 'truck', at('20:00'), at('22:00'), { transaction, now: NOW });
 
         // Assert: from 19:50 to 22:10 with the margin, among the enabled
-        // spots of the zone, with the same rule as the spot that crear gives
+        // spots of the type, with the same rule as the spot that crear gives
         expect(free).toBe(3);
         const options = ParkingSpot.count.mock.calls[0][0];
         expect(options.where.zoneId).toBe(ZONE_ID);
+        expect(options.where.vehicleType).toBe('truck');
         expect(options.where.status).toEqual({ [Op.ne]: 'Disabled' });
         expect(options.transaction).toBe(transaction);
         const sql = sqlOf(options.where);

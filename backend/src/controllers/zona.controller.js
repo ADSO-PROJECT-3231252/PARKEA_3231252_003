@@ -5,7 +5,8 @@ const { scheduleErrors, checkStay } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
 const { checkStayTimes, outsideHoursError } = require('../utils/stayRequest');
 const availability = require('../services/availability');
-const { withVehicleTypes } = require('../services/zoneVehicleTypes');
+const { withVehicleTypes, acceptedType } = require('../services/zoneVehicleTypes');
+const { VEHICLE_TYPES } = require('../constants/vehicleTypes');
 const { vehicleTypesErrors, vehicleTypesOf } = require('../utils/zoneVehicleTypes');
 
 // HU-29: every zone is sent with its opening hours (Zona.toJSON)
@@ -455,20 +456,26 @@ async function getZonaPorId(req, res, next) {
 // the free spots with the 10 minutes before and after. ?startTime=&endTime=,
 // or ?startTime=&openEnded=true for a stay without an exit time, which holds
 // its spot until the closing time of the zone or for 24 hours, as when it is
-// reserved. It only informs: the reservation still decides when it is sent.
+// reserved. HU-31: and &vehicleType=, the type of the chosen vehicle: the
+// answer counts the spots of that type, with its rate. It only informs: the
+// reservation still decides when it is sent.
 async function getDisponibilidadPorHoras(req, res, next) {
   try {
     const { id } = req.params;
-    const { startTime, endTime, openEnded } = req.query;
+    const { startTime, endTime, openEnded, vehicleType } = req.query;
 
     // A repeated value (?startTime=a&startTime=b) arrives as a list
-    for (const [name, value] of Object.entries({ startTime, endTime, openEnded })) {
+    for (const [name, value] of Object.entries({ startTime, endTime, openEnded, vehicleType })) {
       if (value !== undefined && typeof value !== 'string') {
         return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: `${name} must be text` });
       }
     }
     if (openEnded !== undefined && openEnded !== 'true' && openEnded !== 'false') {
       return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: 'openEnded must be true or false' });
+    }
+    // HU-31: the spots of one vehicle type, the one of the chosen vehicle
+    if (!VEHICLE_TYPES.includes(vehicleType)) {
+      return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: `vehicleType must be one of ${VEHICLE_TYPES.join(', ')}` });
     }
     const isOpenStay = openEnded === 'true';
 
@@ -487,22 +494,27 @@ async function getDisponibilidadPorHoras(req, res, next) {
       if (!zona.isActive) {
         return { status: 409, body: { code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' } };
       }
+      // HU-31: the zone must take that type, as in POST /reservations
+      const aceptado = await acceptedType(zona.id, vehicleType, { transaction });
+      if (aceptado.error) return aceptado.error;
       // HU-29: the stay must fit the hours of the day of the entry, and an
       // open stay holds its spot until the closing time of that day
       const horario = checkStay(zona, horas.start, isOpenStay ? null : horas.end);
       if (horario.problem) return outsideHoursError(horario.problem);
       const end = isOpenStay && horario.closesAt ? horario.closesAt : horas.end;
 
-      const libres = await availability.freeSpotsBetween(zona.id, horas.start, end, { transaction, now });
+      const libres = await availability.freeSpotsBetween(zona.id, vehicleType, horas.start, end, { transaction, now });
       return {
         status: 200,
         body: {
           zoneId: zona.id,
+          vehicleType,
           startTime: horas.start,
           endTime: end,
           openEnded: isOpenStay,
           availableSlots: libres,
-          totalSlots: zona.totalSlots,
+          totalSlots: aceptado.tipo.totalSlots,
+          hourlyRate: Number(aceptado.tipo.hourlyRate),
         },
       };
     });

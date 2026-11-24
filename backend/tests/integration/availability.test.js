@@ -144,7 +144,8 @@ describe('A spot of a vehicle type (HU-31)', () => {
 
         // Act and assert
         expect(await firstFree(zona, 60, 120, 'motorcycle')).toBeNull();
-        expect(await firstFree(zona, 60, 120, 'car')).toBe(1);
+        expect(await availability.freeSpotsBetween(zona.id, 'motorcycle', inMinutes(60), inMinutes(120))).toBe(0);
+        expect(await availability.freeSpotsBetween(zona.id, 'car', inMinutes(60), inMinutes(120))).toBe(2);
     });
 
     test('a type the zone does not have has no spots', async () => {
@@ -153,6 +154,7 @@ describe('A spot of a vehicle type (HU-31)', () => {
 
         // Act and assert
         expect(await firstFree(zona, 60, 120, 'truck')).toBeNull();
+        expect(await availability.freeSpotsBetween(zona.id, 'truck', inMinutes(60), inMinutes(120))).toBe(0);
     });
 });
 

@@ -99,17 +99,21 @@ function availableNowByZone(zoneIds, { transaction, now = new Date() } = {}) {
 }
 
 // #375: how many spots of one zone are free from `from` to `to`: the spots
-// that POST /reservations could give to a stay with those hours
-function freeSpotsBetween(zoneId, from, to, { transaction, now = new Date() } = {}) {
+// that POST /reservations could give to a stay with those hours. HU-31: of
+// one vehicle type, like the spot it gives
+function freeSpotsBetween(zoneId, vehicleType, from, to, { transaction, now = new Date() } = {}) {
     return ParkingSpot.count({
-        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(from, to, now)] },
+        where: { zoneId, vehicleType, status: ENABLED, [Op.and]: [freeBetween(from, to, now)] },
         transaction,
     });
 }
 
 // `availableSlots` of one zone
 function availableNow(zoneId, { transaction, now = new Date() } = {}) {
-    return freeSpotsBetween(zoneId, now, plus(now, MIN_STAY_MS), { transaction, now });
+    return ParkingSpot.count({
+        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(now, plus(now, MIN_STAY_MS), now)] },
+        transaction,
+    });
 }
 
 // HU-31: the key of one vehicle type of one zone in the Maps below
