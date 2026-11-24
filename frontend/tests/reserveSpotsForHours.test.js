@@ -251,7 +251,10 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         expect(spotsLine()).toHaveTextContent('Cuando la entrada y la salida sean válidas, te diremos si hay cupos para ese horario.');
     });
 
-    test('hours outside the hours of the zone ask nothing', async () => {
+    test.each([
+        ['the entry and the exit', 21, 22],
+        ['only the exit', 19, 21],
+    ])('hours outside the hours of the zone ask nothing (%s)', async (_case, entry, exit) => {
         // Arrange: it opens tomorrow from 6:00 a. m. to 8:00 p. m. in
         // Colombia (UTC-5), the time of the hours of the zones
         const HOUR = 60 * 60 * 1000;
@@ -260,9 +263,9 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         const colombiaAt = (hours) => new Date(Date.UTC(colombia.getUTCFullYear(), colombia.getUTCMonth(), colombia.getUTCDate(), hours + 5));
         await renderScreen({ ...ZONE, open24h: false, schedule: [{ day, opensAt: '06:00', closesAt: '20:00' }] });
 
-        // Act: from 9:00 to 10:00 p. m. in Colombia
-        typeEntry(colombiaAt(21));
-        typeExit(colombiaAt(22));
+        // Act: from 9:00 to 10:00 p. m., and from 7:00 to 9:00 p. m., in Colombia
+        typeEntry(colombiaAt(entry));
+        typeExit(colombiaAt(exit));
         await wait(5 * SPOTS_WAIT_MS);
 
         // Assert
