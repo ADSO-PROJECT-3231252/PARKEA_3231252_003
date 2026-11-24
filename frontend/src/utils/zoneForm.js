@@ -1,6 +1,7 @@
 import { isNotEmpty, REQUIRED_MESSAGE } from './validators';
 import { translateError } from './errorMessages';
 import { DAYS, MIN_OPEN_MINUTES, minutesOf } from './zoneHours';
+import { VEHICLE_TYPES } from './vehicleTypes';
 
 // Rules of the zone form, shared by create (HU-20) and edit (HU-21).
 // They mirror validarZona in the backend (zona.controller.js), so most
@@ -16,11 +17,41 @@ export const ZONE_LIMITS = {
 // HU-29: the key of the error of one day of the schedule ("day1" ... "day7")
 export const dayField = (day) => `day${day}`;
 
+// HU-31: the key of the error of the spots or the rate of one vehicle type
+// ("car.totalSlots", "motorcycle.hourlyRate"). "vehicleTypes" is the error
+// of the whole section (no type checked, or too many spots together).
+export const typeField = (type, name) => `${type}.${name}`;
+
 // Order of the fields on screen: the first one with an error gets the focus.
 export const ZONE_FIELDS = [
     'name', 'address', 'totalSlots', 'hourlyRate', 'latitude', 'longitude',
     'open24h', 'schedule', ...DAYS.map(dayField),
 ];
+
+// HU-31 AC-01: one entry per vehicle type, none checked. A type keeps its
+// spots and its rate while it is unchecked, so checking it again uses them.
+export const emptyVehicleTypes = () =>
+    Object.fromEntries(VEHICLE_TYPES.map((type) => [type, { checked: false, totalSlots: '', hourlyRate: '' }]));
+
+// The types that are checked, in the order car, motorcycle, truck: the order
+// of the body of the API, so its errors (vehicleTypes[1]) find their type.
+export const checkedTypes = (form) => VEHICLE_TYPES.filter((type) => form.vehicleTypes[type].checked);
+
+// HU-31 AC-01: "Total: 30 cupos", the spots of the checked types. A type
+// whose spots are not a valid number yet adds nothing.
+export function totalSlotsOf(form) {
+    return checkedTypes(form).reduce((sum, type) => {
+        const slots = Number(form.vehicleTypes[type].totalSlots);
+        return Number.isInteger(slots) && slots > 0 ? sum + slots : sum;
+    }, 0);
+}
+
+// HU-31 AC-01: the rate a type starts with when it is checked: the first rate
+// already typed for another checked type, or empty.
+export function suggestedRate(form, type) {
+    const other = checkedTypes(form).find((t) => t !== type && form.vehicleTypes[t].hourlyRate !== '');
+    return other ? form.vehicleTypes[other].hourlyRate : '';
+}
 
 // HU-29 AC-02: one row per day, Monday to Sunday. A new row is open, with
 // its times still to be written.
@@ -31,6 +62,8 @@ export const EMPTY_ZONE_FORM = {
     address: '',
     totalSlots: '',
     hourlyRate: '',
+    // HU-31: { car: { checked, totalSlots, hourlyRate }, motorcycle, truck }
+    vehicleTypes: emptyVehicleTypes(),
     latitude: '',
     longitude: '',
     // HU-29 AC-01: null until the admin chooses "Abierta 24 horas" (true) or
@@ -55,6 +88,10 @@ export function dayError(row) {
     if (minutesOf(row.closesAt) - minutesOf(row.opensAt) < MIN_OPEN_MINUTES) return SCHEDULE_MESSAGES.tooShort;
     return '';
 }
+
+// The class of a text field of the zone form, red while it has an error
+export const zoneInputClass = (hasError) =>
+    `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
 
 // Capacity and rate only accept digits: the rate is in whole pesos, so a
 // typed "2.000" stays "2000" instead of becoming 2.
@@ -96,6 +133,23 @@ function coordinateError(value, min, max, label) {
     return '';
 }
 
+// HU-31: the vehicle types of a zone as the form holds them. `types` is the
+// list of the API: the administrator gets the types turned off too
+// (isAccepting false), which stay unchecked with their spots and rate.
+export function typesToForm(types) {
+    const form = emptyVehicleTypes();
+    if (!Array.isArray(types)) return form;
+    for (const item of types) {
+        if (!form[item.vehicleType]) continue;
+        form[item.vehicleType] = {
+            checked: item.isAccepting !== false,
+            totalSlots: String(item.totalSlots ?? ''),
+            hourlyRate: item.hourlyRate == null ? '' : String(Number(item.hourlyRate)),
+        };
+    }
+    return form;
+}
+
 // HU-21 AC-01: the zone as the API returns it, as the form holds it. Numbers
 // become text; String(Number()) drops the zeros the DB adds ("4.8284000",
 // "2500.00") but keeps every decimal, so saving without changes moves nothing.
@@ -121,6 +175,18 @@ export function zoneToForm(zone) {
             : emptyWeek(),
     };
 }
+
+export const VEHICLE_TYPE_MESSAGES = {
+    noType: 'Marca al menos un tipo de vehículo.',
+    slots: `Los cupos deben ser un número entero entre 1 y ${ZONE_LIMITS.maxSlots}.`,
+    rate: 'La tarifa por hora debe ser mayor que $ 0.',
+    rateFromApi: 'Ingresa una tarifa válida en pesos.',
+    fromApi: `Revisa los tipos de vehículo: marca al menos uno, con máximo ${ZONE_LIMITS.maxSlots} cupos entre todos.`,
+};
+
+// HU-31 AC-02: the zone has at most 500 spots, all its types together
+export const tooManySlotsError = (total) =>
+    `La zona puede tener máximo ${ZONE_LIMITS.maxSlots} cupos entre todos los tipos. Ahora suma ${total}.`;
 
 // HU-21 AC-03: the capacity can't go below the spots taken by Pending or
 // Active reservations. Same text whether the form or the API catches it.
