@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const { sequelize, Reserva } = require('../models');
 const { safeRollback } = require('../utils/transaction');
 
-const INTERVALO_MS = 60 * 1000; // corre cada minuto
+const INTERVALO_MS = 60 * 1000; // runs every minute
 
 async function expirarReservasVencidas() {
     const ahora = new Date();
@@ -17,7 +17,7 @@ async function expirarReservasVencidas() {
     for (const reserva of vencidas) {
         const t = await sequelize.transaction();
         try {
-            // Vuelve a leer con lock, por si otro ciclo ya la procesó mientras tanto
+            // Read it again with a lock, in case another run already processed it in the meantime
             const reservaActual = await Reserva.findOne({
                 where: { id: reserva.id, status: 'Pending' },
                 transaction: t,
@@ -35,16 +35,16 @@ async function expirarReservasVencidas() {
             await reservaActual.update({ status: 'Expired' }, { transaction: t });
 
             await t.commit();
-            console.log(`[expirar-reservas] Reserva ${reservaActual.id} expirada`);
+            console.log(`[expirar-reservas] Reservation ${reservaActual.id} expired`);
         } catch (error) {
             await safeRollback(t);
-            console.error(`[expirar-reservas] Error procesando reserva ${reserva.id}:`, error);
+            console.error(`[expirar-reservas] Error processing reservation ${reserva.id}:`, error);
         }
     }
 }
 
 function iniciarJobExpiracion() {
-    console.log('[expirar-reservas] Job de expiración iniciado (revisa cada 60s)');
+    console.log('[expirar-reservas] Expiration job started (runs every 60s)');
     // If the database stops answering, the error is logged and the next run
     // tries again; without the catch, Node stops the whole API
     setInterval(() => {

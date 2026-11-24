@@ -18,7 +18,7 @@ async function finalizarReservasVencidas() {
     for (const reserva of vencidas) {
         const t = await sequelize.transaction();
         try {
-            // Read it again using lock, in case another thread has already processed it in the meantime.
+            // Read it again with a lock, in case another run already processed it in the meantime.
             // #373: an extension saved meanwhile moved its exit time, so the
             // exit time is checked again too: then it is not finished yet
             const reservaActual = await Reserva.findOne({
@@ -57,16 +57,16 @@ async function finalizarReservasVencidas() {
             }
 
             await t.commit();
-            console.log(`[finalizar-reservas] Reserva ${reservaActual.id} finalizada`);
+            console.log(`[finalizar-reservas] Reservation ${reservaActual.id} finished`);
         } catch (error) {
             await safeRollback(t);
-            console.error(`[finalizar-reservas] Error procesando reserva ${reserva.id}:`, error);
+            console.error(`[finalizar-reservas] Error processing reservation ${reserva.id}:`, error);
         }
     }
 }
 
 function iniciarJobFinalizacion() {
-    console.log('[finalizar-reservas] Job de finalización iniciado (revisa cada 60s)');
+    console.log('[finalizar-reservas] Finish job started (runs every 60s)');
     // If the database stops answering, the error is logged and the next run
     // tries again; without the catch, Node stops the whole API
     setInterval(() => {

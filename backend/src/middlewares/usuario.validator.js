@@ -4,10 +4,10 @@ const { isTextOrMissing } = require('../utils/validation');
 const { normalizeName, isValidName, isValidPhone } = require('../utils/personRules');
 
 const validarEditarPerfil = [
-    // Ambos campos son opcionales aca porque el frontend solo envia el que
-    // realmente cambio (nombre o telefono). .optional() solo se salta la
-    // cadena cuando la clave no viene en el request; un string vacio explicito
-    // sigue fallando notEmpty(), asi que "" no sirve para borrar el nombre.
+    // Both fields are optional here because the frontend only sends the one
+    // that changed (name or phone). .optional() only skips the chain when the
+    // key is missing from the request; an explicit empty string still fails
+    // notEmpty(), so "" cannot be used to erase the name.
     body('fullName')
         .optional()
         .custom(isTextOrMissing).withMessage('Full name must be text').bail()

@@ -201,8 +201,8 @@ async function getAlertas(req, res, next) {
     const alerts = zonasLlenas.map((z) => ({
       type: 'zone_full',
       severity: 'warning',
-      message: `La zona "${z.name}" ha alcanzado su capacidad máxima.`,
       zoneId: z.id,
+      zoneName: z.name,
     }));
 
     return res.status(200).json({ alerts });

@@ -82,7 +82,7 @@ describe('GET /api/admin/dashboard/alerts (HU-22, #373)', () => {
         expect(res.body.alerts).toEqual([{
             type: 'zone_full',
             severity: 'warning',
-            message: 'La zona "Norte" ha alcanzado su capacidad máxima.',
+            zoneName: 'Norte',
             zoneId: NORTE,
         }]);
         expect(Zona.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { isActive: true } }));
