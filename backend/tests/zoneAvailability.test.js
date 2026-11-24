@@ -4,10 +4,11 @@ const { Op } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Zona, ZoneSchedule, ParkingSpot, Reserva, sequelize } = require('../src/models');
+const { Usuario, Zona, ZoneSchedule, ZoneVehicleType, ParkingSpot, Reserva, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // #373: the free spots of each zone are calculated from the reservations.
+// HU-31: for each vehicle type the zone accepts, and the zone sends the sums.
 // "Now" is Monday 2026-11-16 at 8:00 a. m. in Colombia (13:00 UTC).
 const NOW = new Date('2026-11-16T13:00:00Z');
 const CENTRO = '22222222-2222-4222-8222-222222222222';
@@ -26,6 +27,17 @@ function zone(id, name, totalSlots) {
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
 }
+
+// HU-31: the vehicle types of the zones, as the model gives them: each item
+// is [zoneId, vehicleType, totalSlots, hourlyRate, isAccepting]
+function vehicleTypes(...rows) {
+    return jest.spyOn(ZoneVehicleType, 'findAll').mockImplementation(async ({ where }) => rows
+        .map(([zoneId, vehicleType, totalSlots, hourlyRate = '2000.00', isAccepting = true]) => ZoneVehicleType.build({ zoneId, vehicleType, totalSlots, hourlyRate, isAccepting }))
+        .filter((tipo) => where.zoneId.includes(tipo.zoneId) && (where.isAccepting === undefined || tipo.isAccepting === where.isAccepting)));
+}
+
+// The car type of each zone, with all its spots
+const carsOf = (...zones) => vehicleTypes(...zones.map((z) => [z.id, 'car', z.totalSlots]));
 
 beforeEach(() => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'queueMicrotask'] });
@@ -48,8 +60,10 @@ afterEach(() => {
 describe('GET /api/zones (HU-09, #373)', () => {
     test('each zone has the spots free for 30 minutes from now, all counted in one query', async () => {
         // Arrange
-        jest.spyOn(Zona, 'findAll').mockResolvedValue([zone(CENTRO, 'Centro', 10), zone(NORTE, 'Norte', 4)]);
-        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, free: 6 }, { zoneId: NORTE, free: 1 }]);
+        const zonas = [zone(CENTRO, 'Centro', 10), zone(NORTE, 'Norte', 4)];
+        jest.spyOn(Zona, 'findAll').mockResolvedValue(zonas);
+        carsOf(...zonas);
+        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 6 }, { zoneId: NORTE, vehicleType: 'car', free: 1 }]);
 
         // Act
         const res = await request(app).get('/api/zones');
@@ -58,16 +72,21 @@ describe('GET /api/zones (HU-09, #373)', () => {
         expect(res.status).toBe(200);
         expect(res.body.zones.map((z) => [z.name, z.availableSlots])).toEqual([['Centro', 6], ['Norte', 1]]);
         expect(ParkingSpot.findAll).toHaveBeenCalledTimes(1);
-        const { where } = ParkingSpot.findAll.mock.calls[0][0];
+        const { where, group } = ParkingSpot.findAll.mock.calls[0][0];
         expect(where.zoneId).toEqual([CENTRO, NORTE]);
+        expect(group).toEqual(['zoneId', 'vehicleType']);
         expect(where[Op.and][0].val).toContain("r.start_time < '2026-11-16 13:40:00'");
-        expectOneMoment(Zona.findAll, ParkingSpot.findAll);
+        expect(ZoneVehicleType.findAll).toHaveBeenCalledTimes(1);
+        expect(ZoneVehicleType.findAll.mock.calls[0][0].where).toEqual({ zoneId: [CENTRO, NORTE], isAccepting: true });
+        expectOneMoment(Zona.findAll, ZoneVehicleType.findAll, ParkingSpot.findAll);
     });
 
     test('lists the zones by the share of free spots, the highest first, and a full zone last', async () => {
         // Arrange: Centro has 3 of 10 free, Norte 2 of 4 and Sur none
-        jest.spyOn(Zona, 'findAll').mockResolvedValue([zone(SUR, 'Sur', 5), zone(CENTRO, 'Centro', 10), zone(NORTE, 'Norte', 4)]);
-        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, free: 3 }, { zoneId: NORTE, free: 2 }]);
+        const zonas = [zone(SUR, 'Sur', 5), zone(CENTRO, 'Centro', 10), zone(NORTE, 'Norte', 4)];
+        jest.spyOn(Zona, 'findAll').mockResolvedValue(zonas);
+        carsOf(...zonas);
+        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 3 }, { zoneId: NORTE, vehicleType: 'car', free: 2 }]);
 
         // Act
         const res = await request(app).get('/api/zones');
@@ -78,8 +97,10 @@ describe('GET /api/zones (HU-09, #373)', () => {
 
     test('zones with the same share go by name', async () => {
         // Arrange
-        jest.spyOn(Zona, 'findAll').mockResolvedValue([zone(NORTE, 'Norte', 4), zone(CENTRO, 'Centro', 4)]);
-        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, free: 4 }, { zoneId: NORTE, free: 4 }]);
+        const zonas = [zone(NORTE, 'Norte', 4), zone(CENTRO, 'Centro', 4)];
+        jest.spyOn(Zona, 'findAll').mockResolvedValue(zonas);
+        carsOf(...zonas);
+        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 4 }, { zoneId: NORTE, vehicleType: 'car', free: 4 }]);
 
         // Act
         const res = await request(app).get('/api/zones');
@@ -91,6 +112,7 @@ describe('GET /api/zones (HU-09, #373)', () => {
     test('only the active zones are listed, with their hours', async () => {
         // Arrange
         jest.spyOn(Zona, 'findAll').mockResolvedValue([]);
+        jest.spyOn(ZoneVehicleType, 'findAll');
         jest.spyOn(ParkingSpot, 'findAll');
 
         // Act
@@ -100,6 +122,7 @@ describe('GET /api/zones (HU-09, #373)', () => {
         expect(res.status).toBe(200);
         expect(res.body.zones).toEqual([]);
         expect(Zona.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { isActive: true } }));
+        expect(ZoneVehicleType.findAll).not.toHaveBeenCalled();
         expect(ParkingSpot.findAll).not.toHaveBeenCalled();
     });
 });
@@ -108,7 +131,8 @@ describe('GET /api/zones/:id (HU-14, #373)', () => {
     test('the zone has its spots free for 30 minutes from now', async () => {
         // Arrange
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(zone(CENTRO, 'Centro', 10));
-        jest.spyOn(ParkingSpot, 'count').mockResolvedValue(8);
+        vehicleTypes([CENTRO, 'car', 10]);
+        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 8 }]);
 
         // Act
         const res = await request(app).get(`/api/zones/${CENTRO}`);
@@ -116,23 +140,25 @@ describe('GET /api/zones/:id (HU-14, #373)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(res.body.zone).toMatchObject({ id: CENTRO, totalSlots: 10, availableSlots: 8 });
-        const { where } = ParkingSpot.count.mock.calls[0][0];
-        expect(where).toMatchObject({ zoneId: CENTRO, status: { [Op.ne]: 'Disabled' } });
+        const { where } = ParkingSpot.findAll.mock.calls[0][0];
+        expect(where).toMatchObject({ zoneId: [CENTRO], status: { [Op.ne]: 'Disabled' } });
         expect(where[Op.and][0].val).toContain("r.start_time < '2026-11-16 13:40:00'");
-        expectOneMoment(Zona.findByPk, ParkingSpot.count);
+        expectOneMoment(Zona.findByPk, ZoneVehicleType.findAll, ParkingSpot.findAll);
     });
 
     test('a zone that does not exist answers 404 and counts nothing', async () => {
         // Arrange
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(null);
-        jest.spyOn(ParkingSpot, 'count');
+        jest.spyOn(ZoneVehicleType, 'findAll');
+        jest.spyOn(ParkingSpot, 'findAll');
 
         // Act
         const res = await request(app).get(`/api/zones/${CENTRO}`);
 
         // Assert
         expect(res.status).toBe(404);
-        expect(ParkingSpot.count).not.toHaveBeenCalled();
+        expect(ZoneVehicleType.findAll).not.toHaveBeenCalled();
+        expect(ParkingSpot.findAll).not.toHaveBeenCalled();
     });
 });
 
@@ -146,9 +172,14 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         // Arrange
         const centro = zone(CENTRO, 'Centro', 10);
         centro.setDataValue('activeReservations', 3);
-        jest.spyOn(Zona, 'findAll').mockResolvedValue([centro, zone(NORTE, 'Norte', 4)]);
-        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, free: 8 }, { zoneId: NORTE, free: 4 }]);
-        jest.spyOn(Reserva, 'findAll').mockResolvedValue([{ zoneId: CENTRO, spots: 2 }]);
+        const zonas = [centro, zone(NORTE, 'Norte', 4)];
+        jest.spyOn(Zona, 'findAll').mockResolvedValue(zonas);
+        carsOf(...zonas);
+        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 8 }, { zoneId: NORTE, vehicleType: 'car', free: 4 }]);
+        // First the spots in use of each type, then of each zone
+        jest.spyOn(Reserva, 'findAll')
+            .mockResolvedValueOnce([{ zoneId: CENTRO, vehicleType: 'car', spots: 2, reservations: 3 }])
+            .mockResolvedValueOnce([{ zoneId: CENTRO, spots: 2 }]);
 
         // Act
         const res = await asAdmin(request(app).get('/api/zones/all'));
@@ -158,9 +189,11 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         expect(res.body.zones.map((z) => [z.name, z.availableSlots, z.spotsInUse])).toEqual([['Centro', 8, 2], ['Norte', 4, 0]]);
         expect(res.body.zones[0].activeReservations).toBe(3);
         expect(ParkingSpot.findAll).toHaveBeenCalledTimes(1);
-        expect(Reserva.findAll).toHaveBeenCalledTimes(1);
-        expect(Reserva.findAll.mock.calls[0][0].where).toMatchObject({ zoneId: [CENTRO, NORTE], endTime: { [Op.gt]: NOW } });
-        expectOneMoment(Zona.findAll, ParkingSpot.findAll, Reserva.findAll);
+        expect(Reserva.findAll).toHaveBeenCalledTimes(2);
+        for (const [options] of Reserva.findAll.mock.calls) {
+            expect(options.where).toMatchObject({ zoneId: [CENTRO, NORTE], endTime: { [Op.gt]: NOW } });
+        }
+        expectOneMoment(Zona.findAll, ZoneVehicleType.findAll, ParkingSpot.findAll, Reserva.findAll);
     });
 
     test('PATCH /api/zones/:id/toggle sends the zone with its free spots', async () => {
@@ -168,7 +201,9 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         const centro = zone(CENTRO, 'Centro', 10);
         jest.spyOn(centro, 'update').mockImplementation(async (values) => centro.set(values));
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(centro);
-        jest.spyOn(ParkingSpot, 'count').mockResolvedValue(9);
+        vehicleTypes([CENTRO, 'car', 10]);
+        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 9 }]);
+        jest.spyOn(Reserva, 'findAll').mockResolvedValue([]);
 
         // Act
         const res = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`).send({ isActive: false }));
@@ -176,7 +211,7 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         // Assert
         expect(res.status).toBe(200);
         expect(res.body.zone).toMatchObject({ id: CENTRO, isActive: false, availableSlots: 9 });
-        expectOneMoment(Zona.findByPk, ParkingSpot.count);
+        expectOneMoment(Zona.findByPk, ZoneVehicleType.findAll, ParkingSpot.findAll, Reserva.findAll);
     });
 
     test('PATCH /api/zones/:id/toggle counts the free spots before saving, so a failed count changes nothing and can be repeated', async () => {
@@ -185,7 +220,9 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         const centro = zone(CENTRO, 'Centro', 10);
         jest.spyOn(centro, 'update').mockImplementation(async (values) => centro.set(values));
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(centro);
-        jest.spyOn(ParkingSpot, 'count').mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValue(9);
+        vehicleTypes([CENTRO, 'car', 10]);
+        jest.spyOn(Reserva, 'findAll').mockResolvedValue([]);
+        jest.spyOn(ParkingSpot, 'findAll').mockRejectedValueOnce(new Error('Connection lost')).mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 9 }]);
 
         // Act
         const failed = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`).send({ isActive: false }));
@@ -196,7 +233,113 @@ describe('The zones of the administrator (HU-19, HU-21, #373)', () => {
         expect(centro.update).toHaveBeenCalledTimes(1);
         expect(again.status).toBe(200);
         expect(again.body.zone).toMatchObject({ isActive: false, availableSlots: 9 });
-        expect(ParkingSpot.count.mock.invocationCallOrder[1]).toBeLessThan(centro.update.mock.invocationCallOrder[0]);
+        expect(ParkingSpot.findAll.mock.invocationCallOrder[1]).toBeLessThan(centro.update.mock.invocationCallOrder[0]);
+    });
+});
+
+describe('The vehicle types of the zones (HU-31)', () => {
+    beforeEach(() => {
+        // The session of the administrator (auth middleware)
+        jest.spyOn(Usuario, 'findByPk').mockResolvedValue({ id: ADMIN_ID, isActive: true, passwordVersion: 0, role: { name: 'admin' } });
+    });
+
+    // Centro: 10 cars (6 free) and 4 motorcycles (1 free) that it accepts,
+    // and 2 trucks that it no longer accepts (2 free)
+    function arrangeCentro() {
+        const centro = zone(CENTRO, 'Centro', 14);
+        jest.spyOn(Zona, 'findAll').mockResolvedValue([centro]);
+        jest.spyOn(Zona, 'findByPk').mockResolvedValue(centro);
+        vehicleTypes([CENTRO, 'truck', 2, '9000.00', false], [CENTRO, 'motorcycle', 4, '1500.00'], [CENTRO, 'car', 10, '2500.00']);
+        jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([
+            { zoneId: CENTRO, vehicleType: 'car', free: 6 },
+            { zoneId: CENTRO, vehicleType: 'motorcycle', free: 1 },
+            { zoneId: CENTRO, vehicleType: 'truck', free: 2 },
+        ]);
+        return centro;
+    }
+
+    test('a zone sends the types it accepts, in the order car, motorcycle, truck, with their spots, free spots and rates as numbers', async () => {
+        // Arrange
+        arrangeCentro();
+
+        // Act
+        const res = await request(app).get('/api/zones');
+
+        // Assert
+        expect(res.body.zones[0].vehicleTypes).toEqual([
+            { vehicleType: 'car', totalSlots: 10, availableSlots: 6, hourlyRate: 2500 },
+            { vehicleType: 'motorcycle', totalSlots: 4, availableSlots: 1, hourlyRate: 1500 },
+        ]);
+    });
+
+    test.each([
+        ['the list', '/api/zones', (body) => body.zones[0]],
+        ['the detail', `/api/zones/${CENTRO}`, (body) => body.zone],
+    ])('in %s, the spots of the zone are the ones of the types it accepts, and the zone has no rate of its own', async (_case, url, zoneOf) => {
+        // Arrange
+        arrangeCentro();
+
+        // Act
+        const res = await request(app).get(url);
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(zoneOf(res.body)).toMatchObject({ totalSlots: 14, availableSlots: 7 });
+        expect(zoneOf(res.body)).not.toHaveProperty('hourlyRate');
+    });
+
+    test('a type with no free spot sends 0', async () => {
+        // Arrange
+        arrangeCentro();
+        ParkingSpot.findAll.mockResolvedValue([{ zoneId: CENTRO, vehicleType: 'car', free: 6 }]);
+
+        // Act
+        const res = await request(app).get(`/api/zones/${CENTRO}`);
+
+        // Assert
+        expect(res.body.zone.vehicleTypes.map((tipo) => tipo.availableSlots)).toEqual([6, 0]);
+        expect(res.body.zone.availableSlots).toBe(6);
+    });
+
+    test('the administrator also gets the types that are turned off, and for each one its spots in use and its open reservations', async () => {
+        // Arrange: 2 reservations in the same car spot, and 1 in a truck spot
+        arrangeCentro();
+        jest.spyOn(Reserva, 'findAll')
+            .mockResolvedValueOnce([
+                { zoneId: CENTRO, vehicleType: 'car', spots: 1, reservations: 2 },
+                { zoneId: CENTRO, vehicleType: 'truck', spots: 1, reservations: 1 },
+            ])
+            .mockResolvedValueOnce([{ zoneId: CENTRO, spots: 2 }]);
+
+        // Act
+        const res = await asAdmin(request(app).get('/api/zones/all'));
+
+        // Assert: the spots of the zone are still the ones of the types it accepts
+        expect(res.status).toBe(200);
+        expect(res.body.zones[0]).toMatchObject({ totalSlots: 14, availableSlots: 7, spotsInUse: 2 });
+        expect(res.body.zones[0].vehicleTypes).toEqual([
+            { vehicleType: 'car', totalSlots: 10, availableSlots: 6, hourlyRate: 2500, isAccepting: true, spotsInUse: 1, openReservations: 2 },
+            { vehicleType: 'motorcycle', totalSlots: 4, availableSlots: 1, hourlyRate: 1500, isAccepting: true, spotsInUse: 0, openReservations: 0 },
+            { vehicleType: 'truck', totalSlots: 2, availableSlots: 2, hourlyRate: 9000, isAccepting: false, spotsInUse: 1, openReservations: 1 },
+        ]);
+        expect(ZoneVehicleType.findAll.mock.calls[0][0].where).toEqual({ zoneId: [CENTRO] });
+        const [byType] = Reserva.findAll.mock.calls[0];
+        expect(byType.group).toEqual(['zoneId', 'parkingSpot.vehicle_type']);
+    });
+
+    test('toggling a zone sends it to the administrator with every type', async () => {
+        // Arrange
+        const centro = arrangeCentro();
+        jest.spyOn(centro, 'update').mockImplementation(async (values) => centro.set(values));
+        jest.spyOn(Reserva, 'findAll').mockResolvedValue([]);
+
+        // Act
+        const res = await asAdmin(request(app).patch(`/api/zones/${CENTRO}/toggle`).send({ isActive: true }));
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body.zone.vehicleTypes.map((tipo) => [tipo.vehicleType, tipo.isAccepting])).toEqual([['car', true], ['motorcycle', true], ['truck', false]]);
+        expect(res.body.zone).toMatchObject({ totalSlots: 14, availableSlots: 7 });
     });
 });
 

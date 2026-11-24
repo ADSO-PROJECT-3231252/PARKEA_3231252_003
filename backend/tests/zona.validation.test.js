@@ -1,74 +1,75 @@
 const { validarZona, validarHorario } = require('../src/controllers/zona.controller');
 
-// A zone that passes every rule; each test changes only the hourly rate
+// A zone that passes every rule; each test changes only one value
 const validZone = {
     name: 'Zone A',
     address: 'Street 1 # 2-3',
     latitude: 4.8133,
     longitude: -75.6961,
-    totalSlots: 10,
-    hourlyRate: 2500,
+    vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, hourlyRate: 2500 }],
 };
 
-// The hourly rate must be greater than 0 (#316), and it is DECIMAL(10, 2): a
-// third decimal would be rounded by the database without a warning (HU-20,
-// HU-21)
-describe('validarZona: the hourly rate', () => {
-    test.each([
-        ['the smallest rate the column holds', 0.01],
-        ['a whole number', 3500],
-        ['one decimal', 3500.5],
-        ['two decimals', 3500.12],
-        ['the largest rate the column holds', 99999999.99],
-    ])('accepts %s', (_label, hourlyRate) => {
-        // Act
-        const error = validarZona({ ...validZone, hourlyRate });
-
-        // Assert
-        expect(error).toBeNull();
+// HU-31: the spots and the rate are the ones of each vehicle type. Their
+// rules are in tests/zoneVehicleTypesBody.test.js; here, how validarZona
+// answers them.
+describe('validarZona: the vehicle types', () => {
+    test('a zone with its types is valid', () => {
+        expect(validarZona(validZone)).toBeNull();
     });
 
     test.each([
-        ['three decimals', 3500.123],
-        ['more than three decimals', 3500.1234],
-        ['a third decimal that floating point hides', 1.005],
-        ['a tiny fraction', 0.001],
-    ])('rejects %s with VALIDATION_ERROR on hourlyRate', (_label, hourlyRate) => {
+        ['missing', undefined],
+        ['null', null],
+    ])('vehicleTypes %s answers MISSING_REQUIRED_FIELDS, like the other required fields', (_case, vehicleTypes) => {
         // Act
-        const error = validarZona({ ...validZone, hourlyRate });
+        const error = validarZona({ ...validZone, vehicleTypes });
+
+        // Assert
+        expect(error).toEqual({
+            status: 400,
+            body: { code: 'MISSING_REQUIRED_FIELDS', message: 'name, address, latitude, longitude, and vehicleTypes are required' },
+        });
+    });
+
+    test('every error of the types is sent at once, each one on its field', () => {
+        // Act
+        const error = validarZona({
+            ...validZone,
+            vehicleTypes: [{ vehicleType: 'car', totalSlots: 0, hourlyRate: 0 }, { vehicleType: 'bicycle', totalSlots: 5, hourlyRate: 1000 }],
+        });
 
         // Assert
         expect(error.status).toBe(400);
         expect(error.body.code).toBe('VALIDATION_ERROR');
-        expect(error.body.errors[0]).toMatchObject({
-            path: 'hourlyRate',
-            msg: 'hourlyRate must have at most 2 decimals',
-        });
+        expect(error.body.errors.map((item) => item.path)).toEqual([
+            'vehicleTypes[0].totalSlots',
+            'vehicleTypes[0].hourlyRate',
+            'vehicleTypes[1].vehicleType',
+        ]);
     });
 
-    test.each([
-        ['zero', 0],
-        ['minus zero', -0],
-    ])('rejects a rate of %s: it must be greater than 0 (HU-20 AC-04, #316)', (_label, hourlyRate) => {
+    test('the zone no longer takes totalSlots and hourlyRate of its own', () => {
         // Act
-        const error = validarZona({ ...validZone, hourlyRate });
+        const error = validarZona({ ...validZone, vehicleTypes: undefined, totalSlots: 10, hourlyRate: 2500 });
 
         // Assert
-        expect(error.status).toBe(400);
+        expect(error.body.code).toBe('MISSING_REQUIRED_FIELDS');
+    });
+
+    test('the name and the address are checked before the types', () => {
+        // Act
+        const error = validarZona({ ...validZone, name: 'x'.repeat(101), vehicleTypes: [] });
+
+        // Assert
+        expect(error.body.errors).toEqual([{ path: 'name', msg: 'name must be at most 100 characters' }]);
+    });
+
+    test('the types are checked before the coordinates', () => {
+        // Act
+        const error = validarZona({ ...validZone, latitude: 40.4168, longitude: -3.7038, vehicleTypes: [] });
+
+        // Assert
         expect(error.body.code).toBe('VALIDATION_ERROR');
-        expect(error.body.errors[0]).toMatchObject({
-            path: 'hourlyRate',
-            msg: 'hourlyRate must be greater than 0',
-        });
-    });
-
-    test('a negative rate still answers NEGATIVE_VALUE, even with many decimals', () => {
-        // Act
-        const error = validarZona({ ...validZone, hourlyRate: -1.234 });
-
-        // Assert
-        expect(error.status).toBe(400);
-        expect(error.body.code).toBe('NEGATIVE_VALUE');
     });
 });
 

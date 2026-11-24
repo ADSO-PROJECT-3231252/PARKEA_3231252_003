@@ -5,15 +5,20 @@ const request = require('supertest');
 const { Zona, ParkingSpot, sequelize } = require('../../src/models');
 const { app, unique, adminToken, createZone } = require('./helpers');
 
+// HU-31: the API takes the spots and the rate of each vehicle type
 const zoneBody = (name, totalSlots = 1) => ({
     name,
     address: 'Calle 1 # 2-3',
     latitude: 4.8133,
     longitude: -75.6961,
-    totalSlots,
-    hourlyRate: 2000,
+    vehicleTypes: [{ vehicleType: 'car', totalSlots, hourlyRate: 2000 }],
     open24h: true,
 });
+// The same zone, as the columns of the model
+const zoneRow = (name) => {
+    const { vehicleTypes: [car], ...zone } = zoneBody(name);
+    return { ...zone, totalSlots: car.totalSlots, hourlyRate: car.hourlyRate };
+};
 
 async function send(method, path, body) {
     return request(app)[method](path).set('Authorization', `Bearer ${await adminToken()}`).send(body);
@@ -32,7 +37,7 @@ async function whileNameIsTaken(name, hook, sendRequest) {
 
     await sequelize.transaction(async (blocker) => {
         // Inactive, so it does not show in the public list of other tests
-        await Zona.create({ ...zoneBody(name), isActive: false }, { transaction: blocker });
+        await Zona.create({ ...zoneRow(name), isActive: false }, { transaction: blocker });
 
         Zona.addHook(hook, hookName, (zona) => {
             if (zona.name === name) notifySave();

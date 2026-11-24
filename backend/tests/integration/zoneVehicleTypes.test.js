@@ -29,8 +29,8 @@ async function spotsOf(zoneId) {
     return rows.map((row) => `${row.vehicleType} ${row.spotNumber} ${row.status}`);
 }
 
-// PUT /api/zones/:id with the values of the zone and the new ones
-async function edit(zona, values) {
+// PUT /api/zones/:id with the values of the zone and its car spots and rate
+async function edit(zona, { totalSlots, hourlyRate }) {
     return request(app)
         .put(`/api/zones/${zona.id}`)
         .set('Authorization', `Bearer ${await adminToken()}`)
@@ -39,10 +39,8 @@ async function edit(zona, values) {
             address: zona.address,
             latitude: Number(zona.latitude),
             longitude: Number(zona.longitude),
-            totalSlots: zona.totalSlots,
-            hourlyRate: Number(zona.hourlyRate),
+            vehicleTypes: [{ vehicleType: 'car', totalSlots, hourlyRate }],
             open24h: true,
-            ...values,
         });
 }
 
@@ -122,7 +120,7 @@ describe('Undoing and doing again the migrations of the types (HU-31)', () => {
         // A zone with a reservation and a disabled spot, on top of the zones
         // of the seeders and of the other tests
         zona = await createZone(3);
-        await edit(zona, { totalSlots: 2 });
+        await edit(zona, { totalSlots: 2, hourlyRate: 2000 });
         const cuenta = await createUser();
         const res = await reserve(cuenta, zona, inMinutes(60).toISOString(), inMinutes(120).toISOString());
         if (res.status !== 201) throw new Error(`Not reserved: ${res.status} ${JSON.stringify(res.body)}`);

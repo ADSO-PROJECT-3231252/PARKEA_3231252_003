@@ -16,7 +16,7 @@ const ZONE_ID = '22222222-2222-4222-8222-222222222222';
 const token = jwt.sign({ id: ADMIN_ID, email: 'admin@parkea.com', rol: 'admin' }, process.env.JWT_SECRET);
 
 // A valid zone, without its hours
-const ZONE = { name: 'Centro', address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961, totalSlots: 10, hourlyRate: 2000 };
+const ZONE = { name: 'Centro', address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961, vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, hourlyRate: 2000 }] };
 // Open Monday to Friday from 6:00 a. m. to 8:00 p. m.
 const WEEKDAYS = [1, 2, 3, 4, 5].map((day) => ({ day, opensAt: '06:00', closesAt: '20:00' }));
 // Wednesday closes before it opens
@@ -45,9 +45,16 @@ beforeEach(() => {
     deleteHours = jest.spyOn(ZoneSchedule, 'destroy').mockResolvedValue(0);
     jest.spyOn(ParkingSpot, 'bulkCreate').mockResolvedValue([]);
     jest.spyOn(Zona, 'findOne').mockResolvedValue(null);
-    // HU-31: the car type of a zone, created with it and kept when it is edited
+    // HU-31: the vehicle types of the zone and their spots, saved with it
+    // (tests/zoneVehicleTypesSave.test.js) and counted when it is sent
+    // (tests/zoneAvailability.test.js)
+    jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue([]);
+    jest.spyOn(ZoneVehicleType, 'bulkCreate').mockResolvedValue([]);
     jest.spyOn(ZoneVehicleType, 'create').mockResolvedValue({});
-    jest.spyOn(ZoneVehicleType, 'findOne').mockResolvedValue({ update: jest.fn() });
+    jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([]);
+    jest.spyOn(ParkingSpot, 'max').mockResolvedValue(0);
+    jest.spyOn(availability, 'availableNowByZoneAndType').mockResolvedValue(new Map());
+    jest.spyOn(availability, 'inUseByZoneAndType').mockResolvedValue(new Map());
 });
 
 afterEach(() => {
@@ -138,7 +145,10 @@ describe('Editing the opening hours of a zone (HU-29, AC-02 and AC-07)', () => {
     beforeEach(() => {
         zona = zoneInstance();
         readZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
-        jest.spyOn(ParkingSpot, 'count').mockResolvedValue(10);
+        // HU-31: its car type keeps its 10 spots
+        const carType = ZoneVehicleType.build({ zoneId: ZONE_ID, vehicleType: 'car', totalSlots: 10, hourlyRate: '2000.00', isAccepting: true });
+        jest.spyOn(carType, 'update').mockResolvedValue(carType);
+        jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue([carType]);
     });
 
     test('without choosing the hours it answers 400 on open24h and changes nothing', async () => {
@@ -241,7 +251,9 @@ describe('Setting the active state of a zone (#304)', () => {
     beforeEach(() => {
         zona = zoneInstance();
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
-        jest.spyOn(availability, 'availableNow').mockResolvedValue(7);
+        // HU-31: its car type, with 7 free spots
+        jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue([ZoneVehicleType.build({ zoneId: ZONE_ID, vehicleType: 'car', totalSlots: 10, hourlyRate: '2000.00' })]);
+        jest.spyOn(availability, 'availableNowByZoneAndType').mockResolvedValue(new Map([[`${ZONE_ID}:car`, 7]]));
         startTransaction.mockImplementation(async (...args) => {
             const readZone = args.at(-1);
             return readZone(transaction);

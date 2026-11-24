@@ -1,6 +1,7 @@
 const util = require('util');
 const jwt = require('jsonwebtoken');
 const request = require('supertest');
+const availability = require('../src/services/availability');
 const { DatabaseError } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
@@ -77,9 +78,16 @@ beforeEach(() => {
     transaction = fakeTransaction();
     jest.spyOn(sequelize, 'transaction').mockResolvedValue(transaction);
     jest.spyOn(Usuario, 'findByPk').mockImplementation(async (id) => session(id));
-    // HU-31: the car type of a zone, created with it and kept when it is edited
+    // HU-31: the vehicle types of the zone and their spots, saved with it
+    // (tests/zoneVehicleTypesSave.test.js) and counted when it is sent
+    // (tests/zoneAvailability.test.js)
+    jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue([]);
+    jest.spyOn(ZoneVehicleType, 'bulkCreate').mockResolvedValue([]);
     jest.spyOn(ZoneVehicleType, 'create').mockResolvedValue({});
-    jest.spyOn(ZoneVehicleType, 'findOne').mockResolvedValue({ update: jest.fn() });
+    jest.spyOn(ParkingSpot, 'findAll').mockResolvedValue([]);
+    jest.spyOn(ParkingSpot, 'max').mockResolvedValue(0);
+    jest.spyOn(availability, 'availableNowByZoneAndType').mockResolvedValue(new Map());
+    jest.spyOn(availability, 'inUseByZoneAndType').mockResolvedValue(new Map());
     logged = [];
     jest.spyOn(console, 'error').mockImplementation((...args) => {
         // What console.error writes: the text, or the error as Node prints it
@@ -129,7 +137,7 @@ describe('safeRollback', () => {
 
 const inTwoHours = () => new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
 const inThreeHours = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
-const ZONE = { name: 'Centro', address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961, totalSlots: 10, hourlyRate: 2000, open24h: true };
+const ZONE = { name: 'Centro', address: 'Calle 1 # 2-3', latitude: 4.8133, longitude: -75.6961, vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, hourlyRate: 2000 }], open24h: true };
 
 // Every route with a transaction opened by hand, and the read where it fails.
 // `arrange` receives `fail` (deadlockOn, or the same with the transaction open)
@@ -323,10 +331,12 @@ describe('An error after the commit (#371)', () => {
     });
 
     test('editing a zone: it answers 200 with the saved zone, and nothing is undone', async () => {
-        // Arrange: the capacity stays the same, so no spot changes
+        // Arrange: the spots of its car type stay the same, so no spot changes
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(zoneThatCannotBeReadAgain());
         jest.spyOn(Zona, 'findOne').mockResolvedValue(null);
-        jest.spyOn(ParkingSpot, 'count').mockResolvedValue(10);
+        const carType = ZoneVehicleType.build({ zoneId: ZONE_ID, vehicleType: 'car', totalSlots: 10, hourlyRate: '2000.00', isAccepting: true });
+        jest.spyOn(carType, 'update').mockResolvedValue(carType);
+        jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue([carType]);
         jest.spyOn(ZoneSchedule, 'destroy').mockResolvedValue(0);
         jest.spyOn(ZoneSchedule, 'bulkCreate').mockResolvedValue([]);
 
