@@ -140,6 +140,14 @@ describe.each([
         expect(nextButton).toHaveAttribute('aria-disabled', 'true');
         expect(nextButton).toHaveFocus();
 
+        // Act: Enter again, now on the last page
+        const lastPage = document.body.textContent;
+        await user.keyboard('{Enter}');
+
+        // Assert: the last page stays, with the focus on Siguiente
+        expect(document.body.textContent).toBe(lastPage);
+        expect(nextButton).toHaveFocus();
+
         // Act
         previousButton.focus();
         await user.keyboard('{Enter}');
@@ -177,6 +185,17 @@ describe('The focus goes to "Mostrando…" after a page change (#311)', () => {
 
         // Assert
         expect(await screen.findByText('Mostrando 11 a 20 de 20 usuarios')).toHaveFocus();
+        expect(screen.getByRole('button', { name: 'Página siguiente' })).toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getByRole('button', { name: 'Última página' })).toHaveAttribute('aria-disabled', 'true');
+
+        // Act: Página siguiente and Última página again, now on the last page
+        const callsOnLastPage = getUsers.mock.calls.length;
+        await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+        await user.click(screen.getByRole('button', { name: 'Última página' }));
+
+        // Assert: no other page is asked for
+        expect(getUsers).toHaveBeenCalledTimes(callsOnLastPage);
+        expect(screen.getByText('Mostrando 11 a 20 de 20 usuarios')).toBeInTheDocument();
 
         // Act: "Limpiar filtros" has nothing to clear, so it asks for nothing
         const callsOnSecondPage = getUsers.mock.calls.length;
@@ -217,6 +236,14 @@ describe('The focus goes to "Mostrando…" after a page change (#311)', () => {
         expect(shown).toHaveFocus();
         expect(shown).not.toHaveAttribute('aria-live');
         expect(screen.getByRole('button', { name: 'Siguiente' })).toHaveAttribute('aria-disabled', 'true');
+
+        // Act: Siguiente again, now on the last page
+        const callsOnLastPage = getReservations.mock.calls.length;
+        await user.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+        // Assert: no other page is asked for
+        expect(getReservations).toHaveBeenCalledTimes(callsOnLastPage);
+        expect(screen.getByText('Mostrando 11–20 de 20 reservas')).toBeInTheDocument();
 
         // Act
         await user.click(screen.getByRole('button', { name: 'Anterior' }));
