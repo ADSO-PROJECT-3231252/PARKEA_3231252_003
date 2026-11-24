@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Info } from 'lucide-react';
 import { ZONE_LIMITS, onlyDigits, cleanCoordinate } from '../utils/zoneForm';
+import ZoneScheduleFields from './ZoneScheduleFields';
 
 // Leaflet is only downloaded when a zone form opens (like the zones map in
 // HU-25), so it doesn't add weight to every other page.
@@ -18,7 +19,7 @@ function MapUnavailable() {
 }
 
 const inputClass = (hasError) =>
-    `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
+    `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
 
 // Label, input and one line under it: the hint, or the error in its place.
 // The input gets aria-describedby with whichever line is showing.
@@ -47,7 +48,8 @@ function Field({ id, label, hint, error, children }) {
 
 // Fields of the zone form, shared by create (HU-20) and edit (HU-21).
 // zoneForm is what useZoneForm returns; hints has the line under the name,
-// address, capacity and rate, which each screen words for its own case.
+// address, capacity and rate, which each screen words for its own case, and
+// optionally under the opening hours (HU-29).
 export default function ZoneFormFields({ zoneForm, hints }) {
     const {
         form,
@@ -135,7 +137,7 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                         )}
                     </Field>
 
-                    {/* HU-20 AC-04: zero or more, in whole pesos */}
+                    {/* HU-20 AC-04: more than zero, in whole pesos (#316) */}
                     <Field id="hourlyRate" label="Tarifa por hora (COP)" hint={hints.hourlyRate} error={errors.hourlyRate}>
                         {(a11y) => (
                             <div
@@ -158,7 +160,7 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                                     onChange={(e) => setField('hourlyRate', onlyDigits(e.target.value))}
                                     placeholder="Ej. 2000"
                                     autoComplete="off"
-                                    className="w-full min-w-0 px-3 py-2.5 font-mono text-body text-neutral-900 placeholder:font-sans placeholder:text-neutral-400 focus:outline-none"
+                                    className="w-full min-w-0 px-3 py-2.5 font-mono text-body text-neutral-900 placeholder:font-sans placeholder:text-neutral-500 focus:outline-none"
                                     {...a11y}
                                 />
                             </div>
@@ -244,6 +246,9 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                     </div>
                 </fieldset>
             </div>
+
+            {/* HU-29: opening hours */}
+            <ZoneScheduleFields zoneForm={zoneForm} hint={hints.schedule} />
         </>
     );
 }

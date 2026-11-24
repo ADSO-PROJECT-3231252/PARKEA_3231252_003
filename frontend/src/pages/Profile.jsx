@@ -1,7 +1,8 @@
 import { getInitials } from '../utils/format';
 import { useState, useEffect } from 'react';
 import { User, Lock, Eye, EyeOff, Info, Calendar, Save } from 'lucide-react';
-import { isNotEmpty, isValidPhone, normalizePhone } from '../utils/validators';
+import { isNotEmpty, isValidPassword, normalizePhone, PASSWORD_MESSAGE } from '../utils/validators';
+import { isValidName, isValidPhone, NAME_RULE_MESSAGE, PHONE_RULE_MESSAGE } from '../utils/personRules';
 import { getProfile, updateProfile, changePassword } from '../services/userService';
 import { translateError } from '../utils/errorMessages';
 import { useAuth } from '../hooks/useAuth';
@@ -15,11 +16,15 @@ const DOCUMENT_LABELS = {
 
 const EMPTY_PASSWORD_FORM = { currentPassword: '', newPassword: '', confirmNewPassword: '' };
 
-// Same limit as the registration form (HU-08 AC-02 follows HU-01's rules).
-const FULL_NAME_MAX_LENGTH = 70;
+// #312: when the backend rejects a field (VALIDATION_ERROR with errors[].path),
+// its message goes under that field, as in the registration form.
+const SERVER_FIELD_MESSAGES = {
+    fullName: NAME_RULE_MESSAGE,
+    phone: PHONE_RULE_MESSAGE,
+};
 
 export default function Profile() {
-    const { updateUser } = useAuth();
+    const { updateUser, updateToken } = useAuth();
 
     const [profile, setProfile] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
@@ -58,7 +63,7 @@ export default function Profile() {
     // that no longer matches it; editing just the name must not get blocked by,
     // or resend, a phone field nobody touched.
     const nameChanged = profile !== null && form.fullName !== (profile.fullName || '');
-    const phoneChanged = profile !== null && normalizePhone(form.phone) !== (profile.phone || '');
+    const phoneChanged = profile !== null && normalizePhone(form.phone) !== normalizePhone(profile.phone);
     const profileChanged = nameChanged || phoneChanged;
     const passwordTouched = Boolean(
         pwForm.currentPassword || pwForm.newPassword || pwForm.confirmNewPassword
@@ -80,14 +85,18 @@ export default function Profile() {
     // saving a change to the other one.
     const validateProfile = () => {
         const errors = {};
-        if (nameChanged && !isNotEmpty(form.fullName)) {
-            errors.fullName = 'El nombre completo es obligatorio.';
+        if (nameChanged) {
+            if (!isNotEmpty(form.fullName)) {
+                errors.fullName = 'El nombre completo es obligatorio.';
+            } else if (!isValidName(form.fullName)) {
+                errors.fullName = NAME_RULE_MESSAGE;
+            }
         }
         if (phoneChanged) {
             if (!isNotEmpty(form.phone)) {
                 errors.phone = 'El teléfono es obligatorio.';
-            } else if (!isValidPhone(form.phone)) {
-                errors.phone = 'El teléfono debe tener 10 dígitos y solo números.';
+            } else if (!isValidPhone(normalizePhone(form.phone))) {
+                errors.phone = PHONE_RULE_MESSAGE;
             }
         }
         setProfileErrors(errors);
@@ -101,14 +110,8 @@ export default function Profile() {
         }
         if (!isNotEmpty(pwForm.newPassword)) {
             errors.newPassword = 'La nueva contraseña es obligatoria.';
-        } else if (
-            pwForm.newPassword.length < 8 ||
-            pwForm.newPassword.length > 20 ||
-            !/[A-Z]/.test(pwForm.newPassword) ||
-            !/[0-9]/.test(pwForm.newPassword) ||
-            !/[^A-Za-z0-9]/.test(pwForm.newPassword)
-        ) {
-            errors.newPassword = 'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+        } else if (!isValidPassword(pwForm.newPassword)) {
+            errors.newPassword = PASSWORD_MESSAGE;
         }
         if (!isNotEmpty(pwForm.confirmNewPassword)) {
             errors.confirmNewPassword = 'Confirma tu nueva contraseña.';
@@ -139,7 +142,10 @@ export default function Profile() {
         // attempt never leaves the account half-updated.
         if (passwordTouched) {
             try {
-                await changePassword(pwForm);
+                const { data } = await changePassword(pwForm);
+                // #199: the token used until now stopped working with the
+                // password change; the answer brings the new one
+                if (data?.token) updateToken(data.token);
                 setPwSuccess('Contraseña actualizada correctamente.');
                 setPwForm(EMPTY_PASSWORD_FORM);
             } catch (err) {
@@ -170,7 +176,19 @@ export default function Profile() {
                 updateUser({ fullName: data.user.fullName, phone: data.user.phone });
                 setProfileSuccess('Perfil actualizado correctamente.');
             } catch (err) {
-                setProfileServerError(translateError(err.response?.data?.code));
+                const code = err.response?.data?.code;
+                if (code === 'VALIDATION_ERROR') {
+                    const fieldErrors = {};
+                    for (const { path } of err.response.data.errors ?? []) {
+                        if (SERVER_FIELD_MESSAGES[path]) fieldErrors[path] = SERVER_FIELD_MESSAGES[path];
+                    }
+                    const markedAny = Object.keys(fieldErrors).length > 0;
+                    setProfileErrors((prev) => ({ ...prev, ...fieldErrors }));
+                    // "Revisa los campos marcados" only makes sense if a field was marked
+                    setProfileServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
+                } else {
+                    setProfileServerError(translateError(code));
+                }
             }
         }
 
@@ -245,7 +263,8 @@ export default function Profile() {
                                     id="fullName"
                                     name="fullName"
                                     type="text"
-                                    maxLength={FULL_NAME_MAX_LENGTH}
+                                    autoComplete="name"
+                                    aria-required="true"
                                     value={form.fullName}
                                     onChange={handleProfileChange}
                                     aria-invalid={Boolean(profileErrors.fullName)}
@@ -271,6 +290,8 @@ export default function Profile() {
                                     id="phone"
                                     name="phone"
                                     type="tel"
+                                    autoComplete="tel"
+                                    aria-required="true"
                                     value={form.phone}
                                     onChange={handleProfileChange}
                                     aria-invalid={Boolean(profileErrors.phone)}
@@ -350,13 +371,15 @@ export default function Profile() {
                                     id="currentPassword"
                                     name="currentPassword"
                                     type={showCurrent ? 'text' : 'password'}
+                                    autoComplete="current-password"
                                     placeholder="Ingresa tu contraseña actual"
                                     value={pwForm.currentPassword}
                                     onChange={handlePwChange}
                                     aria-invalid={Boolean(pwErrors.currentPassword)}
                                     aria-describedby={pwErrors.currentPassword ? 'currentPassword-error' : undefined}
                                     className={`w-full rounded-md border px-3 py-2 pr-9 text-body text-neutral-900
-                                        focus:outline-none focus:ring-2 focus:ring-parkea-600 ${pwErrors.currentPassword
+                                        placeholder:text-neutral-500 focus:outline-none focus:ring-2
+                                        focus:ring-parkea-600 ${pwErrors.currentPassword
                                             ? 'border-danger'
                                             : 'border-neutral-200'
                                         }`}
@@ -365,7 +388,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowCurrent((v) => !v)}
                                     aria-label={showCurrent ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showCurrent ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
@@ -387,6 +410,7 @@ export default function Profile() {
                                     id="newPassword"
                                     name="newPassword"
                                     type={showNew ? 'text' : 'password'}
+                                    autoComplete="new-password"
                                     maxLength={20}
                                     placeholder="Ingresa tu nueva contraseña"
                                     value={pwForm.newPassword}
@@ -394,7 +418,8 @@ export default function Profile() {
                                     aria-invalid={Boolean(pwErrors.newPassword)}
                                     aria-describedby={pwErrors.newPassword ? 'newPassword-error' : 'newPassword-hint'}
                                     className={`w-full rounded-md border px-3 py-2 pr-9 text-body text-neutral-900
-                                        focus:outline-none focus:ring-2 focus:ring-parkea-600 ${pwErrors.newPassword
+                                        placeholder:text-neutral-500 focus:outline-none focus:ring-2
+                                        focus:ring-parkea-600 ${pwErrors.newPassword
                                             ? 'border-danger'
                                             : 'border-neutral-200'
                                         }`}
@@ -403,7 +428,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowNew((v) => !v)}
                                     aria-label={showNew ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showNew ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}
@@ -415,7 +440,7 @@ export default function Profile() {
                                 </p>
                             ) : (
                                 <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
-                                    Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
+                                    {PASSWORD_MESSAGE}
                                 </p>
                             )}
                         </div>
@@ -429,6 +454,7 @@ export default function Profile() {
                                     id="confirmNewPassword"
                                     name="confirmNewPassword"
                                     type={showConfirm ? 'text' : 'password'}
+                                    autoComplete="new-password"
                                     maxLength={20}
                                     placeholder="Confirma tu nueva contraseña"
                                     value={pwForm.confirmNewPassword}
@@ -438,7 +464,8 @@ export default function Profile() {
                                         pwErrors.confirmNewPassword ? 'confirmNewPassword-error' : undefined
                                     }
                                     className={`w-full rounded-md border px-3 py-2 pr-9 text-body text-neutral-900
-                                        focus:outline-none focus:ring-2 focus:ring-parkea-600 ${pwErrors.confirmNewPassword
+                                        placeholder:text-neutral-500 focus:outline-none focus:ring-2
+                                        focus:ring-parkea-600 ${pwErrors.confirmNewPassword
                                             ? 'border-danger'
                                             : 'border-neutral-200'
                                         }`}
@@ -447,7 +474,7 @@ export default function Profile() {
                                     type="button"
                                     onClick={() => setShowConfirm((v) => !v)}
                                     aria-label={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
                                         hover:text-neutral-700"
                                 >
                                     {showConfirm ? <EyeOff className="h-4.5 w-4.5" aria-hidden="true" /> : <Eye className="h-4.5 w-4.5" aria-hidden="true" />}

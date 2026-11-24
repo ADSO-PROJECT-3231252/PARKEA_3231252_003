@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     Car,
     CalendarDays,
@@ -20,8 +20,9 @@ import CancelReservationDialog from '../components/CancelReservationDialog';
 import FinishStayDialog from '../components/FinishStayDialog';
 import ExtendStayDialog from '../components/ExtendStayDialog';
 import { formatCurrency, formatDateTime, formatDuration, formatReservationCode as shortCode } from '../utils/format';
-import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation } from '../utils/reservationStatus';
+import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReservation, shownStatus } from '../utils/reservationStatus';
 import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
+import { paymentLabelOf } from '../utils/paymentStatus';
 import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
@@ -37,13 +38,6 @@ const STATUS_FILTERS = [
     { value: 'Cancelled', label: 'Canceladas' },
     { value: 'Expired', label: 'Expiradas' },
 ];
-// AC-02: payment status is required on every entry.
-const PAYMENT_STATUS_LABELS = {
-    Pending: 'Pendiente',
-    Paid: 'Pagado',
-    Cancelled: 'Cancelado',
-    Refunded: 'Reembolsado',
-};
 function StatusBadge({ status }) {
     const { label = status, Icon, badge } = RESERVATION_STATUS[status] ?? FALLBACK_STATUS;
     return (
@@ -78,8 +72,9 @@ function DateInfo({ reservation, now }) {
     if (endTime) {
         duration = formatDuration(startTime, endTime);
     } else if (isRunningStay(reservation, now)) {
-        duration = `${formatDuration(startTime, stayEndSoFar(startTime, now))} hasta ahora`;
-    } else if (['Pending', 'Active'].includes(reservation.status)) {
+        duration = `${formatDuration(startTime, stayEndSoFar(startTime, now, reservation.latestEndTime))} hasta ahora`;
+    } else if (['Pending', 'Active'].includes(shownStatus(reservation, now))) {
+        // #347: not for a Pending one whose 15 minutes to pay ended
         duration = 'Tiempo indefinido';
     }
     return (
@@ -105,18 +100,20 @@ function DateInfo({ reservation, now }) {
 }
 // AC-03: unpaid → estimated total; paid → amount paid. HU-27: a running open
 // stay shows the amount so far, and one that ended with a balance, its total.
-function amountLabel(reservation, pendingBalance) {
+// `status`: the one shown, so a Pending reservation whose 15 minutes to pay
+// ended is labeled like an expired one (#347).
+function amountLabel(reservation, pendingBalance, status) {
     if (reservation.amountType === 'so_far') return 'Hasta ahora';
     if (pendingBalance > 0) return 'Total';
-    if (reservation.openEnded && reservation.status === 'Pending') return 'Primera hora';
+    if (reservation.openEnded && status === 'Pending') return 'Primera hora';
     return reservation.amountType === 'paid' ? 'Pagado' : 'Estimado';
 }
-function AmountInfo({ reservation }) {
+function AmountInfo({ reservation, now }) {
     const { amount, appliedHourlyRate, extensions = 0 } = reservation;
     const pendingBalance = pendingBalanceOf(reservation);
     return (
         <div>
-            <p className="text-caption text-neutral-600">{amountLabel(reservation, pendingBalance)}</p>
+            <p className="text-caption text-neutral-600">{amountLabel(reservation, pendingBalance, shownStatus(reservation, now))}</p>
             <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(amount)}</p>
             {/* HU-28 AC-09: the amount paid includes the extensions */}
             {extensions > 0 && (
@@ -140,20 +137,39 @@ text-neutral-600"
         </div>
     );
 }
-function StatusInfo({ reservation }) {
-    const paymentLabel =
-        pendingBalanceOf(reservation) > 0
-            ? 'Saldo pendiente'
-            : (PAYMENT_STATUS_LABELS[reservation.paymentStatus] ?? reservation.paymentStatus);
+function StatusInfo({ reservation, now }) {
+    // #347: from 00:00 a Pending reservation shows as expired
+    const status = shownStatus(reservation, now);
     return (
         <div className="flex flex-col items-start gap-1 lg:items-center">
-            <StatusBadge status={reservation.status} />
-            <p className="text-caption text-neutral-600">Pago: {paymentLabel}</p>
+            <StatusBadge status={status} />
+            {/* AC-02: payment status is required on every entry */}
+            <p className="text-caption text-neutral-600">Pago: {paymentLabelOf({ ...reservation, status })}</p>
         </div>
     );
 }
 function Actions({ reservation, now, onViewDetails, onPay, onCancel, onFinish, onExtend, inline = false }) {
-    const isPending = reservation.status === 'Pending';
+    const detailRef = useRef(null);
+    const restoreFocusRef = useRef(false);
+
+    // React detaches the ref before removing the button from the DOM.
+    const trackExpiringAction = useCallback((button) => {
+        if (!button) return;
+        return () => {
+            if (document.activeElement === button) {
+                restoreFocusRef.current = true;
+            }
+        };
+    }, []);
+
+    useLayoutEffect(() => {
+        if (restoreFocusRef.current) {
+            restoreFocusRef.current = false;
+            detailRef.current?.focus();
+        }
+    });
+
+    const canPay = canPayReservation(reservation, now);
     const canCancel = canCancelReservation(reservation, now);
     const canFinish = canFinishStay(reservation, now);
     const canExtend = canExtendStay(reservation, now);
@@ -170,10 +186,12 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
         : 'flex w-full flex-col gap-1.5 sm:w-36';
     return (
         <div className={wrapper}>
-            {/* AC-06: only Pending reservations can be paid (HU-17). */}
-            {isPending && (
+            {/* AC-06: only Pending reservations can be paid (HU-17), while their
+                15 minutes to pay last (#347). */}
+            {canPay && (
                 <button
                     type="button"
+                    ref={trackExpiringAction}
                     onClick={() => onPay(reservation.id)}
                     aria-label={`Pagar la ${which}`}
                     className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
@@ -210,7 +228,8 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {canExtend && (
                 <button
                     type="button"
-                    onClick={() => onExtend(reservation)}
+                    ref={trackExpiringAction}
+                    onClick={() => onExtend(reservation, detailRef.current)}
                     aria-label={`Ampliar la estadía de la ${which}`}
                     className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
                 >
@@ -218,11 +237,13 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
                     Ampliar estadía
                 </button>
             )}
-            {/* HU-16 AC-01: Pending or Active (already paid) reservations that have not started. */}
+            {/* HU-16 AC-01: Pending reservations while their 15 minutes to pay last
+                (#347), or Active (already paid) ones that have not started. */}
             {canCancel && (
                 <button
                     type="button"
-                    onClick={() => onCancel(reservation)}
+                    ref={trackExpiringAction}
+                    onClick={() => onCancel(reservation, detailRef.current)}
                     aria-label={`Cancelar la ${which}`}
                     className={`${base} border-danger text-danger hover:bg-danger-soft`}
                 >
@@ -233,6 +254,7 @@ font-medium transition-colors ${inline ? 'w-full md:w-auto md:px-5' : 'w-full'}`
             {/* AC-07: every entry — including Pending, which the mockup omits — opens its confirmation (HU-15). */}
             <button
                 type="button"
+                ref={detailRef}
                 onClick={() => onViewDetails(reservation.id)}
                 aria-label={`Ver detalle de la ${which}`}
                 className={`${base} border-parkea-600 text-parkea-600 hover:bg-parkea-50`}
@@ -265,8 +287,8 @@ function PageButton({ children, ...props }) {
             type="button"
             className="min-w-9 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-caption
 text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600
-disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200
-disabled:hover:text-neutral-900"
+aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200
+aria-disabled:hover:text-neutral-900"
             {...props}
         >
             {children}
@@ -288,7 +310,9 @@ function pageItems(current, total) {
 }
 export default function Reservations() {
     const navigate = useNavigate();
-    const [statusFilter, setStatusFilter] = useState('All');
+    const { search, hash } = useLocation();
+    const requestedStatus = new URLSearchParams(search).get('status');
+    const statusFilter = STATUS_FILTERS.find(({ value }) => value === requestedStatus)?.value ?? 'All';
     const [page, setPage] = useState(1);
     const [reservations, setReservations] = useState([]);
     const [pagination, setPagination] = useState({ total: 0, totalPages: 1 });
@@ -296,6 +320,9 @@ export default function Reservations() {
     const [error, setError] = useState(false);
     // Bumped by "Reintentar" to re-run the fetch with the same filter/page.
     const [reloadKey, setReloadKey] = useState(0);
+    // #311: the list is replaced by a loading state, so after a page change the focus goes to the range text
+    const rangeRef = useRef(null);
+    const focusRangeAfterLoad = useRef(false);
     // Time of the last load, used to decide which reservations already started.
     // Set from the fetch callback, never during render.
     const [now, setNow] = useState(null);
@@ -303,11 +330,35 @@ export default function Reservations() {
     // stay in the finish dialog and when it was opened. The message shown
     // after either action (HU-16 AC-06, HU-27 AC-09).
     const [cancelTarget, setCancelTarget] = useState(null);
+    // #361: the "Ver detalle" button of the reservation whose cancel or
+    // extend dialog is open. The focus goes back there when the button that
+    // opened the dialog disappeared meanwhile.
+    const actionFallbackRef = useRef(null);
+    const headingRef = useRef(null);
+    const trackReservationRow = useCallback((row) => {
+        if (!row) return;
+        return () => {
+            // Keep the keyboard position on the list when the focused row is removed.
+            if (row.contains(document.activeElement)) headingRef.current?.focus();
+        };
+    }, []);
     const [finishTarget, setFinishTarget] = useState(null);
     // HU-28: the stay in the extend dialog and when it was opened.
     const [extendTarget, setExtendTarget] = useState(null);
     const [resultMessage, setResultMessage] = useState('');
     const resultMessageRef = useRef(null);
+    // #307: the filter lives in the URL, so a link can change it too ("Mis
+    // reservas" in the header shows all of them again). Like a click on a
+    // filter, a new filter starts on its first page, shows the loading state
+    // and drops the message of the last action.
+    const [listedStatus, setListedStatus] = useState(statusFilter);
+    if (listedStatus !== statusFilter) {
+        setListedStatus(statusFilter);
+        setPage(1);
+        setLoading(true);
+        setError(false);
+        setResultMessage('');
+    }
     useEffect(() => {
         // Guards against out-of-order responses: if the user switches filter or
         // page while a request is still in flight, the older response must not
@@ -337,21 +388,25 @@ export default function Reservations() {
             active = false;
         };
     }, [statusFilter, page, reloadKey]);
-    // HU-28 AC-01: "Ampliar estadía" is offered until the exit time, so the
-    // list updates itself when the next exit time on screen is reached. A
+    // The list updates itself at the next moment a button on screen changes:
+    // HU-28 AC-01, "Ampliar estadía" is offered until the exit time; #347,
+    // "Pagar" and "Cancelar" are offered until the 15 minutes to pay end. A
     // timer cannot wait more than about 24 days, so a longer wait is done in
     // steps (each step updates `now`, which schedules the next one).
-    const nextExitMs = reservations
-        .filter((r) => r.status === 'Active' && !r.openEnded && r.endTime)
-        .map((r) => new Date(r.endTime).getTime())
-        .filter((ms) => now !== null && ms > now)
+    const nextChangeMs = reservations
+        .map((r) => {
+            if (r.status === 'Active' && !r.openEnded && r.endTime) return new Date(r.endTime).getTime();
+            if (r.status === 'Pending' && r.holdExpiresAt) return new Date(r.holdExpiresAt).getTime();
+            return null;
+        })
+        .filter((ms) => ms !== null && now !== null && ms > now)
         .reduce((min, ms) => Math.min(min, ms), Infinity);
     useEffect(() => {
-        if (nextExitMs === Infinity) return;
-        const delay = Math.max(0, nextExitMs - Date.now());
+        if (nextChangeMs === Infinity) return;
+        const delay = Math.max(0, nextChangeMs - Date.now());
         const timer = setTimeout(() => setNow(Date.now()), Math.min(delay + 100, MAX_TIMER_MS));
         return () => clearTimeout(timer);
-    }, [nextExitMs, now]);
+    }, [nextChangeMs, now]);
     // Every change that triggers a new fetch shows the loading state first; it's
     // set here, in the event, rather than inside the effect.
     const startLoading = () => {
@@ -360,12 +415,13 @@ export default function Reservations() {
     };
     const handleFilterChange = (value) => {
         if (value === statusFilter) return;
-        setResultMessage('');
-        startLoading();
-        setStatusFilter(value);
-        setPage(1);
+        const params = new URLSearchParams(search);
+        if (value === 'All') params.delete('status');
+        else params.set('status', value);
+        navigate({ search: params.toString(), hash }, { replace: true });
     };
     const goToPage = (target) => {
+        focusRangeAfterLoad.current = true;
         setResultMessage('');
         startLoading();
         setPage(target);
@@ -377,7 +433,10 @@ export default function Reservations() {
     const handleViewDetails = (id) => navigate(`/reservations/${id}`);
     const handlePay = (id) => navigate(`/reservations/${id}/payment`);
     // HU-16
-    const handleCancel = (reservation) => setCancelTarget(reservation);
+    const handleCancel = (reservation, detailButton) => {
+        actionFallbackRef.current = detailButton;
+        setCancelTarget(reservation);
+    };
     const handleCancelClose = ({ stale }) => {
         setCancelTarget(null);
         // The reservation changed since the list was loaded (e.g. it started):
@@ -405,7 +464,10 @@ export default function Reservations() {
     };
     // HU-28: a later exit time goes to the payment screen; switching to an
     // open stay reloads the list, where the stay shows without an exit time.
-    const handleExtend = (reservation) => setExtendTarget({ reservation, openedAt: Date.now() });
+    const handleExtend = (reservation, detailButton) => {
+        actionFallbackRef.current = detailButton;
+        setExtendTarget({ reservation, openedAt: Date.now() });
+    };
     const handleExtendClose = ({ stale }) => {
         setExtendTarget(null);
         if (stale) setReloadKey((k) => k + 1);
@@ -424,12 +486,18 @@ export default function Reservations() {
     const isFiltered = statusFilter !== 'All';
     const isEmpty = !loading && !error && reservations.length === 0;
     const showList = !loading && !error && reservations.length > 0;
+
+    useEffect(() => {
+        if (loading) return;
+        if (showList && focusRangeAfterLoad.current) rangeRef.current?.focus();
+        focusRangeAfterLoad.current = false;
+    }, [loading, showList]);
     const firstShown = (page - 1) * PAGE_SIZE + 1;
     const lastShown = firstShown + reservations.length - 1;
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <title>Mis reservas | PARKEA</title>
-            <h1 className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
+            <h1 ref={headingRef} tabIndex={-1} className="font-display text-title uppercase text-neutral-900">Mis reservas</h1>
             <p className="mt-1 text-body text-neutral-600">
                 Consulta el historial de tus reservas y su estado.
             </p>
@@ -599,8 +667,9 @@ bg-white lg:block"
                                     {reservations.map((r) => (
                                         <tr
                                             key={r.id}
+                                            ref={trackReservationRow}
                                             className={`border-t border-l-4 border-t-neutral-200
-align-middle ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
+align-middle ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                         >
                                             <td
                                                 className="px-5 py-4 font-mono text-label
@@ -618,10 +687,10 @@ text-neutral-900"
                                                 <DateInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
-                                                <AmountInfo reservation={r} />
+                                                <AmountInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
-                                                <StatusInfo reservation={r} />
+                                                <StatusInfo reservation={r} now={now} />
                                             </td>
                                             <td className="px-4 py-4">
                                                 <Actions
@@ -644,21 +713,22 @@ text-neutral-900"
                             {reservations.map((r) => (
                                 <li
                                     key={r.id}
+                                    ref={trackReservationRow}
                                     className={`rounded-lg border border-l-4 border-neutral-200 bg-white
-p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
+p-4 ${(RESERVATION_STATUS[shownStatus(r, now)] ?? FALLBACK_STATUS).border}`}
                                 >
                                     <div className="flex flex-wrap items-start justify-between gap-2">
                                         <p className="font-mono text-label text-neutral-900">
                                             <span className="sr-only">Código </span>
                                             {shortCode(r.id)}
                                         </p>
-                                        <StatusInfo reservation={r} />
+                                        <StatusInfo reservation={r} now={now} />
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-4">
                                         <ZoneInfo reservation={r} />
                                         <DateInfo reservation={r} now={now} />
                                         <VehicleInfo vehicle={r.vehicle} />
-                                        <AmountInfo reservation={r} />
+                                        <AmountInfo reservation={r} now={now} />
                                     </div>
                                     <div className="mt-4">
                                         <Actions
@@ -680,7 +750,7 @@ p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
                             Los montos estimados pueden variar según el tiempo real de uso.
                         </p>
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                            <p className="text-caption text-neutral-600" aria-live="polite">
+                            <p ref={rangeRef} tabIndex={-1} className="text-caption text-neutral-600 focus:outline-none">
                                 Mostrando {firstShown}–{lastShown} de {pagination.total} reservas
                             </p>
                             {/* AC-10 */}
@@ -690,7 +760,12 @@ p-4 ${(RESERVATION_STATUS[r.status] ?? FALLBACK_STATUS).border}`}
                                     className="flex flex-wrap
 items-center gap-1.5"
                                 >
-                                    <PageButton onClick={() => goToPage(page - 1)} disabled={page === 1}>
+                                    <PageButton
+                                        onClick={() => {
+                                            if (page > 1) goToPage(page - 1);
+                                        }}
+                                        aria-disabled={page === 1 || undefined}
+                                    >
                                         Anterior
                                     </PageButton>
                                     {pageItems(page, pagination.totalPages).map((item, i) =>
@@ -723,8 +798,10 @@ text-center text-caption font-medium text-white"
                                         ),
                                     )}
                                     <PageButton
-                                        onClick={() => goToPage(page + 1)}
-                                        disabled={page === pagination.totalPages}
+                                        onClick={() => {
+                                            if (page < pagination.totalPages) goToPage(page + 1);
+                                        }}
+                                        aria-disabled={page === pagination.totalPages || undefined}
                                     >
                                         Siguiente
                                     </PageButton>
@@ -735,6 +812,7 @@ text-center text-caption font-medium text-white"
                 )}
             </div>
             <CancelReservationDialog
+                fallbackFocusRef={actionFallbackRef}
                 reservation={cancelTarget}
                 onClose={handleCancelClose}
                 onCancelled={handleCancelled}
@@ -750,6 +828,7 @@ text-center text-caption font-medium text-white"
             )}
             {extendTarget && (
                 <ExtendStayDialog
+                    fallbackFocusRef={actionFallbackRef}
                     reservation={extendTarget.reservation}
                     hourlyRate={extendTarget.reservation.appliedHourlyRate}
                     paid={extendTarget.reservation.amount}

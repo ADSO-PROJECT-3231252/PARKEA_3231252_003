@@ -14,9 +14,17 @@ describe('translateError', () => {
 
     test.each([
         ['EMAIL_ALREADY_REGISTERED', 'Este correo ya está registrado'],
+        ['USER_HAS_OPEN_RESERVATIONS', 'Este usuario tiene reservas pendientes o activas, o un saldo por pagar. Espera a que se resuelvan para cambiar su rol o desactivarlo'],
         ['VEHICLE_HAS_ACTIVE_RESERVATION', 'Este vehículo tiene una reserva activa. Cancélala antes de eliminarlo'],
         ['TOO_MANY_REQUESTS', 'Hiciste demasiados intentos. Espera unos minutos e intenta de nuevo'],
         ['NO_SPOTS_AVAILABLE', 'Este cupo ya no está disponible. Elige otra zona u horario'],
+        ['EMAIL_NOT_VERIFIED', 'Confirma tu correo antes de iniciar sesión. Revisa tu bandeja de entrada'],
+        ['VERIFICATION_TOKEN_INVALID', 'Este enlace de confirmación ya no es válido. Pide uno nuevo'],
+        ['OUTSIDE_ZONE_HOURS', 'La reserva debe estar dentro del horario de la zona, con la entrada al menos 30 minutos antes del cierre'],
+        ['ZONE_CLOSED_THAT_DAY', 'Esta zona no abre ese día'],
+        ['TOO_MANY_PENDING_RESERVATIONS', 'Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra'],
+        ['VEHICLE_LIMIT_REACHED', 'Alcanzaste el máximo de 5 vehículos activos. Elimina uno antes de registrar otro'],
+        ['SPOT_RESERVED_LATER', 'Tu cupo tiene otra reserva más tarde, así que no se puede ampliar hasta esa hora. Elige una hora de salida más temprana'],
     ])('translates %s', (code, text) => {
         expect(translateError(code)).toBe(text);
     });

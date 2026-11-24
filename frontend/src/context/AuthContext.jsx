@@ -14,6 +14,20 @@ export function AuthProvider({ children }) {
             setUser(savedSession);
         }
         setLoading(false);
+
+        // #307: this tab follows the session of the other tabs. Signing out
+        // there signs out here, and signing in there (maybe with another
+        // account) signs in here, so a tab never shows one account while its
+        // requests use the token of another.
+        function handleStorage(event) {
+            if (event.storageArea !== localStorage) return;
+            if (event.key !== 'token' && event.key !== 'user' && event.key !== null) return;
+
+            setUser(readSavedSession({ clearBroken: false }));
+        }
+
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
     }, []);
 
     const loginUser = (token, userData) => {
@@ -30,6 +44,13 @@ export function AuthProvider({ children }) {
         });
     };
 
+    // #199: after a password change the API answers with a new token, because
+    // the old one stops working. The session goes on with the new one.
+    const updateToken = (token) => {
+        localStorage.setItem('token', token);
+        setUser((prev) => (prev ? { ...prev, token } : prev));
+    };
+
     const logoutUser = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -37,7 +58,7 @@ export function AuthProvider({ children }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loginUser, updateUser, logoutUser, loading }}>
+        <AuthContext.Provider value={{ user, loginUser, updateUser, updateToken, logoutUser, loading }}>
             {children}
         </AuthContext.Provider>
     );

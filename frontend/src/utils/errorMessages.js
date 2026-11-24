@@ -15,6 +15,8 @@ const errorMessages = {
     FORBIDDEN_ROLE: 'No tienes permiso para realizar esta acción',
     RESET_TOKEN_INVALID: 'Este enlace de recuperación ya no es válido. Solicita uno nuevo',
     ACCOUNT_DEACTIVATED: 'Tu cuenta ha sido desactivada. Contacta al administrador',
+    EMAIL_NOT_VERIFIED: 'Confirma tu correo antes de iniciar sesión. Revisa tu bandeja de entrada',
+    VERIFICATION_TOKEN_INVALID: 'Este enlace de confirmación ya no es válido. Pide uno nuevo',
 
     // Users / profile
     USER_NOT_FOUND: 'Usuario no encontrado',
@@ -23,6 +25,8 @@ const errorMessages = {
     CANNOT_MODIFY_SELF: 'No puedes realizar esta acción sobre tu propia cuenta',
     PRIMARY_ADMIN_PROTECTED: 'El administrador principal no puede modificarse',
     MIN_ONE_ADMIN_REQUIRED: 'El sistema debe conservar al menos un administrador activo',
+    // #348: an account with something open cannot change its role or be deactivated
+    USER_HAS_OPEN_RESERVATIONS: 'Este usuario tiene reservas pendientes o activas, o un saldo por pagar. Espera a que se resuelvan para cambiar su rol o desactivarlo',
     INVALID_ROLE: 'Rol inválido',
     INVALID_RANGE: 'El rango de fechas no es válido',
 
@@ -31,6 +35,7 @@ const errorMessages = {
     PLATE_ALREADY_REGISTERED: 'Esta placa ya está registrada',
     VEHICLE_HAS_ACTIVE_RESERVATION: 'Este vehículo tiene una reserva activa. Cancélala antes de eliminarlo',
     INVALID_PLATE_FORMAT: 'El formato de la placa no corresponde al tipo de vehículo seleccionado',
+    VEHICLE_LIMIT_REACHED: 'Alcanzaste el máximo de 5 vehículos activos. Elimina uno antes de registrar otro',
 
     // Zones
     ZONE_NOT_FOUND: 'Zona no encontrada',
@@ -50,7 +55,11 @@ const errorMessages = {
     END_BEFORE_START: 'La hora de fin debe ser posterior a la de inicio',
     INVALID_DURATION: 'La reserva debe durar entre 30 minutos y 24 horas',
     RESERVATION_TOO_FAR_AHEAD: 'Solo puedes reservar con un máximo de 48 horas de anticipación',
+    // HU-29: the screens add the hours of that day when the API sends them
+    OUTSIDE_ZONE_HOURS: 'La reserva debe estar dentro del horario de la zona, con la entrada al menos 30 minutos antes del cierre',
+    ZONE_CLOSED_THAT_DAY: 'Esta zona no abre ese día',
     VEHICLE_RESERVATION_OVERLAP: 'Este vehículo ya tiene una reserva en ese horario',
+    TOO_MANY_PENDING_RESERVATIONS: 'Ya tienes 2 reservas pendientes de pago. Paga o cancela una antes de hacer otra',
     NO_SPOTS_AVAILABLE: 'Este cupo ya no está disponible. Elige otra zona u horario',
     RESERVATION_NOT_FOUND: 'Reserva no encontrada',
     RESERVATION_ALREADY_STARTED: 'Esta reserva ya inició y no se puede cancelar',
@@ -66,6 +75,7 @@ const errorMessages = {
     EXTENSION_NOT_LATER: 'La nueva hora de salida debe ser posterior a la actual',
     EXTENSION_TOO_LONG: 'La estadía no puede durar más de 24 horas desde la entrada',
     RESERVATION_CHANGED: 'Esta reserva cambió mientras la ampliabas, por ejemplo desde otra pestaña. No se cobró nada en este intento. Revisa la reserva e intenta de nuevo',
+    SPOT_RESERVED_LATER: 'Tu cupo tiene otra reserva más tarde, así que no se puede ampliar hasta esa hora. Elige una hora de salida más temprana',
 
     // Payments
     INVALID_PAYMENT_METHOD: 'Método de pago inválido',

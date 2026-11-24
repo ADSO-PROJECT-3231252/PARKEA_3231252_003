@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { formatDate, formatTime } from '../utils/format';
 import { describeLog } from '../utils/adminUsersHelpers';
 
@@ -11,6 +12,8 @@ export default function LogDetailsModal({ log, onClose }) {
     const dialogRef = useRef(null);
     const closeButtonRef = useRef(null);
     const previouslyFocusedRef = useRef(null);
+
+    useBodyScrollLock(Boolean(log));
 
     useEffect(() => {
         if (!log) return;

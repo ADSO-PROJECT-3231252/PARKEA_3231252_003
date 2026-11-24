@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock } from 'lucide-react';
-import { isNotEmpty } from '../utils/validators';
+import { isNotEmpty, isValidPassword, PASSWORD_MESSAGE } from '../utils/validators';
 import { resetPassword } from '../services/authService';
 import { translateError } from '../utils/errorMessages';
-import logo from '../assets/logo.png';
-const PASSWORD_RULE = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,20}$/;
+import logo from '../assets/logo.webp';
 export default function ResetPassword() {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
@@ -17,6 +16,12 @@ export default function ResetPassword() {
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [tokenInvalid, setTokenInvalid] = useState(false);
+    // #311: a link the server rejects replaces the form with its message, so
+    // the focus goes to the message instead of being lost with the button
+    const invalidRef = useRef(null);
+    useEffect(() => {
+        if (tokenInvalid) invalidRef.current?.focus();
+    }, [tokenInvalid]);
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm((prev) => ({ ...prev, [name]: value }));
@@ -27,9 +32,8 @@ export default function ResetPassword() {
         const newErrors = {};
         if (!isNotEmpty(form.newPassword)) {
             newErrors.newPassword = 'La nueva contraseña es obligatoria.';
-        } else if (!PASSWORD_RULE.test(form.newPassword)) {
-            newErrors.newPassword =
-                'Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.';
+        } else if (!isValidPassword(form.newPassword)) {
+            newErrors.newPassword = PASSWORD_MESSAGE;
         }
         if (!isNotEmpty(form.confirmNewPassword)) {
             newErrors.confirmNewPassword = 'Confirma tu nueva contraseña.';
@@ -41,6 +45,8 @@ export default function ResetPassword() {
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
+        // #311: the button is aria-disabled while it waits, so a second Enter or click still arrives here
+        if (loading) return;
         setServerError('');
         if (!validate()) return;
         setLoading(true);
@@ -58,6 +64,10 @@ export default function ResetPassword() {
             // link back to phase 1.
             if (code === 'RESET_TOKEN_INVALID') {
                 setTokenInvalid(true);
+            } else if (code === 'PASSWORD_UNCHANGED') {
+                // #199: the new password is the current one; the link still
+                // works, so the error goes on the field to try another one
+                setErrors((prev) => ({ ...prev, newPassword: translateError(code) }));
             } else {
                 setServerError(translateError(code));
             }
@@ -77,8 +87,10 @@ p-8 text-center"
                 >
                     <h1 className="sr-only">Enlace no válido</h1>
                     <p
+                        ref={invalidRef}
+                        tabIndex={-1}
                         role="alert"
-                        className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 mb-4"
+                        className="text-caption text-danger bg-danger-soft rounded-md px-3 py-2 mb-4 focus:outline-none"
                     >
                         {translateError('RESET_TOKEN_INVALID')}
                     </p>
@@ -138,6 +150,8 @@ p-8 text-center"
                                 id="newPassword"
                                 name="newPassword"
                                 type={showPassword ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                aria-required="true"
                                 maxLength={20}
                                 placeholder="Ingresa tu nueva contraseña"
                                 value={form.newPassword}
@@ -147,14 +161,14 @@ p-8 text-center"
                                     errors.newPassword ? 'newPassword-error' : 'newPassword-hint'
                                 }
                                 className={`w-full rounded-md border px-3 py-2.5 pr-9 font-sans text-body
-text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600
 ${errors.newPassword ? 'border-danger' : 'border-neutral-200'}`}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showPassword ? (
@@ -170,7 +184,7 @@ hover:text-neutral-700"
                             </p>
                         ) : (
                             <p id="newPassword-hint" className="mt-1 text-caption text-neutral-600">
-                                Entre 8 y 20 caracteres, con una mayúscula, un número y un carácter especial.
+                                {PASSWORD_MESSAGE}
                             </p>
                         )}
                     </div>
@@ -186,6 +200,8 @@ hover:text-neutral-700"
                                 id="confirmNewPassword"
                                 name="confirmNewPassword"
                                 type={showConfirm ? 'text' : 'password'}
+                                autoComplete="new-password"
+                                aria-required="true"
                                 maxLength={20}
                                 placeholder="Confirma tu nueva contraseña"
                                 value={form.confirmNewPassword}
@@ -195,14 +211,14 @@ hover:text-neutral-700"
                                     errors.confirmNewPassword ? 'confirmNewPassword-error' : undefined
                                 }
                                 className={`w-full rounded-md border px-3 py-2.5 pr-9 font-sans text-body
-text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600
+text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600
 ${errors.confirmNewPassword ? 'border-danger' : 'border-neutral-200'}`}
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowConfirm((v) => !v)}
                                 aria-label={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-neutral-600
 hover:text-neutral-700"
                             >
                                 {showConfirm ? (
@@ -224,10 +240,10 @@ hover:text-neutral-700"
                     </div>
                     <button
                         type="submit"
-                        disabled={loading}
+                        aria-disabled={loading || undefined}
                         className="w-full rounded-md bg-parkea-600 text-white font-sans font-medium py-2.5
 hover:bg-parkea-700 focus:outline-none focus:ring-2 focus:ring-offset-2
-focus:ring-parkea-600 transition disabled:opacity-60"
+focus:ring-parkea-600 transition aria-disabled:opacity-60 aria-disabled:hover:bg-parkea-600"
                     >
                         {loading ? 'Guardando...' : 'Guardar nueva contraseña'}
                     </button>

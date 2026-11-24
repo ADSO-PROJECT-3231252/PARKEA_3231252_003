@@ -1,10 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info } from 'lucide-react';
+import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { todayHoursLabel } from '../utils/zoneHours';
+import { normalizeText } from '../utils/normalizeText';
 
 // HU-25: Leaflet is only downloaded when the map view is opened. If that
 // download fails, the page falls back to the list like any other map error.
@@ -29,9 +31,13 @@ const BADGE_CLASSES = {
     available: 'bg-parkea-50 text-parkea-600',
 };
 
+// #373: availableSlots is the room now (the spots free for the next 30
+// minutes). A zone with none now can still be reserved for other hours, so
+// "Reservar" is never blocked: the reserve screen and the API decide.
 function ZoneCard({ zone, onReserve }) {
     const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
-    const full = zone.availableSlots === 0;
+    const fullNow = availability.state === 'full';
+    const noteId = `full-now-${zone.id}`;
 
     return (
         <div className="@container flex flex-col rounded-lg border border-neutral-200 bg-white p-5">
@@ -47,13 +53,19 @@ function ZoneCard({ zone, onReserve }) {
 
             {zone.address && <p className="mt-1 pl-[22px] text-body text-neutral-600">{zone.address}</p>}
 
+            {/* HU-29 AC-06: the hours of today */}
+            <p className="mt-2 flex items-start gap-1.5 text-body text-neutral-900">
+                <Clock className="mt-1 h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                <span>{todayHoursLabel(zone)}</span>
+            </p>
+
             <div className="mt-4 flex flex-col gap-3 @sm:flex-row @sm:items-end @sm:justify-between">
                 <span className="flex items-center gap-1.5 text-body text-neutral-900">
                     <Users className="h-4 w-4 text-neutral-500" aria-hidden="true" />
                     <span className="font-mono tabular-nums">{zone.availableSlots}</span>
                     <span className="text-neutral-600">de</span>
                     <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                    <span className="text-caption text-neutral-600">cupos disponibles</span>
+                    <span className="text-caption text-neutral-600">cupos libres ahora</span>
                 </span>
                 <span className="flex flex-col @sm:items-end">
                     <span className="text-caption text-neutral-600">Tarifa por hora</span>
@@ -67,16 +79,17 @@ function ZoneCard({ zone, onReserve }) {
             <button
                 type="button"
                 onClick={() => onReserve(zone)}
-                aria-disabled={full || undefined}
-                aria-label={full ? `Reservar en ${zone.name} (no disponible: esta zona no tiene cupos)` : `Reservar en ${zone.name}`}
-                title={full ? 'Esta zona no tiene cupos disponibles' : undefined}
-                className={`mt-4 w-full rounded-md px-4 py-2 text-label font-medium transition-colors ${full
-                    ? 'cursor-not-allowed bg-neutral-200 text-neutral-600'
-                    : 'bg-parkea-600 text-white hover:bg-parkea-700'
-                    }`}
+                aria-label={`Reservar en ${zone.name}`}
+                aria-describedby={fullNow ? noteId : undefined}
+                className="mt-4 w-full rounded-md bg-parkea-600 px-4 py-2 text-label font-medium text-white transition-colors hover:bg-parkea-700"
             >
-                {full ? 'Sin cupos disponibles' : 'Reservar'}
+                Reservar
             </button>
+            {fullNow && (
+                <p id={noteId} className="mt-2 text-center text-caption text-neutral-600">
+                    No hay cupos en este momento, pero puedes reservar para otro horario.
+                </p>
+            )}
         </div>
     );
 }
@@ -89,6 +102,8 @@ export default function Zones() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
     const [search, setSearch] = useState('');
+    // #311: the clear button disappears with the text, so the focus goes back to the search box
+    const searchRef = useRef(null);
     const [page, setPage] = useState(1);
 
     // HU-25: list and map share this screen, so the search is kept when the
@@ -126,14 +141,24 @@ export default function Zones() {
     };
 
     const filteredZones = useMemo(() => {
-        const term = search.trim().toLowerCase();
+        const term = normalizeText(search.trim());
         if (!term) return zones;
-        return zones.filter((zone) => zone.name.toLowerCase().includes(term));
+        return zones.filter((zone) => normalizeText(zone.name).includes(term));
     }, [zones, search]);
 
     const totalPages = Math.max(1, Math.ceil(filteredZones.length / PAGE_SIZE));
     const currentPage = Math.min(page, totalPages);
     const paginatedZones = filteredZones.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    // #331 (WCAG 2.1 SC 4.1.3): while there is a search, a hidden status message
+    // tells a screen reader how many zones were found. The element is always in
+    // the page (empty without a search), so the change is announced.
+    let searchStatus = '';
+    if (search.trim() && !loading && !error) {
+        searchStatus = filteredZones.length === 0
+            ? 'No se encontraron zonas con ese nombre.'
+            : `${filteredZones.length} ${filteredZones.length === 1 ? 'zona encontrada' : 'zonas encontradas'}`;
+    }
 
     const handleSearchChange = (e) => {
         setSearch(e.target.value);
@@ -143,6 +168,7 @@ export default function Zones() {
     const handleClearSearch = () => {
         setSearch('');
         setPage(1);
+        searchRef.current?.focus();
     };
 
     // AC-08: if the map can't load, explain it and fall back to the list.
@@ -154,7 +180,6 @@ export default function Zones() {
     const showList = () => setSearchParams({});
 
     const handleReserve = (zone) => {
-        if (zone.availableSlots === 0) return;
         if (!user) {
             navigate('/login', { state: { from: `/reserve/${zone.id}` } });
             return;
@@ -209,11 +234,12 @@ export default function Zones() {
                     Buscar zonas por nombre
                 </label>
                 <input
+                    ref={searchRef}
                     id="zone-search"
                     type="text"
                     value={search}
                     onChange={handleSearchChange}
-                    placeholder="Buscar por nombre de zona..."
+                    placeholder="Buscar por nombre…"
                     className="w-full rounded-md border border-neutral-200 py-2 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600"
                 />
                 {search && (
@@ -221,12 +247,17 @@ export default function Zones() {
                         type="button"
                         onClick={handleClearSearch}
                         aria-label="Limpiar búsqueda"
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-600 hover:text-neutral-700"
+                        className="absolute right-1.5 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-neutral-600 hover:text-neutral-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-parkea-600"
                     >
                         <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                 )}
             </div>
+
+            {/* #331: announces the result of the search to screen readers */}
+            <p role="status" className="sr-only">
+                {searchStatus}
+            </p>
 
             <div className="mt-6">
                 {mapFailed && view === 'list' && (
@@ -319,10 +350,12 @@ export default function Zones() {
                             >
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage - 1)}
-                                    disabled={currentPage === 1}
+                                    onClick={() => {
+                                        if (currentPage > 1) setPage(currentPage - 1);
+                                    }}
+                                    aria-disabled={currentPage === 1 || undefined}
                                     aria-label="Página anterior"
-                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
                                 >
                                     <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                                     Anterior
@@ -332,10 +365,12 @@ export default function Zones() {
                                 </span>
                                 <button
                                     type="button"
-                                    onClick={() => setPage(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
+                                    onClick={() => {
+                                        if (currentPage < totalPages) setPage(currentPage + 1);
+                                    }}
+                                    aria-disabled={currentPage === totalPages || undefined}
                                     aria-label="Página siguiente"
-                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-neutral-200 disabled:hover:text-neutral-900"
+                                    className="flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:border-neutral-200 aria-disabled:hover:text-neutral-900"
                                 >
                                     Siguiente
                                     <ChevronRight className="h-4 w-4" aria-hidden="true" />

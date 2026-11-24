@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './ZoneMap.css';
-import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info } from 'lucide-react';
+import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info, Clock } from 'lucide-react';
 import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { todayHoursLabel } from '../utils/zoneHours';
+import { buildPinHtml } from '../utils/zonePin';
 
 // HU-25: map view of the active zones. Base map: OpenStreetMap standard
 // tiles (free, no API key, attribution required).
@@ -21,12 +22,6 @@ const SINGLE_ZONE_ZOOM = 16;
 
 // AC-08: if this many tiles fail before any tile loads, the map is unusable.
 const MAX_TILE_ERRORS = 3;
-
-const PIN_CLASSES = {
-    available: 'bg-parkea-600',
-    almost: 'bg-warning',
-    full: 'bg-danger',
-};
 
 const BADGE_CLASSES = {
     available: 'bg-parkea-50 text-parkea-600',
@@ -46,27 +41,11 @@ function getPosition(zone) {
 }
 
 // AC-02/AC-03: one pin per zone, colored by availability; full zones also get
-// a different icon so the state is not conveyed by color alone.
+// a different icon so the state is not conveyed by color alone. The HTML is
+// built in utils/zonePin.js, where it is tested.
 function buildIcon(name, availableSlots, totalSlots) {
-    const availability = getZoneAvailability(availableSlots, totalSlots);
-    const Icon = availability.state === 'full' ? Ban : SquareParking;
-    const html = renderToStaticMarkup(
-        <span className="relative block h-10 w-8">
-            <span
-                className={`zone-marker-pin absolute left-0 top-0 flex h-8 w-8 items-center justify-center border-2 border-white shadow-md ${PIN_CLASSES[availability.state]}`}
-            >
-                <Icon className="h-4 w-4 text-white" aria-hidden="true" />
-            </span>
-            <span className="absolute left-9 top-1 max-w-[160px] truncate whitespace-nowrap rounded-md border border-neutral-200 bg-white px-2 py-0.5 text-caption font-medium text-neutral-900 shadow-sm">
-                {name}
-            </span>
-            <span className="sr-only">
-                {`, ${availability.text}, ${availableSlots} de ${totalSlots} cupos`}
-            </span>
-        </span>,
-    );
     return L.divIcon({
-        html,
+        html: buildPinHtml(name, availableSlots, totalSlots),
         className: 'zone-marker-icon',
         iconSize: [32, 40],
         // The pin's tip: bottom-center of the rotated square
@@ -75,11 +54,14 @@ function buildIcon(name, availableSlots, totalSlots) {
     });
 }
 
-// AC-04/AC-05: summary shown when a marker is opened.
+// AC-04/AC-05: summary shown when a marker is opened. #373: a zone with no
+// room now can still be reserved for other hours, so "Reservar" is never
+// blocked; the summary only says that there is no room now.
 function ZoneSummary({ zone, availability, onReserve }) {
     const map = useMap();
     const reserveRef = useRef(null);
-    const full = availability.state === 'full';
+    const fullNow = availability.state === 'full';
+    const noteId = `full-now-${zone.id}`;
 
     // AC-10: the summary is rendered only once it opens, so focus is moved
     // here (not in Leaflet's popupopen event, which fires before it exists).
@@ -119,12 +101,18 @@ function ZoneSummary({ zone, availability, onReserve }) {
                 </p>
             )}
 
+            {/* HU-29 AC-06: the hours of today */}
+            <p className="mt-1 flex items-start gap-2 text-body text-neutral-900">
+                <Clock className="mt-1 h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
+                <span className="min-w-0 break-words">{todayHoursLabel(zone)}</span>
+            </p>
+
             <div className="mt-3 flex items-center justify-between gap-x-3 gap-y-2 border-t border-neutral-200 pt-3 max-[319px]:flex-wrap">
                 <span className="flex items-center gap-2 text-body text-neutral-900">
                     <Users className="h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
                     <span>
                         <span className="font-mono tabular-nums">{zone.availableSlots}</span> de{' '}
-                        <span className="font-mono tabular-nums">{zone.totalSlots}</span> cupos disponibles
+                        <span className="font-mono tabular-nums">{zone.totalSlots}</span> cupos libres ahora
                     </span>
                 </span>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-caption font-medium ${BADGE_CLASSES[availability.state]}`}>
@@ -147,19 +135,15 @@ function ZoneSummary({ zone, availability, onReserve }) {
                 type="button"
                 data-reserve
                 onClick={() => onReserve(zone)}
-                aria-label={full ? `Sin cupos disponibles en ${zone.name}` : `Reservar en ${zone.name}`}
-                aria-disabled={full || undefined}
-                aria-describedby={full ? `full-${zone.id}` : undefined}
-                className={`mt-4 w-full rounded-md px-4 py-2.5 text-label font-medium transition-colors ${full
-                    ? 'cursor-not-allowed bg-neutral-200 text-neutral-700'
-                    : 'bg-parkea-600 text-white hover:bg-parkea-700'
-                    }`}
+                aria-label={`Reservar en ${zone.name}`}
+                aria-describedby={fullNow ? noteId : undefined}
+                className="mt-4 w-full rounded-md bg-parkea-600 px-4 py-2.5 text-label font-medium text-white transition-colors hover:bg-parkea-700"
             >
-                {full ? 'Sin cupos disponibles' : 'Reservar'}
+                Reservar
             </button>
-            {full && (
-                <p id={`full-${zone.id}`} className="mt-2 text-center text-caption text-neutral-600">
-                    Esta zona no tiene cupos en este momento, así que no se puede reservar.
+            {fullNow && (
+                <p id={noteId} className="mt-2 text-center text-caption text-neutral-600">
+                    No hay cupos en este momento, pero puedes reservar para otro horario.
                 </p>
             )}
         </div>
@@ -321,7 +305,7 @@ export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
                             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-danger" aria-hidden="true">
                                 <Ban className="h-2.5 w-2.5 text-white" aria-hidden="true" />
                             </span>
-                            Llena (sin cupos)
+                            Llena (sin cupos ahora)
                         </li>
                     </ul>
                 </div>
