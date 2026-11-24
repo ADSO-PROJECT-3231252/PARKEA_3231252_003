@@ -1,4 +1,4 @@
-import { vehicleTypePlural } from './vehicleTypes';
+import { VEHICLE_TYPES, vehicleTypePlural } from './vehicleTypes';
 
 // Availability state shared by the zone list (HU-09) and the Home zone widget.
 // Returns the state key plus its label; each screen applies its own styles.
@@ -11,6 +11,25 @@ export function getZoneAvailability(availableSlots, totalSlots) {
     }
     return { state: 'available', text: 'Disponible' };
 }
+
+// HU-31: the type `type` of a zone as the API sends it ({ vehicleType,
+// totalSlots, availableSlots, hourlyRate }), or null when the zone does not
+// accept it. The API only sends the types that take reservations.
+export const zoneTypeOf = (zone, type) => zone?.vehicleTypes?.find((item) => item.vehicleType === type) ?? null;
+
+// HU-31: the types a zone accepts, in the order of every screen
+export const acceptedTypesOf = (zone) => VEHICLE_TYPES.filter((type) => zoneTypeOf(zone, type));
+
+// HU-31 AC-09: the spots of the zone, or the ones of a type when the screen is
+// about that type (the filter of the list): { availableSlots, totalSlots }
+export function spotsOf(zone, type) {
+    const item = type ? zoneTypeOf(zone, type) : null;
+    return item ?? { availableSlots: zone.availableSlots, totalSlots: zone.totalSlots };
+}
+
+// HU-31 AC-09: the type of the filter "?type=motorcycle", or null for "Todos"
+// (also when the value is not a type)
+export const typeFilterOf = (value) => (VEHICLE_TYPES.includes(value) ? value : null);
 
 // HU-19 AC-07 / AC-08: texts of the activate/deactivate confirmation, shared by
 // the zone list (HU-19) and the edit form (HU-21 AC-07). activeReservations is
