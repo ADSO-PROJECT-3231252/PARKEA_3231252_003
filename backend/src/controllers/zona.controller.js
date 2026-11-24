@@ -1,8 +1,9 @@
 const { Op } = require('sequelize');
 const { Zona, ParkingSpot, ZoneSchedule, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
-const { scheduleErrors } = require('../utils/zoneHours');
+const { scheduleErrors, checkStay } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
+const { checkStayTimes, outsideHoursError } = require('../utils/stayRequest');
 const availability = require('../services/availability');
 
 // HU-29: every zone is sent with its opening hours (Zona.toJSON)
@@ -397,6 +398,69 @@ async function getZonaPorId(req, res, next) {
   }
 }
 
+// GET /api/zones/:id/availability — public (#375): how many spots of the zone
+// are free for some hours, with the same rules as POST /reservations: the
+// same checks of the times (utils/stayRequest.js), the hours of the zone and
+// the free spots with the 10 minutes before and after. ?startTime=&endTime=,
+// or ?startTime=&openEnded=true for a stay without an exit time, which holds
+// its spot until the closing time of the zone or for 24 hours, as when it is
+// reserved. It only informs: the reservation still decides when it is sent.
+async function getDisponibilidadPorHoras(req, res, next) {
+  try {
+    const { id } = req.params;
+    const { startTime, endTime, openEnded } = req.query;
+
+    // A repeated value (?startTime=a&startTime=b) arrives as a list
+    for (const [name, value] of Object.entries({ startTime, endTime, openEnded })) {
+      if (value !== undefined && typeof value !== 'string') {
+        return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: `${name} must be text` });
+      }
+    }
+    if (openEnded !== undefined && openEnded !== 'true' && openEnded !== 'false') {
+      return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: 'openEnded must be true or false' });
+    }
+    const isOpenStay = openEnded === 'true';
+
+    const now = new Date();
+    const horas = checkStayTimes({ startTime, endTime, openEnded: isOpenStay }, now);
+    if (horas.error) {
+      return res.status(horas.error.status).json(horas.error.body);
+    }
+
+    // The zone and its free spots are read at the same moment
+    const respuesta = await enUnMomento(async (transaction) => {
+      const zona = await Zona.findByPk(id, { include: [CON_HORARIO], transaction });
+      if (!zona) {
+        return { status: 404, body: { code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' } };
+      }
+      if (!zona.isActive) {
+        return { status: 409, body: { code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' } };
+      }
+      // HU-29: the stay must fit the hours of the day of the entry, and an
+      // open stay holds its spot until the closing time of that day
+      const horario = checkStay(zona, horas.start, isOpenStay ? null : horas.end);
+      if (horario.problem) return outsideHoursError(horario.problem);
+      const end = isOpenStay && horario.closesAt ? horario.closesAt : horas.end;
+
+      const libres = await availability.freeSpotsBetween(zona.id, horas.start, end, { transaction, now });
+      return {
+        status: 200,
+        body: {
+          zoneId: zona.id,
+          startTime: horas.start,
+          endTime: end,
+          openEnded: isOpenStay,
+          availableSlots: libres,
+          totalSlots: zona.totalSlots,
+        },
+      };
+    });
+    return res.status(respuesta.status).json(respuesta.body);
+  } catch (error) {
+    next(error);
+  }
+}
+
 // GET /api/zones/all — admin only, ALL zones regardless of active status (HU-19, AC-01)
 async function getTodasLasZonas(req, res, next) {
   try {
@@ -432,4 +496,4 @@ async function getTodasLasZonas(req, res, next) {
 }
 
 // validarZona and validarHorario are exported only so the tests can call them without a database
-module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getZonaPorId, validarZona, validarHorario };
+module.exports = { getZonas, getTodasLasZonas, createZona, updateZona, toggleZona, getZonaPorId, getDisponibilidadPorHoras, validarZona, validarHorario };

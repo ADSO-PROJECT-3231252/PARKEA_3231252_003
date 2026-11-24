@@ -120,6 +120,28 @@ describe('The rules of availability (#373)', () => {
         expect(sql).toContain("r.end_time > '2026-11-16 12:50:00'");
     });
 
+    test('the free spots of a zone for some hours are its enabled spots with no reservation in them, with the margin (#375)', async () => {
+        // Arrange
+        const transaction = { id: 't' };
+        jest.spyOn(ParkingSpot, 'count').mockResolvedValue(3);
+
+        // Act: today from 3:00 to 5:00 p. m. in Colombia
+        const free = await availability.freeSpotsBetween(ZONE_ID, at('20:00'), at('22:00'), { transaction, now: NOW });
+
+        // Assert: from 19:50 to 22:10 with the margin, among the enabled
+        // spots of the zone, with the same rule as the spot that crear gives
+        expect(free).toBe(3);
+        const options = ParkingSpot.count.mock.calls[0][0];
+        expect(options.where.zoneId).toBe(ZONE_ID);
+        expect(options.where.status).toEqual({ [Op.ne]: 'Disabled' });
+        expect(options.transaction).toBe(transaction);
+        const sql = sqlOf(options.where);
+        expect(sql).toContain("r.start_time < '2026-11-16 22:10:00'");
+        expect(sql).toContain("r.end_time > '2026-11-16 19:50:00'");
+        expect(sql).toContain("r.status = 'Finished'");
+        expect(sql).toContain("r.hold_expires_at > '2026-11-16 13:00:00'");
+    });
+
     test('each zone gets its availableSlots, and the API sends it', async () => {
         // Arrange
         const centro = Zona.build({ id: ZONE_ID, name: 'Centro', totalSlots: 10 });
@@ -169,6 +191,48 @@ describe('The rules of availability (#373)', () => {
 
     test('the spot is free until 10 minutes before the next reservation', () => {
         expect(availability.freeUntil({ startTime: at('17:00') })).toEqual(at('16:50'));
+    });
+
+    test('after its exit time, the spot of a stay is free until 10 minutes before its next reservation, looked for as an extension does (#375)', async () => {
+        // Arrange: a stay until 4:00 p. m. UTC that can go up to 8:00 p. m.
+        jest.spyOn(Reserva, 'findOne').mockResolvedValue({ id: 'next', startTime: at('18:00') });
+        const stay = { id: 'stay', parkingSpotId: 'spot-1', endTime: at('16:00') };
+        const transaction = { id: 't' };
+
+        // Act
+        const until = await availability.spotFreeUntil(stay, at('20:00'), { transaction, now: NOW });
+
+        // Assert: the same search as nextHolderOfSpot, from the exit time to the furthest exit
+        expect(until).toEqual(at('17:50'));
+        const options = Reserva.findOne.mock.calls[0][0];
+        expect(options.where).toMatchObject({
+            id: { [Op.ne]: 'stay' },
+            parkingSpotId: 'spot-1',
+            startTime: { [Op.lt]: at('20:10') },
+            endTime: { [Op.gt]: at('15:50') },
+        });
+        expect(options.where[Op.and]).toEqual([availability.holdsItsSpot(NOW)]);
+        expect(options.transaction).toBe(transaction);
+    });
+
+    test('with no reservation of the spot until the furthest exit, the spot of a stay has no limit (#375)', async () => {
+        // Arrange
+        jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);
+
+        // Act and assert
+        expect(await availability.spotFreeUntil({ id: 'stay', parkingSpotId: 'spot-1', endTime: at('16:00') }, at('20:00'), { now: NOW })).toBeNull();
+    });
+
+    test.each([
+        ['has no furthest exit (its zone does not open that day)', null],
+        ['is already at its furthest exit', at('16:00')],
+    ])('a stay that %s has no limit to look for, and nothing is read (#375)', async (_case, latest) => {
+        // Arrange
+        jest.spyOn(Reserva, 'findOne');
+
+        // Act and assert
+        expect(await availability.spotFreeUntil({ id: 'stay', parkingSpotId: 'spot-1', endTime: at('16:00') }, latest, { now: NOW })).toBeNull();
+        expect(Reserva.findOne).not.toHaveBeenCalled();
     });
 
     test('the spots in use are the different spots with a reservation that holds them from now on', async () => {

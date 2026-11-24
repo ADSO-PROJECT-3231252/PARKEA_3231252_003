@@ -97,12 +97,18 @@ function availableNowByZone(zoneIds, { transaction, now = new Date() } = {}) {
     return freeSpotsByZone(zoneIds, now, plus(now, MIN_STAY_MS), { transaction, now });
 }
 
-// `availableSlots` of one zone
-function availableNow(zoneId, { transaction, now = new Date() } = {}) {
+// #375: how many spots of one zone are free from `from` to `to`: the spots
+// that POST /reservations could give to a stay with those hours
+function freeSpotsBetween(zoneId, from, to, { transaction, now = new Date() } = {}) {
     return ParkingSpot.count({
-        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(now, plus(now, MIN_STAY_MS), now)] },
+        where: { zoneId, status: ENABLED, [Op.and]: [freeBetween(from, to, now)] },
         transaction,
     });
+}
+
+// `availableSlots` of one zone
+function availableNow(zoneId, { transaction, now = new Date() } = {}) {
+    return freeSpotsBetween(zoneId, now, plus(now, MIN_STAY_MS), { transaction, now });
 }
 
 // Adds `availableSlots` to each zone, as the API sends it (Zona.toJSON keeps
@@ -134,6 +140,19 @@ function nextHolderOfSpot(reserva, from, to, { transaction, now = new Date() } =
 
 // Until when a spot is free before the reservation that holds it next
 const freeUntil = (holder) => plus(holder.startTime, -MARGIN_MS);
+
+// #375: until when the spot of `reserva` is free after its exit time, for the
+// screens that offer an extension: 10 minutes before the next reservation
+// that holds it, looked for up to `latest`, the furthest exit the stay can
+// have (entry + 24 hours, or the closing time of its zone, HU-29). It is the
+// same search as the extension (nextHolderOfSpot), so what the screens offer
+// is what the extension accepts. Null when no reservation holds the spot
+// until then, or when the stay cannot go past its exit time.
+async function spotFreeUntil(reserva, latest, { transaction, now = new Date() } = {}) {
+    if (!latest || new Date(latest) <= new Date(reserva.endTime)) return null;
+    const holder = await nextHolderOfSpot(reserva, reserva.endTime, latest, { transaction, now });
+    return holder ? freeUntil(holder) : null;
+}
 
 // HU-21: how many spots of the zone hold a reservation from now on
 function spotsInUse(zoneId, { transaction, now = new Date() } = {}) {
@@ -169,11 +188,13 @@ module.exports = {
     freeFromNow,
     firstFreeSpot,
     freeSpotsByZone,
+    freeSpotsBetween,
     availableNowByZone,
     availableNow,
     withAvailableSlots,
     nextHolderOfSpot,
     freeUntil,
+    spotFreeUntil,
     spotsInUse,
     spotsInUseByZone,
 };
