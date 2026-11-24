@@ -1,7 +1,10 @@
-const { Pago, Reserva } = require('../models');
+const { Pago, Reserva, Zona, Usuario } = require('../models');
 const { sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { validarMetodoPago, esRechazado, RECHAZADO } = require('../utils/simulatedPayment');
+const { countsAsExpired, RESERVATION_EXPIRED } = require('../utils/reservationHold');
+const { firstPaymentAmount } = require('../utils/stayPricing');
+const { safeRollback } = require('../utils/transaction');
 
 // POST /api/payments/:reservationId
 const crearPago = async (req, res) => {
@@ -16,6 +19,28 @@ const crearPago = async (req, res) => {
 
   const t = await sequelize.transaction();
   try {
+    // #348: the account is locked first, like in crear, and read again. A
+    // payment that passed the deadline check could otherwise save the
+    // reservation as Active after an admin changed the role or the status of
+    // the account: the change saw a Pending reservation whose 15 minutes had
+    // ended, which no longer counts. With this lock the change waits for the
+    // payment and then sees the reservation Active (409), or the payment
+    // waits for the change and answers 403. The order is account,
+    // reservation and zone.
+    const cuenta = await Usuario.findByPk(usuarioId, {
+      attributes: ['id', 'isActive', 'roleId'],
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!cuenta || !cuenta.isActive) {
+      await t.rollback();
+      return res.status(403).json({ code: ErrorCodes.ACCOUNT_DEACTIVATED, message: 'This account has been deactivated' });
+    }
+    if (cuenta.roleId !== req.usuario.roleId) {
+      await t.rollback();
+      return res.status(403).json({ code: ErrorCodes.FORBIDDEN_ROLE, message: 'You do not have permission for this action' });
+    }
+
     const reserva = await Reserva.findByPk(reservationId, { transaction: t, lock: t.LOCK.UPDATE });
     if (!reserva) {
       await t.rollback();
@@ -25,18 +50,18 @@ const crearPago = async (req, res) => {
       await t.rollback();
       return res.status(403).json({ code: ErrorCodes.RESERVATION_NOT_OWNED, message: 'This reservation does not belong to you' });
     }
-    // The expiration job only runs every 60 s, so a reservation can still say
-    // Pending for up to a minute after its hold deadline. The deadline itself is
-    // what decides whether it can still be paid (HU-26, AC-06).
-    const holdVencido = reserva.status === 'Pending'
-      && reserva.holdExpiresAt
-      && new Date(reserva.holdExpiresAt) <= new Date();
-    if (reserva.status === 'Expired' || holdVencido) {
+    // #373: the zone is locked after the reservation, like in ampliar, so a
+    // new reservation or a lower capacity of the zone waits until this payment
+    // ends. The deadline is checked after the lock, with the time of that
+    // moment: a reservation saved while this payment waited already counted
+    // this one as expired, so it must not be paid and take the spot back.
+    await Zona.findByPk(reserva.zoneId, { transaction: t, lock: t.LOCK.UPDATE });
+
+    // The deadline decides whether it can still be paid, even if the job has
+    // not marked it Expired yet (HU-26, AC-06)
+    if (countsAsExpired(reserva)) {
       await t.rollback();
-      return res.status(400).json({
-        code: ErrorCodes.RESERVATION_EXPIRED,
-        message: 'This reservation expired because it was not paid in time. Please make a new reservation.',
-      });
+      return res.status(400).json(RESERVATION_EXPIRED);
     }
     if (reserva.status !== 'Pending') {
       await t.rollback();
@@ -56,10 +81,8 @@ const crearPago = async (req, res) => {
     }
 
     // HU-27 AC-03: an open stay is confirmed by paying its first hour
-    const horas = reserva.openEnded
-      ? 1
-      : (new Date(reserva.endTime) - new Date(reserva.startTime)) / (1000 * 60 * 60);
-    const amount = Number((horas * Number(reserva.appliedHourlyRate)).toFixed(2));
+    // (#373: the same amount the confirmation and the list show)
+    const amount = firstPaymentAmount(reserva);
 
     const pago = await Pago.create({
       reservationId: reserva.id,
@@ -79,7 +102,7 @@ const crearPago = async (req, res) => {
 
     return res.status(201).json({ message: 'Payment approved', payment: pago });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     console.error('Error creating payment:', error);
     return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Internal error processing the payment' });
   }
@@ -135,7 +158,7 @@ const pagarSaldo = async (req, res) => {
 
     return res.status(200).json({ message: 'Balance paid', payment: saldo });
   } catch (error) {
-    await t.rollback();
+    await safeRollback(t);
     console.error('Error paying the balance:', error);
     return res.status(500).json({ code: ErrorCodes.INTERNAL_ERROR, message: 'Internal error processing the payment' });
   }

@@ -24,8 +24,10 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       field: 'spot_number',
     },
+    // #373: only whether the spot can be reserved. It is taken only for the
+    // hours of its reservations (services/availability.js).
     status: {
-      type: DataTypes.ENUM('Available', 'Occupied', 'Disabled'),
+      type: DataTypes.ENUM('Available', 'Disabled'),
       allowNull: false,
       defaultValue: 'Available',
     },

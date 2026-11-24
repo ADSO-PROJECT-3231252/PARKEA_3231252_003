@@ -8,6 +8,7 @@ module.exports = (sequelize, DataTypes) => {
       Usuario.hasMany(models.Vehiculo, { foreignKey: 'userId', as: 'vehicles' });
       Usuario.hasMany(models.Reserva, { foreignKey: 'userId', as: 'reservations' });
       Usuario.hasMany(models.PasswordResetToken, { foreignKey: 'userId', as: 'passwordResetTokens' });
+      Usuario.hasMany(models.EmailVerificationToken, { foreignKey: 'userId', as: 'emailVerificationTokens' });
       Usuario.hasMany(models.AdminActionLog, { foreignKey: 'adminId', as: 'actionsPerformed' });
       Usuario.hasMany(models.AdminActionLog, { foreignKey: 'targetUserId', as: 'actionsReceived' });
     }
@@ -39,9 +40,11 @@ module.exports = (sequelize, DataTypes) => {
     },
     documentType: {
       type: DataTypes.ENUM('CC', 'TI', 'CE', 'PASSPORT'),
-      allowNull: true,
+      allowNull: false,
       field: 'document_type',
     },
+    // #372: optional, because HU-30 frees the document of an old account that
+    // is in the admin log (auth.controller.js releaseDocument)
     documentNumber: {
       type: DataTypes.STRING(20),
       allowNull: true,
@@ -64,6 +67,19 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: false,
       field: 'role_id',
+    },
+    // #199: goes up on every password change; older session tokens stop working
+    passwordVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'password_version',
+    },
+    // HU-30: NULL until the user opens the link of the verification email
+    emailVerifiedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'email_verified_at',
     },
   }, {
     sequelize,

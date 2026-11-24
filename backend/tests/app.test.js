@@ -151,7 +151,7 @@ describe('POST /api/auth/login validation', () => {
         // Act
         const res = await request(app)
             .post('/api/auth/login')
-            .send({ email: ['admin@parkea.com'], password: 'Admin123!' });
+            .send({ email: ['admin@parkea.com'], password: 'unused-in-this-test' });
 
         // Assert
         expect(res.status).toBe(400);
