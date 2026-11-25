@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Car, IdCard, Tag, Layers, Palette, Eye, ChevronDown, AlertCircle, RefreshCw } from 'lucide-react';
 import { isNotEmpty, isValidPlate, REQUIRED_MESSAGE } from '../utils/validators';
@@ -25,6 +25,19 @@ export default function EditVehicle() {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null); // null | 'not_found' | 'generic'
     const [saving, setSaving] = useState(false);
+    // #390: after a failed save, the focus goes to the message ('server') or
+    // to the field that has the error, once it is on screen. That also brings
+    // it into view on a phone, where the button is far below the message.
+    const serverErrorRef = useRef(null);
+    const pendingFocus = useRef(null);
+    useEffect(() => {
+        if (!pendingFocus.current) return;
+        const target = pendingFocus.current === 'server'
+            ? serverErrorRef.current
+            : document.getElementById(pendingFocus.current);
+        pendingFocus.current = null;
+        target?.focus();
+    });
     const fetchVehicle = useCallback(() => {
         getVehicle(id)
             .then(({ data }) => {
@@ -119,8 +132,10 @@ export default function EditVehicle() {
         } catch (err) {
             const code = err.response?.data?.code;
             if (code === 'INVALID_PLATE_FORMAT') {
+                pendingFocus.current = 'vehicleType';
                 setErrors((prev) => ({ ...prev, vehicleType: translateError(code) }));
             } else if (code === 'VALIDATION_ERROR') {
+                pendingFocus.current = 'server';
                 // #234: mark the brand, the model or the color that the server rejects
                 const fieldErrors = {};
                 for (const { path } of err.response.data.errors ?? []) {
@@ -131,6 +146,7 @@ export default function EditVehicle() {
                 // "Revisa los campos marcados" only makes sense if a field was marked.
                 setServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
             } else {
+                pendingFocus.current = 'server';
                 setServerError(translateError(code));
             }
         } finally {
@@ -205,9 +221,11 @@ transition-colors hover:bg-white`}
             >
                 {serverError && (
                     <p
+                        ref={serverErrorRef}
+                        tabIndex={-1}
                         role="alert"
                         className={`mb-6 rounded-md bg-danger-soft px-3 py-2 text-center
-text-caption text-danger`}
+text-caption text-danger focus:outline-none`}
                     >
                         {serverError}
                     </p>

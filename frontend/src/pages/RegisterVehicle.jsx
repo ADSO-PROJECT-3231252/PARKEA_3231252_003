@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Car, IdCard, Tag, Layers, Palette, Eye, ChevronDown } from 'lucide-react';
 import { isNotEmpty, isValidPlate, REQUIRED_MESSAGE } from '../utils/validators';
@@ -39,6 +39,20 @@ export default function RegisterVehicle() {
     const [errors, setErrors] = useState({});
     const [serverError, setServerError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // #390: after a failed save, the focus goes to the message ('server') or
+    // to the field that has the error, once it is on screen. That also brings
+    // it into view on a phone, where the button is far below the message.
+    const serverErrorRef = useRef(null);
+    const pendingFocus = useRef(null);
+    useEffect(() => {
+        if (!pendingFocus.current) return;
+        const target = pendingFocus.current === 'server'
+            ? serverErrorRef.current
+            : document.getElementById(pendingFocus.current);
+        pendingFocus.current = null;
+        target?.focus();
+    });
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -126,8 +140,10 @@ export default function RegisterVehicle() {
             // AC-04: plate-already-registered must show inline on the plate field,
             // not as a generic banner.
             if (code === 'INVALID_PLATE_FORMAT' || code === 'PLATE_ALREADY_REGISTERED') {
+                pendingFocus.current = 'plate';
                 setErrors((prev) => ({ ...prev, plate: translateError(code) }));
             } else if (code === 'VALIDATION_ERROR') {
+                pendingFocus.current = 'server';
                 // #234: mark the brand, the model or the color that the server rejects
                 const fieldErrors = {};
                 for (const { path } of err.response.data.errors ?? []) {
@@ -138,6 +154,7 @@ export default function RegisterVehicle() {
                 // "Revisa los campos marcados" only makes sense if a field was marked.
                 setServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
             } else {
+                pendingFocus.current = 'server';
                 setServerError(translateError(code));
             }
         } finally {
@@ -158,7 +175,12 @@ export default function RegisterVehicle() {
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 w-full rounded-lg border border-neutral-200 bg-white p-8">
                 {serverError && (
-                    <p role="alert" className="mb-6 rounded-md bg-danger-soft px-3 py-2 text-center text-caption text-danger">
+                    <p
+                        ref={serverErrorRef}
+                        tabIndex={-1}
+                        role="alert"
+                        className="mb-6 rounded-md bg-danger-soft px-3 py-2 text-center text-caption text-danger focus:outline-none"
+                    >
                         {serverError}
                     </p>
                 )}
