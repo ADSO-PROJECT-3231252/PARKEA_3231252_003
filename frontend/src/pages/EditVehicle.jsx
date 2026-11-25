@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Car, IdCard, Tag, Layers, Palette, Eye, ChevronDown, AlertCircle, RefreshCw } from 'lucide-react';
 import { isNotEmpty, isValidPlate, REQUIRED_MESSAGE } from '../utils/validators';
@@ -6,7 +6,7 @@ import { getVehicle, updateVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
 import { MAX_LENGTH } from '../utils/vehicleFieldLimits';
 import { isValidVehicleText, normalizeVehicleText, VEHICLE_TEXT_RULE_MESSAGE } from '../utils/vehicleRules';
-import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
+import { VEHICLE_TYPE_OPTIONS, vehicleTypeLabel } from '../utils/vehicleTypes';
 import FieldRow from '../components/FieldRow';
 
 export default function EditVehicle() {
@@ -25,11 +25,16 @@ export default function EditVehicle() {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null); // null | 'not_found' | 'generic'
     const [saving, setSaving] = useState(false);
+    // HU-31 AC-13: the type the vehicle has, which it keeps while it has a
+    // reservation that has not ended
+    const [savedType, setSavedType] = useState('');
+    const typeRef = useRef(null);
     const fetchVehicle = useCallback(() => {
         getVehicle(id)
             .then(({ data }) => {
                 const vehicle = data.vehicle;
                 setPlate(vehicle.plate);
+                setSavedType(vehicle.vehicleType);
                 setForm({
                     vehicleType: vehicle.vehicleType,
                     brand: vehicle.brand ?? '',
@@ -120,6 +125,14 @@ export default function EditVehicle() {
             const code = err.response?.data?.code;
             if (code === 'INVALID_PLATE_FORMAT') {
                 setErrors((prev) => ({ ...prev, vehicleType: translateError(code) }));
+            } else if (code === 'VEHICLE_HAS_ACTIVE_RESERVATION') {
+                // HU-31 AC-13: nothing was saved. The message is on the type,
+                // with the way to save the other changes, and the focus goes there.
+                setErrors((prev) => ({
+                    ...prev,
+                    vehicleType: `Este vehículo tiene una reserva pendiente o activa, así que no puedes cambiar su tipo. Deja "${vehicleTypeLabel(savedType)}" para guardar los demás cambios.`,
+                }));
+                typeRef.current?.focus();
             } else if (code === 'VALIDATION_ERROR') {
                 // #234: mark the brand, the model or the color that the server rejects
                 const fieldErrors = {};
@@ -219,6 +232,7 @@ text-caption text-danger`}
                         </label>
                         <div className="relative mt-1">
                             <select
+                                ref={typeRef}
                                 id="vehicleType"
                                 name="vehicleType"
                                 value={form.vehicleType}
