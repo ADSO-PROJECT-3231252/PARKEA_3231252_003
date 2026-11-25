@@ -9,7 +9,9 @@ export const SPOTS_WAIT_MS = 500;
 const MAX_ADVANCE_MS = 48 * 60 * 60 * 1000;
 
 // #375: how many spots of the zone are free for the hours of the form
-// (GET /zones/:id/availability). `hours` is null while the form has no valid
+// (GET /zones/:id/availability). HU-31: the spots of `vehicleType`, the type of
+// the chosen vehicle (null while there is none, and then it does not ask).
+// `hours` is null while the form has no valid
 // hours, or { startTime, endTime } / { startTime, openEnded: true } with the
 // same values that POST /reservations would get. It asks SPOTS_WAIT_MS after
 // the last change, cancels a request whose hours changed meanwhile, and never
@@ -17,19 +19,21 @@ const MAX_ADVANCE_MS = 48 * 60 * 60 * 1000;
 // form says why). The answer:
 // - { state: 'idle' }: no valid hours to ask for.
 // - { state: 'waiting' }: waiting for the pause or for the answer.
-// - { state: 'done', availableSlots, openEnded }
+// - { state: 'done', availableSlots, openEnded, vehicleType }
 // - { state: 'error', code, hours }: the code of the API (null without one,
 //   for example without network) and, for the hours of the zone, its hours.
 // `refresh` asks again for the same hours (after the reservation answered
 // that the room was taken meanwhile).
-export function useSpotsForHours(zoneId, hours) {
-    const key = hours ? JSON.stringify([zoneId, hours.startTime, hours.openEnded ? null : hours.endTime, Boolean(hours.openEnded)]) : null;
+export function useSpotsForHours(zoneId, vehicleType, hours) {
+    const key = hours && vehicleType
+        ? JSON.stringify([zoneId, vehicleType, hours.startTime, hours.openEnded ? null : hours.endTime, Boolean(hours.openEnded)])
+        : null;
     const [answer, setAnswer] = useState({ key: null });
     const [round, setRound] = useState(0);
 
     useEffect(() => {
         if (!key) return undefined;
-        const [id, startTime, endTime, openEnded] = JSON.parse(key);
+        const [id, type, startTime, endTime, openEnded] = JSON.parse(key);
         const controller = new AbortController();
         const timer = setTimeout(() => {
             // An entry that passed while the form was open, or one too far
@@ -39,9 +43,9 @@ export function useSpotsForHours(zoneId, hours) {
                 setAnswer({ key, result: { state: 'idle' } });
                 return;
             }
-            const params = openEnded ? { startTime, openEnded: true } : { startTime, endTime };
+            const params = openEnded ? { vehicleType: type, startTime, openEnded: true } : { vehicleType: type, startTime, endTime };
             getAvailabilityForHours(id, params, { signal: controller.signal })
-                .then(({ data }) => setAnswer({ key, result: { state: 'done', availableSlots: data.availableSlots, openEnded } }))
+                .then(({ data }) => setAnswer({ key, result: { state: 'done', availableSlots: data.availableSlots, openEnded, vehicleType: type } }))
                 .catch((err) => {
                     // Cancelled because the hours changed: another request follows
                     if (controller.signal.aborted) return;

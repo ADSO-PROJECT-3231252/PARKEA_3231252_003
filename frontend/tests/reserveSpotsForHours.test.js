@@ -31,15 +31,17 @@ const ZONE = {
     address: 'Calle 1',
     totalSlots: 10,
     availableSlots: 0,
-    hourlyRate: '2000.00',
+    // HU-31: the zone accepts cars, and the free spots are of the type of
+    // the chosen vehicle
+    vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, availableSlots: 0, hourlyRate: 2000 }],
     isActive: true,
     open24h: true,
     schedule: [],
 };
 
 const VEHICLES = [
-    { id: 'v1', plate: 'ABC123', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true },
-    { id: 'v2', plate: 'XYZ789', brand: 'Mazda', model: '3', color: 'Gris', isDefault: false },
+    { id: 'v1', plate: 'ABC123', vehicleType: 'car', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true },
+    { id: 'v2', plate: 'XYZ789', vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Gris', isDefault: false },
 ];
 
 async function renderScreen(zone = ZONE) {
@@ -127,7 +129,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(1);
         expect(getAvailabilityForHours).toHaveBeenCalledWith(
             'z1',
-            { startTime: tomorrowAt(10).toISOString(), endTime: tomorrowAt(12, 30).toISOString() },
+            { vehicleType: 'car', startTime: tomorrowAt(10).toISOString(), endTime: tomorrowAt(12, 30).toISOString() },
             { signal: expect.any(AbortSignal) },
         );
         expect(spotsLine()).toHaveTextContent('Hay 3 cupos para ese horario.');
@@ -162,7 +164,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         await wait();
 
         // Assert
-        expect(getAvailabilityForHours).toHaveBeenCalledWith('z1', { startTime: tomorrowAt(10).toISOString(), openEnded: true }, expect.anything());
+        expect(getAvailabilityForHours).toHaveBeenCalledWith('z1', { vehicleType: 'car', startTime: tomorrowAt(10).toISOString(), openEnded: true }, expect.anything());
         expect(spotsLine()).toHaveTextContent('No hay cupos para una estadía sin hora de salida desde esa entrada. Prueba con una hora de salida.');
     });
 

@@ -242,7 +242,9 @@ export default function ReserveSpot() {
             hoursToAsk = { startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
         }
     }
-    const spots = useSpotsForHours(zoneId, hoursToAsk);
+    // HU-31 AC-10: the free spots of the type of the chosen vehicle
+    const chosenType = vehicles.find((v) => v.id === form.vehicleId)?.vehicleType ?? null;
+    const spots = useSpotsForHours(zoneId, chosenType, hoursToAsk);
 
     const validate = () => {
         const newErrors = {};
