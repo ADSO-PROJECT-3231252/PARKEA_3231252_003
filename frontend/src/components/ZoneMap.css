@@ -43,6 +43,11 @@
     /* Never wider than the map on phones (the map is 92vw minus the page
        padding; 16px of auto-pan padding is kept on each side). */
     width: min(300px, calc(92vw - 72px)) !important;
+    /* Never taller than the map (65vh, at least 380px), less the tip and
+       the auto-pan padding: a zone with a long name and three vehicle types
+       scrolls inside instead of hiding its "Reservar" (HU-31) */
+    max-height: calc(max(65vh, 380px) - 72px);
+    overflow-y: auto;
     font: inherit;
     line-height: inherit;
 }
