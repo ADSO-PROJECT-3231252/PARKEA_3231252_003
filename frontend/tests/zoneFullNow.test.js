@@ -72,10 +72,10 @@ describe('A zone with no room now can still be reserved from the list (#375)', (
         renderList();
         const button = await screen.findByRole('button', { name: 'Reservar en Parqueadero Centro' });
 
-        // Assert: the "Llena" badge stays, the count is the room now, and
-        // the note is read with the button
+        // Assert: the "Llena" badge stays, the count is the room now (HU-31:
+        // of each type), and the note is read with the button
         expect(screen.getByText('Llena')).toBeInTheDocument();
-        expect(screen.getAllByText('cupos libres ahora')).toHaveLength(2);
+        expect(screen.getAllByText('Cupos libres ahora y tarifa por hora')).toHaveLength(2);
         expect(button).toBeEnabled();
         expect(button).not.toHaveAttribute('aria-disabled');
         expect(button).toHaveTextContent('Reservar');

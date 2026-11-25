@@ -1,12 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info, Clock } from 'lucide-react';
+import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Map, List, Info, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
-import { formatCurrency } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import { todayHoursLabel } from '../utils/zoneHours';
 import { normalizeText } from '../utils/normalizeText';
+import ZoneTypeSpots from '../components/ZoneTypeSpots';
 
 // HU-25: Leaflet is only downloaded when the map view is opened. If that
 // download fails, the page falls back to the list like any other map error.
@@ -34,6 +34,8 @@ const BADGE_CLASSES = {
 // #373: availableSlots is the room now (the spots free for the next 30
 // minutes). A zone with none now can still be reserved for other hours, so
 // "Reservar" is never blocked: the reserve screen and the API decide.
+// HU-31 AC-08: the card shows the types of the zone, with their free spots
+// and rates.
 function ZoneCard({ zone, onReserve }) {
     const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
     const fullNow = availability.state === 'full';
@@ -59,21 +61,10 @@ function ZoneCard({ zone, onReserve }) {
                 <span>{todayHoursLabel(zone)}</span>
             </p>
 
-            <div className="mt-4 flex flex-col gap-3 @sm:flex-row @sm:items-end @sm:justify-between">
-                <span className="flex items-center gap-1.5 text-body text-neutral-900">
-                    <Users className="h-4 w-4 text-neutral-500" aria-hidden="true" />
-                    <span className="font-mono tabular-nums">{zone.availableSlots}</span>
-                    <span className="text-neutral-600">de</span>
-                    <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                    <span className="text-caption text-neutral-600">cupos libres ahora</span>
-                </span>
-                <span className="flex flex-col @sm:items-end">
-                    <span className="text-caption text-neutral-600">Tarifa por hora</span>
-                    <span className="flex items-center gap-1 whitespace-nowrap font-mono text-body text-neutral-900">
-                        <Banknote className="h-4 w-4 text-neutral-500" aria-hidden="true" />
-                        {formatCurrency(zone.hourlyRate)}
-                    </span>
-                </span>
+            {/* HU-31 AC-08: each type with its free spots now and its rate */}
+            <div className="mt-4 border-t border-neutral-100 pt-3">
+                <p className="text-caption text-neutral-600">Cupos libres ahora y tarifa por hora</p>
+                <ZoneTypeSpots zone={zone} className="mt-1.5" />
             </div>
 
             <button
