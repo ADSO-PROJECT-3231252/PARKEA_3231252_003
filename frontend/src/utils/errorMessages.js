@@ -48,6 +48,9 @@ const errorMessages = {
     COORDINATES_OUTSIDE_COLOMBIA: 'La ubicación de la zona debe estar dentro de Colombia',
     CAPACITY_BELOW_IN_USE: 'No puedes reducir la capacidad por debajo de los cupos en uso',
     INSUFFICIENT_AVAILABLE_SPOTS: 'No hay suficientes cupos disponibles para reducir la capacidad',
+    // HU-31 AC-12: the zone does not take that type of vehicle (it may have
+    // been turned off since the page opened); the screen names the type
+    VEHICLE_TYPE_NOT_ACCEPTED: 'Esta zona no recibe este tipo de vehículo',
 
     // Reservations
     INVALID_DATE: 'La fecha u hora no es válida',
