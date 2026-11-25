@@ -44,7 +44,8 @@ const zoneWith = (schedule, open24h = false) => ({
     address: 'Calle 1',
     totalSlots: 10,
     availableSlots: 10,
-    hourlyRate: '2000.00',
+    // HU-31: a zone for cars, and a car to reserve with
+    vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, availableSlots: 10, hourlyRate: 2000 }],
     isActive: true,
     open24h,
     schedule,
@@ -54,7 +55,7 @@ const OPEN_TOMORROW = zoneWith([{ day: TOMORROW.day, opensAt: '06:00', closesAt:
 
 async function renderScreen(zone) {
     getZone.mockResolvedValue({ data: { zone } });
-    getVehicles.mockResolvedValue({ data: { vehicles: [{ id: 'v1', plate: 'ABC123', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true }] } });
+    getVehicles.mockResolvedValue({ data: { vehicles: [{ id: 'v1', plate: 'ABC123', vehicleType: 'car', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true }] } });
     render(
         <MemoryRouter initialEntries={['/reserve/z1']}>
             <Routes>
