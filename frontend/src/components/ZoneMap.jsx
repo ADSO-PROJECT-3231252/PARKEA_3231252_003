@@ -3,11 +3,12 @@ import { MapContainer, TileLayer, Marker, Popup, ZoomControl, useMap } from 'rea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './ZoneMap.css';
-import { SquareParking, Ban, LocateFixed, MapPin, Users, Banknote, X, Info, Clock } from 'lucide-react';
-import { formatCurrency } from '../utils/format';
-import { getZoneAvailability } from '../utils/zones';
+import { SquareParking, Ban, LocateFixed, MapPin, X, Info, Clock } from 'lucide-react';
+import { getZoneAvailability, spotsOf } from '../utils/zones';
 import { todayHoursLabel } from '../utils/zoneHours';
 import { buildPinHtml } from '../utils/zonePin';
+import { vehicleTypePlural } from '../utils/vehicleTypes';
+import ZoneTypeSpots from './ZoneTypeSpots';
 
 // HU-25: map view of the active zones. Base map: OpenStreetMap standard
 // tiles (free, no API key, attribution required).
@@ -43,9 +44,9 @@ function getPosition(zone) {
 // AC-02/AC-03: one pin per zone, colored by availability; full zones also get
 // a different icon so the state is not conveyed by color alone. The HTML is
 // built in utils/zonePin.js, where it is tested.
-function buildIcon(name, availableSlots, totalSlots) {
+function buildIcon(name, availableSlots, totalSlots, type) {
     return L.divIcon({
-        html: buildPinHtml(name, availableSlots, totalSlots),
+        html: buildPinHtml(name, availableSlots, totalSlots, type),
         className: 'zone-marker-icon',
         iconSize: [32, 40],
         // The pin's tip: bottom-center of the rotated square
@@ -56,8 +57,11 @@ function buildIcon(name, availableSlots, totalSlots) {
 
 // AC-04/AC-05: summary shown when a marker is opened. #373: a zone with no
 // room now can still be reserved for other hours, so "Reservar" is never
-// blocked; the summary only says that there is no room now.
-function ZoneSummary({ zone, availability, onReserve }) {
+// blocked; the summary only says that there is no room now. HU-31 AC-08: the
+// types of the zone with their free spots and rates (instead of the spots and
+// the rate of the whole zone); with the filter of a type, the badge and the
+// note are about that type.
+function ZoneSummary({ zone, type, availability, onReserve }) {
     const map = useMap();
     const reserveRef = useRef(null);
     const fullNow = availability.state === 'full';
@@ -107,27 +111,18 @@ function ZoneSummary({ zone, availability, onReserve }) {
                 <span className="min-w-0 break-words">{todayHoursLabel(zone)}</span>
             </p>
 
-            <div className="mt-3 flex items-center justify-between gap-x-3 gap-y-2 border-t border-neutral-200 pt-3 max-[319px]:flex-wrap">
-                <span className="flex items-center gap-2 text-body text-neutral-900">
-                    <Users className="h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
-                    <span>
-                        <span className="font-mono tabular-nums">{zone.availableSlots}</span> de{' '}
-                        <span className="font-mono tabular-nums">{zone.totalSlots}</span> cupos libres ahora
+            {/* The badge is of the whole zone, or of the type of the filter;
+                the list has the free spots of each type, so the summary fits
+                in the map of a phone */}
+            <div className="mt-3 border-t border-neutral-200 pt-3">
+                <div className="flex items-center justify-between gap-3">
+                    <p className="text-caption text-neutral-600">Cupos libres ahora y tarifa por hora</p>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-caption font-medium ${BADGE_CLASSES[availability.state]}`}>
+                        {availability.text}
+                        {type && <span className="sr-only"> para {vehicleTypePlural(type)}</span>}
                     </span>
-                </span>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-caption font-medium ${BADGE_CLASSES[availability.state]}`}>
-                    {availability.text}
-                </span>
-            </div>
-
-            <div className="mt-3 flex items-center justify-between gap-x-3 gap-y-2 border-t border-neutral-200 pt-3 max-[319px]:flex-wrap">
-                <span className="flex items-center gap-2 text-body text-neutral-900">
-                    <Banknote className="h-4 w-4 shrink-0 text-neutral-600" aria-hidden="true" />
-                    Tarifa por hora
-                </span>
-                <span className="whitespace-nowrap font-mono text-body font-medium text-neutral-900">
-                    {formatCurrency(zone.hourlyRate)}
-                </span>
+                </div>
+                <ZoneTypeSpots zone={zone} className="mt-1.5" />
             </div>
 
             <button
@@ -143,21 +138,26 @@ function ZoneSummary({ zone, availability, onReserve }) {
             </button>
             {fullNow && (
                 <p id={noteId} className="mt-2 text-center text-caption text-neutral-600">
-                    No hay cupos en este momento, pero puedes reservar para otro horario.
+                    {type
+                        ? `No hay cupos de ${vehicleTypePlural(type)} en este momento, pero puedes reservar para otro horario.`
+                        : 'No hay cupos en este momento, pero puedes reservar para otro horario.'}
                 </p>
             )}
         </div>
     );
 }
 
-function ZoneMarker({ zone, position, onReserve }) {
-    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
+function ZoneMarker({ zone, type, position, onReserve }) {
+    // HU-31 AC-09: with the filter of a type, the pin is of that type
+    const spots = spotsOf(zone, type);
+    const availability = getZoneAvailability(spots.availableSlots, spots.totalSlots);
     // Rebuilt only when what the pin shows changes, so a background refresh of
     // the same data doesn't recreate the marker icon.
-    const { name, availableSlots, totalSlots } = zone;
+    const { name } = zone;
+    const { availableSlots, totalSlots } = spots;
     const icon = useMemo(
-        () => buildIcon(name, availableSlots, totalSlots),
-        [name, availableSlots, totalSlots],
+        () => buildIcon(name, availableSlots, totalSlots, type),
+        [name, availableSlots, totalSlots, type],
     );
 
     // AC-10: when the summary closes, focus goes back to the pin.
@@ -173,7 +173,7 @@ function ZoneMarker({ zone, position, onReserve }) {
     return (
         <Marker position={position} icon={icon} eventHandlers={eventHandlers}>
             <Popup className="zone-popup" closeButton={false} autoPanPadding={[16, 16]}>
-                <ZoneSummary zone={zone} availability={availability} onReserve={onReserve} />
+                <ZoneSummary zone={zone} type={type} availability={availability} onReserve={onReserve} />
             </Popup>
         </Marker>
     );
@@ -202,7 +202,7 @@ function useTileFailure(onLoadError) {
     );
 }
 
-export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
+export default function ZoneMap({ zones, type = null, onReserve, onLoadError, onShowList }) {
     const [map, setMap] = useState(null);
 
     const placed = useMemo(
@@ -266,7 +266,7 @@ export default function ZoneMap({ zones, onReserve, onLoadError, onShowList }) {
                         />
                         <ZoomControl position="bottomleft" zoomInTitle="Acercar" zoomOutTitle="Alejar" />
                         {placed.map(({ zone, position }) => (
-                            <ZoneMarker key={zone.id} zone={zone} position={position} onReserve={onReserve} />
+                            <ZoneMarker key={zone.id} zone={zone} type={type} position={position} onReserve={onReserve} />
                         ))}
                     </MapContainer>
 

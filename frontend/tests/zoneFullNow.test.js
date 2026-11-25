@@ -32,7 +32,8 @@ const zone = (id, name, availableSlots, latitude) => ({
     address: 'Calle 1 # 2-3',
     availableSlots,
     totalSlots: 10,
-    hourlyRate: '3000.00',
+    // HU-31: a zone for cars
+    vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, availableSlots, hourlyRate: 3000 }],
     isActive: true,
     open24h: true,
     schedule: [],
@@ -130,7 +131,8 @@ describe('A zone with no room now can still be reserved from the map (#375)', ()
         expect(button).not.toHaveAttribute('aria-disabled');
         expect(button).toHaveTextContent('Reservar');
         expect(button).toHaveAccessibleDescription(NOTE);
-        expect(screen.getAllByText('cupos libres ahora', { exact: false })).toHaveLength(2);
+        // HU-31: the free spots now of each type
+        expect(screen.getAllByText('Cupos libres ahora y tarifa por hora')).toHaveLength(2);
         expect(screen.getByText('Llena (sin cupos ahora)')).toBeInTheDocument();
         expect(screen.queryByText('Sin cupos disponibles')).not.toBeInTheDocument();
     });
@@ -158,7 +160,7 @@ describe('A zone with no room now can still be reserved from the map (#375)', ()
 describe('The reserve screen of a zone with no room now (#375)', () => {
     async function renderReserve(zoneValues) {
         getZone.mockResolvedValue({ data: { zone: zoneValues } });
-        getVehicles.mockResolvedValue({ data: { vehicles: [{ id: 'v1', plate: 'ABC123', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true }] } });
+        getVehicles.mockResolvedValue({ data: { vehicles: [{ id: 'v1', plate: 'ABC123', vehicleType: 'car', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true }] } });
         render(
             <MemoryRouter initialEntries={[`/reserve/${zoneValues.id}`]}>
                 <Routes>
