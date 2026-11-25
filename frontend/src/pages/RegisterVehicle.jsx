@@ -15,6 +15,10 @@ const PLATE_PLACEHOLDER = {
     motorcycle: 'Ejemplo: GHT42D',
 };
 
+// #390: the fields in the order they are shown, to send the focus to the
+// first one that fails
+const FIELD_ORDER = ['vehicleType', 'plate', 'brand', 'model', 'visualDescription', 'color'];
+
 // #217: Reserve a spot sends the user here when they have no vehicles, and
 // passes where to come back. Only "/reserve/" plus a zone id is accepted, so
 // the state can't send the user to any other page (not even with "../").
@@ -108,13 +112,17 @@ export default function RegisterVehicle() {
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        return newErrors;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
-        if (!validate()) return;
+        const newErrors = validate();
+        if (Object.keys(newErrors).length > 0) {
+            pendingFocus.current = FIELD_ORDER.find((id) => newErrors[id]) ?? null;
+            return;
+        }
 
         setLoading(true);
         try {

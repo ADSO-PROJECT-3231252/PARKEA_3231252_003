@@ -9,6 +9,10 @@ import { isValidVehicleText, normalizeVehicleText, VEHICLE_TEXT_RULE_MESSAGE } f
 import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
 import FieldRow from '../components/FieldRow';
 
+// #390: the fields in the order they are shown (the plate is not edited), to
+// send the focus to the first one that fails
+const FIELD_ORDER = ['vehicleType', 'brand', 'model', 'visualDescription', 'color'];
+
 export default function EditVehicle() {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -107,12 +111,16 @@ export default function EditVehicle() {
             }
         }
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        return newErrors;
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
-        if (!validate()) return;
+        const newErrors = validate();
+        if (Object.keys(newErrors).length > 0) {
+            pendingFocus.current = FIELD_ORDER.find((id) => newErrors[id]) ?? null;
+            return;
+        }
         setSaving(true);
         try {
             const payload = {
