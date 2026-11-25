@@ -472,3 +472,31 @@ test.each(['tr', 'li'])('focuses the list heading when a refresh removes the res
     expect(buttons(CANCEL_PAID)).toHaveLength(2);
     expect(screen.getByRole('heading', { name: 'Mis reservas' })).toHaveFocus();
 });
+
+// HU-31 AC-03: the spots are numbered per type, so the list shows each spot
+// with its type, as GET /reservations sends it (spotVehicleType)
+describe('The spot of each reservation (HU-31 AC-03)', () => {
+    test('is shown with its type', async () => {
+        // Arrange
+        answer([{ ...pending, spotVehicleType: 'truck' }, { ...paid, spotNumber: 2, spotVehicleType: 'car' }]);
+
+        // Act
+        renderList();
+
+        // Assert
+        expect((await screen.findAllByText('Cupo 4 · Camión')).length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Cupo 2 · Carro').length).toBeGreaterThan(0);
+    });
+
+    test('without its type, only its number, and a dash without a spot', async () => {
+        // Arrange
+        answer([{ ...pending, spotVehicleType: null }, { ...paid, spotNumber: null, spotVehicleType: null }]);
+
+        // Act
+        renderList();
+
+        // Assert
+        expect((await screen.findAllByText('Cupo 4')).length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Cupo —').length).toBeGreaterThan(0);
+    });
+});
