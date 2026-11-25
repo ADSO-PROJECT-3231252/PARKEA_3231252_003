@@ -95,16 +95,26 @@ const emailLimits = () => [
 const forgotPasswordLimiter = emailLimits();
 const resendVerificationLimiter = emailLimits();
 
-// HU-01 (Audit 1): 30 new accounts every hour for each network. Only accounts
-// that are created are counted, so mistakes in the form never use tries, and
-// a class or the demo can sign up from the same Wi-Fi.
-const registerLimiter = rateLimit({
-    ...common,
-    keyGenerator: networkKey,
-    windowMs: ONE_HOUR,
-    limit: 30,
-    skipFailedRequests: true,
-});
+// HU-01: each network can create 30 accounts per hour.
+// A separate counter allows 20 registration conflicts per 15 minutes.
+const registerLimiter = [
+    rateLimit({
+        ...common,
+        keyGenerator: networkKey,
+        windowMs: ONE_HOUR,
+        limit: 30,
+        skipFailedRequests: true,
+    }),
+    rateLimit({
+        ...common,
+        keyGenerator: networkKey,
+        windowMs: FIFTEEN_MINUTES,
+        limit: 20,
+        skipSuccessfulRequests: true,
+        // Only a 409 response counts toward the conflict limit.
+        requestWasSuccessful: (_req, res) => res.statusCode !== 409,
+    }),
+];
 
 module.exports = {
     loginLimiter,

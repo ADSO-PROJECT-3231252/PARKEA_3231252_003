@@ -214,3 +214,30 @@ describe('Sign-up limit (30 created accounts every hour)', () => {
         expect(res.body.code).toBe('VALIDATION_ERROR');
     });
 });
+
+describe('Sign-up conflict limit (#383)', () => {
+    test('counts only 409 responses and blocks the next attempt after 20 conflicts', async () => {
+        const express = require('express');
+        const { registerLimiter } = require('../src/middlewares/rateLimit');
+        const testApp = express();
+
+        // Simulate the registration result after the real middleware runs.
+        let registrationStatus = 400;
+        testApp.post('/register', registerLimiter, (_req, res) => {
+            res.sendStatus(registrationStatus);
+        });
+
+        // Neither a form error nor a created account uses a conflict attempt.
+        await request(testApp).post('/register').expect(400);
+        registrationStatus = 201;
+        await request(testApp).post('/register').expect(201);
+
+        registrationStatus = 409;
+        for (let attempt = 1; attempt <= 20; attempt++) {
+            await request(testApp).post('/register').expect(409);
+        }
+
+        const blocked = await request(testApp).post('/register').expect(429);
+        expect(blocked.body.code).toBe('TOO_MANY_REQUESTS');
+    });
+});
