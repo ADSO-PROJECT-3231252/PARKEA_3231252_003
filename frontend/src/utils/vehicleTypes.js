@@ -21,3 +21,13 @@ export const VEHICLE_TYPE_LABELS = Object.fromEntries(VEHICLE_TYPE_OPTIONS.map((
 // The name of a type, or the value itself when it is not one of PARKEA
 export const vehicleTypeLabel = (type) => VEHICLE_TYPE_INFO[type]?.label ?? type;
 export const vehicleTypePlural = (type) => VEHICLE_TYPE_INFO[type]?.plural ?? type;
+
+// HU-31 AC-03: a spot is always shown with its type, since the spots are
+// numbered per type (car 3 and motorcycle 3 are two spots). spotText is the
+// value of a field already called "Cupo" ("3 · Moto"); spotLabel says it
+// alone ("Cupo 3 · Moto"). Without its type, only the number.
+export const spotText = (spotNumber, vehicleType) => {
+    const number = spotNumber ?? '—';
+    return vehicleType ? `${number} · ${vehicleTypeLabel(vehicleType)}` : `${number}`;
+};
+export const spotLabel = (spotNumber, vehicleType) => `Cupo ${spotText(spotNumber, vehicleType)}`;

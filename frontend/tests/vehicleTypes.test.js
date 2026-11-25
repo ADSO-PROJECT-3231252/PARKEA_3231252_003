@@ -4,6 +4,8 @@ import {
     VEHICLE_TYPE_LABELS,
     vehicleTypeLabel,
     vehicleTypePlural,
+    spotText,
+    spotLabel,
 } from '../src/utils/vehicleTypes';
 
 // HU-31: one place for the names of the vehicle types, used by every screen
@@ -33,5 +35,28 @@ describe('The vehicle types of PARKEA (HU-31)', () => {
     test('a type that is not of PARKEA is shown as it comes', () => {
         expect(vehicleTypeLabel('bicycle')).toBe('bicycle');
         expect(vehicleTypePlural('bicycle')).toBe('bicycle');
+    });
+});
+
+// HU-31 AC-03: the spots are numbered per type, so a spot is always shown
+// with its type
+describe('The text of a spot (HU-31 AC-03)', () => {
+    test.each([
+        [3, 'motorcycle', '3 · Moto', 'Cupo 3 · Moto'],
+        [12, 'car', '12 · Carro', 'Cupo 12 · Carro'],
+        [1, 'truck', '1 · Camión', 'Cupo 1 · Camión'],
+    ])('spot %s of %s is "%s", or "%s" alone', (number, type, text, label) => {
+        expect(spotText(number, type)).toBe(text);
+        expect(spotLabel(number, type)).toBe(label);
+    });
+
+    test('without its type, only its number', () => {
+        expect(spotText(4, null)).toBe('4');
+        expect(spotLabel(4, undefined)).toBe('Cupo 4');
+    });
+
+    test('without a number, a dash', () => {
+        expect(spotText(null, 'car')).toBe('— · Carro');
+        expect(spotLabel(undefined, null)).toBe('Cupo —');
     });
 });
