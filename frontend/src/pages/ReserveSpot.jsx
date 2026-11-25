@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
     MapPin,
@@ -8,6 +8,7 @@ import {
     Clock,
     Car,
     ChevronDown,
+    Map,
     ArrowLeft,
     CalendarCheck,
     AlertCircle,
@@ -20,8 +21,10 @@ import { createReservation } from '../services/reservationService';
 import { useSpotsForHours } from '../hooks/useSpotsForHours';
 import SpotsForHours from '../components/SpotsForHours';
 import { formatCurrency, formatDuration } from '../utils/format';
-import { getZoneAvailability } from '../utils/zones';
-import { isNotEmpty, REQUIRED_MESSAGE } from '../utils/validators';
+import { acceptedTypesOf, getZoneAvailability, joinTypes, zoneTypeOf } from '../utils/zones';
+import { VEHICLE_TYPES, vehicleTypeLabel, vehicleTypePlural } from '../utils/vehicleTypes';
+import VehicleTypeIcon from '../components/VehicleTypeIcon';
+import { REQUIRED_MESSAGE } from '../utils/validators';
 import { translateError } from '../utils/errorMessages';
 import {
     closingOf,
@@ -91,6 +94,63 @@ function ZoneHours({ zone }) {
     );
 }
 
+// HU-31 AC-11: none of the vehicles of the user is of a type the zone
+// accepts. It offers the zones for each type the user has (the list with that
+// filter, AC-09) and registering a vehicle, which comes back here (#217).
+function NoVehicleFits({ zone, acceptedTypes, ownTypes, typeTurnedOff, vehicleAdded, turnedOffRef }) {
+    // AC-12: the form disappeared because the type was turned off meanwhile,
+    // so the focus goes to the message that says it
+    useEffect(() => {
+        if (typeTurnedOff) turnedOffRef.current?.focus();
+    }, [typeTurnedOff, turnedOffRef]);
+
+    return (
+        <div className="mt-6 flex flex-col items-start gap-3 rounded-lg border border-neutral-200 bg-white p-5">
+            {typeTurnedOff && (
+                <p ref={turnedOffRef} tabIndex={-1} role="alert" className="flex items-center gap-2 text-body text-danger focus:outline-none">
+                    <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    Esta zona dejó de recibir {vehicleTypePlural(typeTurnedOff)}.
+                </p>
+            )}
+            {vehicleAdded && (
+                <p role="status" className="text-body text-parkea-700">
+                    Vehículo registrado correctamente.
+                </p>
+            )}
+            <h2 className="flex items-center gap-2 break-words text-subtitle-sm font-display uppercase text-neutral-900">
+                <MapPin className="h-4 w-4 shrink-0 text-parkea-600" aria-hidden="true" />
+                {zone.name}
+            </h2>
+            <p className="text-body text-neutral-700">
+                {acceptedTypes.length > 0
+                    ? `Esta zona recibe ${joinTypes(acceptedTypes)}, y ninguno de tus vehículos es de ${acceptedTypes.length === 1 ? 'ese tipo' : 'esos tipos'}.`
+                    : 'Esta zona no está recibiendo reservas en este momento.'}
+            </p>
+            <div className="flex flex-wrap gap-3">
+                {ownTypes.map((type) => (
+                    <Link
+                        key={type}
+                        to={`/zones?type=${type}`}
+                        className="flex items-center gap-2 rounded-md bg-parkea-600 px-4 py-2 text-label text-white transition-colors hover:bg-parkea-700"
+                    >
+                        <Map className="h-4 w-4" aria-hidden="true" />
+                        Ver zonas para {vehicleTypePlural(type)}
+                    </Link>
+                ))}
+                {/* #217: after saving the vehicle, the app comes back here */}
+                <Link
+                    to="/vehicles/new"
+                    state={{ returnTo: `/reserve/${zone.id}` }}
+                    className="flex items-center gap-2 rounded-md border border-neutral-200 px-4 py-2 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                >
+                    <Car className="h-4 w-4" aria-hidden="true" />
+                    Registrar un vehículo
+                </Link>
+            </div>
+        </div>
+    );
+}
+
 export default function ReserveSpot() {
     const { zoneId } = useParams();
     const navigate = useNavigate();
@@ -98,7 +158,12 @@ export default function ReserveSpot() {
 
     // #217: back from adding the first vehicle (HU-10 AC-07). The redirect
     // state is cleared so a page refresh doesn't show the message again.
-    const [vehicleAdded] = useState(() => Boolean(location.state?.vehicleAdded));
+    // HU-31 AC-11: also back from adding a vehicle that the zone accepts,
+    // with its id, so it is the one chosen.
+    const [returned] = useState(() => ({
+        vehicleAdded: Boolean(location.state?.vehicleAdded),
+        vehicleId: typeof location.state?.vehicleId === 'string' ? location.state.vehicleId : null,
+    }));
     useEffect(() => {
         if (location.state?.vehicleAdded) navigate(location.pathname, { replace: true, state: null });
     }, [location, navigate]);
@@ -112,7 +177,8 @@ export default function ReserveSpot() {
     const [vehiclesError, setVehiclesError] = useState(false);
 
     const [form, setForm] = useState({
-        vehicleId: '',
+        // HU-31 AC-10: the vehicle the user picked; the one used is `chosen`
+        vehicleId: returned.vehicleId ?? '',
         startDate: '',
         startTime: '',
         endDate: '',
@@ -122,9 +188,14 @@ export default function ReserveSpot() {
     const [errors, setErrors] = useState({});
     const [serverErrorCode, setServerErrorCode] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    // HU-31 AC-12: the type of the vehicle that the zone stopped accepting
+    // while the screen was open
+    const [typeTurnedOff, setTypeTurnedOff] = useState(null);
+    const turnedOffRef = useRef(null);
 
+    // It returns the request, so the screen can act once the zone is read
     const fetchZone = useCallback(() => {
-        getZone(zoneId)
+        return getZone(zoneId)
             .then(({ data }) => {
                 setZone(data.zone);
                 setZoneError(false);
@@ -133,16 +204,24 @@ export default function ReserveSpot() {
             .finally(() => setZoneLoading(false));
     }, [zoneId]);
 
+    // HU-31 AC-12: the zone stopped taking `type` while the screen was open.
+    // The vehicle field says so; once the zone is read again, another vehicle
+    // that fits is chosen, or the screen says that none fits (AC-11).
+    const typeWentOff = useCallback((type) => {
+        setErrors((prev) => ({
+            ...prev,
+            vehicle: `Esta zona ya no recibe ${vehicleTypePlural(type)}. Revisa el vehículo elegido y la tarifa antes de reservar.`,
+        }));
+        setTypeTurnedOff(type);
+    }, []);
+
     const fetchVehicleList = useCallback(() => {
         getVehicles()
             .then(({ data }) => {
+                // AC-03: the list already comes with the default vehicle
+                // first, so the first one that fits is chosen (HU-31 AC-10)
                 setVehicles(data.vehicles);
                 setVehiclesError(false);
-                // AC-03: the list already comes with the default vehicle first
-                // no need to search for isDefault manually.
-                if (data.vehicles.length > 0) {
-                    setForm((prev) => ({ ...prev, vehicleId: data.vehicles[0].id }));
-                }
             })
             .catch(() => setVehiclesError(true))
             .finally(() => setVehiclesLoading(false));
@@ -174,11 +253,21 @@ export default function ReserveSpot() {
         setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
         // HU-27: without an exit time, its error no longer applies.
         if (name === 'openEnded' && checked) setErrors((prev) => ({ ...prev, end: undefined }));
+        // Another vehicle takes the error of the one before away
+        if (name === 'vehicleId') setErrors((prev) => ({ ...prev, vehicle: undefined }));
         // HU-29: a date or time that changes takes its old error away; the
         // hours of the zone are checked again below as it is typed
         const field = { startDate: 'start', startTime: 'start', endDate: 'end', endTime: 'end' }[name];
         if (field) setErrors((prev) => ({ ...prev, [field]: undefined }));
     };
+
+    // HU-31 AC-10: only a vehicle of a type the zone accepts can be chosen.
+    // The one picked, or else the first one that fits. Derived, so when the
+    // zone is read again (AC-12) a vehicle that no longer fits is replaced.
+    const fits = (vehicle) => Boolean(zoneTypeOf(zone, vehicle.vehicleType));
+    const chosen = vehicles.find((v) => v.id === form.vehicleId && fits(v)) ?? vehicles.find(fits) ?? null;
+    // Its type in the zone: its spots, free spots and rate
+    const zoneType = chosen ? zoneTypeOf(zone, chosen.vehicleType) : null;
 
     const startDateTime = combineDateTime(form.startDate, form.startTime);
     const endDateTime = combineDateTime(form.endDate, form.endTime);
@@ -190,17 +279,18 @@ export default function ReserveSpot() {
     let estimatedCost = 0;
     let hoursLabel = '';
 
-    if (hasValidRange && zone) {
+    if (hasValidRange && zoneType) {
         durationLabel = formatDuration(startDateTime, endDateTime);
         const totalMinutes = Math.round((endDateTime - startDateTime) / 60000);
         const hoursDecimal = totalMinutes / 60;
-        estimatedCost = Math.round(hoursDecimal * Number(zone.hourlyRate));
+        // HU-31 AC-10: the rate of the type of the chosen vehicle
+        estimatedCost = Math.round(hoursDecimal * Number(zoneType.hourlyRate));
         hoursLabel = Number.isInteger(hoursDecimal) ? String(hoursDecimal) : hoursDecimal.toFixed(1);
     }
 
     // HU-27 AC-03: an open stay shows its summary as soon as the entry is set;
     // only the first hour is paid to confirm it.
-    const showSummary = form.openEnded ? Boolean(startDateTime) : hasValidRange;
+    const showSummary = Boolean(zoneType) && (form.openEnded ? Boolean(startDateTime) : hasValidRange);
 
     // HU-29 AC-03 / AC-06: the hours of the zone are checked as the dates are
     // typed, so the problem shows before sending. The exit is only checked
@@ -243,14 +333,21 @@ export default function ReserveSpot() {
         }
     }
     // HU-31 AC-10: the free spots of the type of the chosen vehicle
-    const chosenType = vehicles.find((v) => v.id === form.vehicleId)?.vehicleType ?? null;
-    const spots = useSpotsForHours(zoneId, chosenType, hoursToAsk);
+    const spots = useSpotsForHours(zoneId, zoneType?.vehicleType ?? null, hoursToAsk);
+
+    // HU-31 AC-12: the free spots answered that the type was turned off after
+    // the page opened (before sending the reservation)
+    const typeGoneForSpots = spots.state === 'error' && spots.code === 'VEHICLE_TYPE_NOT_ACCEPTED' ? (zoneType?.vehicleType ?? null) : null;
+    useEffect(() => {
+        if (!typeGoneForSpots) return;
+        fetchZone().then(() => typeWentOff(typeGoneForSpots));
+    }, [typeGoneForSpots, fetchZone, typeWentOff]);
 
     const validate = () => {
         const newErrors = {};
         const now = new Date();
 
-        if (!isNotEmpty(form.vehicleId)) {
+        if (!chosen) {
             newErrors.vehicle = REQUIRED_MESSAGE;
         }
 
@@ -294,7 +391,7 @@ export default function ReserveSpot() {
         try {
             const { data } = await createReservation({
                 zoneId,
-                vehicleId: form.vehicleId,
+                vehicleId: chosen.id,
                 startTime: startDateTime.toISOString(),
                 // HU-27: an open stay is sent without an exit time
                 ...(form.openEnded ? { openEnded: true } : { endTime: endDateTime.toISOString() }),
@@ -312,6 +409,10 @@ export default function ReserveSpot() {
                 setErrors((prev) => ({ ...prev, end: translateError(code) }));
             } else if (code === 'VEHICLE_RESERVATION_OVERLAP' || code === 'VEHICLE_NOT_FOUND') {
                 setErrors((prev) => ({ ...prev, vehicle: translateError(code) }));
+            } else if (code === 'VEHICLE_TYPE_NOT_ACCEPTED') {
+                // HU-31 AC-12: the type was turned off meanwhile
+                typeWentOff(chosen.vehicleType);
+                fetchZone();
             } else if (code === 'OUTSIDE_ZONE_HOURS' || code === 'ZONE_CLOSED_THAT_DAY') {
                 // HU-29 AC-03: the hours may have changed since the page opened;
                 // the message shows the hours of that day
@@ -377,7 +478,12 @@ export default function ReserveSpot() {
         );
     }
 
-    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
+    // HU-31 AC-10: the spots now of the type of the chosen vehicle (of the
+    // whole zone while there is none, when the vehicles could not be loaded)
+    const spotsNow = zoneType ?? zone;
+    const availability = getZoneAvailability(spotsNow.availableSlots, spotsNow.totalSlots);
+    const typePlural = zoneType ? vehicleTypePlural(zoneType.vehicleType) : null;
+    const acceptedTypes = acceptedTypesOf(zone);
 
     // AC-04: no vehicles at all block the flow entirely, don't render the form.
     if (!vehiclesError && vehicles.length === 0) {
@@ -403,6 +509,26 @@ export default function ReserveSpot() {
         );
     }
 
+    // HU-31 AC-11: none of the vehicles is of a type the zone accepts, so
+    // there is no form: the zones for those types, or another vehicle
+    if (!vehiclesError && !chosen) {
+        const ownTypes = VEHICLE_TYPES.filter((type) => vehicles.some((v) => v.vehicleType === type));
+        return (
+            <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
+                <title>Reservar cupo | PARKEA</title>
+                <h1 className="text-title font-display uppercase text-neutral-900">Reservar cupo</h1>
+                <NoVehicleFits
+                    zone={zone}
+                    acceptedTypes={acceptedTypes}
+                    ownTypes={ownTypes}
+                    typeTurnedOff={typeTurnedOff}
+                    vehicleAdded={returned.vehicleAdded}
+                    turnedOffRef={turnedOffRef}
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
             <title>Reservar cupo | PARKEA</title>
@@ -418,36 +544,46 @@ export default function ReserveSpot() {
                     <div className="min-w-0">
                         <h2 className="break-words text-subtitle-sm font-display uppercase text-neutral-900">{zone.name}</h2>
                         {zone.address && <p className="break-words text-body text-neutral-600">{zone.address}</p>}
+                        {/* HU-31: the types it accepts, so a vehicle that is not
+                            in the list makes sense */}
+                        {acceptedTypes.length > 0 && (
+                            <p className="text-body text-neutral-600">Recibe {joinTypes(acceptedTypes)}.</p>
+                        )}
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">
                             <span className={`rounded-full px-2.5 py-1 text-label font-medium ${BADGE_CLASSES[availability.state]}`}>
                                 {availability.text}
                             </span>
                             <span className="flex flex-wrap items-center gap-1 text-body text-neutral-600">
                                 <Users className="h-3.5 w-3.5 shrink-0 text-neutral-500" aria-hidden="true" />
-                                <span className="font-mono tabular-nums">{zone.availableSlots}</span>
+                                <span className="font-mono tabular-nums">{spotsNow.availableSlots}</span>
                                 <span>de</span>
-                                <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                                <span>cupos libres ahora</span>
+                                <span className="font-mono tabular-nums">{spotsNow.totalSlots}</span>
+                                <span>{typePlural ? `cupos de ${typePlural} libres ahora` : 'cupos libres ahora'}</span>
                             </span>
                         </div>
                         {/* #373: the count is the room now; other hours may have room */}
                         {availability.state === 'full' && (
                             <p className="mt-1.5 text-caption text-neutral-600">
-                                No hay cupos en este momento, pero puedes reservar para otro horario.
+                                {typePlural
+                                    ? `No hay cupos de ${typePlural} en este momento, pero puedes reservar para otro horario.`
+                                    : 'No hay cupos en este momento, pero puedes reservar para otro horario.'}
                             </p>
                         )}
                     </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-3 sm:border-l sm:border-neutral-200 sm:pl-6">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
-                        <Banknote className="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <p className="text-caption text-neutral-600">Tarifa por hora</p>
-                        <p className="font-mono text-subtitle-sm text-neutral-900">{formatCurrency(zone.hourlyRate)}</p>
+                {/* HU-31 AC-10: the rate of the type of the chosen vehicle */}
+                {zoneType && (
+                    <div className="flex shrink-0 items-center gap-3 sm:border-l sm:border-neutral-200 sm:pl-6">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
+                            <Banknote className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div>
+                            <p className="text-caption text-neutral-600">Tarifa por hora de {typePlural}</p>
+                            <p className="font-mono text-subtitle-sm text-neutral-900">{formatCurrency(zoneType.hourlyRate)}</p>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             <ZoneHours zone={zone} />
@@ -477,21 +613,26 @@ export default function ReserveSpot() {
                             Vehículo <span className="text-danger">*</span>
                         </label>
                         <div className="relative mt-1">
-                            <Car className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-parkea-600" aria-hidden="true" />
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-parkea-600">
+                                <VehicleTypeIcon type={chosen?.vehicleType} className="h-4 w-4" />
+                            </span>
                             <select
                                 id="vehicleId"
                                 name="vehicleId"
-                                value={form.vehicleId}
+                                value={chosen?.id ?? ''}
                                 onChange={handleChange}
                                 aria-invalid={Boolean(errors.vehicle)}
-                                aria-describedby={errors.vehicle ? 'vehicleId-error' : undefined}
+                                aria-describedby={[errors.vehicle ? 'vehicleId-error' : null, zoneType ? 'vehicleId-rate' : null].filter(Boolean).join(' ') || undefined}
                                 className={`w-full appearance-none rounded-md border bg-white py-2.5 pl-9 pr-9 text-body text-neutral-900 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${errors.vehicle ? 'border-danger' : 'border-neutral-200'
                                     }`}
                             >
+                                {/* HU-31 AC-10: a vehicle of a type the zone does
+                                    not accept is in the list, disabled, with why */}
                                 {vehicles.map((v) => (
-                                    <option key={v.id} value={v.id}>
-                                        {v.plate} - {v.brand} {v.model} - {v.color}
-                                        {v.isDefault ? ' (Predeterminado)' : ''}
+                                    <option key={v.id} value={v.id} disabled={!fits(v)}>
+                                        {fits(v)
+                                            ? `${v.plate} · ${vehicleTypeLabel(v.vehicleType)} · ${v.brand} ${v.model} · ${v.color}${v.isDefault ? ' (Predeterminado)' : ''}`
+                                            : `${v.plate} · ${vehicleTypeLabel(v.vehicleType)} (esta zona no recibe ${vehicleTypePlural(v.vehicleType)})`}
                                     </option>
                                 ))}
                             </select>
@@ -501,12 +642,19 @@ export default function ReserveSpot() {
                             <p id="vehicleId-error" role="alert" className="mt-1 text-caption text-danger">
                                 {errors.vehicle}
                             </p>
-                        ) : vehicleAdded ? (
+                        ) : returned.vehicleAdded ? (
                             <p role="status" className="mt-1 text-caption text-parkea-700">
-                                Vehículo registrado correctamente. Ya quedó seleccionado para tu reserva.
+                                {!returned.vehicleId || chosen?.id === returned.vehicleId
+                                    ? 'Vehículo registrado correctamente. Ya quedó seleccionado para tu reserva.'
+                                    : 'Vehículo registrado correctamente, pero esta zona no recibe ese tipo de vehículo.'}
                             </p>
-                        ) : (
-                            <p className="mt-1 text-caption text-neutral-600">Este vehículo se usará para tu reserva.</p>
+                        ) : null}
+                        {/* HU-31 AC-10: the rate changes with the vehicle, and
+                            a screen reader hears it */}
+                        {zoneType && (
+                            <p id="vehicleId-rate" aria-live="polite" className="mt-1 text-caption text-neutral-600">
+                                Tarifa para {typePlural}: {formatCurrency(zoneType.hourlyRate)} por hora.
+                            </p>
                         )}
                     </div>
 
@@ -665,9 +813,9 @@ export default function ReserveSpot() {
                                         {form.openEnded ? (
                                             <>
                                                 <p className="text-caption text-neutral-600">A pagar al confirmar</p>
-                                                <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(zone.hourlyRate)}</p>
+                                                <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(zoneType.hourlyRate)}</p>
                                                 <p className="text-caption text-neutral-600">
-                                                    (Primera hora. Luego {formatCurrency(zone.hourlyRate)} por cada hora empezada)
+                                                    (Primera hora. Luego {formatCurrency(zoneType.hourlyRate)} por cada hora empezada)
                                                 </p>
                                             </>
                                         ) : (
@@ -675,7 +823,7 @@ export default function ReserveSpot() {
                                                 <p className="text-caption text-neutral-600">Costo total estimado</p>
                                                 <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(estimatedCost)}</p>
                                                 <p className="text-caption text-neutral-600">
-                                                    (Tarifa: {formatCurrency(zone.hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
+                                                    (Tarifa: {formatCurrency(zoneType.hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
                                                 </p>
                                             </>
                                         )}
