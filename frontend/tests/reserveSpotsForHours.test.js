@@ -132,12 +132,12 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
             { vehicleType: 'car', startTime: tomorrowAt(10).toISOString(), endTime: tomorrowAt(12, 30).toISOString() },
             { signal: expect.any(AbortSignal) },
         );
-        expect(spotsLine()).toHaveTextContent('Hay 3 cupos para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 3 cupos de carros para ese horario.');
     });
 
     test.each([
-        ['1 free spot', 'Hay 1 cupo para ese horario.', 1],
-        ['no free spot', 'No hay cupos para ese horario. Prueba con otras horas.', 0],
+        ['1 free spot', 'Hay 1 cupo de carros para ese horario.', 1],
+        ['no free spot', 'No hay cupos de carros para ese horario. Prueba con otras horas.', 0],
     ])('with %s it says "%s", and the button stays enabled', async (_case, text, free) => {
         // Arrange
         getAvailabilityForHours.mockReturnValue(answer(free));
@@ -165,7 +165,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
 
         // Assert
         expect(getAvailabilityForHours).toHaveBeenCalledWith('z1', { vehicleType: 'car', startTime: tomorrowAt(10).toISOString(), openEnded: true }, expect.anything());
-        expect(spotsLine()).toHaveTextContent('No hay cupos para una estadía sin hora de salida desde esa entrada. Prueba con una hora de salida.');
+        expect(spotsLine()).toHaveTextContent('No hay cupos de carros para una estadía sin hora de salida desde esa entrada. Prueba con una hora de salida.');
     });
 
     test('hours that change while it asks cancel that request, and its answer is never shown', async () => {
@@ -190,7 +190,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         expect(spotsLine()).toHaveTextContent('Buscando cupos para ese horario…');
         await wait();
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(2);
-        expect(spotsLine()).toHaveTextContent('Hay 5 cupos para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 5 cupos de carros para ese horario.');
     });
 
     test('asking again for the same hours cancels the request that had not answered, without showing an error', async () => {
@@ -214,7 +214,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         expect(spotsLine()).toHaveTextContent('Buscando cupos para ese horario…');
         await wait();
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(2);
-        expect(spotsLine()).toHaveTextContent('No hay cupos para ese horario. Prueba con otras horas.');
+        expect(spotsLine()).toHaveTextContent('No hay cupos de carros para ese horario. Prueba con otras horas.');
     });
 
     test('a change that leaves the same hours (another vehicle) asks nothing again', async () => {
@@ -230,7 +230,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         await wait(5 * SPOTS_WAIT_MS);
 
         // Assert
-        expect(spotsLine()).toHaveTextContent('Hay 2 cupos para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 2 cupos de carros para ese horario.');
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(1);
     });
 
@@ -301,7 +301,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         typeEntry(tomorrowAt(10));
         typeExit(tomorrowAt(12));
         await wait();
-        expect(spotsLine()).toHaveTextContent('Hay 1 cupo para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 1 cupo de carros para ese horario.');
 
         // Act
         await act(async () => {
@@ -311,6 +311,6 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
 
         // Assert
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(2);
-        expect(spotsLine()).toHaveTextContent('No hay cupos para ese horario. Prueba con otras horas.');
+        expect(spotsLine()).toHaveTextContent('No hay cupos de carros para ese horario. Prueba con otras horas.');
     });
 });
