@@ -19,6 +19,7 @@ import { getReservations } from '../services/reservationService';
 import { COLOMBIA_TIME_ZONE, formatDate, formatTime, formatCurrency, formatStay, formatStayHours, keepTogether } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
 import DecorativeImage from '../components/DecorativeImage';
+import ZoneTypeSpots from '../components/ZoneTypeSpots';
 import Reveal from '../components/Reveal';
 import { pickHomeReservation } from '../utils/homeReservation';
 import { nextReservationChange, shownStatus } from '../utils/reservationStatus';
@@ -364,27 +365,21 @@ function AuthenticatedHome({ user }) {
                         <ul className="space-y-2">
                             {zones.map((zone) => {
                                 const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
+                                // HU-31 AC-08: each type with its free spots now and its rate
                                 return (
-                                    <li
-                                        key={zone.id}
-                                        className="flex flex-col gap-1 rounded-md bg-parkea-50 p-3 xl:flex-row xl:items-center xl:justify-between xl:gap-2"
-                                    >
-                                        <p className="flex min-w-0 items-start gap-1 text-body text-neutral-900">
-                                            <span className="flex h-[1lh] shrink-0 items-center">
-                                                <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
-                                            </span>
-                                            <span className="min-w-0 break-words">{zone.name}</span>
-                                        </p>
-                                        <div className="flex items-center justify-between gap-3 pl-[18px] xl:shrink-0 xl:justify-end xl:pl-0">
-                                            <span className="flex items-baseline gap-1 font-mono text-caption text-neutral-600">
-                                                <span className="text-right tabular-nums">{zone.availableSlots}</span>
-                                                <span>de</span>
-                                                <span className="text-right tabular-nums">{zone.totalSlots}</span>
-                                            </span>
-                                            <span className={`text-right text-label font-medium ${ZONE_AVAILABILITY_COLORS[availability.state]}`}>
+                                    <li key={zone.id} className="rounded-md bg-parkea-50 p-3">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <p className="flex min-w-0 items-start gap-1 text-body text-neutral-900">
+                                                <span className="flex h-[1lh] shrink-0 items-center">
+                                                    <MapPin className="h-3.5 w-3.5 text-parkea-600" aria-hidden="true" />
+                                                </span>
+                                                <span className="min-w-0 break-words">{zone.name}</span>
+                                            </p>
+                                            <span className={`shrink-0 text-right text-label font-medium ${ZONE_AVAILABILITY_COLORS[availability.state]}`}>
                                                 {availability.text}
                                             </span>
                                         </div>
+                                        <ZoneTypeSpots zone={zone} size="sm" className="mt-1.5 pl-[18px]" />
                                     </li>
                                 );
                             })}
