@@ -445,3 +445,39 @@ describe('The motion of the three homes (#330)', () => {
         }
     });
 });
+
+// HU-31 AC-03: the spots are numbered per type, so the card shows the spot
+// with its type, as GET /reservations sends it (spotVehicleType)
+describe('The spot on the reservation card of the home (HU-31 AC-03)', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        localStorage.setItem('token', 'test-token');
+        localStorage.setItem('user', JSON.stringify({ id: 'user-1', fullName: 'Laura Gómez', role: 'user' }));
+        getReservations.mockReset();
+        getZones.mockReset().mockResolvedValue({ data: { zones: [] } });
+    });
+
+    test('is shown with its type', async () => {
+        // Arrange
+        answerLikeTheApi([{ ...reservation('running', 'Zona Corriendo', 'Active', -1, 2), spotVehicleType: 'motorcycle' }]);
+
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+
+        // Assert
+        expect(await within(card).findByText('Cupo 4 · Moto')).toBeInTheDocument();
+    });
+
+    test('without its type, only its number', async () => {
+        // Arrange
+        answerLikeTheApi([reservation('running', 'Zona Corriendo', 'Active', -1, 2)]);
+
+        // Act
+        renderHome();
+        const card = await reservationsCard();
+
+        // Assert
+        expect(await within(card).findByText('Cupo 4')).toBeInTheDocument();
+    });
+});

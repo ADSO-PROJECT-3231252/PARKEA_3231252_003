@@ -24,6 +24,7 @@ import Reveal from '../components/Reveal';
 import { pickHomeReservation } from '../utils/homeReservation';
 import { nextReservationChange, shownStatus } from '../utils/reservationStatus';
 import { MAX_TIMER_MS } from '../utils/extendStay';
+import { spotLabel } from '../utils/vehicleTypes';
 
 import heroVisitorIllustration from '../assets/hero-visitor.webp';
 import heroUserIllustration from '../assets/hero-user.webp';
@@ -339,8 +340,9 @@ function AuthenticatedHome({ user }) {
                                         ? formatStayHours(currentReservation.startTime, currentReservation.endTime)
                                         : `${keepTogether(formatTime(currentReservation.startTime, COLOMBIA_TIME_ZONE))} · Sin hora de salida`}
                                 </p>
+                                {/* HU-31 AC-03 */}
                                 <p className="shrink-0 font-mono text-label text-neutral-600">
-                                    Cupo N.º {currentReservation.spotNumber}
+                                    {spotLabel(currentReservation.spotNumber, currentReservation.spotVehicleType)}
                                 </p>
                             </div>
                         </div>
