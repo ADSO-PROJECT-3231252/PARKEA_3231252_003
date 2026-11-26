@@ -2,16 +2,20 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ReserveSpot from '../src/pages/ReserveSpot';
-import { getZone } from '../src/services/zoneService';
+import { getZone, getAvailabilityForHours } from '../src/services/zoneService';
 import { getVehicles } from '../src/services/vehicleService';
-import { createReservation } from '../src/services/reservationService';
+import { createReservation, hasPendingBalance } from '../src/services/reservationService';
+import { SPOTS_WAIT_MS } from '../src/hooks/useSpotsForHours';
 import { dayName } from '../src/utils/zoneHours';
 
 // The screen does not call the real API
 // #375: the free spots for the chosen hours never answer here
 jest.mock('../src/services/zoneService', () => ({ getZone: jest.fn(), getAvailabilityForHours: jest.fn(() => new Promise(() => {})) }));
 jest.mock('../src/services/vehicleService', () => ({ getVehicles: jest.fn() }));
-jest.mock('../src/services/reservationService', () => ({ createReservation: jest.fn() }));
+jest.mock('../src/services/reservationService', () => ({
+    createReservation: jest.fn(),
+    hasPendingBalance: jest.fn(),
+}));
 
 // HU-29: the reserve screen checks the hours of the zone before sending.
 // The dates are "tomorrow" in Colombia (UTC-5), so they are always in the
@@ -77,6 +81,7 @@ function typeExit(time) {
 
 beforeEach(() => {
     createReservation.mockReset();
+    hasPendingBalance.mockReset().mockResolvedValue(false);
 });
 
 describe('The reserve screen and the hours of the zone (HU-29)', () => {
@@ -221,6 +226,105 @@ describe('The link of the banner to my reservations (HU-27 AC-11, #299)', () => 
 
         // Assert
         expect(await screen.findByText('Este cupo ya no está disponible. Elige otra zona u horario')).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Ver mis reservas' })).not.toBeInTheDocument();
+    });
+});
+
+describe('Reservation notices before submitting (#305)', () => {
+    test('an inactive zone with free spots shows a warning and disables booking', async () => {
+        await renderScreen({ ...zoneWith([], true), isActive: false });
+
+        const notice = screen.getByText('Esta zona ya no acepta reservas');
+        expect(notice).toHaveAttribute('role', 'alert');
+        expect(screen.getByText('No disponible')).toBeInTheDocument();
+        const button = screen.getByRole('button', { name: 'Reservar cupo' });
+        expect(button).toBeEnabled();
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        expect(button).toHaveAccessibleDescription(notice.textContent);
+        expect(screen.queryByText('cupos libres ahora')).not.toBeInTheDocument();
+        expect(screen.queryByText(/No hay cupos en este momento/i)).not.toBeInTheDocument();
+
+        getAvailabilityForHours.mockClear();
+        typeEntry('10:00');
+        typeExit('12:00');
+        await new Promise((resolve) => setTimeout(resolve, SPOTS_WAIT_MS + 50));
+        expect(getAvailabilityForHours).not.toHaveBeenCalled();
+        fireEvent.submit(button.closest('form'));
+        expect(createReservation).not.toHaveBeenCalled();
+    });
+
+    test('an active zone with no free spots now still allows booking for other hours', async () => {
+        await renderScreen({ ...zoneWith([], true), availableSlots: 0 });
+
+        expect(screen.getByText(/No hay cupos en este momento/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Reservar cupo' })).toBeEnabled();
+    });
+
+    test('a pending balance shows the reservations link before the user submits', async () => {
+        hasPendingBalance.mockResolvedValue(true);
+        await renderScreen(zoneWith([], true));
+
+        const message = await screen.findByText(
+            'Tienes un saldo pendiente de una estadía anterior. Págalo antes de hacer una nueva reserva',
+        );
+        const link = within(message.closest('[role="alert"]')).getByRole('link', { name: 'Ver mis reservas' });
+        expect(link).toHaveAttribute('href', '/reservations');
+        expect(createReservation).not.toHaveBeenCalled();
+    });
+
+    test('an inactive-zone response reloads the zone and prevents another submission', async () => {
+        const active = zoneWith([], true);
+        await renderScreen(active);
+        const reads = getZone.mock.calls.length;
+        getZone.mockResolvedValueOnce({ data: { zone: { ...active, isActive: false } } });
+        createReservation.mockRejectedValueOnce({ response: { data: { code: 'ZONE_INACTIVE' } } });
+
+        typeEntry('10:00');
+        typeExit('12:00');
+        const button = screen.getByRole('button', { name: 'Reservar cupo' });
+        fireEvent.submit(button.closest('form'));
+
+        await screen.findByText('No disponible');
+        expect(getZone).toHaveBeenCalledTimes(reads + 1);
+        expect(button).toHaveAttribute('aria-disabled', 'true');
+        expect(screen.getAllByText('Esta zona ya no acepta reservas')).toHaveLength(1);
+    });
+
+    test('a balance reported again on submit shows a single message and link', async () => {
+        hasPendingBalance.mockResolvedValue(true);
+        createReservation.mockRejectedValueOnce({ response: { data: { code: 'PENDING_BALANCE' } } });
+        await renderScreen(zoneWith([], true));
+        const initialLink = await screen.findByRole('link', { name: 'Ver mis reservas' });
+
+        typeEntry('10:00');
+        typeExit('12:00');
+        await userEvent.setup().click(screen.getByRole('button', { name: 'Reservar cupo' }));
+
+        expect(createReservation).toHaveBeenCalledTimes(1);
+        expect(initialLink).not.toBeInTheDocument();
+        expect(screen.getAllByText(/Tienes un saldo pendiente de una estadía anterior/)).toHaveLength(1);
+        expect(screen.getAllByRole('link', { name: 'Ver mis reservas' })).toHaveLength(1);
+    });
+
+    test('a failed balance check leaves the form usable', async () => {
+        hasPendingBalance.mockRejectedValueOnce(new Error('Network Error'));
+        createReservation.mockResolvedValueOnce({ data: { reservation: { id: 'r1' } } });
+        await renderScreen(zoneWith([], true));
+        expect(hasPendingBalance).toHaveBeenCalled();
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Ver mis reservas' })).not.toBeInTheDocument();
+
+        typeEntry('10:00');
+        typeExit('12:00');
+        await userEvent.setup().click(screen.getByRole('button', { name: 'Reservar cupo' }));
+        expect(await screen.findByText('Confirmación')).toBeInTheDocument();
+    });
+
+    test('an active zone without debt keeps its available badge and booking button', async () => {
+        await renderScreen(zoneWith([], true));
+
+        expect(screen.getByText('Disponible')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Reservar cupo' })).toBeEnabled();
         expect(screen.queryByRole('link', { name: 'Ver mis reservas' })).not.toBeInTheDocument();
     });
 });
