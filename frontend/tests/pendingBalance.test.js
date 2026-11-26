@@ -42,3 +42,9 @@ test('an empty history returns false after one request', async () => {
     await expect(hasPendingBalance()).resolves.toBe(false);
     expect(api.get).toHaveBeenCalledTimes(1);
 });
+
+test('missing pagination stops the search after the first page', async () => {
+    api.get.mockResolvedValueOnce({ data: { reservations: [] } });
+    await expect(hasPendingBalance()).resolves.toBe(false);
+    expect(api.get).toHaveBeenCalledTimes(1);
+});

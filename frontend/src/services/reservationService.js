@@ -1,16 +1,15 @@
+import { pendingBalanceOf } from '../utils/openStay';
 import api from './api';
 
 export const getReservations = (params) => api.get('/reservations', { params });
 export async function hasPendingBalance() {
-    let page = 1;
-    while (true) {
+    let totalPages = 1;
+    for (let page = 1; page <= totalPages; page += 1) {
         const { data } = await getReservations({ status: 'Finished', page, limit: 100 });
-        if (data.reservations.some((reservation) => reservation.openStay?.pendingBalance > 0)) {
-            return true;
-        }
-        if (page >= data.pagination.totalPages) return false;
-        page += 1;
+        if (data.reservations.some((reservation) => pendingBalanceOf(reservation) > 0)) return true;
+        if (page === 1) totalPages = data.pagination?.totalPages ?? 1;
     }
+    return false;
 }
 export const createReservation = (data) => api.post('/reservations', data);
 export const getReservation = (id) => api.get(`/reservations/${id}`);

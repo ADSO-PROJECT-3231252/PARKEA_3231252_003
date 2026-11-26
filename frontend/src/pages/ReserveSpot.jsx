@@ -260,7 +260,7 @@ export default function ReserveSpot() {
             hoursToAsk = { startTime: startDateTime.toISOString(), endTime: endDateTime.toISOString() };
         }
     }
-    const spots = useSpotsForHours(zoneId, hoursToAsk);
+    const spots = useSpotsForHours(zoneId, zone?.isActive === false ? null : hoursToAsk);
 
     const validate = () => {
         const newErrors = {};
@@ -336,11 +336,14 @@ export default function ReserveSpot() {
                     ...prev,
                     start: hoursErrorMessage(code, err.response.data.hours) ?? translateError(code),
                 }));
+            } else if (code === 'ZONE_INACTIVE') {
+                setZone((prev) => ({ ...prev, isActive: false }));
+                fetchZone();
             } else {
                 // #375: the room was taken meanwhile, so the line under the
                 // hours asks again
                 if (code === 'NO_SPOTS_AVAILABLE') spots.refresh();
-                // NO_SPOTS_AVAILABLE (AC-14), ZONE_NOT_FOUND, ZONE_INACTIVE,
+                // NO_SPOTS_AVAILABLE (AC-14), ZONE_NOT_FOUND,
                 // MISSING_REQUIRED_FIELDS, PENDING_BALANCE (HU-27 AC-11),
                 // TOO_MANY_PENDING_RESERVATIONS (#299), or any other error shown in the banner.
                 setServerErrorCode(code ?? 'INTERNAL_ERROR');
@@ -439,13 +442,15 @@ export default function ReserveSpot() {
                             <span className={`rounded-full px-2.5 py-1 text-label font-medium ${BADGE_CLASSES[availability.state]}`}>
                                 {availability.text}
                             </span>
-                            <span className="flex flex-wrap items-center gap-1 text-body text-neutral-600">
-                                <Users className="h-3.5 w-3.5 shrink-0 text-neutral-500" aria-hidden="true" />
-                                <span className="font-mono tabular-nums">{zone.availableSlots}</span>
-                                <span>de</span>
-                                <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                                <span>cupos libres ahora</span>
-                            </span>
+                            {zone.isActive !== false && (
+                                <span className="flex flex-wrap items-center gap-1 text-body text-neutral-600">
+                                    <Users className="h-3.5 w-3.5 shrink-0 text-neutral-500" aria-hidden="true" />
+                                    <span className="font-mono tabular-nums">{zone.availableSlots}</span>
+                                    <span>de</span>
+                                    <span className="font-mono tabular-nums">{zone.totalSlots}</span>
+                                    <span>cupos libres ahora</span>
+                                </span>
+                            )}
                         </div>
                         {/* #373: the count is the room now; other hours may have room */}
                         {availability.state === 'full' && (
@@ -470,7 +475,7 @@ export default function ReserveSpot() {
             <ZoneHours zone={zone} />
 
             {zone.isActive === false && (
-                <p role="alert" className="mt-6 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
+                <p id="zone-inactive-notice" role="alert" className="mt-6 rounded-md bg-danger-soft px-3 py-2 text-body text-danger">
                     {translateError('ZONE_INACTIVE')}
                 </p>
             )}
@@ -478,7 +483,7 @@ export default function ReserveSpot() {
             {pendingBalance && serverErrorCode !== 'PENDING_BALANCE' && (
                 <div role="alert" className="mt-6 flex flex-col items-start gap-2 rounded-md bg-danger-soft px-3 py-2">
                     <p className="text-body text-danger">{translateError('PENDING_BALANCE')}</p>
-                    <Link to="/reservations" className="text-caption font-medium text-danger underline">
+                    <Link to="/reservations" className="rounded-md border border-danger px-3 py-1 text-caption text-danger transition-colors hover:bg-white">
                         Ver mis reservas
                     </Link>
                 </div>
@@ -749,8 +754,10 @@ export default function ReserveSpot() {
                     </button>
                     <button
                         type="submit"
-                        disabled={submitting || zone.isActive === false}
-                        className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={submitting}
+                        aria-disabled={zone.isActive === false || undefined}
+                        aria-describedby={zone.isActive === false ? 'zone-inactive-notice' : undefined}
+                        className="flex items-center justify-center gap-2 rounded-md bg-parkea-600 px-5 py-2 text-label text-white transition-colors hover:bg-parkea-700 disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
                     >
                         <CalendarCheck className="h-4 w-4" aria-hidden="true" />
                         {submitting ? 'Reservando…' : 'Reservar cupo'}
