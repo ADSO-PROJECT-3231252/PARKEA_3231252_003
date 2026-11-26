@@ -508,6 +508,11 @@ Radii: `rounded-sm` 6px, `rounded-md` 10px, `rounded-lg` 12px. Spacing uses mult
 
 ## User Stories
 
+### Signed-in home and sign-out
+
+- **HU-03 — Authenticated home:** After signing in, a user can open the home page to see a personal welcome, reservation information and available parking zones. The navigation also gives access to “Mis reservas” and “Mis vehículos”.
+- **HU-24 — Sign out:** Open the account menu in the header and select “Cerrar sesión”. The home page shows the visitor view again. If another tab has a protected page open, such as “Mis vehículos”, that tab returns to the sign-in screen.
+
 Each user story is an issue with its acceptance criteria, traceability and Definition of Done. Its current status and its pull requests are on the issue and on the **PARKEA - Sprint Board** (Projects tab of the repository).
 
 | ID | Story | Responsible | Issue |
