@@ -16,8 +16,9 @@ const PLATE_PLACEHOLDER = {
 };
 
 // #217: Reserve a spot sends the user here when they have no vehicles (or,
-// HU-31 AC-11, none of a type the zone accepts), and passes where to come back. Only "/reserve/" plus a zone id is accepted, so
-// the state can't send the user to any other page (not even with "../").
+// HU-31 AC-11, none of a type the zone accepts), and passes where to come
+// back. Only "/reserve/" plus a zone id is accepted, so the state can't
+// send the user to any other page (not even with "../").
 function getReturnTo(state) {
     const returnTo = state?.returnTo;
     return typeof returnTo === 'string' && /^\/reserve\/[0-9a-f-]{36}$/i.test(returnTo) ? returnTo : null;
