@@ -56,6 +56,7 @@ counted only per network, so everyone on that network shares their count
 | `/auth/login` and `/auth/login-admin` | 10 every 15 minutes per email, and 100 every 15 minutes per network | Only failed sign-ins (not the ones that work, not server errors). The user and admin sign-ins share the counts |
 | `/auth/forgot-password` and `/auth/resend-verification` | 5 every 15 minutes per email, and 20 every hour per network, each route with its own counts | Every request, because each one can send an email |
 | `/auth/register` | 30 every hour per network | Only the accounts that are created |
+| `/auth/register` | 20 conflicts every 15 minutes per network | Only `409` responses for a duplicate email or document count. After 20 conflicts, the next request returns `429 TOO_MANY_REQUESTS`. |
 | `/auth/reset-password` | 10 every 15 minutes per network | Only failed tries (a link that is not valid, used or expired, a password that is not valid). Not the ones that work, not server errors |
 | `/users/me/password` | 5 every 15 minutes per account, from any network | Only failed changes (a wrong current password, a new password that is not valid or is the same). Not the ones that work, not server errors |
 
