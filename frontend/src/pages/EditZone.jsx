@@ -136,7 +136,6 @@ function EditZoneForm({ initialZone, adminTypes, activeReservations }) {
     const [zone, setZone] = useState(initialZone);
     const [original] = useState(() => zoneToForm(initialZone, adminTypes ?? initialZone.vehicleTypes));
     const [spotsInUse, setSpotsInUse] = useState(() => countsOf(adminTypes, 'spotsInUse'));
-    const [openReservations] = useState(() => (adminTypes ? countsOf(adminTypes, 'openReservations') : null));
     const zoneForm = useZoneForm(original);
     const { form, setServerError, showErrors, showApiError } = zoneForm;
     const [saving, setSaving] = useState(false);
@@ -172,6 +171,16 @@ function EditZoneForm({ initialZone, adminTypes, activeReservations }) {
         }
 
         if (turnedOff.length > 0) {
+            // The reservations of now: some may have come while the form was
+            // open. Without the count, the question says they stay valid.
+            let openReservations = null;
+            try {
+                const { data } = await getAllZones();
+                const current = data.zones.find((z) => z.id === zone.id);
+                if (current) openReservations = countsOf(current.vehicleTypes, 'openReservations');
+            } catch {
+                // The question without the count
+            }
             setTypesDialog(
                 getTypesOffDialog(
                     zone.name,

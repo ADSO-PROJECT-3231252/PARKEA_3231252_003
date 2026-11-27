@@ -158,6 +158,22 @@ describe('"Editar zona" with its vehicle types (HU-31 AC-04, AC-05)', () => {
         );
     });
 
+    test('the question counts the reservations of now, not the ones when the form was opened', async () => {
+        // Arrange: no reservation of motorcycles when the form opens, 3 when it is saved
+        const user = await renderEdit({ adminTypes: ADMIN_TYPES.map((type) => ({ ...type, openReservations: 0 })) });
+        getAllZones.mockResolvedValue({ data: { zones: [{ ...ZONE, activeReservations: 4, vehicleTypes: ADMIN_TYPES }] } });
+
+        // Act
+        await user.click(checkbox('Moto'));
+        await user.click(save('Guardar cambios'));
+
+        // Assert
+        expect(await screen.findByRole('alertdialog', { name: 'Dejar de recibir motos' })).toHaveAccessibleDescription(
+            'La zona Centro no aceptará reservas nuevas de motos. Tiene 3 reservas de motos pendientes o activas, que seguirán válidas hasta que terminen. ' +
+            'Sus cupos y su tarifa se conservan si lo vuelves a marcar.',
+        );
+    });
+
     test('a type with no open reservations is turned off with the plain question', async () => {
         // Arrange: no reservation of cars
         const user = await renderEdit({ adminTypes: ADMIN_TYPES.map((type) => ({ ...type, spotsInUse: 0, openReservations: 0 })) });
