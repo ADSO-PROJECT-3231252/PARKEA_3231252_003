@@ -1,4 +1,4 @@
-import { acceptedTypesOf, spotsOf, typeFilterOf, zoneTypeOf } from '../src/utils/zones';
+import { acceptedTypesOf, getTypesOffDialog, spotsOf, typeFilterOf, zoneTypeOf } from '../src/utils/zones';
 
 // HU-31: a zone as GET /zones sends it, with the types that take
 // reservations (here in another order than the one of the screens)
@@ -66,5 +66,20 @@ describe('typeFilterOf (AC-09)', () => {
         ['another case', 'Car'],
     ])('%s means "Todos"', (_case, value) => {
         expect(typeFilterOf(value)).toBeNull();
+    });
+});
+
+describe('getTypesOffDialog (AC-05)', () => {
+    test('with the reservations unknown, it speaks of every type turned off', () => {
+        const { title, message } = getTypesOffDialog('Centro', [
+            { type: 'motorcycle', openReservations: null },
+            { type: 'truck', openReservations: null },
+        ]);
+        expect(title).toBe('Dejar de recibir motos y camiones');
+        expect(message).toBe(
+            'La zona Centro no aceptará reservas nuevas de motos y camiones. ' +
+                'Si tiene reservas pendientes o activas de esos tipos, seguirán válidas hasta que terminen. ' +
+                'Sus cupos y sus tarifas se conservan si los vuelves a marcar.',
+        );
     });
 });

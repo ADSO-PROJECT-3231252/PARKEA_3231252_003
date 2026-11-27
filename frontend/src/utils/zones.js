@@ -79,7 +79,7 @@ export function getTypesOffDialog(zoneName, turnedOff) {
     let message = `La zona ${zoneName} no aceptará reservas nuevas de ${joinTypes(types)}.`;
     const known = turnedOff.every(({ openReservations }) => Number.isInteger(openReservations));
     if (!known) {
-        message += ' Si tiene reservas pendientes o activas de ese tipo, seguirán válidas hasta que terminen.';
+        message += ` Si tiene reservas pendientes o activas de ${types.length === 1 ? 'ese tipo' : 'esos tipos'}, seguirán válidas hasta que terminen.`;
     } else {
         const open = turnedOff.filter(({ openReservations }) => openReservations > 0);
         if (open.length > 0) {
