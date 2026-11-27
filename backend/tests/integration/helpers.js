@@ -61,8 +61,9 @@ async function adminToken() {
 }
 
 // A zone open 24 hours, created through the API like the administrator does,
-// so it gets its numbered spots
-async function createZone(totalSlots) {
+// so it gets its numbered spots. HU-31: `totalSlots` car spots at $2000 an
+// hour, or the `vehicleTypes` given.
+async function createZone(totalSlots, { vehicleTypes = [{ vehicleType: 'car', totalSlots, hourlyRate: 2000 }] } = {}) {
     const res = await request(app)
         .post('/api/zones')
         .set('Authorization', `Bearer ${await adminToken()}`)
@@ -71,8 +72,7 @@ async function createZone(totalSlots) {
             address: 'Calle 1 # 2-3',
             latitude: 4.8133,
             longitude: -75.6961,
-            totalSlots,
-            hourlyRate: 2000,
+            vehicleTypes,
             open24h: true,
         });
     if (res.status !== 201) throw new Error(`The zone was not created: ${res.status} ${JSON.stringify(res.body)}`);

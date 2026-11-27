@@ -66,7 +66,7 @@ counted only per network, so everyone on that network shares their count
 | POST | `/vehicles` | User | Register a vehicle (HU-10). First vehicle is auto-set as default. Brand, model and color (up to 50, 50 and 30 characters) only accept letters, numbers, spaces, hyphens and periods, with at least one letter or number. The text is checked as it was typed, then saved normalized. A user can have at most 5 active vehicles (a deleted one does not count): with 5, the next one answers 409 `VEHICLE_LIMIT_REACHED` (#299) |
 | GET | `/vehicles` | User | List my vehicles (HU-11). Default vehicle always first |
 | GET | `/vehicles/:id` | User (owner) | Single vehicle detail, used to prefill the edit form |
-| PUT | `/vehicles/:id` | User (owner) | Edit a vehicle (HU-12). Plate is never editable. Brand, model and color follow the same rules as when registering, so a vehicle saved with other characters answers 400 until that field is corrected |
+| PUT | `/vehicles/:id` | User (owner) | Edit a vehicle (HU-12). Plate is never editable. Brand, model and color follow the same rules as when registering, so a vehicle saved with other characters answers 400 until that field is corrected. Its `vehicleType` cannot change while it has a `Pending` or `Active` reservation, which has a spot of that type: 409 `VEHICLE_HAS_ACTIVE_RESERVATION` (HU-31); its other data can |
 | PATCH | `/vehicles/:id/default` | User (owner) | Set this vehicle as the default one |
 | DELETE | `/vehicles/:id` | User (owner) | Soft-delete a vehicle (HU-13). Blocked if it has a Pending/Active reservation |
 
@@ -74,12 +74,12 @@ counted only per network, so everyone on that network shares their count
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| GET | `/zones` | Public | List active zones only (HU-09), the ones with the largest share of free spots first. Every zone has `open24h` and its `schedule` (HU-29, see below), and `availableSlots`: the spots free now (#373, see below) |
-| GET | `/zones/all` | Admin | List every zone, active and inactive (HU-19). Each one also has `activeReservations` (its `Pending` and `Active` reservations) and `spotsInUse` (#373: the spots with a `Pending` or `Active` reservation from now on, the least capacity it can have) |
-| GET | `/zones/:id` | Public | Single zone detail. Not filtered by active status, so admins can reach a deactivated zone to edit/reactivate it |
-| GET | `/zones/:id/availability` | Public | How many spots of the zone are free for some hours (#375): `?startTime=&endTime=`, or `?startTime=&openEnded=true` for an open stay. Same checks and rules as `POST /reservations` (see below) |
-| POST | `/zones` | Admin | Create a zone, auto-generates its parking spots (HU-20). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), a whole-number capacity from 1 to 500, an hourly rate greater than 0 with at most 2 decimals (#316: a rate of 0 answers 400 `VALIDATION_ERROR` on `hourlyRate`, a negative one `NEGATIVE_VALUE`), and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule`. The name must not belong to another zone, without telling capitals or accents apart: 409 `ZONE_NAME_TAKEN`, also when two admins save the same name at the same time (#304, unique index `zones_name_unique`) |
-| PUT | `/zones/:id` | Admin | Edit a zone; adjusts spots if capacity changes (HU-21). Same rules as creation, opening hours included. New hours apply to new reservations and extensions; existing reservations keep their times (HU-29). Lowering the capacity disables only spots with no `Pending` or `Active` reservation from now on, the highest numbers first; below the spots in use it answers 400 `CAPACITY_BELOW_IN_USE` with `spotsInUse` (#373) |
+| GET | `/zones` | Public | List active zones only (HU-09), the ones with the largest share of free spots first. Every zone has `open24h` and its `schedule` (HU-29, see below), its `vehicleTypes` (HU-31, see below), and `totalSlots` and `availableSlots`: all its spots and the ones free now, of the types it accepts (#373, see below) |
+| GET | `/zones/all` | Admin | List every zone, active and inactive (HU-19). Each one also has `activeReservations` (its `Pending` and `Active` reservations) and `spotsInUse` (#373: the spots with a `Pending` or `Active` reservation from now on), and its `vehicleTypes` as the administrator sees them: the ones turned off too, with the counts of each type (HU-31, see below). This is where the edit screen gets them |
+| GET | `/zones/:id` | Public | Single zone detail, with the types it accepts. Not filtered by active status, so admins can reach a deactivated zone to edit/reactivate it |
+| GET | `/zones/:id/availability` | Public | How many spots of one vehicle type of the zone are free for some hours (#375, HU-31): `?vehicleType=&startTime=&endTime=`, or `?vehicleType=&startTime=&openEnded=true` for an open stay. Same checks and rules as `POST /reservations` (see below) |
+| POST | `/zones` | Admin | Create a zone with its vehicle types, auto-generates the parking spots of each type (HU-20, HU-31). Requires valid coordinates inside Colombia (`COORDINATES_OUTSIDE_COLOMBIA` otherwise), its `vehicleTypes` (see below) and its opening hours (HU-29): `open24h: true`, or `open24h: false` with a `schedule`. The name must not belong to another zone, without telling capitals or accents apart: 409 `ZONE_NAME_TAKEN`, also when two admins save the same name at the same time (#304, unique index `zones_name_unique`) |
+| PUT | `/zones/:id` | Admin | Edit a zone and its vehicle types; adjusts the spots of each type whose capacity changes (HU-21, HU-31). Same rules as creation, opening hours included. New hours apply to new reservations and extensions; existing reservations keep their times (HU-29). Lowering the spots of a type disables only spots of that type with no `Pending` or `Active` reservation from now on, the highest numbers first; below the spots of the type in use it answers 400 `CAPACITY_BELOW_IN_USE` with `vehicleType` and `spotsInUse` (#373). A type left out of the list is turned off (see below) |
 | PATCH | `/zones/:id/toggle` | Admin | Activate/deactivate a zone (HU-19). The body says the state wanted, `{ "isActive": true }` or `false` (#304): repeating it changes nothing, so two admins who deactivate it at the same time both leave it inactive. Without a real boolean it answers 400 `VALIDATION_ERROR` |
 
 ### Opening hours (HU-29)
@@ -109,6 +109,61 @@ opens, in Colombia time; a day that is not in the list is closed:
   problem on `schedule`; an item about one day also has its `day`.
 - Zones created before HU-29 are open 24 hours.
 
+### Vehicle types (HU-31)
+
+A zone accepts one or more vehicle types (`car`, `motorcycle`, `truck`),
+each with its own spots and its own hourly rate. The zone has no spots or
+rate of its own: its `totalSlots` is the sum of the types it accepts. The
+body of `POST` and `PUT /zones` has one item for each type the zone
+accepts:
+
+```json
+{
+  "vehicleTypes": [
+    { "vehicleType": "car", "totalSlots": 20, "hourlyRate": 2000 },
+    { "vehicleType": "motorcycle", "totalSlots": 10, "hourlyRate": 1000 }
+  ]
+}
+```
+
+- At least one type, each one at most once. `totalSlots` is a whole number
+  from 1 to 500, and all the types together have at most 500 spots.
+  `hourlyRate` is a number greater than 0 with at most 2 decimals (#316).
+- Every error answers 400 `VALIDATION_ERROR` with one item for each
+  problem, all at once, on its field: `vehicleTypes`,
+  `vehicleTypes[1].totalSlots`, `vehicleTypes[0].hourlyRate`…
+- The spots of each type are numbered from 1 (cars 1 to 20, motorcycles 1
+  to 10). A spot is always of one type, and a reservation gets a spot of
+  the type of its vehicle.
+- In `PUT`, a type the zone accepted that is left out of the list is turned
+  off: it takes no new reservations, and keeps its spots, its rate and the
+  reservations it already has, which go on as they were. Sending it again
+  turns it on with the spots it kept. A new type gets its spots from 1.
+- A reservation keeps the rate of its type at the moment it was made
+  (`appliedHourlyRate`): a new rate is only for new reservations.
+- Zones created before HU-31 accept cars, with their spots and their rate.
+
+Every zone the API sends has `vehicleTypes`, in the order car, motorcycle,
+truck, with only the types it accepts:
+
+```json
+{
+  "totalSlots": 30,
+  "availableSlots": 22,
+  "vehicleTypes": [
+    { "vehicleType": "car", "totalSlots": 20, "availableSlots": 14, "hourlyRate": 2000 },
+    { "vehicleType": "motorcycle", "totalSlots": 10, "availableSlots": 8, "hourlyRate": 1000 }
+  ]
+}
+```
+
+The administrator gets every type in `GET /zones/all` and in the answers of
+`POST` and `PUT /zones`, the ones turned off too, and each one also has
+`isAccepting`, `spotsInUse` (the spots of the type with a `Pending` or
+`Active` reservation from now on: the least spots it can have) and
+`openReservations` (how many reservations hold those spots from now on).
+The sums of the zone always leave out the types turned off.
+
 ### Free spots (#373)
 
 A spot is taken only for the hours of its reservations (see
@@ -116,41 +171,48 @@ A spot is taken only for the hours of its reservations (see
 zone depend on the hours asked and are not stored.
 
 - Every zone the API sends has `availableSlots`: the spots free now for the
-  shortest stay, 30 minutes from now. A zone with 0 now can still have
-  room for later hours.
+  shortest stay, 30 minutes from now, of each type and, for the zone, of
+  all the types it accepts (HU-31). A zone with 0 now can still have room
+  for later hours.
 - `GET /zones` orders the zones by `availableSlots / totalSlots`, the
   largest first, and then by name.
 - The status of a spot only says whether it can be reserved: `Available`
   or `Disabled` (a spot left out by a lower capacity).
 
 `GET /zones/:id/availability` gives the free spots for other hours (#375),
-so the reserve screen can say whether there is room before sending. It
-takes the same `startTime`, `endTime` and `openEnded` as `POST
-/reservations`, as text in the query, and checks them the same way and in
-the same order: `MISSING_REQUIRED_FIELDS`, `INVALID_DATE`,
-`START_TIME_IN_PAST`, `RESERVATION_TOO_FAR_AHEAD`, `END_BEFORE_START`,
-`INVALID_DURATION` (400), then 404 `ZONE_NOT_FOUND`, 409 `ZONE_INACTIVE`
-and the hours of the zone (400 `OUTSIDE_ZONE_HOURS` or
-`ZONE_CLOSED_THAT_DAY`, with `hours`). Each of these errors has the same
-body as in `POST /reservations`. A repeated value, or an `openEnded` that
-is not `true` or `false`, answers 400 `VALIDATION_ERROR`. With
-`openEnded=true`, `endTime` is not needed and is ignored, as in the
+so the reserve screen can say whether there is room before sending. HU-31:
+the spots of one `vehicleType`, the type of the chosen vehicle, which is
+required: without it, or with another value, it answers 400
+`VALIDATION_ERROR`. It takes the same `startTime`, `endTime` and
+`openEnded` as `POST /reservations`, as text in the query, and checks them
+the same way and in the same order: `MISSING_REQUIRED_FIELDS`,
+`INVALID_DATE`, `START_TIME_IN_PAST`, `RESERVATION_TOO_FAR_AHEAD`,
+`END_BEFORE_START`, `INVALID_DURATION` (400), then 404 `ZONE_NOT_FOUND`,
+409 `ZONE_INACTIVE`, 409 `VEHICLE_TYPE_NOT_ACCEPTED` (HU-31) and the hours
+of the zone (400 `OUTSIDE_ZONE_HOURS` or `ZONE_CLOSED_THAT_DAY`, with
+`hours`). Each of these errors has the same body as in `POST
+/reservations` for a vehicle of that type. A repeated value, or an
+`openEnded` that is not `true` or `false`, answers 400 `VALIDATION_ERROR`.
+With `openEnded=true`, `endTime` is not needed and is ignored, as in the
 reservation. It needs no session.
 
 ```json
 {
   "zoneId": "…",
+  "vehicleType": "motorcycle",
   "startTime": "2026-11-23T15:00:00.000Z",
   "endTime": "2026-11-23T17:00:00.000Z",
   "openEnded": false,
   "availableSlots": 3,
-  "totalSlots": 10
+  "totalSlots": 10,
+  "hourlyRate": 1000
 }
 ```
 
-- `availableSlots` counts the enabled spots that no reservation holds in
-  those hours, with the 10 minutes before and after: the spots `POST
-  /reservations` could give for that stay. An open stay counts them until
+- `availableSlots` counts the enabled spots of the type that no reservation
+  holds in those hours, with the 10 minutes before and after: the spots
+  `POST /reservations` could give for that stay. `totalSlots` and
+  `hourlyRate` are the ones of the type. An open stay counts them until
   its provisional exit, which is the `endTime` of the answer: 24 hours
   later, or the closing time of the zone that day.
 - It only informs. It holds nothing, so the reservation still decides when
@@ -160,12 +222,34 @@ reservation. It needs no session.
 
 | Method | Route | Access | Description |
 |---|---|---|---|
-| POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE`. A user can have at most 2 reservations in `Pending` at the same time: with 2, the next one answers 409 `TOO_MANY_PENDING_RESERVATIONS` until one is paid, cancelled or expires (#299) |
-| GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `holdExpiresAt` (until when a `Pending` one can be paid or cancelled, #347; `null` once it is paid), `openEnded`, `latestEndTime` (HU-29), `spotFreeUntil` (#375, see below), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
-| GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `holdExpiresAt`, `latestEndTime` (HU-29), `spotFreeUntil` (#375, see below) and zone coordinates. `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
+| POST | `/reservations` | User | Reserve a spot, assigns one automatically (HU-14): a spot of the type of the vehicle, at the rate of that type, which the reservation keeps (HU-31). A zone that does not accept the type answers 409 `VEHICLE_TYPE_NOT_ACCEPTED` (see below). 30 min–24h duration, up to 48h in advance, no overlap per vehicle. With `openEnded: true` no `endTime` is needed: it is an open stay without an exit time (HU-27). The whole stay must fit the opening hours of the zone (HU-29, see below). A user with an unpaid balance gets 409 `PENDING_BALANCE`. A user can have at most 2 reservations in `Pending` at the same time: with 2, the next one answers 409 `TOO_MANY_PENDING_RESERVATIONS` until one is paid, cancelled or expires (#299) |
+| GET | `/reservations` | User | List my reservations, paginated (HU-18). Optional `?status=` filter and `?page=&limit=` (at most 100 per page). Each one has `spotVehicleType` (the type of its spot, HU-31), `holdExpiresAt` (until when a `Pending` one can be paid or cancelled, #347; `null` once it is paid), `openEnded`, `latestEndTime` (HU-29), `spotFreeUntil` (#375, see below), `amount` with `amountType` (`estimated`, `paid` or, for an open stay that is running, `so_far`) and `extensions` |
+| GET | `/reservations/:id` | User (owner) | Reservation confirmation details (HU-15), includes `spotVehicleType` (HU-31), `holdExpiresAt`, `latestEndTime` (HU-29), `spotFreeUntil` (#375, see below) and zone coordinates. The rate is the one the reservation keeps, `paymentSummary.hourlyRate`: the zone has none (HU-31). `paymentSummary` has `paidTotal` and `extensions` (HU-28); an open stay that has not ended has no `durationHours` yet |
 | PATCH | `/reservations/:id/cancel` | User (owner) | Cancel a reservation (HU-16). A `Pending` one (not paid) while its 15 minutes to pay last, even after its start time (#316); once they end it answers 400 `RESERVATION_EXPIRED` and changes nothing, like the payment, even if the job has not marked it `Expired` yet (#347). An `Expired` one answers the same. An `Active` one (paid) only before its start time, otherwise 409 `RESERVATION_ALREADY_STARTED` (#316). A `Cancelled` or `Finished` one answers 409 `RESERVATION_NOT_CANCELLABLE`. What was paid is marked Refunded, extensions included |
 | PATCH | `/reservations/:id/finish` | User (owner) | Finish an open stay when the user leaves (HU-27). Charges every started hour, subtracts what was paid and creates a pending balance if something is still owed. Optional `expectedHours` (the hours shown to the user): if another hour started meanwhile it answers 409 `STAY_AMOUNT_CHANGED` with the new amount |
 | PATCH | `/reservations/:id/extend` | User (owner) | Extend a paid stay that has not ended (HU-28). `{ fromEndTime, newEndTime, paymentMethod, cardLastFour }` pays the added time now; `{ fromEndTime, openEnded: true }` turns it into an open stay, paid when it ends. Never more than 24 hours from the entry, nor past the closing time of the zone (HU-29). If the exit time changed in another tab it answers 409 `RESERVATION_CHANGED`. A stay never changes spot: if another reservation holds it in the added time, it answers 409 `SPOT_RESERVED_LATER` with `freeUntil` (#373) |
+
+### Reservations and vehicle types (HU-31)
+
+- The zone must accept the type of the vehicle (a type turned off does
+  not). Otherwise it answers 409 `VEHICLE_TYPE_NOT_ACCEPTED` with the
+  types the zone accepts, in the order car, motorcycle, truck, so the
+  screen can say which:
+
+```json
+{ "code": "VEHICLE_TYPE_NOT_ACCEPTED", "message": "…", "vehicleType": "truck", "acceptedTypes": ["car", "motorcycle"] }
+```
+
+- It is checked after `ZONE_NOT_FOUND` and `ZONE_INACTIVE`, and before the
+  limit of `Pending` reservations, the hours of the zone and the spots.
+- The spot is the free one with the lowest number of that type: with every
+  spot of the type taken it answers 409 `NO_SPOTS_AVAILABLE`, even if the
+  zone has free spots of other types.
+- `appliedHourlyRate` is the rate of the type at that moment, and it is
+  what the payment, the extensions and the finish of an open stay charge.
+- The answer, the list and the detail say the type of the spot
+  (`spotVehicleType`), which is the type of the vehicle it was made for
+  (`null` for a reservation without a spot).
 
 ### Reservations and opening hours (HU-29)
 
@@ -254,10 +338,10 @@ reservation. It needs no session.
 |---|---|---|---|
 | GET | `/admin/dashboard?range=today\|week\|month` | Admin | Summary metrics: active reservations, revenue, active zones and registered users, which is the total number of accounts and not the new ones (HU-22). Ranges, see below |
 | GET | `/admin/dashboard/reservations-by-zone?range=today\|week\|month` | Admin | Reservation count per active zone (HU-22) |
-| GET | `/admin/dashboard/occupancy` | Admin | Occupied vs. total slots per active zone, now (HU-22): the occupied ones are the ones not free for the next 30 minutes, that is, `totalSlots` minus `availableSlots` (#373) |
+| GET | `/admin/dashboard/occupancy` | Admin | Occupied vs. total slots per active zone, now (HU-22): the occupied ones are the ones not free for the next 30 minutes, that is, `totalSlots` minus `availableSlots` (#373). HU-31: of the types the zone accepts, and each type in `vehicleTypes`, as `{ vehicleType, totalSlots, occupiedSlots }` |
 | GET | `/admin/dashboard/payments-status?range=today\|week\|month` | Admin | Payment count by status (HU-22) |
 | GET | `/admin/dashboard/recent-payments` | Admin | Last 5 payments (HU-22) |
-| GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: an active zone with no spot free now (HU-22, #373). Each alert brings `type` (`zone_full`), `severity`, `zoneId` and `zoneName`, and no text: the frontend writes the sentence (#313) |
+| GET | `/admin/dashboard/alerts` | Admin | Operational alerts, e.g. zones at full capacity: a type that an active zone accepts with no spot free now, one alert for each type (HU-22, #373, HU-31). Each alert brings `type` (`zone_full`), `severity`, `zoneId`, `zoneName` and `vehicleType`, and no text: the frontend writes the sentence (#313) |
 | GET | `/admin/users?search=&role=&status=&page=&limit=` | Admin | List users with filters, pagination (at most 100 per page), and reservation count per user (HU-23). `search` looks for `%`, `_` and `\` as written (#304) |
 | GET | `/admin/users/logs` | Admin | Last 10 role/status changes made by admins (HU-23) |
 | PATCH | `/admin/users/:id/role` | Admin | Grant/revoke admin role (HU-23). Can't self-modify; keeps at least one active admin. The role it already has answers 200 and writes no line in the log (#304). An account with an `Active` reservation, a `Pending` one whose 15 minutes to pay are still running, or a balance to pay answers 409 `USER_HAS_OPEN_RESERVATIONS` (#348). Both accounts (the admin and the one changed) are locked first, in the order of their id; if the other admin deactivated this one or removed its role meanwhile, 403 `ACCOUNT_DEACTIVATED` or `FORBIDDEN_ROLE` |

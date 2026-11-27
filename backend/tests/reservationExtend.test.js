@@ -49,7 +49,7 @@ function arrange(reserva = stay(), overlap = null) {
     findReservation = jest.spyOn(Reserva, 'findOne').mockResolvedValueOnce(reserva).mockResolvedValue(overlap);
     lockVehicle = jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID });
     const zona = Zona.build(
-        { id: ZONE_ID, name: 'Centro', hourlyRate: '2000.00', isActive: true, open24h: true, schedules: [] },
+        { id: ZONE_ID, name: 'Centro', isActive: true, open24h: true, schedules: [] },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
     readZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);

@@ -89,15 +89,16 @@ describe('Lowering the capacity (HU-21 AC-03, #373)', () => {
             const i = reservas.findIndex((r) => r.spotNumber === spotNumber);
             await request(app).patch(`/api/reservations/${reservas[i].id}/cancel`).set('Authorization', `Bearer ${cuentas[i].token}`);
         }
-        const body = { name: zona.name, address: zona.address, latitude: 4.8133, longitude: -75.6961, hourlyRate: 2000, open24h: true };
+        const body = { name: zona.name, address: zona.address, latitude: 4.8133, longitude: -75.6961, open24h: true };
+        const cars = (totalSlots) => ({ ...body, vehicleTypes: [{ vehicleType: 'car', totalSlots, hourlyRate: 2000 }] });
 
         // Act
-        const below = await asAdmin(request(app).put(`/api/zones/${zona.id}`).send({ ...body, totalSlots: 1 }));
-        const down = await asAdmin(request(app).put(`/api/zones/${zona.id}`).send({ ...body, totalSlots: 2 }));
+        const below = await asAdmin(request(app).put(`/api/zones/${zona.id}`).send(cars(1)));
+        const down = await asAdmin(request(app).put(`/api/zones/${zona.id}`).send(cars(2)));
 
         // Assert: spot 4 is in use, so 3 and 2 are the ones disabled
         expect(below.status).toBe(400);
-        expect(below.body).toMatchObject({ code: 'CAPACITY_BELOW_IN_USE', spotsInUse: 2 });
+        expect(below.body).toMatchObject({ code: 'CAPACITY_BELOW_IN_USE', vehicleType: 'car', spotsInUse: 2 });
         expect(down.status).toBe(200);
         expect(down.body.zone).toMatchObject({ totalSlots: 2, availableSlots: 0 });
         const spots = await ParkingSpot.findAll({ where: { zoneId: zona.id }, order: [['spotNumber', 'ASC']] });

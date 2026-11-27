@@ -4,7 +4,7 @@ const { Op } = require('sequelize');
 
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL)
-const { Usuario, Vehiculo, Zona, ZoneSchedule, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
+const { Usuario, Vehiculo, Zona, ZoneSchedule, ZoneVehicleType, Reserva, Pago, ParkingSpot, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // HU-29: reservations and extensions must fit the hours of the zone. The
@@ -30,7 +30,7 @@ function zone({ open24h = false } = {}) {
         { dayOfWeek: 2, opensAt: '06:00:00', closesAt: '20:00:00' },
     ];
     const zona = Zona.build(
-        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, hourlyRate: '2000.00', isActive: true, open24h, schedules },
+        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', isActive: true, open24h, schedules },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
     return zona;
@@ -56,13 +56,15 @@ describe('Creating a reservation inside the hours of the zone (HU-29, AC-03 and 
     let createReservation;
 
     function arrange(zona) {
-        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID });
+        // A car, in a zone that takes cars (HU-31)
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID, vehicleType: 'car' });
+        jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue([ZoneVehicleType.build({ zoneId: ZONE_ID, vehicleType: 'car', totalSlots: 10, hourlyRate: '2000.00', isAccepting: true })]);
         // The user has no reservations in Pending, so the limit does not apply
         jest.spyOn(Reserva, 'count').mockResolvedValue(0);
         jest.spyOn(Zona, 'findByPk').mockResolvedValue(zona);
         jest.spyOn(Pago, 'findOne').mockResolvedValue(null);
         jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);
-        jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue({ id: 'spot-1', spotNumber: 1, update: jest.fn() });
+        jest.spyOn(ParkingSpot, 'findOne').mockResolvedValue({ id: 'spot-1', spotNumber: 1, vehicleType: 'car', update: jest.fn() });
         createReservation = jest.spyOn(Reserva, 'create').mockResolvedValue({ id: RESERVATION_ID });
         jest.spyOn(Reserva, 'findByPk').mockResolvedValue({ id: RESERVATION_ID });
     }

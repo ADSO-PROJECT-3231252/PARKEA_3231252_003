@@ -5,12 +5,13 @@ const { Op } = require('sequelize');
 // The database is replaced by spies on the models (tests/setup.js: the tests
 // never reach MySQL). What the SQL finds on a real database is checked in
 // tests/integration.
-const { Usuario, Vehiculo, Zona, ZoneSchedule, ParkingSpot, Pago, Reserva, sequelize } = require('../src/models');
+const { Usuario, Vehiculo, Zona, ZoneSchedule, ZoneVehicleType, ParkingSpot, Pago, Reserva, sequelize } = require('../src/models');
 const app = require('../src/app');
 
 // #375: GET /api/zones/:id/availability says how many spots of a zone are
-// free for some hours, with the same rules as POST /reservations. The times
-// are in Colombia (UTC-5), and "now" is Monday 2026-11-16 at 8:00 a. m.
+// free for some hours, with the same rules as POST /reservations. HU-31: the
+// spots of one vehicle type, the one of the chosen vehicle. The times are in
+// Colombia (UTC-5), and "now" is Monday 2026-11-16 at 8:00 a. m.
 const colombia = (time, date = '2026-11-16') => new Date(`${date}T${time}:00-05:00`);
 const NOW = colombia('08:00');
 const ZONE_ID = '22222222-2222-4222-8222-222222222222';
@@ -26,18 +27,23 @@ const TRANSACTION = { id: 'zone-reads', LOCK: { UPDATE: 'UPDATE' }, commit: jest
 function zone({ open24h = true, isActive = true } = {}) {
     const schedules = open24h ? [] : [{ dayOfWeek: 1, opensAt: '06:00:00', closesAt: '20:00:00' }];
     return Zona.build(
-        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', totalSlots: 10, hourlyRate: '2000.00', isActive, open24h, schedules },
+        { id: ZONE_ID, name: 'Centro', address: 'Calle 1', isActive, open24h, schedules },
         { include: [{ model: ZoneSchedule, as: 'schedules' }] },
     );
 }
 
-const ask = (query) => request(app).get(`/api/zones/${ZONE_ID}/availability`).query(query);
+// HU-31: the types a zone accepts, as the model gives them
+const zoneTypes = (...items) => items.map(([vehicleType, totalSlots, hourlyRate]) => ZoneVehicleType.build({ zoneId: ZONE_ID, vehicleType, totalSlots, hourlyRate, isAccepting: true }));
+
+// The question for a car unless the test asks for another type
+const ask = (query) => request(app).get(`/api/zones/${ZONE_ID}/availability`).query({ vehicleType: 'car', ...query });
 const hours = (start, end) => ({ startTime: colombia(start).toISOString(), endTime: colombia(end).toISOString() });
 
 // The SQL text of the literal in a where
 const sqlOf = (where) => where[Op.and].map((part) => part.val).join(' ');
 
 let readZone;
+let readTypes;
 let countFree;
 
 beforeEach(() => {
@@ -46,6 +52,8 @@ beforeEach(() => {
     // a function (POST /reservations) it gives the transaction
     jest.spyOn(sequelize, 'transaction').mockImplementation(async (work) => (work ? work(TRANSACTION) : TRANSACTION));
     readZone = jest.spyOn(Zona, 'findByPk').mockResolvedValue(zone());
+    // 10 car spots at $2000 an hour and 6 motorcycle spots at $1000
+    readTypes = jest.spyOn(ZoneVehicleType, 'findAll').mockResolvedValue(zoneTypes(['car', 10, '2000.00'], ['motorcycle', 6, '1000.00']));
     countFree = jest.spyOn(ParkingSpot, 'count').mockResolvedValue(4);
 });
 
@@ -55,22 +63,25 @@ afterEach(() => {
 });
 
 describe('The free spots of a zone for some hours (#375)', () => {
-    test('counts the enabled spots with no reservation in those hours, with the 10 minutes before and after', async () => {
+    test('counts the enabled spots of the type with no reservation in those hours, with the 10 minutes before and after', async () => {
         // Act: today from 10:00 a. m. to 12:00 p. m., with no session
         const res = await ask(hours('10:00', '12:00'));
 
-        // Assert
+        // Assert: with the spots and the rate of the type (HU-31)
         expect(res.status).toBe(200);
         expect(res.body).toEqual({
             zoneId: ZONE_ID,
+            vehicleType: 'car',
             startTime: colombia('10:00').toISOString(),
             endTime: colombia('12:00').toISOString(),
             openEnded: false,
             availableSlots: 4,
             totalSlots: 10,
+            hourlyRate: 2000,
         });
         const { where } = countFree.mock.calls[0][0];
         expect(where.zoneId).toBe(ZONE_ID);
+        expect(where.vehicleType).toBe('car');
         expect(where.status).toEqual({ [Op.ne]: 'Disabled' });
         // 15:00 to 17:00 UTC, so from 14:50 to 17:10 with the margin
         expect(sqlOf(where)).toContain("r.start_time < '2026-11-16 17:10:00'");
@@ -84,6 +95,7 @@ describe('The free spots of a zone for some hours (#375)', () => {
         // Assert
         expect(sequelize.transaction).toHaveBeenCalledTimes(1);
         expect(readZone.mock.calls[0][1]).toMatchObject({ transaction: TRANSACTION, include: [expect.objectContaining({ as: 'schedules' })] });
+        expect(readTypes).toHaveBeenCalledWith({ where: { zoneId: ZONE_ID, isAccepting: true }, transaction: TRANSACTION });
         expect(countFree.mock.calls[0][0].transaction).toBe(TRANSACTION);
     });
 
@@ -140,6 +152,72 @@ describe('The free spots of a zone for some hours (#375)', () => {
     });
 });
 
+describe('The vehicle type of the question (HU-31)', () => {
+    test('a motorcycle gets the free motorcycle spots, with the spots and the rate of the motorcycles', async () => {
+        // Arrange
+        countFree.mockResolvedValue(5);
+
+        // Act
+        const res = await ask({ ...hours('10:00', '12:00'), vehicleType: 'motorcycle' });
+
+        // Assert
+        expect(res.status).toBe(200);
+        expect(res.body).toMatchObject({ vehicleType: 'motorcycle', availableSlots: 5, totalSlots: 6, hourlyRate: 1000 });
+        expect(countFree.mock.calls[0][0].where).toMatchObject({ zoneId: ZONE_ID, vehicleType: 'motorcycle' });
+    });
+
+    test.each([
+        ['without vehicleType', { vehicleType: undefined }],
+        ['with a type that does not exist', { vehicleType: 'bicycle' }],
+        ['with an empty type', { vehicleType: '' }],
+        ['with a type in capitals', { vehicleType: 'CAR' }],
+    ])('%s it answers 400 VALIDATION_ERROR and reads nothing', async (_case, query) => {
+        // Act
+        const res = await ask({ ...hours('10:00', '12:00'), ...query });
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ code: 'VALIDATION_ERROR', message: 'vehicleType must be one of car, motorcycle, truck' });
+        expect(readZone).not.toHaveBeenCalled();
+    });
+
+    test('a repeated vehicleType answers 400 VALIDATION_ERROR', async () => {
+        // Act
+        const res = await request(app).get(`/api/zones/${ZONE_ID}/availability?vehicleType=car&vehicleType=truck`);
+
+        // Assert
+        expect(res.status).toBe(400);
+        expect(res.body).toEqual({ code: 'VALIDATION_ERROR', message: 'vehicleType must be text' });
+        expect(readZone).not.toHaveBeenCalled();
+    });
+
+    test('a type the zone does not accept answers 409 VEHICLE_TYPE_NOT_ACCEPTED with the types it accepts, and counts nothing', async () => {
+        // Act
+        const res = await ask({ ...hours('10:00', '12:00'), vehicleType: 'truck' });
+
+        // Assert
+        expect(res.status).toBe(409);
+        expect(res.body).toEqual({
+            code: 'VEHICLE_TYPE_NOT_ACCEPTED',
+            message: 'This zone does not accept this type of vehicle',
+            vehicleType: 'truck',
+            acceptedTypes: ['car', 'motorcycle'],
+        });
+        expect(countFree).not.toHaveBeenCalled();
+    });
+
+    test('a type that is not accepted is answered before the hours of the zone, as in POST /reservations', async () => {
+        // Arrange: a stay past the closing time too
+        readZone.mockResolvedValue(zone({ open24h: false }));
+
+        // Act
+        const res = await ask({ ...hours('19:00', '21:00'), vehicleType: 'truck' });
+
+        // Assert
+        expect(res.body.code).toBe('VEHICLE_TYPE_NOT_ACCEPTED');
+    });
+});
+
 describe('The times are checked like in POST /reservations (#375)', () => {
     test.each([
         ['without startTime', 'MISSING_REQUIRED_FIELDS', { endTime: colombia('12:00').toISOString() }],
@@ -176,7 +254,7 @@ describe('The times are checked like in POST /reservations (#375)', () => {
     // The session and everything a reservation needs, with no free spot
     function everythingButASpot() {
         jest.spyOn(Usuario, 'findByPk').mockResolvedValue({ id: USER_ID, isActive: true, passwordVersion: 0, roleId: 'role-user', role: { name: 'user' } });
-        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID });
+        jest.spyOn(Vehiculo, 'findOne').mockResolvedValue({ id: VEHICLE_ID, vehicleType: 'car' });
         jest.spyOn(Reserva, 'count').mockResolvedValue(0);
         jest.spyOn(Pago, 'findOne').mockResolvedValue(null);
         jest.spyOn(Reserva, 'findOne').mockResolvedValue(null);
@@ -195,12 +273,16 @@ describe('The times are checked like in POST /reservations (#375)', () => {
         ['25 hours', 'INVALID_DURATION', { startTime: colombia('10:00').toISOString(), endTime: colombia('11:00', '2026-11-17').toISOString() }, {}],
         ['a date that is not a date', 'INVALID_DATE', { startTime: '2026-13-45', endTime: colombia('12:00').toISOString() }, {}],
         ['a deactivated zone', 'ZONE_INACTIVE', hours('10:00', '12:00'), { isActive: false }],
+        ['a zone that takes no cars (HU-31)', 'VEHICLE_TYPE_NOT_ACCEPTED', hours('10:00', '12:00'), { types: zoneTypes(['truck', 4, '5000.00']) }],
+        ['a zone that takes no cars, past its closing time (HU-31)', 'VEHICLE_TYPE_NOT_ACCEPTED', hours('19:00', '21:00'), { open24h: false, types: zoneTypes(['truck', 4, '5000.00']) }],
         ['a stay past the closing time', 'OUTSIDE_ZONE_HOURS', hours('19:00', '21:00'), { open24h: false }],
         ['a day the zone does not open', 'ZONE_CLOSED_THAT_DAY', { startTime: colombia('10:00', '2026-11-17').toISOString(), endTime: colombia('12:00', '2026-11-17').toISOString() }, { open24h: false }],
     ])('with %s the question and the reservation both answer %s, with the same body', async (_case, code, times, zoneOptions) => {
         // Arrange
         everythingButASpot();
-        readZone.mockResolvedValue(zone(zoneOptions));
+        const { types, ...options } = zoneOptions;
+        readZone.mockResolvedValue(zone(options));
+        if (types) readTypes.mockResolvedValue(types);
 
         // Act
         const asked = await ask(times);

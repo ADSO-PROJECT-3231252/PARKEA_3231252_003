@@ -3,6 +3,8 @@ const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
   async up(queryInterface) {
+    // HU-31 (AC-16): the vehicle types each demo zone accepts, with their
+    // spots and rates, so the screens can be tried with several types
     const zonas = [
       {
         id: uuidv4(),
@@ -10,9 +12,8 @@ module.exports = {
         address: 'Cra. 16 con Calle 32, Dosquebradas',
         latitude: 4.8375,
         longitude: -75.6689,
-        total_slots: 30,
-        hourly_rate: 2000,
         is_active: true,
+        tipos: [['car', 30, 2000], ['motorcycle', 12, 1000]],
       },
       {
         id: uuidv4(),
@@ -20,9 +21,8 @@ module.exports = {
         address: 'Calle 41 con Av. Ferrocarril, Dosquebradas',
         latitude: 4.8398,
         longitude: -75.6721,
-        total_slots: 18,
-        hourly_rate: 2500,
         is_active: true,
+        tipos: [['car', 18, 2500]],
       },
       {
         id: uuidv4(),
@@ -30,9 +30,8 @@ module.exports = {
         address: 'Calle 28 con Cra. 10, Dosquebradas',
         latitude: 4.8291,
         longitude: -75.6645,
-        total_slots: 24,
-        hourly_rate: 1800,
         is_active: true,
+        tipos: [['car', 24, 1800], ['motorcycle', 8, 900], ['truck', 4, 5000]],
       },
       {
         id: uuidv4(),
@@ -40,25 +39,43 @@ module.exports = {
         address: 'Km 2 vía Pereira, Dosquebradas',
         latitude: 4.8156,
         longitude: -75.6934,
-        total_slots: 45,
-        hourly_rate: 1500,
         is_active: true,
+        tipos: [['car', 45, 1500], ['truck', 6, 4500]],
       },
     ];
 
-    await queryInterface.bulkInsert('zones', zonas);
+    // The zones, without their types: a zone has no spots or rate of its own
+    await queryInterface.bulkInsert('zones', zonas.map((zona) => {
+      const fila = { ...zona };
+      delete fila.tipos;
+      return fila;
+    }));
 
-    // Generate one physical parking spot per slot for each zone,
+    // The types go after their zones and before the spots, which must
+    // belong to one of them
+    await queryInterface.bulkInsert('zone_vehicle_types', zonas.flatMap((zona) => zona.tipos.map(([vehicleType, totalSlots, hourlyRate]) => ({
+      id: uuidv4(),
+      zone_id: zona.id,
+      vehicle_type: vehicleType,
+      total_slots: totalSlots,
+      hourly_rate: hourlyRate,
+      is_accepting: true,
+    }))));
+
+    // One physical spot per slot of each type, numbered from 1 in each type,
     // same as createZona() does for zones created through the API
     const spots = [];
     for (const zona of zonas) {
-      for (let i = 1; i <= zona.total_slots; i++) {
-        spots.push({
-          id: uuidv4(),
-          zone_id: zona.id,
-          spot_number: i,
-          status: 'Available',
-        });
+      for (const [vehicleType, totalSlots] of zona.tipos) {
+        for (let i = 1; i <= totalSlots; i++) {
+          spots.push({
+            id: uuidv4(),
+            zone_id: zona.id,
+            vehicle_type: vehicleType,
+            spot_number: i,
+            status: 'Available',
+          });
+        }
       }
     }
     await queryInterface.bulkInsert('parking_spots', spots);
@@ -76,6 +93,8 @@ module.exports = {
 
     if (zoneIds.length > 0) {
       await queryInterface.bulkDelete('parking_spots', { zone_id: { [Op.in]: zoneIds } }, {});
+      // HU-31: after the spots, which must belong to a type of their zone
+      await queryInterface.bulkDelete('zone_vehicle_types', { zone_id: { [Op.in]: zoneIds } }, {});
     }
     await queryInterface.bulkDelete('zones', { name: { [Op.in]: zoneNames } }, {});
   },

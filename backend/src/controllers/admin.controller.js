@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 const ErrorCodes = require('../constants/errorCodes');
 const { colombiaDay } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
-const availability = require('../services/availability');
+const { withVehicleTypes } = require('../services/zoneVehicleTypes');
 const { hasOpenReservationsOrBalance } = require('../services/accountOpenItems');
 
 const RANGOS_VALIDOS = ['today', 'week', 'month'];
@@ -118,26 +118,32 @@ async function getReservasPorZona(req, res, next) {
 
 // #373: the active zones and the spots free now of each one, read in one
 // transaction so both reads see the same moment (REPEATABLE READ): a capacity
-// changed between them would give a negative occupancy or a wrong alert
-function zonasActivasConLibres(attributes) {
-  return sequelize.transaction(async (transaction) => {
-    const zonas = await Zona.findAll({ where: { isActive: true }, attributes, transaction });
-    const libres = await availability.availableNowByZone(zonas.map((z) => z.id), { transaction });
-    return { zonas, libres };
-  });
+// changed between them would give a negative occupancy or a wrong alert.
+// HU-31: with the vehicle types each zone accepts (withVehicleTypes).
+function zonasActivasConLibres() {
+  return sequelize.transaction(async (transaction) => withVehicleTypes(
+    await Zona.findAll({ where: { isActive: true }, attributes: ['id', 'name'], transaction }),
+    { transaction },
+  ));
 }
 
 // GET /api/admin/dashboard/occupancy
 // #373: the occupied spots of each zone are the ones not free now, that is,
-// totalSlots minus availableSlots, in one query for all
+// totalSlots minus availableSlots, in one query for all. HU-31 (AC-14): the
+// spots of every type the zone accepts, and each type on its own.
 async function getOcupacionPorZona(req, res, next) {
   try {
-    const { zonas, libres } = await zonasActivasConLibres(['id', 'name', 'totalSlots']);
+    const zonas = await zonasActivasConLibres();
     const ocupacion = zonas.map((z) => ({
       zoneId: z.id,
       zoneName: z.name,
-      totalSlots: z.totalSlots,
-      occupiedSlots: z.totalSlots - libres.get(z.id),
+      totalSlots: z.get('totalSlots'),
+      occupiedSlots: z.get('totalSlots') - z.get('availableSlots'),
+      vehicleTypes: z.get('vehicleTypes').map((tipo) => ({
+        vehicleType: tipo.vehicleType,
+        totalSlots: tipo.totalSlots,
+        occupiedSlots: tipo.totalSlots - tipo.availableSlots,
+      })),
     }));
     return res.status(200).json({ occupancy: ocupacion });
   } catch (error) {
@@ -194,16 +200,19 @@ async function getPagosRecientes(req, res, next) {
 // GET /api/admin/dashboard/alerts
 async function getAlertas(req, res, next) {
   try {
-    // #373: a zone is full when none of its spots is free now
-    const { zonas, libres } = await zonasActivasConLibres(['id', 'name']);
-    const zonasLlenas = zonas.filter((z) => libres.get(z.id) === 0);
-
-    const alerts = zonasLlenas.map((z) => ({
-      type: 'zone_full',
-      severity: 'warning',
-      zoneId: z.id,
-      zoneName: z.name,
-    }));
+    // #373: a zone is full when none of its spots is free now. HU-31
+    // (AC-14): one alert for each type it accepts with no spot free, which
+    // says the type
+    const zonas = await zonasActivasConLibres();
+    const alerts = zonas.flatMap((z) => z.get('vehicleTypes')
+      .filter((tipo) => tipo.availableSlots === 0)
+      .map((tipo) => ({
+        type: 'zone_full',
+        severity: 'warning',
+        zoneId: z.id,
+        zoneName: z.name,
+        vehicleType: tipo.vehicleType,
+      })));
 
     return res.status(200).json({ alerts });
   } catch (error) {

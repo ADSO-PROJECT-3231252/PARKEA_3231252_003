@@ -8,12 +8,18 @@ module.exports = (sequelize, DataTypes) => {
       Zona.hasMany(models.ParkingSpot, { foreignKey: 'zoneId', as: 'parkingSpots' });
       // HU-29: the hours of each day, only for a zone that is not open 24 hours
       Zona.hasMany(models.ZoneSchedule, { foreignKey: 'zoneId', as: 'schedules' });
+      // HU-31: the vehicle types the zone accepts, with the spots and the
+      // rate of each one
+      Zona.hasMany(models.ZoneVehicleType, { foreignKey: 'zoneId', as: 'vehicleTypes' });
     }
 
     // HU-29: the API sends the hours as `schedule`, one item for each day the
     // zone opens, from Monday (1) to Sunday (7). A zone open 24 hours has an
     // empty list. #373: `availableSlots` is not stored; the controllers add
-    // it (services/availability.js) and it is sent as it is.
+    // it (services/availability.js) and it is sent as it is. HU-31: the zone
+    // has no spots or rate of its own; each vehicle type has its spots and
+    // its rate (`vehicleTypes`), and `totalSlots` is the sum of the types it
+    // accepts. The controllers add them too (services/zoneVehicleTypes.js).
     toJSON() {
       const values = { ...this.get() };
       if (values.schedules !== undefined) {
@@ -38,19 +44,6 @@ module.exports = (sequelize, DataTypes) => {
     address: {
       type: DataTypes.STRING(255),
       allowNull: false,
-    },
-    totalSlots: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 0,
-      field: 'total_slots',
-    },
-    hourlyRate: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-      field: 'hourly_rate',
-      // #316: every zone charges for its hours
-      validate: { min: 0.01 },
     },
     latitude: {
       type: DataTypes.DECIMAL(10, 7),

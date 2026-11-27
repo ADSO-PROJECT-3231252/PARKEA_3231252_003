@@ -154,12 +154,53 @@ async function editar(req, res, next) {
             });
         }
 
-        await vehiculo.update({ vehicleType, brand, model, color, visualDescription });
+        if (vehicleType === vehiculo.vehicleType) {
+            await vehiculo.update({ vehicleType, brand, model, color, visualDescription });
+            return res.status(200).json({ message: 'Vehicle updated successfully', vehicle: vehiculo });
+        }
 
-        return res.status(200).json({
-            message: 'Vehicle updated successfully',
-            vehicle: vehiculo,
+        // HU-31 AC-13: a reservation has a spot of the type of its vehicle, so
+        // the type cannot change while the vehicle has a Pending or Active
+        // reservation, the same rule as deleting it (HU-13, AC-02). Checked
+        // with the lock of the user held: crear takes the same lock first
+        // (#288), so a reservation created at the same time is either seen
+        // here or waits until the type has changed, and then gets a spot of
+        // the new type.
+        let guardado = null;
+        const fallo = await sequelize.transaction(async (t) => {
+            const usuario = await Usuario.findByPk(userId, { attributes: ['id'], transaction: t, lock: t.LOCK.UPDATE });
+            if (!usuario) {
+                return ErrorCodes.USER_NOT_FOUND;
+            }
+            const actual = await Vehiculo.findOne({ where: { id, userId }, transaction: t });
+            if (!actual) {
+                return ErrorCodes.VEHICLE_NOT_FOUND;
+            }
+            const reservaActiva = await Reserva.findOne({
+                where: { vehicleId: id, status: ['Pending', 'Active'] },
+                transaction: t,
+            });
+            if (reservaActiva) {
+                return ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION;
+            }
+            guardado = await actual.update({ vehicleType, brand, model, color, visualDescription }, { transaction: t });
+            return null;
         });
+
+        if (fallo === ErrorCodes.USER_NOT_FOUND) {
+            return res.status(404).json({ code: ErrorCodes.USER_NOT_FOUND, message: 'User not found' });
+        }
+        if (fallo === ErrorCodes.VEHICLE_NOT_FOUND) {
+            return res.status(404).json({ code: ErrorCodes.VEHICLE_NOT_FOUND, message: 'Vehicle not found' });
+        }
+        if (fallo === ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION) {
+            return res.status(409).json({
+                code: ErrorCodes.VEHICLE_HAS_ACTIVE_RESERVATION,
+                message: 'This vehicle has an active reservation. Its type can change when the reservation ends or is cancelled.',
+            });
+        }
+
+        return res.status(200).json({ message: 'Vehicle updated successfully', vehicle: guardado });
     } catch (error) {
         if (error instanceof UniqueConstraintError) {
             return plateAlreadyRegistered(res);

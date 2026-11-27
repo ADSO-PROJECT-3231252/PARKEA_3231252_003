@@ -1,16 +1,20 @@
 const { Op } = require('sequelize');
-const { Zona, ParkingSpot, ZoneSchedule, sequelize } = require('../models');
+const { Zona, ParkingSpot, ZoneSchedule, ZoneVehicleType, sequelize } = require('../models');
 const ErrorCodes = require('../constants/errorCodes');
 const { scheduleErrors, checkStay } = require('../utils/zoneHours');
 const { safeRollback } = require('../utils/transaction');
 const { checkStayTimes, outsideHoursError } = require('../utils/stayRequest');
 const availability = require('../services/availability');
+const { withVehicleTypes, acceptedType } = require('../services/zoneVehicleTypes');
+const { VEHICLE_TYPES } = require('../constants/vehicleTypes');
+const { vehicleTypesErrors, vehicleTypesOf } = require('../utils/zoneVehicleTypes');
 
 // HU-29: every zone is sent with its opening hours (Zona.toJSON)
 const CON_HORARIO = { model: ZoneSchedule, as: 'schedules' };
 
-// The share of the spots of a zone that is free now (#373)
-const shareFree = (zona) => zona.get('availableSlots') / zona.totalSlots;
+// The share of the spots of a zone that is free now (#373). HU-31: of the
+// vehicle types it accepts (withVehicleTypes)
+const shareFree = (zona) => (zona.get('totalSlots') > 0 ? zona.get('availableSlots') / zona.get('totalSlots') : 0);
 
 // #373: the zones and their free spots are read in one transaction, so all
 // the reads see the same moment (REPEATABLE READ): a capacity changed between
@@ -21,8 +25,9 @@ const enUnMomento = (work) => sequelize.transaction(work);
 async function getZonas(req, res, next) {
   try {
     // #373: availableSlots is calculated from the reservations, for all the
-    // zones in one query, and they are ordered by it (then by name)
-    const zonas = await enUnMomento(async (transaction) => availability.withAvailableSlots(
+    // zones in one query, and they are ordered by it (then by name). HU-31:
+    // each zone with the vehicle types it accepts.
+    const zonas = await enUnMomento(async (transaction) => withVehicleTypes(
       await Zona.findAll({ where: { isActive: true }, include: [CON_HORARIO], transaction }),
       { transaction },
     ));
@@ -52,21 +57,16 @@ function dentroDeColombia(lat, lng) {
   );
 }
 
-// Upper limit so a typo (e.g. 50000 instead of 50) can't create thousands of
-// parking spots in a single request
-const MAX_TOTAL_SLOTS = 500;
-// DECIMAL(10, 2) in the database
-const MAX_HOURLY_RATE = 99999999.99;
-
 const textoVacio = (valor) => typeof valor !== 'string' || valor.trim() === '';
 
 // Same rules for create (HU-20) and edit (HU-21, AC-02). Returns the status
 // and body of the error to send, or null when the body is valid. Format errors
 // use the same shape as express-validator: { code: VALIDATION_ERROR, errors }.
-function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRate }) {
-  if (textoVacio(name) || textoVacio(address) || latitude == null || longitude == null
-    || totalSlots == null || hourlyRate == null) {
-    return { status: 400, body: { code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, address, latitude, longitude, totalSlots, and hourlyRate are required' } };
+// HU-31: the spots and the rate are the ones of each vehicle type
+// (vehicleTypes), and all their errors are sent together.
+function validarZona({ name, address, latitude, longitude, vehicleTypes }) {
+  if (textoVacio(name) || textoVacio(address) || latitude == null || longitude == null || vehicleTypes == null) {
+    return { status: 400, body: { code: ErrorCodes.MISSING_REQUIRED_FIELDS, message: 'name, address, latitude, longitude, and vehicleTypes are required' } };
   }
   if (name.trim().length > 100) {
     return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'name', msg: 'name must be at most 100 characters' }] } };
@@ -74,26 +74,9 @@ function validarZona({ name, address, latitude, longitude, totalSlots, hourlyRat
   if (address.trim().length > 255) {
     return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'address', msg: 'address must be at most 255 characters' }] } };
   }
-  if (!Number.isInteger(totalSlots) || totalSlots <= 0 || totalSlots > MAX_TOTAL_SLOTS) {
-    return { status: 400, body: { code: ErrorCodes.INVALID_CAPACITY, message: `totalSlots must be a whole number between 1 and ${MAX_TOTAL_SLOTS}` } };
-  }
-  if (typeof hourlyRate !== 'number' || !Number.isFinite(hourlyRate) || hourlyRate > MAX_HOURLY_RATE) {
-    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'hourlyRate', msg: `hourlyRate must be a number up to ${MAX_HOURLY_RATE}` }] } };
-  }
-  if (hourlyRate < 0) {
-    return { status: 400, body: { code: ErrorCodes.NEGATIVE_VALUE, message: 'hourlyRate cannot be negative' } };
-  }
-  // #316: every zone charges for its hours. With a rate of 0 the reservation
-  // would ask the user to pay $ 0
-  if (hourlyRate === 0) {
-    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'hourlyRate', msg: 'hourlyRate must be greater than 0' }] } };
-  }
-  // hourly_rate is DECIMAL(10, 2): the database would round a third decimal
-  // without any warning, so a rate is valid only when rounding it to 2
-  // decimals does not change it. Checking rate * 100 for a whole number is not
-  // safe: floating point makes 1.005 * 100 equal 100.49999999999999.
-  if (Number(hourlyRate.toFixed(2)) !== hourlyRate) {
-    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: [{ path: 'hourlyRate', msg: 'hourlyRate must have at most 2 decimals' }] } };
+  const errores = vehicleTypesErrors(vehicleTypes);
+  if (errores.length > 0) {
+    return { status: 400, body: { code: ErrorCodes.VALIDATION_ERROR, errors: errores } };
   }
   if (!coordenadasValidas(latitude, longitude)) {
     return { status: 400, body: { code: ErrorCodes.INVALID_COORDINATES, message: 'latitude must be between -90 and 90, and longitude between -180 and 180' } };
@@ -128,16 +111,96 @@ function filasHorario(zoneId, { open24h, schedule }) {
 // #371: the answer to a zone that is already saved (after the commit).
 // Reading it again with its hours is only for the answer: if that read fails,
 // the answer keeps the saved zone and the error goes to the log, instead of a
-// 500 for a change that was saved. #373: `availableSlots` was counted in the
-// transaction, and the zone is sent with it like everywhere else.
-async function responderZonaGuardada(res, status, message, zona, availableSlots) {
+// 500 for a change that was saved. #373, HU-31: its vehicle types and free
+// spots were counted in the transaction (lasCuentas), and the zone is sent
+// with them like everywhere else.
+async function responderZonaGuardada(res, status, message, zona, cuentas) {
   try {
     await zona.reload({ include: [CON_HORARIO] });
   } catch (err) {
     console.error(`The zone ${zona.id} was saved, but reading it again failed:`, err);
   }
-  zona.setDataValue('availableSlots', availableSlots);
+  conCuentas(zona, cuentas);
   return res.status(status).json({ message, zone: zona });
+}
+
+// HU-31: what withVehicleTypes added to a zone, to add it again after the
+// zone is read or saved again (reload and update replace its values)
+async function lasCuentas(zona, options) {
+  await withVehicleTypes([zona], { ...options, forAdmin: true });
+  return { vehicleTypes: zona.get('vehicleTypes'), totalSlots: zona.get('totalSlots'), availableSlots: zona.get('availableSlots') };
+}
+
+function conCuentas(zona, cuentas) {
+  for (const [key, value] of Object.entries(cuentas)) zona.setDataValue(key, value);
+  return zona;
+}
+
+// HU-21 for one vehicle type (HU-31): its spots go from `desde` to `hasta`.
+// A reduction disables the spots with no reservation from now on, the
+// highest numbers first, and cannot go below the spots in use. An increase
+// reuses the spots disabled by an earlier reduction first, and the new ones
+// continue after the highest number of the type, so the numbers of a type
+// never repeat. Returns the error to answer with, or null.
+async function cambiarCupos(zoneId, vehicleType, desde, hasta, { transaction, now }) {
+  if (hasta < desde) {
+    // A spot is in use while a Pending or Active reservation holds it from
+    // now on (several reservations of one spot count once). spotsInUse lets
+    // the screen say how many spots of the type are taken.
+    const ocupados = await availability.spotsOfTypeInUse(zoneId, vehicleType, { transaction, now });
+    if (hasta < ocupados) {
+      return {
+        status: 400,
+        body: {
+          code: ErrorCodes.CAPACITY_BELOW_IN_USE,
+          message: `Cannot reduce the ${vehicleType} spots below ${ocupados} spots currently in use`,
+          vehicleType,
+          spotsInUse: ocupados,
+        },
+      };
+    }
+    const delta = desde - hasta;
+    const candidatos = await ParkingSpot.findAll({
+      where: { zoneId, vehicleType, status: availability.ENABLED, [Op.and]: [availability.freeFromNow(now)] },
+      order: [['spotNumber', 'DESC']],
+      limit: delta,
+      transaction,
+    });
+    if (candidatos.length < delta) {
+      return {
+        status: 400,
+        body: {
+          code: ErrorCodes.INSUFFICIENT_AVAILABLE_SPOTS,
+          message: `Cannot reduce the ${vehicleType} spots: not enough available spots to disable`,
+          vehicleType,
+        },
+      };
+    }
+    await ParkingSpot.update({ status: 'Disabled' }, { where: { id: candidatos.map((c) => c.id) }, transaction });
+  } else if (hasta > desde) {
+    const delta = hasta - desde;
+    const deshabilitados = await ParkingSpot.findAll({
+      where: { zoneId, vehicleType, status: 'Disabled' },
+      order: [['spotNumber', 'ASC']],
+      limit: delta,
+      transaction,
+    });
+    if (deshabilitados.length > 0) {
+      await ParkingSpot.update({ status: 'Available' }, { where: { id: deshabilitados.map((s) => s.id) }, transaction });
+    }
+    const faltan = delta - deshabilitados.length;
+    if (faltan > 0) {
+      const mayorNumero = (await ParkingSpot.max('spotNumber', { where: { zoneId, vehicleType }, transaction })) || 0;
+      const nuevos = Array.from({ length: faltan }, (_, i) => ({
+        zoneId,
+        vehicleType,
+        spotNumber: mayorNumero + i + 1,
+        status: 'Available',
+      }));
+      await ParkingSpot.bulkCreate(nuevos, { transaction });
+    }
+  }
+  return null;
 }
 
 // #304: the unique index of zones.name (zones_name_unique) rejected the name.
@@ -163,12 +226,15 @@ async function createZona(req, res, next) {
 
   const name = req.body.name.trim();
   const address = req.body.address.trim();
-  const { latitude, longitude, totalSlots, hourlyRate } = req.body;
+  const { latitude, longitude } = req.body;
+  // HU-31: the vehicle types the zone accepts, with their spots and rates
+  const tipos = vehicleTypesOf(req.body.vehicleTypes);
 
-  // The zone and its spots are created together: if the spots fail, the zone
-  // must not stay behind without them
+  // The zone, its types and its spots are created together: if the spots
+  // fail, the zone must not stay behind without them
   const t = await sequelize.transaction();
   let zona;
+  let cuentas;
   try {
     const existente = await Zona.findOne({ where: { name }, transaction: t });
     if (existente) {
@@ -181,19 +247,25 @@ async function createZona(req, res, next) {
       address,
       latitude,
       longitude,
-      totalSlots,
-      hourlyRate,
       open24h: req.body.open24h,
     }, { transaction: t });
     await ZoneSchedule.bulkCreate(filasHorario(zona.id, req.body), { transaction: t });
 
-    const spots = Array.from({ length: totalSlots }, (_, i) => ({
+    // The types go before the spots, which must belong to one of them. The
+    // spots of each type are numbered from 1.
+    await ZoneVehicleType.bulkCreate(
+      tipos.map((tipo) => ({ zoneId: zona.id, ...tipo, isAccepting: true })),
+      { transaction: t }
+    );
+    const spots = tipos.flatMap((tipo) => Array.from({ length: tipo.totalSlots }, (_, i) => ({
       zoneId: zona.id,
+      vehicleType: tipo.vehicleType,
       spotNumber: i + 1,
       status: 'Available',
-    }));
+    })));
     await ParkingSpot.bulkCreate(spots, { transaction: t });
 
+    cuentas = await lasCuentas(zona, { transaction: t });
     await t.commit();
   } catch (err) {
     await safeRollback(t);
@@ -203,9 +275,8 @@ async function createZona(req, res, next) {
     return next(err);
   }
 
-  // #371: out of the try, so an error after the commit never tries to undo it.
-  // A new zone has no reservations, so all its spots are free.
-  return responderZonaGuardada(res, 201, 'Zone created successfully', zona, totalSlots);
+  // #371: out of the try, so an error after the commit never tries to undo it
+  return responderZonaGuardada(res, 201, 'Zone created successfully', zona, cuentas);
 }
 
 // PUT /api/zones/:id — admin only
@@ -218,11 +289,13 @@ async function updateZona(req, res, next) {
   const { id } = req.params;
   const name = req.body.name.trim();
   const address = req.body.address.trim();
-  const { latitude, longitude, totalSlots, hourlyRate } = req.body;
+  const { latitude, longitude } = req.body;
+  // HU-31: the vehicle types the zone accepts from now on
+  const tipos = vehicleTypesOf(req.body.vehicleTypes);
 
   const t = await sequelize.transaction();
   let zona;
-  let disponibles;
+  let cuentas;
   try {
     // Locked so a reservation can't take a spot while the capacity changes.
     // #371: the zone first and then its spots; crear and ampliar lock the
@@ -242,80 +315,45 @@ async function updateZona(req, res, next) {
       return res.status(409).json({ code: ErrorCodes.ZONE_NAME_TAKEN, message: 'A zone with this name already exists' });
     }
 
+    // HU-31 AC-05: a type that the zone accepted and is not in the list is
+    // turned off. It takes no new reservations, and keeps its spots, its
+    // rate and the reservations it has. The lock of the zone keeps its types
+    // as they are read here until the commit.
     const ahora = new Date();
-    if (totalSlots < zona.totalSlots) {
-      // HU-21 AC-03, #373: a spot is in use while a Pending or Active
-      // reservation holds it from now on (several reservations of one spot
-      // count once), and only the other spots can be disabled. spotsInUse
-      // lets the screen say how many spots are taken.
-      const ocupados = await availability.spotsInUse(id, { transaction: t, now: ahora });
-      if (totalSlots < ocupados) {
-        await t.rollback();
-        return res.status(400).json({
-          code: ErrorCodes.CAPACITY_BELOW_IN_USE,
-          message: `Cannot reduce capacity below ${ocupados} spots currently in use`,
-          spotsInUse: ocupados,
-        });
-      }
-
-      // The enabled spots with no reservation from now on, the highest
-      // numbers first
-      const delta = zona.totalSlots - totalSlots;
-      const candidatos = await ParkingSpot.findAll({
-        where: { zoneId: id, status: availability.ENABLED, [Op.and]: [availability.freeFromNow(ahora)] },
-        order: [['spotNumber', 'DESC']],
-        limit: delta,
-        transaction: t,
-      });
-      if (candidatos.length < delta) {
-        await t.rollback();
-        return res.status(400).json({
-          code: ErrorCodes.INSUFFICIENT_AVAILABLE_SPOTS,
-          message: 'Cannot reduce capacity: not enough available spots to disable',
-        });
-      }
-      await ParkingSpot.update(
-        { status: 'Disabled' },
-        { where: { id: candidatos.map((c) => c.id) }, transaction: t }
+    const actuales = await ZoneVehicleType.findAll({ where: { zoneId: id }, transaction: t });
+    const pedidos = new Set(tipos.map((tipo) => tipo.vehicleType));
+    const apagados = actuales.filter((actual) => actual.isAccepting && !pedidos.has(actual.vehicleType));
+    if (apagados.length > 0) {
+      await ZoneVehicleType.update(
+        { isAccepting: false },
+        { where: { id: apagados.map((actual) => actual.id) }, transaction: t }
       );
-    } else if (totalSlots > zona.totalSlots) {
-      // HU-21 AC-04: spots disabled by an earlier reduction are reused first;
-      // new ones continue after the highest number, so numbers never repeat
-      const delta = totalSlots - zona.totalSlots;
-      const deshabilitados = await ParkingSpot.findAll({
-        where: { zoneId: id, status: 'Disabled' },
-        order: [['spotNumber', 'ASC']],
-        limit: delta,
-        transaction: t,
-      });
-      if (deshabilitados.length > 0) {
-        await ParkingSpot.update(
-          { status: 'Available' },
-          { where: { id: deshabilitados.map((s) => s.id) }, transaction: t }
-        );
-      }
+    }
 
-      const faltan = delta - deshabilitados.length;
-      if (faltan > 0) {
-        const mayorNumero = (await ParkingSpot.max('spotNumber', { where: { zoneId: id }, transaction: t })) || 0;
-        const nuevos = Array.from({ length: faltan }, (_, i) => ({
-          zoneId: id,
-          spotNumber: mayorNumero + i + 1,
-          status: 'Available',
-        }));
-        await ParkingSpot.bulkCreate(nuevos, { transaction: t });
+    // Each type of the list: its spots change from the ones it has (HU-21,
+    // AC-03 and AC-04). A type that was turned off takes reservations again
+    // with its spots, and a new type gets its spots from 1, after its row,
+    // which they must belong to.
+    for (const tipo of tipos) {
+      const actual = actuales.find((fila) => fila.vehicleType === tipo.vehicleType);
+      if (!actual) {
+        await ZoneVehicleType.create({ zoneId: id, ...tipo, isAccepting: true }, { transaction: t });
+      }
+      const fallo = await cambiarCupos(id, tipo.vehicleType, actual ? actual.totalSlots : 0, tipo.totalSlots, { transaction: t, now: ahora });
+      if (fallo) {
+        await t.rollback();
+        return res.status(fallo.status).json(fallo.body);
+      }
+      if (actual) {
+        await actual.update({ totalSlots: tipo.totalSlots, hourlyRate: tipo.hourlyRate, isAccepting: true }, { transaction: t });
       }
     }
 
-    // #373: the spots free now, with the new capacity
-    disponibles = await availability.availableNow(id, { transaction: t, now: ahora });
     await zona.update({
       name,
       address,
       latitude,
       longitude,
-      totalSlots,
-      hourlyRate,
       open24h: req.body.open24h,
     }, { transaction: t });
 
@@ -324,6 +362,8 @@ async function updateZona(req, res, next) {
     await ZoneSchedule.destroy({ where: { zoneId: id }, transaction: t });
     await ZoneSchedule.bulkCreate(filasHorario(id, req.body), { transaction: t });
 
+    // #373: the spots free now, with the new spots of each type
+    cuentas = await lasCuentas(zona, { transaction: t, now: ahora });
     await t.commit();
   } catch (err) {
     await safeRollback(t);
@@ -334,7 +374,7 @@ async function updateZona(req, res, next) {
   }
 
   // #371: out of the try, so an error after the commit never tries to undo it
-  return responderZonaGuardada(res, 200, 'Zone updated successfully', zona, disponibles);
+  return responderZonaGuardada(res, 200, 'Zone updated successfully', zona, cuentas);
 }
 
 // PATCH /api/zones/:id/toggle — admin only, activate/deactivate instead of deleting
@@ -356,15 +396,15 @@ async function toggleZona(req, res, next) {
     // changed, so the request can be repeated.
     const leida = await enUnMomento(async (transaction) => {
       const encontrada = await Zona.findByPk(id, { include: [CON_HORARIO], transaction });
-      return encontrada && { zona: encontrada, disponibles: await availability.availableNow(encontrada.id, { transaction }) };
+      return encontrada && { zona: encontrada, cuentas: await lasCuentas(encontrada, { transaction }) };
     });
     if (!leida) {
       return res.status(404).json({ code: ErrorCodes.ZONE_NOT_FOUND, message: 'Zone not found' });
     }
-    const { zona, disponibles } = leida;
+    const { zona, cuentas } = leida;
 
     await zona.update({ isActive });
-    zona.setDataValue('availableSlots', disponibles);
+    conCuentas(zona, cuentas);
 
     return res.status(200).json({
       message: `Zone ${zona.isActive ? 'activated' : 'deactivated'} successfully`,
@@ -382,10 +422,11 @@ async function getZonaPorId(req, res, next) {
   try {
     const { id } = req.params;
 
-    // #373: the spots free now, calculated from the reservations
+    // #373: the spots free now, calculated from the reservations. HU-31: of
+    // each vehicle type the zone accepts
     const zona = await enUnMomento(async (transaction) => {
       const leida = await Zona.findByPk(id, { include: [CON_HORARIO], transaction });
-      if (leida) leida.setDataValue('availableSlots', await availability.availableNow(leida.id, { transaction }));
+      if (leida) await withVehicleTypes([leida], { transaction });
       return leida;
     });
     if (!zona) {
@@ -404,20 +445,26 @@ async function getZonaPorId(req, res, next) {
 // the free spots with the 10 minutes before and after. ?startTime=&endTime=,
 // or ?startTime=&openEnded=true for a stay without an exit time, which holds
 // its spot until the closing time of the zone or for 24 hours, as when it is
-// reserved. It only informs: the reservation still decides when it is sent.
+// reserved. HU-31: and &vehicleType=, the type of the chosen vehicle: the
+// answer counts the spots of that type, with its rate. It only informs: the
+// reservation still decides when it is sent.
 async function getDisponibilidadPorHoras(req, res, next) {
   try {
     const { id } = req.params;
-    const { startTime, endTime, openEnded } = req.query;
+    const { startTime, endTime, openEnded, vehicleType } = req.query;
 
     // A repeated value (?startTime=a&startTime=b) arrives as a list
-    for (const [name, value] of Object.entries({ startTime, endTime, openEnded })) {
+    for (const [name, value] of Object.entries({ startTime, endTime, openEnded, vehicleType })) {
       if (value !== undefined && typeof value !== 'string') {
         return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: `${name} must be text` });
       }
     }
     if (openEnded !== undefined && openEnded !== 'true' && openEnded !== 'false') {
       return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: 'openEnded must be true or false' });
+    }
+    // HU-31: the spots of one vehicle type, the one of the chosen vehicle
+    if (!VEHICLE_TYPES.includes(vehicleType)) {
+      return res.status(400).json({ code: ErrorCodes.VALIDATION_ERROR, message: `vehicleType must be one of ${VEHICLE_TYPES.join(', ')}` });
     }
     const isOpenStay = openEnded === 'true';
 
@@ -436,22 +483,27 @@ async function getDisponibilidadPorHoras(req, res, next) {
       if (!zona.isActive) {
         return { status: 409, body: { code: ErrorCodes.ZONE_INACTIVE, message: 'This zone is no longer accepting reservations' } };
       }
+      // HU-31: the zone must take that type, as in POST /reservations
+      const aceptado = await acceptedType(zona.id, vehicleType, { transaction });
+      if (aceptado.error) return aceptado.error;
       // HU-29: the stay must fit the hours of the day of the entry, and an
       // open stay holds its spot until the closing time of that day
       const horario = checkStay(zona, horas.start, isOpenStay ? null : horas.end);
       if (horario.problem) return outsideHoursError(horario.problem);
       const end = isOpenStay && horario.closesAt ? horario.closesAt : horas.end;
 
-      const libres = await availability.freeSpotsBetween(zona.id, horas.start, end, { transaction, now });
+      const libres = await availability.freeSpotsBetween(zona.id, vehicleType, horas.start, end, { transaction, now });
       return {
         status: 200,
         body: {
           zoneId: zona.id,
+          vehicleType,
           startTime: horas.start,
           endTime: end,
           openEnded: isOpenStay,
           availableSlots: libres,
-          totalSlots: zona.totalSlots,
+          totalSlots: aceptado.tipo.totalSlots,
+          hourlyRate: Number(aceptado.tipo.hourlyRate),
         },
       };
     });
@@ -483,8 +535,9 @@ async function getTodasLasZonas(req, res, next) {
       });
       // #373: availableSlots, and spotsInUse: the spots with a Pending or
       // Active reservation from now on, the least capacity the zone can have
-      // (HU-21, AC-03). Each one is one query for all the zones.
-      await availability.withAvailableSlots(leidas, { transaction });
+      // (HU-21, AC-03). Each one is one query for all the zones. HU-31: also
+      // for each vehicle type, the ones turned off included.
+      await withVehicleTypes(leidas, { transaction, forAdmin: true });
       const enUso = await availability.spotsInUseByZone(leidas.map((zona) => zona.id), { transaction });
       for (const zona of leidas) zona.setDataValue('spotsInUse', enUso.get(zona.id));
       return leidas;
