@@ -302,6 +302,8 @@ The primary administrator uses `admin@parkeaweb.me`, so its password recovery em
 ## Free tier behavior and costs
 
 - The free plan sleeps after about 20 minutes without visits. The first visit after that takes 30 to 60 seconds; then it works normally.
+- While the API is asleep, its two reservation jobs do not run. A pending reservation stops holding its spot when its 15-minute payment deadline passes. Availability checks use that deadline, so the next request can see the spot as available even if the database still shows the reservation as `Pending`.
+- When the API wakes up, the jobs resume. On their next run, they mark overdue `Pending` reservations as `Expired` and finish `Active` stays whose end time has passed.
 - Each app has a daily CPU quota (60 minutes). Normal use is far below it. Do not run load tests on the live site: if the quota runs out, the app stops until the next day.
 - Cost today is 0: the apps use the Free F1 plan, and the MySQL server (B1ms, 20 GiB) is covered by the student offer of 750 hours per month for 12 months. The subscription has no credit card, so it can never charge money; if the 100 USD credit ran out, Azure would stop the services.
 - A custom domain is not possible on the Free F1 plan; it requires the Basic B1 plan, which is paid with the credit.
