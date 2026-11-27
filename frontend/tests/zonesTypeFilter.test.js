@@ -205,7 +205,7 @@ describe('The filter by type of vehicle (AC-09)', () => {
         // Assert
         expect(where()).toBe('/zones');
         expect(listed()).toHaveLength(3);
-        expect(searchStatus()).toBeEmptyDOMElement();
+        expect(searchStatus()).toHaveTextContent('3 zonas encontradas');
     });
 
     test('the address with the filter opens with it (a reload)', async () => {
@@ -303,6 +303,23 @@ describe('The filter by type of vehicle (AC-09)', () => {
         // Assert
         expect(option('Todos')).toBeChecked();
         expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+    });
+
+    test('coming back to "Todos" starts on page 1 and says how many zones there are', async () => {
+        // Arrange: 12 zones, on page 2 of "Todos" and then on "Moto"
+        const many = Array.from({ length: 12 }, (_, i) => zone(`zone-${i + 1}`, `Zona ${i + 1}`, [type('car', 5, 10, 3000), type('motorcycle', 2, 4, 1500)]));
+        const user = renderZones(['/zones'], many);
+        await screen.findByText('Zona 1');
+        await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+        await user.click(option('Moto'));
+
+        // Act
+        await user.click(option('Todos'));
+
+        // Assert
+        expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+        expect(listed()[0]).toBe('Zona 1');
+        expect(searchStatus()).toHaveTextContent('12 zonas encontradas');
     });
 });
 

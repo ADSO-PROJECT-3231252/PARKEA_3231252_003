@@ -138,11 +138,12 @@ function zonesFoundText(count, term, type) {
     if (count === 0) {
         if (term && type) return `No se encontraron zonas con ese nombre que reciban ${plural}.`;
         if (type) return `Ninguna zona recibe ${plural} en este momento.`;
-        return 'No se encontraron zonas con ese nombre.';
+        return term ? 'No se encontraron zonas con ese nombre.' : 'No hay zonas disponibles en este momento.';
     }
-    if (!term) return `${count} ${count === 1 ? 'zona recibe' : 'zonas reciben'} ${plural}.`;
     const found = `${count} ${count === 1 ? 'zona encontrada' : 'zonas encontradas'}`;
-    return type ? `${found} que ${count === 1 ? 'recibe' : 'reciben'} ${plural}` : found;
+    if (!type) return found;
+    if (!term) return `${count} ${count === 1 ? 'zona recibe' : 'zonas reciben'} ${plural}.`;
+    return `${found} que ${count === 1 ? 'recibe' : 'reciben'} ${plural}`;
 }
 
 export default function Zones() {
@@ -171,6 +172,8 @@ export default function Zones() {
     // The page is of a filter: another filter starts on page 1, also when it
     // changes with the back button
     const [pageOf, setPageOf] = useState({ type, page: 1 });
+    // HU-31 AC-09: once the filter was changed, "Todos" also says how many zones there are
+    const [typeChanged, setTypeChanged] = useState(false);
     const page = pageOf.type === type ? pageOf.page : 1;
     const setPage = (n) => setPageOf({ type, page: n });
 
@@ -234,9 +237,10 @@ export default function Zones() {
     // #331 (WCAG 2.1 SC 4.1.3): while there is a search, a hidden status message
     // tells a screen reader how many zones were found. The element is always in
     // the page (empty without a search), so the change is announced. HU-31
-    // AC-09: also while there is the filter of a type.
+    // AC-09: also while there is the filter of a type, and on "Todos" once the
+    // user changed the filter (opening the page stays silent).
     let searchStatus = '';
-    if ((term || type) && !loading && !error) {
+    if ((term || type || typeChanged) && !loading && !error) {
         searchStatus = zonesFoundText(filteredZones.length, term, type);
     }
 
@@ -253,7 +257,12 @@ export default function Zones() {
 
     // HU-31 AC-09: the filter replaces its entry of the history, so the back
     // button leaves the list instead of going through every filter tried
-    const handleTypeChange = (value) => setSearchParams(queryWith('type', value), { replace: true });
+    // A new filter starts on page 1, also when it is the one chosen before
+    const handleTypeChange = (value) => {
+        setPageOf({ type: typeFilterOf(value), page: 1 });
+        setTypeChanged(true);
+        setSearchParams(queryWith('type', value), { replace: true });
+    };
 
     const handleClearType = () => {
         handleTypeChange(null);
