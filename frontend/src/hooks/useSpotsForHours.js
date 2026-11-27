@@ -19,7 +19,8 @@ const MAX_ADVANCE_MS = 48 * 60 * 60 * 1000;
 // form says why). The answer:
 // - { state: 'idle' }: no valid hours to ask for.
 // - { state: 'waiting' }: waiting for the pause or for the answer.
-// - { state: 'done', availableSlots, openEnded, vehicleType }
+// - { state: 'done', availableSlots, hourlyRate, openEnded, vehicleType }:
+//   hourlyRate is the rate of the type now, the one a reservation would keep
 // - { state: 'error', code, hours }: the code of the API (null without one,
 //   for example without network) and, for the hours of the zone, its hours.
 // `refresh` asks again for the same hours (after the reservation answered
@@ -45,7 +46,7 @@ export function useSpotsForHours(zoneId, vehicleType, hours) {
             }
             const params = openEnded ? { vehicleType: type, startTime, openEnded: true } : { vehicleType: type, startTime, endTime };
             getAvailabilityForHours(id, params, { signal: controller.signal })
-                .then(({ data }) => setAnswer({ key, result: { state: 'done', availableSlots: data.availableSlots, openEnded, vehicleType: type } }))
+                .then(({ data }) => setAnswer({ key, result: { state: 'done', availableSlots: data.availableSlots, hourlyRate: data.hourlyRate, openEnded, vehicleType: type } }))
                 .catch((err) => {
                     // Cancelled because the hours changed: another request follows
                     if (controller.signal.aborted) return;
