@@ -276,15 +276,13 @@ export default function ReserveSpot() {
     // otherwise showing a number here would be meaningless.
     const hasValidRange = Boolean(startDateTime && endDateTime && endDateTime > startDateTime);
     let durationLabel = '';
-    let estimatedCost = 0;
+    let hoursDecimal = 0;
     let hoursLabel = '';
 
     if (hasValidRange && zoneType) {
         durationLabel = formatDuration(startDateTime, endDateTime);
         const totalMinutes = Math.round((endDateTime - startDateTime) / 60000);
-        const hoursDecimal = totalMinutes / 60;
-        // HU-31 AC-10: the rate of the type of the chosen vehicle
-        estimatedCost = Math.round(hoursDecimal * Number(zoneType.hourlyRate));
+        hoursDecimal = totalMinutes / 60;
         hoursLabel = Number.isInteger(hoursDecimal) ? String(hoursDecimal) : hoursDecimal.toFixed(1);
     }
 
@@ -334,6 +332,12 @@ export default function ReserveSpot() {
     }
     // HU-31 AC-10: the free spots of the type of the chosen vehicle
     const spots = useSpotsForHours(zoneId, zoneType?.vehicleType ?? null, hoursToAsk);
+
+    // HU-31 AC-10: the rate of the type of the chosen vehicle. The answer for
+    // the chosen hours has the rate the reservation would keep, also when it
+    // changed after the zone was read
+    const hourlyRate = spots.state === 'done' && spots.hourlyRate != null ? spots.hourlyRate : zoneType?.hourlyRate;
+    const estimatedCost = hasValidRange && zoneType ? Math.round(hoursDecimal * Number(hourlyRate)) : 0;
 
     // HU-31 AC-12: the free spots answered that the type was turned off after
     // the page opened (before sending the reservation)
@@ -580,7 +584,7 @@ export default function ReserveSpot() {
                         </span>
                         <div>
                             <p className="text-caption text-neutral-600">Tarifa por hora de {typePlural}</p>
-                            <p className="font-mono text-subtitle-sm text-neutral-900">{formatCurrency(zoneType.hourlyRate)}</p>
+                            <p className="font-mono text-subtitle-sm text-neutral-900">{formatCurrency(hourlyRate)}</p>
                         </div>
                     </div>
                 )}
@@ -653,7 +657,7 @@ export default function ReserveSpot() {
                             a screen reader hears it */}
                         {zoneType && (
                             <p id="vehicleId-rate" aria-live="polite" className="mt-1 text-caption text-neutral-600">
-                                Tarifa para {typePlural}: {formatCurrency(zoneType.hourlyRate)} por hora.
+                                Tarifa para {typePlural}: {formatCurrency(hourlyRate)} por hora.
                             </p>
                         )}
                     </div>
@@ -813,9 +817,9 @@ export default function ReserveSpot() {
                                         {form.openEnded ? (
                                             <>
                                                 <p className="text-caption text-neutral-600">A pagar al confirmar</p>
-                                                <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(zoneType.hourlyRate)}</p>
+                                                <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(hourlyRate)}</p>
                                                 <p className="text-caption text-neutral-600">
-                                                    (Primera hora. Luego {formatCurrency(zoneType.hourlyRate)} por cada hora empezada)
+                                                    (Primera hora. Luego {formatCurrency(hourlyRate)} por cada hora empezada)
                                                 </p>
                                             </>
                                         ) : (
@@ -823,7 +827,7 @@ export default function ReserveSpot() {
                                                 <p className="text-caption text-neutral-600">Costo total estimado</p>
                                                 <p className="font-mono text-body font-medium text-neutral-900">{formatCurrency(estimatedCost)}</p>
                                                 <p className="text-caption text-neutral-600">
-                                                    (Tarifa: {formatCurrency(zoneType.hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
+                                                    (Tarifa: {formatCurrency(hourlyRate)} x {hoursLabel} {hoursLabel === '1' ? 'hora' : 'horas'})
                                                 </p>
                                             </>
                                         )}
