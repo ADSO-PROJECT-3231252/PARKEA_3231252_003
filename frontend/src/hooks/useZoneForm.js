@@ -8,6 +8,8 @@ import {
     validateZoneCoordinates,
     mapZoneApiError,
     dayField,
+    typeField,
+    suggestedRate,
 } from '../utils/zoneForm';
 import { DAYS } from '../utils/zoneHours';
 
@@ -68,6 +70,28 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
         const latitude = name === 'latitude' ? value : form.latitude;
         const longitude = name === 'longitude' ? value : form.longitude;
         revalidateCoordinateErrors(latitude, longitude);
+    };
+
+    // HU-31 AC-01: checks or unchecks a vehicle type. A type checked without a
+    // rate starts with the rate typed for another type; an unchecked type
+    // keeps its spots and its rate, so checking it again brings them back.
+    const setTypeChecked = (type, checked) => {
+        setForm((prev) => {
+            const current = prev.vehicleTypes[type];
+            const hourlyRate = checked && current.hourlyRate === '' ? suggestedRate(prev, type) : current.hourlyRate;
+            return { ...prev, vehicleTypes: { ...prev.vehicleTypes, [type]: { ...current, checked, hourlyRate } } };
+        });
+        clearErrors('vehicleTypes', typeField(type, 'totalSlots'), typeField(type, 'hourlyRate'));
+    };
+
+    // HU-31 AC-01: the spots ("totalSlots") or the rate ("hourlyRate") of a type.
+    // Changing the spots of one type can fix the total of the section too.
+    const setTypeValue = (type, name, value) => {
+        setForm((prev) => ({
+            ...prev,
+            vehicleTypes: { ...prev.vehicleTypes, [type]: { ...prev.vehicleTypes[type], [name]: value } },
+        }));
+        clearErrors(typeField(type, name), ...(name === 'totalSlots' ? ['vehicleTypes'] : []));
     };
 
     // HU-29 AC-01: "Abierta 24 horas" (true) or "Horario personalizado" (false)
@@ -132,7 +156,7 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
 
     // Shows a failed save: under its field when it has one, or on top.
     const showApiError = (err) => {
-        const { fields, general } = mapZoneApiError(err);
+        const { fields, general } = mapZoneApiError(err, form);
         if (fields) {
             showErrors(fields);
         } else {
@@ -150,6 +174,8 @@ export default function useZoneForm(initialForm = EMPTY_ZONE_FORM) {
         position,
         serverErrorRef,
         setField,
+        setTypeChecked,
+        setTypeValue,
         setOpen24h,
         setDay,
         applyToAll,

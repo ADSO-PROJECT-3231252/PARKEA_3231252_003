@@ -18,8 +18,10 @@ import { formatCurrency } from '../utils/format';
 import { normalizeText } from '../utils/normalizeText';
 import { getZoneAvailability, getZoneToggleDialog, getZoneToggleSuccess } from '../utils/zones';
 import { getPageWindow } from '../utils/adminUsersHelpers';
+import { vehicleTypeLabel } from '../utils/vehicleTypes';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ZoneStatusBadge from '../components/ZoneStatusBadge';
+import VehicleTypeIcon from '../components/VehicleTypeIcon';
 
 // AC-11: the list is paginated when there are more than 10 zones.
 const PAGE_SIZE = 10;
@@ -44,6 +46,30 @@ function Availability({ zone }) {
                 ({percentOf(zone.availableSlots, zone.totalSlots)}%)
             </span>
         </span>
+    );
+}
+
+// HU-31 AC-07: the vehicle types of the zone, with their spots and rates. A
+// type turned off keeps them, and says that it takes no new reservations.
+function ZoneTypes({ zone }) {
+    return (
+        <ul className="space-y-1">
+            {(zone.vehicleTypes ?? []).map((type) => (
+                <li key={type.vehicleType} className={`text-caption ${type.isAccepting === false ? 'text-neutral-600' : 'text-neutral-900'}`}>
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                        <VehicleTypeIcon type={type.vehicleType} className="h-4 w-4 shrink-0 text-parkea-600" />
+                        <span className="w-14 font-medium">{vehicleTypeLabel(type.vehicleType)}</span>
+                        <span className="sr-only">, </span>
+                        <span className="w-16 text-right">
+                            <span className="font-mono tabular-nums">{type.totalSlots}</span> {type.totalSlots === 1 ? 'cupo' : 'cupos'}
+                        </span>
+                        <span className="sr-only">, </span>
+                        <span className="font-mono">{formatCurrency(type.hourlyRate)}/h</span>
+                    </span>
+                    {type.isAccepting === false && <span className="block pl-6">No recibe reservas nuevas</span>}
+                </li>
+            ))}
+        </ul>
     );
 }
 
@@ -389,7 +415,7 @@ export default function AdminZones() {
                                         <th scope="col" className="px-4 py-3 font-medium">Dirección</th>
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Capacidad total</th>
                                         <th scope="col" className="px-4 py-3 text-center font-medium">Cupos disponibles</th>
-                                        <th scope="col" className="px-4 py-3 text-right font-medium">Tarifa por hora</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Tipos de vehículo</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Estado</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Acciones</th>
                                     </tr>
@@ -410,8 +436,8 @@ export default function AdminZones() {
                                             <td className="px-4 py-3 text-center">
                                                 <Availability zone={zone} />
                                             </td>
-                                            <td className="whitespace-nowrap px-4 py-3 text-right font-mono text-body text-neutral-900">
-                                                {formatCurrency(zone.hourlyRate)}
+                                            <td className="px-4 py-3">
+                                                <ZoneTypes zone={zone} />
                                             </td>
                                             <td className="px-4 py-3">
                                                 <ZoneStatusBadge isActive={zone.isActive} />
@@ -437,7 +463,7 @@ export default function AdminZones() {
                                         <ZoneStatusBadge isActive={zone.isActive} />
                                     </div>
                                     {zone.address && <p className="text-body text-neutral-600">{zone.address}</p>}
-                                    <dl className="grid grid-cols-3 gap-2 rounded-md bg-neutral-50 p-3 text-center">
+                                    <dl className="grid grid-cols-2 gap-2 rounded-md bg-neutral-50 p-3 text-center">
                                         <div>
                                             <dt className="text-caption text-neutral-600">Capacidad</dt>
                                             <dd className="font-mono text-body tabular-nums text-neutral-900">{zone.totalSlots}</dd>
@@ -448,10 +474,10 @@ export default function AdminZones() {
                                                 <Availability zone={zone} />
                                             </dd>
                                         </div>
-                                        <div>
-                                            <dt className="text-caption text-neutral-600">Tarifa/hora</dt>
-                                            <dd className="whitespace-nowrap font-mono text-body text-neutral-900">
-                                                {formatCurrency(zone.hourlyRate)}
+                                        <div className="col-span-2 border-t border-neutral-200 pt-2 text-left">
+                                            <dt className="text-caption text-neutral-600">Tipos de vehículo</dt>
+                                            <dd className="mt-1">
+                                                <ZoneTypes zone={zone} />
                                             </dd>
                                         </div>
                                     </dl>

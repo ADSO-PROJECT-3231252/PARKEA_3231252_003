@@ -200,3 +200,14 @@ describe('The dialog takes spotFreeUntil from the screen that opens it (#375)', 
             .toEqual([colombia('13:00'), colombia('14:00'), colombia('15:00'), FREE_UNTIL]);
     });
 });
+
+// HU-31 AC-03: the spot the stay keeps is said with its type
+describe('The spot in the extend dialog (HU-31 AC-03)', () => {
+    test('is said with its type', () => {
+        // Act
+        renderDialog({ ...STAY, spotFreeUntil: null, spotVehicleType: 'motorcycle' });
+
+        // Assert
+        expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(/y conservas el mismo cupo \(4 · Moto\)\.$/);
+    });
+});

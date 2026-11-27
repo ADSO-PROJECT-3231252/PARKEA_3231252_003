@@ -6,6 +6,7 @@ import { translateError } from '../utils/errorMessages';
 import { formatCurrency, formatDate, formatTime, keepTogether } from '../utils/format';
 import { hoursLabel } from '../utils/openStay';
 import { extendErrorMessage, extendLimitMs, extensionCharge, extensionOptions, formatAddedTime, limitedByClosing, spotFreeUntil, untilText } from '../utils/extendStay';
+import { spotText } from '../utils/vehicleTypes';
 
 // Value of the "Tiempo indefinido" option; the others are the new exit times.
 const OPEN_STAY = 'open';
@@ -111,7 +112,7 @@ export default function ExtendStayDialog({ reservation, hourlyRate, paid, opened
     if (spotLimit && spotLimit !== 'none') {
         howFar = `hasta ${untilText(spotLimit, reservation.endTime)}, porque después tu cupo tiene otra reserva, `;
     }
-    let message = `${sentence(`Tu salida actual es ${exitText}`)} Puedes ampliarla ${howFar}y conservas el mismo cupo (${reservation.spotNumber}).`;
+    let message = `${sentence(`Tu salida actual es ${exitText}`)} Puedes ampliarla ${howFar}y conservas el mismo cupo (${spotText(reservation.spotNumber, reservation.spotVehicleType)}).`;
     if (exitPassed) message = sentence(`Tu salida era ${exitText}`);
     else if (spotLimit === 'none') {
         message = sentence(`Tu salida actual es ${exitText}`);

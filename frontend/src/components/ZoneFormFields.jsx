@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Info } from 'lucide-react';
-import { ZONE_LIMITS, onlyDigits, cleanCoordinate } from '../utils/zoneForm';
+import { ZONE_LIMITS, cleanCoordinate, zoneInputClass as inputClass } from '../utils/zoneForm';
 import ZoneScheduleFields from './ZoneScheduleFields';
+import VehicleTypeFields from './VehicleTypeFields';
+import Field from './ZoneField';
 
 // Leaflet is only downloaded when a zone form opens (like the zones map in
 // HU-25), so it doesn't add weight to every other page.
@@ -18,39 +20,12 @@ function MapUnavailable() {
     );
 }
 
-const inputClass = (hasError) =>
-    `w-full rounded-md border bg-white px-3 py-2.5 text-body text-neutral-900 placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-parkea-600 ${hasError ? 'border-danger' : 'border-neutral-200'}`;
-
-// Label, input and one line under it: the hint, or the error in its place.
-// The input gets aria-describedby with whichever line is showing.
-function Field({ id, label, hint, error, children }) {
-    const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
-    return (
-        <div>
-            <label htmlFor={id} className="block text-label text-neutral-900">
-                {label} <span className="text-danger" aria-hidden="true">*</span>
-            </label>
-            <div className="mt-1">{children({ 'aria-describedby': describedBy, 'aria-invalid': Boolean(error) })}</div>
-            {error ? (
-                <p id={`${id}-error`} role="alert" className="mt-1 text-caption text-danger">
-                    {error}
-                </p>
-            ) : (
-                hint && (
-                    <p id={`${id}-hint`} className="mt-1 text-caption text-neutral-600">
-                        {hint}
-                    </p>
-                )
-            )}
-        </div>
-    );
-}
-
 // Fields of the zone form, shared by create (HU-20) and edit (HU-21).
-// zoneForm is what useZoneForm returns; hints has the line under the name,
-// address, capacity and rate, which each screen words for its own case, and
-// optionally under the opening hours (HU-29).
-export default function ZoneFormFields({ zoneForm, hints }) {
+// zoneForm is what useZoneForm returns; hints has the line under the name
+// and the address, which each screen words for its own case, and optionally
+// under the opening hours (HU-29). HU-31: typeHints and keepOneChecked go to
+// the section of the vehicle types (VehicleTypeFields).
+export default function ZoneFormFields({ zoneForm, hints, typeHints, keepOneChecked = false }) {
     const {
         form,
         errors,
@@ -117,55 +92,8 @@ export default function ZoneFormFields({ zoneForm, hints }) {
                         )}
                     </Field>
 
-                    {/* HU-20 AC-03: whole number from 1 to 500 */}
-                    <Field id="totalSlots" label="Capacidad total" hint={hints.totalSlots} error={errors.totalSlots}>
-                        {(a11y) => (
-                            <input
-                                ref={fieldRef('totalSlots')}
-                                id="totalSlots"
-                                type="text"
-                                inputMode="numeric"
-                                required
-                                maxLength={3}
-                                value={form.totalSlots}
-                                onChange={(e) => setField('totalSlots', onlyDigits(e.target.value))}
-                                placeholder="Ej. 30"
-                                autoComplete="off"
-                                className={`${inputClass(errors.totalSlots)} font-mono placeholder:font-sans`}
-                                {...a11y}
-                            />
-                        )}
-                    </Field>
-
-                    {/* HU-20 AC-04: more than zero, in whole pesos (#316) */}
-                    <Field id="hourlyRate" label="Tarifa por hora (COP)" hint={hints.hourlyRate} error={errors.hourlyRate}>
-                        {(a11y) => (
-                            <div
-                                className={`flex overflow-hidden rounded-md border bg-white focus-within:ring-2 focus-within:ring-parkea-600 ${errors.hourlyRate ? 'border-danger' : 'border-neutral-200'}`}
-                            >
-                                <span
-                                    className="flex items-center border-r border-neutral-200 bg-neutral-50 px-3 text-body text-neutral-600"
-                                    aria-hidden="true"
-                                >
-                                    $
-                                </span>
-                                <input
-                                    ref={fieldRef('hourlyRate')}
-                                    id="hourlyRate"
-                                    type="text"
-                                    inputMode="numeric"
-                                    required
-                                    maxLength={ZONE_LIMITS.rateDigits}
-                                    value={form.hourlyRate}
-                                    onChange={(e) => setField('hourlyRate', onlyDigits(e.target.value))}
-                                    placeholder="Ej. 2000"
-                                    autoComplete="off"
-                                    className="w-full min-w-0 px-3 py-2.5 font-mono text-body text-neutral-900 placeholder:font-sans placeholder:text-neutral-500 focus:outline-none"
-                                    {...a11y}
-                                />
-                            </div>
-                        )}
-                    </Field>
+                    {/* HU-31: the vehicle types, with their spots and rates */}
+                    <VehicleTypeFields zoneForm={zoneForm} hints={typeHints} keepOneChecked={keepOneChecked} />
                 </div>
 
                 {/* HU-20 AC-05: coordinates, typed or picked on the map */}

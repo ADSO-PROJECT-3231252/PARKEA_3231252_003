@@ -11,6 +11,8 @@ import {
 } from '../services/adminService';
 import { formatCurrency, formatDate, formatTime } from '../utils/format';
 import { getZoneAvailability } from '../utils/zones';
+import { VEHICLE_TYPES, vehicleTypeLabel, vehicleTypePlural } from '../utils/vehicleTypes';
+import VehicleTypeIcon from '../components/VehicleTypeIcon';
 import { PAYMENT_STATUS_LABELS } from '../utils/paymentStatus';
 import { ZONE_AXIS_WIDTH, ZONE_TOOLTIP_STYLE, zoneChartHeight, zoneTooltipPosition } from '../utils/zoneChart';
 import MetricCard from '../components/MetricCard';
@@ -61,6 +63,51 @@ const OCCUPANCY_BADGE_CLASS = {
     almost: 'border-warning text-warning bg-warning-soft',
     available: 'border-parkea-600 text-parkea-600 bg-parkea-50',
 };
+
+// HU-31 AC-14: the state of a type, as a word next to its count (never color alone)
+const OCCUPANCY_TEXT_CLASS = {
+    full: 'text-danger',
+    almost: 'text-warning',
+    available: 'text-parkea-600',
+};
+
+// HU-31 AC-14: one alert for each type of a zone with no spot free. Without
+// its type (an alert of before HU-31), the sentence of the whole zone.
+const fullZoneText = (alert) => (alert.vehicleType
+    ? `La zona "${alert.zoneName}" no tiene cupos libres para ${vehicleTypePlural(alert.vehicleType)}.`
+    : `La zona "${alert.zoneName}" ha alcanzado su capacidad máxima.`);
+
+// HU-31 AC-14: under the bar of a zone, each of its types with its occupied
+// spots and its state: "Moto  10 de 10  Llena"
+function OccupancyByType({ vehicleTypes = [] }) {
+    const types = VEHICLE_TYPES.map((type) => vehicleTypes.find((t) => t.vehicleType === type)).filter(Boolean);
+    if (types.length === 0) return null;
+    return (
+        <ul
+            aria-label="Ocupación por tipo de vehículo"
+            className="mt-2 grid grid-cols-[auto_auto_1fr] gap-x-3 gap-y-1 text-caption text-neutral-600"
+        >
+            {types.map(({ vehicleType, totalSlots, occupiedSlots }) => {
+                const state = getZoneAvailability(totalSlots - occupiedSlots, totalSlots);
+                return (
+                    <li key={vehicleType} className="col-span-3 grid grid-cols-subgrid items-center">
+                        <span className="flex items-center gap-1.5 text-neutral-900">
+                            <VehicleTypeIcon type={vehicleType} className="h-3.5 w-3.5 shrink-0 text-parkea-600" />
+                            {vehicleTypeLabel(vehicleType)}
+                            <span className="sr-only">: </span>
+                        </span>
+                        <span className="whitespace-nowrap text-right">
+                            <span className="font-mono tabular-nums">{occupiedSlots}</span> de{' '}
+                            <span className="font-mono tabular-nums">{totalSlots}</span>
+                            <span className="sr-only"> ocupados, </span>
+                        </span>
+                        <span className={`font-medium ${OCCUPANCY_TEXT_CLASS[state.state]}`}>{state.text}</span>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
 
 function SectionLoading() {
     return (
@@ -241,7 +288,8 @@ export default function AdminPanel() {
                 <div className="mb-6 flex flex-col gap-2">
                     {alerts.map((alert, index) => (
                         <div
-                            key={`${alert.type}-${alert.zoneId ?? index}`}
+                            // HU-31: a zone can have one alert for each type
+                            key={`${alert.type}-${alert.zoneId ?? index}-${alert.vehicleType ?? ''}`}
                             role="alert"
                             className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warning bg-warning-soft px-5 py-4"
                         >
@@ -250,7 +298,7 @@ export default function AdminPanel() {
                                 aria-hidden="true"
                             />
                                 <p className="break-words text-body text-neutral-900">
-                                    {`La zona "${alert.zoneName}" ha alcanzado su capacidad máxima.`}
+                                    {fullZoneText(alert)}
                                 </p>
                             </div>
                             <Link
@@ -471,6 +519,7 @@ export default function AdminPanel() {
                                                 {zona.occupiedSlots} de {zona.totalSlots}
                                             </span>
                                         </div>
+                                        <OccupancyByType vehicleTypes={zona.vehicleTypes} />
                                     </li>
                                 );
                             })}

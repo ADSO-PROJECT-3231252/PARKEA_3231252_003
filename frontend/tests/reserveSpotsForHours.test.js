@@ -31,15 +31,17 @@ const ZONE = {
     address: 'Calle 1',
     totalSlots: 10,
     availableSlots: 0,
-    hourlyRate: '2000.00',
+    // HU-31: the zone accepts cars, and the free spots are of the type of
+    // the chosen vehicle
+    vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, availableSlots: 0, hourlyRate: 2000 }],
     isActive: true,
     open24h: true,
     schedule: [],
 };
 
 const VEHICLES = [
-    { id: 'v1', plate: 'ABC123', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true },
-    { id: 'v2', plate: 'XYZ789', brand: 'Mazda', model: '3', color: 'Gris', isDefault: false },
+    { id: 'v1', plate: 'ABC123', vehicleType: 'car', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true },
+    { id: 'v2', plate: 'XYZ789', vehicleType: 'car', brand: 'Mazda', model: '3', color: 'Gris', isDefault: false },
 ];
 
 async function renderScreen(zone = ZONE) {
@@ -127,15 +129,15 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(1);
         expect(getAvailabilityForHours).toHaveBeenCalledWith(
             'z1',
-            { startTime: tomorrowAt(10).toISOString(), endTime: tomorrowAt(12, 30).toISOString() },
+            { vehicleType: 'car', startTime: tomorrowAt(10).toISOString(), endTime: tomorrowAt(12, 30).toISOString() },
             { signal: expect.any(AbortSignal) },
         );
-        expect(spotsLine()).toHaveTextContent('Hay 3 cupos para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 3 cupos de carros para ese horario.');
     });
 
     test.each([
-        ['1 free spot', 'Hay 1 cupo para ese horario.', 1],
-        ['no free spot', 'No hay cupos para ese horario. Prueba con otras horas.', 0],
+        ['1 free spot', 'Hay 1 cupo de carros para ese horario.', 1],
+        ['no free spot', 'No hay cupos de carros para ese horario. Prueba con otras horas.', 0],
     ])('with %s it says "%s", and the button stays enabled', async (_case, text, free) => {
         // Arrange
         getAvailabilityForHours.mockReturnValue(answer(free));
@@ -162,8 +164,8 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         await wait();
 
         // Assert
-        expect(getAvailabilityForHours).toHaveBeenCalledWith('z1', { startTime: tomorrowAt(10).toISOString(), openEnded: true }, expect.anything());
-        expect(spotsLine()).toHaveTextContent('No hay cupos para una estadía sin hora de salida desde esa entrada. Prueba con una hora de salida.');
+        expect(getAvailabilityForHours).toHaveBeenCalledWith('z1', { vehicleType: 'car', startTime: tomorrowAt(10).toISOString(), openEnded: true }, expect.anything());
+        expect(spotsLine()).toHaveTextContent('No hay cupos de carros para una estadía sin hora de salida desde esa entrada. Prueba con una hora de salida.');
     });
 
     test('hours that change while it asks cancel that request, and its answer is never shown', async () => {
@@ -188,7 +190,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         expect(spotsLine()).toHaveTextContent('Buscando cupos para ese horario…');
         await wait();
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(2);
-        expect(spotsLine()).toHaveTextContent('Hay 5 cupos para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 5 cupos de carros para ese horario.');
     });
 
     test('asking again for the same hours cancels the request that had not answered, without showing an error', async () => {
@@ -212,7 +214,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         expect(spotsLine()).toHaveTextContent('Buscando cupos para ese horario…');
         await wait();
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(2);
-        expect(spotsLine()).toHaveTextContent('No hay cupos para ese horario. Prueba con otras horas.');
+        expect(spotsLine()).toHaveTextContent('No hay cupos de carros para ese horario. Prueba con otras horas.');
     });
 
     test('a change that leaves the same hours (another vehicle) asks nothing again', async () => {
@@ -228,7 +230,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         await wait(5 * SPOTS_WAIT_MS);
 
         // Assert
-        expect(spotsLine()).toHaveTextContent('Hay 2 cupos para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 2 cupos de carros para ese horario.');
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(1);
     });
 
@@ -299,7 +301,7 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
         typeEntry(tomorrowAt(10));
         typeExit(tomorrowAt(12));
         await wait();
-        expect(spotsLine()).toHaveTextContent('Hay 1 cupo para ese horario.');
+        expect(spotsLine()).toHaveTextContent('Hay 1 cupo de carros para ese horario.');
 
         // Act
         await act(async () => {
@@ -309,6 +311,38 @@ describe('The free spots for the chosen hours on the reserve screen (#375)', () 
 
         // Assert
         expect(getAvailabilityForHours).toHaveBeenCalledTimes(2);
-        expect(spotsLine()).toHaveTextContent('No hay cupos para ese horario. Prueba con otras horas.');
+        expect(spotsLine()).toHaveTextContent('No hay cupos de carros para ese horario. Prueba con otras horas.');
+    });
+
+    test('the rate and the total are the ones the API answers for those hours (HU-31 AC-10)', async () => {
+        // Arrange: the rate of cars went from $2.000 to $3.000 after the screen was opened
+        getAvailabilityForHours.mockReturnValue(Promise.resolve({ data: { availableSlots: 7, totalSlots: 10, vehicleType: 'car', hourlyRate: 3000 } }));
+        await renderScreen();
+
+        // Act
+        typeEntry(tomorrowAt(10));
+        typeExit(tomorrowAt(12));
+        await wait();
+
+        // Assert
+        expect(screen.getByText('Tarifa por hora de carros').nextElementSibling).toHaveTextContent('$ 3.000');
+        expect(document.getElementById('vehicleId-rate')).toHaveTextContent('Tarifa para carros: $ 3.000 por hora.');
+        expect(screen.getByText('$ 6.000')).toBeInTheDocument();
+        expect(screen.getByText(/\(Tarifa: \$\s3\.000 x 2 horas\)/)).toBeInTheDocument();
+    });
+
+    test('an open stay shows the first hour with the rate the API answers (HU-31 AC-10)', async () => {
+        // Arrange: the rate of cars went from $2.000 to $3.000 after the screen was opened
+        getAvailabilityForHours.mockReturnValue(Promise.resolve({ data: { availableSlots: 7, totalSlots: 10, vehicleType: 'car', hourlyRate: 3000, openEnded: true } }));
+        await renderScreen();
+
+        // Act
+        typeEntry(tomorrowAt(10));
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Tiempo indefinido' }));
+        await wait();
+
+        // Assert
+        expect(screen.getByText('A pagar al confirmar').nextElementSibling).toHaveTextContent('$ 3.000');
+        expect(screen.getByText(/\(Primera hora\. Luego \$\s3\.000 por cada hora empezada\)/)).toBeInTheDocument();
     });
 });

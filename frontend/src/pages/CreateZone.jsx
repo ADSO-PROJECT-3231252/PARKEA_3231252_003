@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Save } from 'lucide-react';
 import { createZone } from '../services/zoneService';
 import { formatCurrency } from '../utils/format';
+import { VEHICLE_TYPES } from '../utils/vehicleTypes';
 import { ZONE_LIMITS, validateZoneForm, buildZonePayload } from '../utils/zoneForm';
 import useZoneForm from '../hooks/useZoneForm';
 import ZoneFormFields from '../components/ZoneFormFields';
@@ -38,16 +39,27 @@ export default function CreateZone() {
     // AC-07: discards what was typed and goes back to the list
     const handleCancel = () => navigate('/admin/zones');
 
-    const rate = form.hourlyRate === '' ? null : Number(form.hourlyRate);
     const hints = {
         name: 'Nombre con el que los usuarios verán la zona. No puede repetirse.',
         address: 'Dirección exacta de la zona de parqueo.',
-        totalSlots: `Número total de cupos de la zona, entre 1 y ${ZONE_LIMITS.maxSlots}.`,
-        hourlyRate:
-            rate === null
-                ? 'Valor en pesos que se cobrará por cada hora de parqueo.'
-                : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
     };
+
+    // HU-31 AC-01: the line under the spots and the rate of each type
+    const typeHints = Object.fromEntries(
+        VEHICLE_TYPES.map((type) => {
+            const rate = form.vehicleTypes[type].hourlyRate;
+            return [
+                type,
+                {
+                    totalSlots: `Entre 1 y ${ZONE_LIMITS.maxSlots}.`,
+                    hourlyRate:
+                        rate === ''
+                            ? 'Valor en pesos por cada hora de parqueo.'
+                            : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
+                },
+            ];
+        }),
+    );
 
     return (
         <div className="mx-auto w-[92%] max-w-[1800px] px-4 py-8 sm:px-6">
@@ -60,7 +72,7 @@ export default function CreateZone() {
             </p>
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 rounded-lg border border-neutral-200 bg-white">
-                <ZoneFormFields zoneForm={zoneForm} hints={hints} />
+                <ZoneFormFields zoneForm={zoneForm} hints={hints} typeHints={typeHints} />
 
                 {/* AC-07: cancel and save */}
                 <div className="flex flex-col-reverse gap-3 border-t border-neutral-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">

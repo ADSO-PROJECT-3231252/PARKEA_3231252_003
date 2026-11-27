@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AdminPanel from '../src/pages/AdminPanel';
 import {
@@ -75,12 +75,12 @@ const recentPayments = [
     payment('p4', 'Refunded'),
 ];
 
-function answer({ zones = reservationsByZone, alerts = [] } = {}) {
+function answer({ zones = reservationsByZone, alerts = [], occupancyRows = occupancy } = {}) {
     getDashboardMetrics.mockResolvedValue({
         data: { metrics: { activeReservations: 1, revenue: 4000, activeZones: 7, registeredUsers: 3 } },
     });
     getReservationsByZone.mockResolvedValue({ data: { reservationsByZone: zones } });
-    getZoneOccupancy.mockResolvedValue({ data: { occupancy } });
+    getZoneOccupancy.mockResolvedValue({ data: { occupancy: occupancyRows } });
     getPaymentsStatus.mockResolvedValue({ data: { paymentStatus: { Paid: 3, Pending: 1, Cancelled: 0, Refunded: 2 } } });
     getRecentPayments.mockResolvedValue({ data: { recentPayments } });
     getDashboardAlerts.mockResolvedValue({ data: { alerts } });
@@ -283,5 +283,101 @@ describe('The alerts of the panel (#313)', () => {
         // Assert: only the full zone is shown, never "undefined"
         expect(screen.getAllByText(/ha alcanzado su capacidad máxima/)).toHaveLength(1);
         expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+    });
+});
+
+// HU-31 AC-14: the occupancy counts the spots of every type, and each zone
+// shows each of its types, as GET /admin/dashboard/occupancy sends them
+describe('The occupancy by type of vehicle (HU-31 AC-14)', () => {
+    const CENTRO = {
+        zoneId: 'zone-1',
+        zoneName: 'Centro',
+        totalSlots: 30,
+        occupiedSlots: 28,
+        // In another order than the one of the screens
+        vehicleTypes: [
+            { vehicleType: 'motorcycle', totalSlots: 10, occupiedSlots: 10 },
+            { vehicleType: 'car', totalSlots: 20, occupiedSlots: 18 },
+        ],
+    };
+
+    test('each zone shows its types with their occupied spots and their state', async () => {
+        // Arrange
+        answer({ occupancyRows: [CENTRO] });
+
+        // Act
+        renderPanel();
+        const box = await section('Ocupación por zona');
+
+        // Assert: car first, and each state as a word, never color alone
+        const types = await within(box).findByRole('list', { name: 'Ocupación por tipo de vehículo' });
+        expect(within(types).getAllByRole('listitem').map((row) => row.textContent)).toEqual([
+            'Carro: 18 de 20 ocupados, Casi llena',
+            'Moto: 10 de 10 ocupados, Llena',
+        ]);
+        expect(within(types).getByText('Llena')).toHaveClass('text-danger');
+        expect(within(box).getByText('28 de 30')).toBeInTheDocument();
+    });
+
+    test('a zone without its types (an API from before HU-31) shows only its bar', async () => {
+        // Arrange
+        answer();
+
+        // Act
+        renderPanel();
+        const box = await section('Ocupación por zona');
+        await within(box).findByText('Centro');
+
+        // Assert
+        expect(within(box).queryByRole('list', { name: 'Ocupación por tipo de vehículo' })).not.toBeInTheDocument();
+    });
+});
+
+// HU-31 AC-14: one alert for each type of a zone with no spot free
+describe('The full-zone alerts by type of vehicle (HU-31 AC-14)', () => {
+    test('say which type has no spot free, one for each type', async () => {
+        // Arrange: the motorcycles and the trucks of Centro are full
+        answer({
+            alerts: [
+                { type: 'zone_full', severity: 'warning', zoneId: 'zone-1', zoneName: 'Centro', vehicleType: 'motorcycle' },
+                { type: 'zone_full', severity: 'warning', zoneId: 'zone-1', zoneName: 'Centro', vehicleType: 'truck' },
+            ],
+        });
+
+        // Act
+        renderPanel();
+
+        // Assert
+        const moto = await screen.findByText('La zona "Centro" no tiene cupos libres para motos.');
+        expect(moto.closest('[role="alert"]')).toHaveTextContent('Ver zonas');
+        expect(screen.getByText('La zona "Centro" no tiene cupos libres para camiones.')).toBeInTheDocument();
+        expect(screen.queryByText(/ha alcanzado su capacidad máxima/)).not.toBeInTheDocument();
+    });
+
+    test('the two alerts of the same zone are two boxes, also after a refresh', async () => {
+        // Arrange
+        jest.useFakeTimers();
+        const alerts = [
+            { type: 'zone_full', severity: 'warning', zoneId: 'zone-1', zoneName: 'Centro', vehicleType: 'car' },
+            { type: 'zone_full', severity: 'warning', zoneId: 'zone-1', zoneName: 'Centro', vehicleType: 'motorcycle' },
+        ];
+        answer({ alerts });
+        const errors = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        try {
+            // Act: the panel asks again every 5 seconds
+            renderPanel();
+            await screen.findByText('La zona "Centro" no tiene cupos libres para carros.');
+            await act(async () => {
+                jest.advanceTimersByTime(5000);
+            });
+
+            // Assert: React warns of nothing (two boxes with the same key would)
+            expect(screen.getAllByRole('alert').filter((box) => box.textContent.includes('Centro'))).toHaveLength(2);
+            expect(errors).not.toHaveBeenCalled();
+        } finally {
+            errors.mockRestore();
+            jest.useRealTimers();
+        }
     });
 });

@@ -2,26 +2,29 @@
 // the chosen hours (components/SpotsForHours.jsx)
 import { translateError } from './errorMessages';
 import { hoursErrorMessage } from './zoneHours';
+import { vehicleTypePlural } from './vehicleTypes';
 
 // A sentence ends with a period, also the general texts of the errors
 const withPeriod = (text) => (text.endsWith('.') ? text : `${text}.`);
 
 // #375: what the line says for each answer of useSpotsForHours, and how it
-// looks: { tone, text }
+// looks: { tone, text }. HU-31 AC-10: the spots are of the type of the
+// chosen vehicle, and the line names it.
 export function spotsForHoursMessage(spots, openEnded) {
     if (spots.state === 'waiting') {
         return { tone: 'waiting', text: 'Buscando cupos para ese horario…' };
     }
     if (spots.state === 'done') {
+        const ofType = spots.vehicleType ? ` de ${vehicleTypePlural(spots.vehicleType)}` : '';
         if (spots.availableSlots > 0) {
             const count = spots.availableSlots === 1 ? 'Hay 1 cupo' : `Hay ${spots.availableSlots} cupos`;
-            return { tone: 'room', text: `${count} para ese horario.` };
+            return { tone: 'room', text: `${count}${ofType} para ese horario.` };
         }
         // An open stay needs its spot until the closing time or for 24
         // hours: a stay with an exit time may still find room
         return spots.openEnded
-            ? { tone: 'full', text: 'No hay cupos para una estadía sin hora de salida desde esa entrada. Prueba con una hora de salida.' }
-            : { tone: 'full', text: 'No hay cupos para ese horario. Prueba con otras horas.' };
+            ? { tone: 'full', text: `No hay cupos${ofType} para una estadía sin hora de salida desde esa entrada. Prueba con una hora de salida.` }
+            : { tone: 'full', text: `No hay cupos${ofType} para ese horario. Prueba con otras horas.` };
     }
     if (spots.state === 'error') {
         // The hours of the zone may have changed since the page opened

@@ -15,9 +15,10 @@ const PLATE_PLACEHOLDER = {
     motorcycle: 'Ejemplo: GHT42D',
 };
 
-// #217: Reserve a spot sends the user here when they have no vehicles, and
-// passes where to come back. Only "/reserve/" plus a zone id is accepted, so
-// the state can't send the user to any other page (not even with "../").
+// #217: Reserve a spot sends the user here when they have no vehicles (or,
+// HU-31 AC-11, none of a type the zone accepts), and passes where to come
+// back. Only "/reserve/" plus a zone id is accepted, so the state can't
+// send the user to any other page (not even with "../").
 function getReturnTo(state) {
     const returnTo = state?.returnTo;
     return typeof returnTo === 'string' && /^\/reserve\/[0-9a-f-]{36}$/i.test(returnTo) ? returnTo : null;
@@ -116,11 +117,13 @@ export default function RegisterVehicle() {
                 payload.visualDescription = form.visualDescription.trim();
             }
 
-            await createVehicle(payload);
+            const res = await createVehicle(payload);
             // AC-07: success message + redirect, via the same flash-state pattern
             // Login.jsx uses for "Registro completado". Coming from a reservation,
-            // it goes back to it, where the new vehicle is already selected.
-            navigate(returnTo ?? '/vehicles', { state: { vehicleAdded: true } });
+            // it goes back to it, where the new vehicle is already selected
+            // (HU-31 AC-11: by its id, since it may not be the first one).
+            const vehicleId = res?.data?.vehicle?.id;
+            navigate(returnTo ?? '/vehicles', { state: { vehicleAdded: true, ...(returnTo && vehicleId ? { vehicleId } : {}) } });
         } catch (err) {
             const code = err.response?.data?.code;
             // AC-04: plate-already-registered must show inline on the plate field,

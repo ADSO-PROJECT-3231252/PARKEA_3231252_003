@@ -8,14 +8,22 @@ import {
     parseCoordinatePair,
     zoneToForm,
     emptyWeek,
+    emptyVehicleTypes,
 } from '../src/utils/zoneForm';
 
-// A form that passes every rule; each test changes only what it checks.
+// HU-31: the types of a form; [type, totalSlots, hourlyRate] are checked
+const types = (...checked) => {
+    const form = emptyVehicleTypes();
+    for (const [type, totalSlots, hourlyRate] of checked) form[type] = { checked: true, totalSlots, hourlyRate };
+    return form;
+};
+
+// A form that passes every rule, with 20 car spots at $ 2.500; each test
+// changes only what it checks.
 const validForm = () => ({
     name: 'Parque Olaya',
     address: 'Carrera 7 # 20-15, Pereira',
-    totalSlots: '20',
-    hourlyRate: '2500',
+    vehicleTypes: types(['car', '20', '2500']),
     latitude: '4.8133',
     longitude: '-75.6961',
     open24h: true,
@@ -102,39 +110,169 @@ describe('validateZoneForm', () => {
         expect(errors).toEqual({});
     });
 
-    test('every empty field is required', () => {
-        const empty = { name: '', address: '  ', totalSlots: '', hourlyRate: '', latitude: '', longitude: '', open24h: null, schedule: emptyWeek() };
+    test('every empty field is required, and at least one vehicle type', () => {
+        const empty = { name: '', address: '  ', vehicleTypes: emptyVehicleTypes(), latitude: '', longitude: '', open24h: null, schedule: emptyWeek() };
         const errors = validateZoneForm(empty);
-        expect(Object.keys(errors).sort()).toEqual(['address', 'hourlyRate', 'latitude', 'longitude', 'name', 'open24h', 'totalSlots']);
+        expect(Object.keys(errors).sort()).toEqual(['address', 'latitude', 'longitude', 'name', 'open24h', 'vehicleTypes']);
         expect(errors.name).toBe('Este campo es obligatorio.');
+        expect(errors.vehicleTypes).toBe('Marca al menos un tipo de vehículo.');
+    });
+});
+
+// HU-31 AC-02: the spots and the rate of each checked type
+describe('The vehicle types of the zone form (HU-31)', () => {
+    const withTypes = (...checked) => ({ ...validForm(), vehicleTypes: types(...checked) });
+
+    test('a checked type needs its spots and its rate, each error next to its field', () => {
+        // Act
+        const errors = validateZoneForm(withTypes(['car', '20', '2500'], ['motorcycle', '', '']));
+
+        // Assert
+        expect(errors).toEqual({
+            'motorcycle.totalSlots': 'Este campo es obligatorio.',
+            'motorcycle.hourlyRate': 'Este campo es obligatorio.',
+        });
     });
 
-    test.each(['0', '501', '2.5'])('capacity %s is outside 1 to 500 or not a whole number', (totalSlots) => {
-        const errors = validateZoneForm({ ...validForm(), totalSlots });
-        expect(errors.totalSlots).toBe('La capacidad debe ser un número entero entre 1 y 500.');
+    test('an unchecked type is not checked, even with values that are not valid', () => {
+        // Arrange: trucks unchecked, with values kept from before
+        const form = withTypes(['car', '20', '2500']);
+        form.vehicleTypes.truck = { checked: false, totalSlots: '0', hourlyRate: '0' };
+
+        // Act + Assert
+        expect(validateZoneForm(form)).toEqual({});
     });
 
-    test.each(['1', '500'])('capacity %s is accepted (limits)', (totalSlots) => {
-        expect(validateZoneForm({ ...validForm(), totalSlots })).toEqual({});
+    test.each(['0', '501', '2.5'])('%s spots are outside 1 to 500 or not a whole number', (totalSlots) => {
+        const errors = validateZoneForm(withTypes(['motorcycle', totalSlots, '1000']));
+        expect(errors).toEqual({ 'motorcycle.totalSlots': 'Los cupos deben ser un número entero entre 1 y 500.' });
     });
 
-    // HU-20 AC-04 (#316): every zone charges for its hours
+    test.each(['1', '500'])('%s spots are accepted (limits)', (totalSlots) => {
+        expect(validateZoneForm(withTypes(['truck', totalSlots, '5000']))).toEqual({});
+    });
+
+    // #316: every type charges for its hours
     test.each(['0', '000'])('a rate of %s is rejected: it must be more than $ 0', (hourlyRate) => {
-        const errors = validateZoneForm({ ...validForm(), hourlyRate });
-        expect(errors.hourlyRate).toBe('La tarifa por hora debe ser mayor que $ 0.');
+        const errors = validateZoneForm(withTypes(['car', '20', hourlyRate]));
+        expect(errors).toEqual({ 'car.hourlyRate': 'La tarifa por hora debe ser mayor que $ 0.' });
     });
 
     test('a rate of $ 1 is accepted', () => {
-        expect(validateZoneForm({ ...validForm(), hourlyRate: '1' })).toEqual({});
+        expect(validateZoneForm(withTypes(['car', '20', '1']))).toEqual({});
     });
 
-    test('capacity below the spots in use is rejected when editing', () => {
-        const errors = validateZoneForm({ ...validForm(), totalSlots: '3' }, { spotsInUse: 4 });
-        expect(errors.totalSlots).toBe('Hay 4 cupos en uso por reservas pendientes o activas. La capacidad no puede ser menor.');
+    test('the zone has at most 500 spots, all its types together', () => {
+        // Act
+        const over = validateZoneForm(withTypes(['car', '400', '2000'], ['motorcycle', '101', '1000']));
+        const limit = validateZoneForm(withTypes(['car', '400', '2000'], ['motorcycle', '100', '1000']));
+
+        // Assert
+        expect(over).toEqual({ vehicleTypes: 'La zona puede tener máximo 500 cupos entre todos los tipos. Ahora suma 501.' });
+        expect(limit).toEqual({});
     });
 
-    test('capacity equal to the spots in use is accepted', () => {
-        expect(validateZoneForm({ ...validForm(), totalSlots: '4' }, { spotsInUse: 4 })).toEqual({});
+    test('the total is not checked while the spots of a type are not valid', () => {
+        const errors = validateZoneForm(withTypes(['car', '500', '2000'], ['motorcycle', '600', '1000']));
+        expect(errors).toEqual({ 'motorcycle.totalSlots': 'Los cupos deben ser un número entero entre 1 y 500.' });
+    });
+
+    test('AC-04: the spots of a type below its spots in use are rejected when editing', () => {
+        // Act
+        const errors = validateZoneForm(withTypes(['car', '20', '2000'], ['motorcycle', '3', '1000']), { spotsInUse: { motorcycle: 4, car: 25 } });
+
+        // Assert: the cars have 25 in use, but the form already has 20 more
+        expect(errors).toEqual({
+            'car.totalSlots': 'Mínimo 25: hay 25 cupos de carros con reservas pendientes o activas.',
+            'motorcycle.totalSlots': 'Mínimo 4: hay 4 cupos de motos con reservas pendientes o activas.',
+        });
+    });
+
+    test('AC-04: down to exactly the spots in use is accepted, and 1 spot in use is said once', () => {
+        expect(validateZoneForm(withTypes(['motorcycle', '4', '1000']), { spotsInUse: { motorcycle: 4 } })).toEqual({});
+        expect(validateZoneForm(withTypes(['truck', '0', '5000']), { spotsInUse: { truck: 1 } })['truck.totalSlots'])
+            .toBe('Los cupos deben ser un número entero entre 1 y 500.');
+    });
+
+    test('the payload has the checked types only, in the order car, motorcycle, truck, with numbers', () => {
+        // Arrange: trucks typed first, motorcycles unchecked with a kept value
+        const form = withTypes(['truck', '4', '5000'], ['car', '20', '2500']);
+        form.vehicleTypes.motorcycle = { checked: false, totalSlots: '8', hourlyRate: '900' };
+
+        // Act + Assert
+        expect(buildZonePayload(form).vehicleTypes).toEqual([
+            { vehicleType: 'car', totalSlots: 20, hourlyRate: 2500 },
+            { vehicleType: 'truck', totalSlots: 4, hourlyRate: 5000 },
+        ]);
+    });
+
+    test('editing shows every type of the admin list: the ones turned off unchecked, with their values', () => {
+        // Act
+        const form = zoneToForm({ ...validForm(), vehicleTypes: undefined }, [
+            { vehicleType: 'car', totalSlots: 30, hourlyRate: 2000, isAccepting: true, spotsInUse: 3 },
+            { vehicleType: 'truck', totalSlots: 4, hourlyRate: 5000.5, isAccepting: false },
+        ]);
+
+        // Assert
+        expect(form.vehicleTypes).toEqual({
+            car: { checked: true, totalSlots: '30', hourlyRate: '2000' },
+            motorcycle: { checked: false, totalSlots: '', hourlyRate: '' },
+            truck: { checked: false, totalSlots: '4', hourlyRate: '5000.5' },
+        });
+    });
+
+    test('without the admin list, the types the zone takes are checked', () => {
+        // Act
+        const form = zoneToForm({ ...validForm(), vehicleTypes: [{ vehicleType: 'motorcycle', totalSlots: 8, availableSlots: 8, hourlyRate: 900 }] });
+
+        // Assert
+        expect(form.vehicleTypes.motorcycle).toEqual({ checked: true, totalSlots: '8', hourlyRate: '900' });
+        expect(form.vehicleTypes.car.checked).toBe(false);
+    });
+
+    describe('errors of the API', () => {
+        const sent = withTypes(['car', '20', '2000'], ['truck', '4', '5000']);
+
+        test('"vehicleTypes[1].totalSlots" goes next to the spots of the second type sent', () => {
+            // Act
+            const result = mapZoneApiError(apiError({
+                code: 'VALIDATION_ERROR',
+                errors: [
+                    { path: 'vehicleTypes[1].totalSlots', msg: '...' },
+                    { path: 'vehicleTypes[0].hourlyRate', msg: '...' },
+                ],
+            }), sent);
+
+            // Assert
+            expect(result.fields).toEqual({
+                'truck.totalSlots': 'Los cupos deben ser un número entero entre 1 y 500.',
+                'car.hourlyRate': 'Ingresa una tarifa válida en pesos.',
+            });
+        });
+
+        test.each([
+            ['the whole list', 'vehicleTypes'],
+            ['a repeated type', 'vehicleTypes[1].vehicleType'],
+            ['a type that was not sent', 'vehicleTypes[5].totalSlots'],
+        ])('an error of %s goes above the types', (_case, path) => {
+            const result = mapZoneApiError(apiError({ code: 'VALIDATION_ERROR', errors: [{ path, msg: '...' }] }), sent);
+            expect(result.fields).toEqual({ vehicleTypes: 'Revisa los tipos de vehículo: marca al menos uno, con máximo 500 cupos entre todos.' });
+        });
+
+        test('CAPACITY_BELOW_IN_USE goes next to the spots of its type, with the spots in use', () => {
+            const result = mapZoneApiError(apiError({ code: 'CAPACITY_BELOW_IN_USE', vehicleType: 'truck', spotsInUse: 1 }), sent);
+            expect(result.fields).toEqual({ 'truck.totalSlots': 'Mínimo 1: hay 1 cupo de camiones con reservas pendientes o activas.' });
+        });
+
+        test('INSUFFICIENT_AVAILABLE_SPOTS goes next to the spots of its type', () => {
+            const result = mapZoneApiError(apiError({ code: 'INSUFFICIENT_AVAILABLE_SPOTS', vehicleType: 'car' }), sent);
+            expect(result.fields).toEqual({ 'car.totalSlots': 'No hay suficientes cupos disponibles para reducir la capacidad' });
+        });
+
+        test('a capacity error without its type goes above the types', () => {
+            const result = mapZoneApiError(apiError({ code: 'CAPACITY_BELOW_IN_USE', spotsInUse: 2 }), sent);
+            expect(result.fields).toEqual({ vehicleTypes: 'No puedes reducir la capacidad por debajo de los cupos en uso' });
+        });
     });
 
     test.each([
@@ -171,8 +309,7 @@ describe('buildZonePayload', () => {
         expect(payload).toEqual({
             name: 'Parque Olaya',
             address: 'Carrera 7',
-            totalSlots: 20,
-            hourlyRate: 2500,
+            vehicleTypes: [{ vehicleType: 'car', totalSlots: 20, hourlyRate: 2500 }],
             latitude: 4.8133,
             longitude: -75.6961,
             open24h: true,
@@ -199,16 +336,11 @@ describe('mapZoneApiError', () => {
         expect(result.fields.longitude).toBe('Las coordenadas ingresadas no son válidas');
     });
 
-    test('CAPACITY_BELOW_IN_USE says how many spots are in use', () => {
-        const result = mapZoneApiError(apiError({ code: 'CAPACITY_BELOW_IN_USE', spotsInUse: 1 }));
-        expect(result.fields.totalSlots).toBe('Hay 1 cupo en uso por una reserva pendiente o activa. La capacidad no puede ser menor.');
-    });
-
     test('VALIDATION_ERROR maps each known path to its field', () => {
-        const result = mapZoneApiError(apiError({ code: 'VALIDATION_ERROR', errors: [{ path: 'name' }, { path: 'hourlyRate' }] }));
+        const result = mapZoneApiError(apiError({ code: 'VALIDATION_ERROR', errors: [{ path: 'name' }, { path: 'address' }] }));
         expect(result.fields).toEqual({
             name: 'El nombre puede tener máximo 100 caracteres.',
-            hourlyRate: 'Ingresa una tarifa válida en pesos.',
+            address: 'La dirección puede tener máximo 255 caracteres.',
         });
     });
 
@@ -235,8 +367,8 @@ describe('parseCoordinatePair', () => {
 
 describe('zoneToForm', () => {
     test('drops the zeros the database adds and keeps every decimal', () => {
-        const form = zoneToForm({ name: 'Parque Olaya', address: 'Carrera 7', totalSlots: 20, hourlyRate: '2500.00', latitude: '4.8284000', longitude: '-75.6912000', open24h: true, schedule: [] });
-        expect(form).toEqual({ name: 'Parque Olaya', address: 'Carrera 7', totalSlots: '20', hourlyRate: '2500', latitude: '4.8284', longitude: '-75.6912', open24h: true, schedule: emptyWeek() });
+        const form = zoneToForm({ name: 'Parque Olaya', address: 'Carrera 7', vehicleTypes: [{ vehicleType: 'car', totalSlots: 20, hourlyRate: 2500 }], latitude: '4.8284000', longitude: '-75.6912000', open24h: true, schedule: [] });
+        expect(form).toEqual({ name: 'Parque Olaya', address: 'Carrera 7', vehicleTypes: types(['car', '20', '2500']), latitude: '4.8284', longitude: '-75.6912', open24h: true, schedule: emptyWeek() });
     });
 });
 
@@ -328,7 +460,7 @@ describe('Opening hours of the zone form (HU-29)', () => {
     });
 
     test('a zone from an older API, without open24h, starts with nothing chosen', () => {
-        const form = zoneToForm({ name: 'Centro', totalSlots: 10, hourlyRate: '2000.00', latitude: '4.8', longitude: '-75.6' });
+        const form = zoneToForm({ name: 'Centro', latitude: '4.8', longitude: '-75.6' });
         expect(form.open24h).toBeNull();
     });
 

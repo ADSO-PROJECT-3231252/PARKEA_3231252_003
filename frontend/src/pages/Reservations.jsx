@@ -24,6 +24,7 @@ import { RESERVATION_STATUS, FALLBACK_STATUS, canCancelReservation, canPayReserv
 import { canFinishStay, isRunningStay, pendingBalanceOf, stayEndSoFar } from '../utils/openStay';
 import { paymentLabelOf } from '../utils/paymentStatus';
 import { MAX_TIMER_MS, canExtendStay } from '../utils/extendStay';
+import { spotLabel } from '../utils/vehicleTypes';
 // AC-10: paginated when there are more than 10 reservations. Filtering,
 // pagination and ordering by start date, most recent first (AC-04), are all
 // done by the backend: GET /reservations?status=&page=&limit=
@@ -277,7 +278,8 @@ text-neutral-600"
                     {reservation.zone.address}
                 </p>
             )}
-            <p className="text-caption text-neutral-600">Cupo {reservation.spotNumber ?? '—'}</p>
+            {/* HU-31 AC-03 */}
+            <p className="text-caption text-neutral-600">{spotLabel(reservation.spotNumber, reservation.spotVehicleType)}</p>
         </div>
     );
 }

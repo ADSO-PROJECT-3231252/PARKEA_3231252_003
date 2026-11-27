@@ -21,6 +21,7 @@ import { translateError } from '../utils/errorMessages';
 import { RESERVATION_STATUS } from '../utils/reservationStatus';
 import { hoursLabel, pendingBalanceOf } from '../utils/openStay';
 import { EXTEND_FINAL_CODES, extendErrorMessage, extensionCharge, extensionProblem, spotFreeUntil, untilText } from '../utils/extendStay';
+import { spotText } from '../utils/vehicleTypes';
 
 // Values the backend expects in paymentMethod (pago.controller.js).
 const METHOD_CARD = 'card';
@@ -673,8 +674,9 @@ export default function PayReservation() {
                                     {zone.name}
                                     {zone.address && <span className="block text-caption text-neutral-600">{zone.address}</span>}
                                 </SummaryItem>
+                                {/* HU-31 AC-03 */}
                                 <SummaryItem label="Cupo asignado" groupStart>
-                                    <span className="font-mono">{reservation.spotNumber}</span>
+                                    <span className="font-mono">{spotText(reservation.spotNumber, reservation.spotVehicleType)}</span>
                                 </SummaryItem>
                                 <SummaryItem label="Vehículo">
                                     <span className="font-mono">
