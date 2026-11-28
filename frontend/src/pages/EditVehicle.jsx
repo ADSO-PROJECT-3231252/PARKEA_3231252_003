@@ -8,6 +8,11 @@ import { MAX_LENGTH } from '../utils/vehicleFieldLimits';
 import { isValidVehicleText, normalizeVehicleText, VEHICLE_TEXT_RULE_MESSAGE } from '../utils/vehicleRules';
 import { VEHICLE_TYPE_OPTIONS, vehicleTypeLabel } from '../utils/vehicleTypes';
 import FieldRow from '../components/FieldRow';
+import usePendingFocus from '../hooks/usePendingFocus';
+
+// #390: the fields in the order they are shown (the plate is not edited), to
+// send the focus to the first one that fails
+const FIELD_ORDER = ['vehicleType', 'brand', 'model', 'visualDescription', 'color'];
 
 export default function EditVehicle() {
     const navigate = useNavigate();
@@ -25,10 +30,12 @@ export default function EditVehicle() {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null); // null | 'not_found' | 'generic'
     const [saving, setSaving] = useState(false);
+    // #390: after a failed save, the focus goes to the message or to the field
+    const serverErrorRef = useRef(null);
+    const pendingFocusRef = usePendingFocus(serverErrorRef);
     // HU-31 AC-13: the type the vehicle has, which it keeps while it has a
     // reservation that has not ended
     const [savedType, setSavedType] = useState('');
-    const typeRef = useRef(null);
     const fetchVehicle = useCallback(() => {
         getVehicle(id)
             .then(({ data }) => {
@@ -99,12 +106,16 @@ export default function EditVehicle() {
             }
         }
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        return newErrors;
     };
     const handleSubmit = async (e) => {
         e.preventDefault();
         setServerError('');
-        if (!validate()) return;
+        const newErrors = validate();
+        if (Object.keys(newErrors).length > 0) {
+            pendingFocusRef.current = FIELD_ORDER.find((id) => newErrors[id]) ?? null;
+            return;
+        }
         setSaving(true);
         try {
             const payload = {
@@ -124,16 +135,18 @@ export default function EditVehicle() {
         } catch (err) {
             const code = err.response?.data?.code;
             if (code === 'INVALID_PLATE_FORMAT') {
+                pendingFocusRef.current = 'vehicleType';
                 setErrors((prev) => ({ ...prev, vehicleType: translateError(code) }));
             } else if (code === 'VEHICLE_HAS_ACTIVE_RESERVATION') {
                 // HU-31 AC-13: nothing was saved. The message is on the type,
                 // with the way to save the other changes, and the focus goes there.
+                pendingFocusRef.current = 'vehicleType';
                 setErrors((prev) => ({
                     ...prev,
                     vehicleType: `Este vehículo tiene una reserva pendiente o activa, así que no puedes cambiar su tipo. Deja "${vehicleTypeLabel(savedType)}" para guardar los demás cambios.`,
                 }));
-                typeRef.current?.focus();
             } else if (code === 'VALIDATION_ERROR') {
+                pendingFocusRef.current = 'server';
                 // #234: mark the brand, the model or the color that the server rejects
                 const fieldErrors = {};
                 for (const { path } of err.response.data.errors ?? []) {
@@ -144,6 +157,7 @@ export default function EditVehicle() {
                 // "Revisa los campos marcados" only makes sense if a field was marked.
                 setServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
             } else {
+                pendingFocusRef.current = 'server';
                 setServerError(translateError(code));
             }
         } finally {
@@ -218,9 +232,11 @@ transition-colors hover:bg-white`}
             >
                 {serverError && (
                     <p
+                        ref={serverErrorRef}
+                        tabIndex={-1}
                         role="alert"
                         className={`mb-6 rounded-md bg-danger-soft px-3 py-2 text-center
-text-caption text-danger`}
+text-caption text-danger focus:outline-none`}
                     >
                         {serverError}
                     </p>
@@ -232,7 +248,6 @@ text-caption text-danger`}
                         </label>
                         <div className="relative mt-1">
                             <select
-                                ref={typeRef}
                                 id="vehicleType"
                                 name="vehicleType"
                                 value={form.vehicleType}

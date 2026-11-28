@@ -134,8 +134,11 @@
 @layer base {
     /* #311: the space of the scroll bar is always kept, so the page does not
        move sideways when a dialog locks the scroll (useBodyScrollLock) */
+    /* #390: the header is sticky (h-16), so an element that gets the focus
+       stops below it instead of behind it */
     html {
         scrollbar-gutter: stable;
+        scroll-padding-top: 6rem;
     }
 
     body {
