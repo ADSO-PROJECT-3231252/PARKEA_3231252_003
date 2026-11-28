@@ -4,7 +4,8 @@ import { X, Save, Power, PowerOff, AlertCircle, RefreshCw, ArrowLeft, CheckCircl
 import { getZone, getAllZones, updateZone, toggleZone } from '../services/zoneService';
 import { translateError } from '../utils/errorMessages';
 import { formatCurrency } from '../utils/format';
-import { getZoneToggleDialog, getZoneToggleSuccess } from '../utils/zones';
+import { getZoneToggleDialog, getZoneToggleSuccess, getTypesOffDialog } from '../utils/zones';
+import { VEHICLE_TYPES, vehicleTypePlural } from '../utils/vehicleTypes';
 import { ZONE_LIMITS, zoneToForm, validateZoneForm, buildZonePayload } from '../utils/zoneForm';
 import useZoneForm from '../hooks/useZoneForm';
 import ZoneFormFields from '../components/ZoneFormFields';
@@ -29,27 +30,20 @@ function PageTitle({ zone }) {
     );
 }
 
-const plural = (n, one, many) => (n === 1 ? one : many);
+// HU-31: the vehicle types of the zone as the admin list (/zones/all) sends
+// them: the ones turned off too, and for each one the spots that hold a
+// reservation from now on (spotsInUse, the least it can have, AC-04) and the
+// reservations that hold them (openReservations, AC-05). null when unknown.
+const adminTypesOf = (listed) => (Array.isArray(listed?.vehicleTypes) ? listed.vehicleTypes : null);
 
-// #373: how many spots of the zone hold a reservation from now on, as the
-// admin list (/zones/all) sends it. A spot with several reservations at
-// different hours counts once, so it is not the number of reservations
-// (activeReservations), which is only used while the API does not send
-// spotsInUse yet. null when unknown.
-function spotsInUseOf(listed) {
-    if (!listed) return null;
-    const inUse = Number.isInteger(listed.spotsInUse) ? listed.spotsInUse : listed.activeReservations;
-    return Number(inUse) || 0;
-}
-
-// Loads the zone and, apart, how many of its spots are in use and how many
-// reservations it has. Those numbers only come in the admin list
-// (/zones/all), so if that request fails the form still opens: the backend
-// checks the capacity anyway (AC-03).
+// Loads the zone and, apart, its types as the administrator sees them and how
+// many reservations it has. Those only come in the admin list (/zones/all),
+// so if that request fails the form still opens with the types the zone
+// takes: the backend checks the spots in use anyway (AC-03).
 export default function EditZone() {
     const { id } = useParams();
     const [zone, setZone] = useState(null);
-    const [spotsInUse, setSpotsInUse] = useState(null);
+    const [adminTypes, setAdminTypes] = useState(null);
     const [activeReservations, setActiveReservations] = useState(null);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null); // null | 'not_found' | 'generic'
@@ -64,7 +58,7 @@ export default function EditZone() {
                 }
                 setZone(one.value.data.zone);
                 const listed = all.status === 'fulfilled' ? all.value.data.zones.find((z) => z.id === id) : null;
-                setSpotsInUse(spotsInUseOf(listed));
+                setAdminTypes(adminTypesOf(listed));
                 setActiveReservations(listed ? Number(listed.activeReservations) || 0 : null);
                 setFetchError(null);
             })
@@ -129,18 +123,24 @@ export default function EditZone() {
         );
     }
 
-    return <EditZoneForm initialZone={zone} initialSpotsInUse={spotsInUse} activeReservations={activeReservations} />;
+    return <EditZoneForm initialZone={zone} adminTypes={adminTypes} activeReservations={activeReservations} />;
 }
 
-function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
+// HU-31 AC-04 / AC-05: { car: 3 } and { car: 5 } from the admin list
+const countsOf = (adminTypes, name) =>
+    Object.fromEntries((adminTypes ?? []).filter((t) => Number.isInteger(t[name])).map((t) => [t.vehicleType, t[name]]));
+
+function EditZoneForm({ initialZone, adminTypes, activeReservations }) {
     const navigate = useNavigate();
     // The zone as saved: the form may hold changes not saved yet
     const [zone, setZone] = useState(initialZone);
-    const [original] = useState(() => zoneToForm(initialZone));
-    const [spotsInUse, setSpotsInUse] = useState(initialSpotsInUse);
+    const [original] = useState(() => zoneToForm(initialZone, adminTypes ?? initialZone.vehicleTypes));
+    const [spotsInUse, setSpotsInUse] = useState(() => countsOf(adminTypes, 'spotsInUse'));
     const zoneForm = useZoneForm(original);
     const { form, setServerError, showErrors, showApiError } = zoneForm;
     const [saving, setSaving] = useState(false);
+    // AC-05: the confirmation before saving a zone whose types were unchecked
+    const [typesDialog, setTypesDialog] = useState(null);
 
     // AC-07: activate or deactivate, with the HU-19 confirmation
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -148,21 +148,52 @@ function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
     const [toggleError, setToggleError] = useState('');
     const [toggleMessage, setToggleMessage] = useState('');
 
-    const rate = form.hourlyRate === '' ? null : Number(form.hourlyRate);
-    const rateChanged = rate !== null && rate !== Number(original.hourlyRate);
+    // AC-05 (HU-21): a new rate only applies to reservations made from now on
+    const rateChanged = VEHICLE_TYPES.some((type) => {
+        const before = original.vehicleTypes[type];
+        const now = form.vehicleTypes[type];
+        return before.checked && now.checked && now.hourlyRate !== '' && Number(now.hourlyRate) !== Number(before.hourlyRate);
+    });
+
+    // HU-31 AC-05: the types that took reservations and are now unchecked
+    const turnedOff = VEHICLE_TYPES.filter((type) => original.vehicleTypes[type].checked && !form.vehicleTypes[type].checked);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (saving || toggling) return;
         setServerError('');
 
-        // AC-02 / AC-03: the HU-20 rules, and no capacity below the spots in use
-        const newErrors = validateZoneForm(form, { spotsInUse: spotsInUse ?? 0 });
+        // AC-02 / AC-03: the HU-20 rules, and no type below its spots in use
+        const newErrors = validateZoneForm(form, { spotsInUse });
         if (Object.keys(newErrors).length > 0) {
             showErrors(newErrors);
             return;
         }
 
+        if (turnedOff.length > 0) {
+            // The reservations of now: some may have come while the form was
+            // open. Without the count, the question says they stay valid.
+            let openReservations = null;
+            try {
+                const { data } = await getAllZones();
+                const current = data.zones.find((z) => z.id === zone.id);
+                if (current) openReservations = countsOf(current.vehicleTypes, 'openReservations');
+            } catch {
+                // The question without the count
+            }
+            setTypesDialog(
+                getTypesOffDialog(
+                    zone.name,
+                    turnedOff.map((type) => ({ type, openReservations: openReservations ? (openReservations[type] ?? 0) : null })),
+                ),
+            );
+            return;
+        }
+        save();
+    };
+
+    const save = async () => {
+        setTypesDialog(null);
         setSaving(true);
         try {
             const { data } = await updateZone(zone.id, buildZonePayload(form));
@@ -172,8 +203,8 @@ function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
             });
         } catch (err) {
             // Someone may have booked meanwhile: the hint shows the new number
-            const inUse = err.response?.data?.spotsInUse;
-            if (Number.isInteger(inUse)) setSpotsInUse(inUse);
+            const { spotsInUse: inUse, vehicleType } = err.response?.data ?? {};
+            if (Number.isInteger(inUse) && vehicleType) setSpotsInUse((prev) => ({ ...prev, [vehicleType]: inUse }));
             showApiError(err);
             setSaving(false);
         }
@@ -208,33 +239,13 @@ function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
         }
     };
 
-    // AC-03 / AC-04: the capacity hint says how many spots are in use and,
-    // when it changes, how many will stay available.
-    const slots = Number(form.totalSlots);
-    const validSlots = form.totalSlots !== '' && slots >= 1 && slots <= ZONE_LIMITS.maxSlots;
-    let capacityHint = `Número total de cupos de la zona, entre 1 y ${ZONE_LIMITS.maxSlots}.`;
-    if (spotsInUse > 0) {
-        capacityHint = `Entre ${spotsInUse} y ${ZONE_LIMITS.maxSlots}. ${plural(spotsInUse, 'Hay 1 cupo en uso', `Hay ${spotsInUse} cupos en uso`)} por reservas pendientes o activas.`;
-    }
-    if (spotsInUse !== null && validSlots && slots >= spotsInUse && form.totalSlots !== original.totalSlots) {
-        const free = slots - spotsInUse;
-        capacityHint += ` Con ${slots} ${plural(slots, 'cupo', 'cupos')} ${plural(free, 'quedará 1 disponible', `quedarán ${free} disponibles`)}.`;
-    }
-
-    // AC-05: a new rate only applies to reservations made from now on
     const hints = {
         name: 'Nombre con el que los usuarios verán la zona. No puede repetirse.',
         address: 'Dirección exacta de la zona de parqueo.',
-        totalSlots: capacityHint,
-        hourlyRate:
-            rate === null
-                ? 'Valor en pesos que se cobrará por cada hora de parqueo.'
-                : rateChanged
-                  ? `Las reservas nuevas pagarán ${formatCurrency(rate)} por hora. Las que ya existen mantienen ${formatCurrency(original.hourlyRate)}.`
-                  : `Se cobrarán ${formatCurrency(rate)} por cada hora de parqueo.`,
         // HU-29 AC-07: new hours do not move the reservations already made
         schedule: 'Si cambias el horario, aplica a las reservas y ampliaciones nuevas. Las reservas que ya existen no cambian.',
     };
+    const typeHints = Object.fromEntries(VEHICLE_TYPES.map((type) => [type, typeHintsOf(type, original, form, spotsInUse)]));
 
     // HU-19 AC-08: the warning counts reservations, not spots
     const dialog = getZoneToggleDialog({ ...zone, activeReservations });
@@ -245,7 +256,7 @@ function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
             <PageTitle zone={zone} />
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 rounded-lg border border-neutral-200 bg-white">
-                <ZoneFormFields zoneForm={zoneForm} hints={hints} />
+                <ZoneFormFields zoneForm={zoneForm} hints={hints} typeHints={typeHints} keepOneChecked />
 
                 {/* AC-07: outcome of activating or deactivating, next to the button */}
                 <div role="status" aria-live="polite">
@@ -293,6 +304,18 @@ function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
                 </div>
             </form>
 
+            {/* HU-31 AC-05: the types that stop taking reservations */}
+            <ConfirmDialog
+                open={Boolean(typesDialog)}
+                variant={typesDialog?.variant}
+                title={typesDialog?.title}
+                message={typesDialog?.message}
+                confirmLabel={typesDialog?.confirmLabel}
+                cancelLabel="Cancelar"
+                onConfirm={save}
+                onCancel={() => setTypesDialog(null)}
+            />
+
             <ConfirmDialog
                 open={dialogOpen}
                 variant={dialog.variant}
@@ -307,4 +330,41 @@ function EditZoneForm({ initialZone, initialSpotsInUse, activeReservations }) {
             />
         </div>
     );
+}
+
+// HU-31 AC-04 to AC-06: the lines under the spots and the rate of a type, and
+// the line of a type that is unchecked
+function typeHintsOf(type, original, form, spotsInUse) {
+    const before = original.vehicleTypes[type];
+    const now = form.vehicleTypes[type];
+    const inUse = spotsInUse[type] ?? 0;
+    const plural = vehicleTypePlural(type);
+
+    // AC-04: "Mínimo 4: hay 4 cupos con reservas", and how many stay free
+    let totalSlots = `Entre 1 y ${ZONE_LIMITS.maxSlots}.`;
+    if (inUse > 0) {
+        totalSlots = `Mínimo ${inUse}: ${inUse === 1 ? 'hay 1 cupo' : `hay ${inUse} cupos`} con reservas pendientes o activas.`;
+    }
+    const slots = Number(now.totalSlots);
+    if (before.checked && now.totalSlots !== before.totalSlots && Number.isInteger(slots) && slots >= Math.max(inUse, 1) && slots <= ZONE_LIMITS.maxSlots) {
+        const free = slots - inUse;
+        totalSlots += ` Con ${slots} ${slots === 1 ? 'cupo' : 'cupos'} ${free === 1 ? 'quedará 1 disponible' : `quedarán ${free} disponibles`}.`;
+    }
+
+    // AC-06: a new rate only applies to the reservations made from now on
+    let hourlyRate = 'Valor en pesos por cada hora de parqueo.';
+    if (now.hourlyRate !== '') {
+        hourlyRate = before.hourlyRate !== '' && Number(now.hourlyRate) !== Number(before.hourlyRate)
+            ? `Las reservas nuevas de ${plural} pagarán ${formatCurrency(now.hourlyRate)} por hora. Las que ya existen mantienen ${formatCurrency(before.hourlyRate)}.`
+            : `Se cobrarán ${formatCurrency(now.hourlyRate)} por cada hora de parqueo.`;
+    }
+
+    // AC-05: a type off keeps its spots and its rate
+    let off;
+    if (before.checked) {
+        off = `Al guardar, la zona dejará de recibir reservas nuevas de ${plural}. Las que ya tiene seguirán válidas.`;
+    } else if (before.totalSlots !== '') {
+        off = `No recibe ${plural}. Si marcas este tipo, vuelve con ${before.totalSlots} ${before.totalSlots === '1' ? 'cupo' : 'cupos'} y ${formatCurrency(before.hourlyRate)} por hora.`;
+    }
+    return { totalSlots, hourlyRate, off };
 }

@@ -1,4 +1,5 @@
 import { getZoneAvailability } from './zones';
+import { vehicleTypePlural } from './vehicleTypes';
 
 // HU-25 AC-02/AC-03: HTML of the zone pins on the map. It is a plain string
 // (not react-dom/server) so the map chunk does not have to bundle the React
@@ -34,8 +35,9 @@ export function escapeHtml(value) {
 }
 
 // One pin per zone, colored by availability; full zones also get a different
-// icon so the state is not conveyed by color alone.
-export function buildPinHtml(name, availableSlots, totalSlots) {
+// icon so the state is not conveyed by color alone. HU-31 AC-09: with the
+// filter of a type, the spots are of that type, and the hidden text says so.
+export function buildPinHtml(name, availableSlots, totalSlots, type = null) {
     const availability = getZoneAvailability(availableSlots, totalSlots);
     const iconPaths = availability.state === 'full' ? ICON_PATHS.ban : ICON_PATHS.parking;
     return (
@@ -49,7 +51,7 @@ export function buildPinHtml(name, availableSlots, totalSlots) {
         escapeHtml(name) +
         '</span>' +
         '<span class="sr-only">' +
-        escapeHtml(`, ${availability.text}, ${availableSlots} de ${totalSlots} cupos`) +
+        escapeHtml(`, ${availability.text}, ${availableSlots} de ${totalSlots} cupos${type ? ` de ${vehicleTypePlural(type)}` : ''}`) +
         '</span>' +
         '</span>'
     );

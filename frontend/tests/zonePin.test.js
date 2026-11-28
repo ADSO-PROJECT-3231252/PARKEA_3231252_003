@@ -115,6 +115,17 @@ describe('buildPinHtml: text for screen readers (AC-02)', () => {
     });
 });
 
+// HU-31 AC-09: with the filter of a type, the pin is of the spots of that type
+describe('buildPinHtml: the pin of a type', () => {
+    test.each([
+        ['motorcycle', 0, 4, ', Llena, 0 de 4 cupos de motos'],
+        ['truck', 3, 3, ', Disponible, 3 de 3 cupos de camiones'],
+    ])('of %s says the type to screen readers', (type, available, total, text) => {
+        const pin = render(buildPinHtml('Zona Centro', available, total, type));
+        expect(pin.querySelector('.sr-only').textContent).toBe(text);
+    });
+});
+
 // The pin draws its icons by hand (see utils/zonePin.js). This fails if they
 // stop matching the installed lucide-react, for example after an upgrade.
 describe('buildPinHtml: icons copied from lucide-react', () => {

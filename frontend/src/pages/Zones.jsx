@@ -1,12 +1,14 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Users, Banknote, Map, List, Info, Clock } from 'lucide-react';
+import { MapPin, Search, X, RefreshCw, AlertCircle, ChevronLeft, ChevronRight, Ban, Map, List, Info, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getZones } from '../services/zoneService';
-import { formatCurrency } from '../utils/format';
-import { getZoneAvailability } from '../utils/zones';
+import { getZoneAvailability, spotsOf, typeFilterOf, zoneTypeOf } from '../utils/zones';
 import { todayHoursLabel } from '../utils/zoneHours';
 import { normalizeText } from '../utils/normalizeText';
+import { VEHICLE_TYPES, vehicleTypeLabel, vehicleTypePlural } from '../utils/vehicleTypes';
+import VehicleTypeIcon from '../components/VehicleTypeIcon';
+import ZoneTypeSpots from '../components/ZoneTypeSpots';
 
 // HU-25: Leaflet is only downloaded when the map view is opened. If that
 // download fails, the page falls back to the list like any other map error.
@@ -31,11 +33,18 @@ const BADGE_CLASSES = {
     available: 'bg-parkea-50 text-parkea-600',
 };
 
+// HU-31 AC-09: the options of the filter, "Todos" first
+const TYPE_FILTERS = [{ value: null, label: 'Todos' }, ...VEHICLE_TYPES.map((value) => ({ value, label: vehicleTypeLabel(value) }))];
+
 // #373: availableSlots is the room now (the spots free for the next 30
 // minutes). A zone with none now can still be reserved for other hours, so
 // "Reservar" is never blocked: the reserve screen and the API decide.
-function ZoneCard({ zone, onReserve }) {
-    const availability = getZoneAvailability(zone.availableSlots, zone.totalSlots);
+// HU-31 AC-08: the card shows the types of the zone, with their free spots
+// and rates. With the filter of a type (AC-09), the badge and the note are
+// about that type.
+function ZoneCard({ zone, type, onReserve }) {
+    const spots = spotsOf(zone, type);
+    const availability = getZoneAvailability(spots.availableSlots, spots.totalSlots);
     const fullNow = availability.state === 'full';
     const noteId = `full-now-${zone.id}`;
 
@@ -48,6 +57,7 @@ function ZoneCard({ zone, onReserve }) {
                 </h2>
                 <span className={`shrink-0 rounded-full px-2.5 py-1 text-label font-medium ${BADGE_CLASSES[availability.state]}`}>
                     {availability.text}
+                    {type && <span className="sr-only"> para {vehicleTypePlural(type)}</span>}
                 </span>
             </div>
 
@@ -59,21 +69,10 @@ function ZoneCard({ zone, onReserve }) {
                 <span>{todayHoursLabel(zone)}</span>
             </p>
 
-            <div className="mt-4 flex flex-col gap-3 @sm:flex-row @sm:items-end @sm:justify-between">
-                <span className="flex items-center gap-1.5 text-body text-neutral-900">
-                    <Users className="h-4 w-4 text-neutral-500" aria-hidden="true" />
-                    <span className="font-mono tabular-nums">{zone.availableSlots}</span>
-                    <span className="text-neutral-600">de</span>
-                    <span className="font-mono tabular-nums">{zone.totalSlots}</span>
-                    <span className="text-caption text-neutral-600">cupos libres ahora</span>
-                </span>
-                <span className="flex flex-col @sm:items-end">
-                    <span className="text-caption text-neutral-600">Tarifa por hora</span>
-                    <span className="flex items-center gap-1 whitespace-nowrap font-mono text-body text-neutral-900">
-                        <Banknote className="h-4 w-4 text-neutral-500" aria-hidden="true" />
-                        {formatCurrency(zone.hourlyRate)}
-                    </span>
-                </span>
+            {/* HU-31 AC-08: each type with its free spots now and its rate */}
+            <div className="mt-4 border-t border-neutral-100 pt-3">
+                <p className="text-caption text-neutral-600">Cupos libres ahora y tarifa por hora</p>
+                <ZoneTypeSpots zone={zone} className="mt-1.5" />
             </div>
 
             <button
@@ -87,11 +86,64 @@ function ZoneCard({ zone, onReserve }) {
             </button>
             {fullNow && (
                 <p id={noteId} className="mt-2 text-center text-caption text-neutral-600">
-                    No hay cupos en este momento, pero puedes reservar para otro horario.
+                    {type
+                        ? `No hay cupos de ${vehicleTypePlural(type)} en este momento, pero puedes reservar para otro horario.`
+                        : 'No hay cupos en este momento, pero puedes reservar para otro horario.'}
                 </p>
             )}
         </div>
     );
+}
+
+// HU-31 AC-09: "Todos · Carro · Moto · Camión". Radio buttons, so the arrows
+// of the keyboard move between them and a screen reader hears which one is
+// chosen, drawn as a row of buttons.
+function TypeFilter({ type, onChange, allRef }) {
+    return (
+        <fieldset className="min-w-0">
+            <legend className="text-label text-neutral-700">Tipo de vehículo</legend>
+            <div className="mt-1 flex flex-wrap gap-2">
+                {TYPE_FILTERS.map(({ value, label }) => {
+                    const id = `type-filter-${value ?? 'all'}`;
+                    return (
+                        <div key={id}>
+                            <input
+                                ref={value === null ? allRef : undefined}
+                                id={id}
+                                type="radio"
+                                name="type-filter"
+                                checked={type === value}
+                                onChange={() => onChange(value)}
+                                className="peer sr-only"
+                            />
+                            <label
+                                htmlFor={id}
+                                className="flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-label text-neutral-700 transition-colors hover:border-parkea-600 hover:text-parkea-600 peer-checked:border-parkea-600 peer-checked:bg-parkea-600 peer-checked:text-white peer-checked:hover:bg-parkea-700 peer-checked:hover:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-parkea-600 peer-focus-visible:ring-offset-2"
+                            >
+                                {value && <VehicleTypeIcon type={value} className="h-4 w-4 shrink-0" />}
+                                {label}
+                            </label>
+                        </div>
+                    );
+                })}
+            </div>
+        </fieldset>
+    );
+}
+
+// HU-31 AC-09: what the hidden status says about the zones found, and the
+// text of the list when there are none
+function zonesFoundText(count, term, type) {
+    const plural = type ? vehicleTypePlural(type) : '';
+    if (count === 0) {
+        if (term && type) return `No se encontraron zonas con ese nombre que reciban ${plural}.`;
+        if (type) return `Ninguna zona recibe ${plural} en este momento.`;
+        return term ? 'No se encontraron zonas con ese nombre.' : 'No hay zonas disponibles en este momento.';
+    }
+    const found = `${count} ${count === 1 ? 'zona encontrada' : 'zonas encontradas'}`;
+    if (!type) return found;
+    if (!term) return `${count} ${count === 1 ? 'zona recibe' : 'zonas reciben'} ${plural}.`;
+    return `${found} que ${count === 1 ? 'recibe' : 'reciben'} ${plural}`;
 }
 
 export default function Zones() {
@@ -104,13 +156,35 @@ export default function Zones() {
     const [search, setSearch] = useState('');
     // #311: the clear button disappears with the text, so the focus goes back to the search box
     const searchRef = useRef(null);
-    const [page, setPage] = useState(1);
+    // HU-31: the button that clears the filter disappears with the empty
+    // list, so the focus goes to "Todos"
+    const allTypesRef = useRef(null);
 
     // HU-25: list and map share this screen, so the search is kept when the
     // user switches views (AC-01). The view lives in the URL (?view=map).
+    // HU-31 AC-09: so does the filter of a type (?type=motorcycle), which is
+    // kept by the back button, a reload and the switch of view.
     const [searchParams, setSearchParams] = useSearchParams();
     const view = searchParams.get('view') === 'map' ? 'map' : 'list';
+    const type = typeFilterOf(searchParams.get('type'));
     const [mapFailed, setMapFailed] = useState(false);
+
+    // The page is of a filter: another filter starts on page 1, also when it
+    // changes with the back button
+    const [pageOf, setPageOf] = useState({ type, page: 1 });
+    // HU-31 AC-09: once the filter was changed, "Todos" also says how many zones there are
+    const [typeChanged, setTypeChanged] = useState(false);
+    const page = pageOf.type === type ? pageOf.page : 1;
+    const setPage = (n) => setPageOf({ type, page: n });
+
+    // The query with one parameter changed (null removes it), keeping the others
+    const queryWith = (name, value) => {
+        const next = new URLSearchParams(searchParams);
+        if (value) next.set(name, value);
+        else next.delete(name);
+        const query = next.toString();
+        return query ? `?${query}` : '';
+    };
 
     const fetchZones = useCallback(() => {
         getZones()
@@ -140,11 +214,21 @@ export default function Zones() {
         fetchZones();
     };
 
+    // HU-31 AC-09: with the filter of a type, the zones that accept it, the
+    // ones with more of its spots free first (the API sends the zones with
+    // more spots free first, HU-09)
+    const term = normalizeText(search.trim());
     const filteredZones = useMemo(() => {
-        const term = normalizeText(search.trim());
-        if (!term) return zones;
-        return zones.filter((zone) => normalizeText(zone.name).includes(term));
-    }, [zones, search]);
+        let found = term ? zones.filter((zone) => normalizeText(zone.name).includes(term)) : zones;
+        if (type) {
+            const shareFree = (zone) => {
+                const { availableSlots, totalSlots } = zoneTypeOf(zone, type);
+                return totalSlots > 0 ? availableSlots / totalSlots : 0;
+            };
+            found = found.filter((zone) => zoneTypeOf(zone, type)).sort((a, b) => shareFree(b) - shareFree(a));
+        }
+        return found;
+    }, [zones, term, type]);
 
     const totalPages = Math.max(1, Math.ceil(filteredZones.length / PAGE_SIZE));
     const currentPage = Math.min(page, totalPages);
@@ -152,12 +236,12 @@ export default function Zones() {
 
     // #331 (WCAG 2.1 SC 4.1.3): while there is a search, a hidden status message
     // tells a screen reader how many zones were found. The element is always in
-    // the page (empty without a search), so the change is announced.
+    // the page (empty without a search), so the change is announced. HU-31
+    // AC-09: also while there is the filter of a type, and on "Todos" once the
+    // user changed the filter (opening the page stays silent).
     let searchStatus = '';
-    if (search.trim() && !loading && !error) {
-        searchStatus = filteredZones.length === 0
-            ? 'No se encontraron zonas con ese nombre.'
-            : `${filteredZones.length} ${filteredZones.length === 1 ? 'zona encontrada' : 'zonas encontradas'}`;
+    if ((term || type || typeChanged) && !loading && !error) {
+        searchStatus = zonesFoundText(filteredZones.length, term, type);
     }
 
     const handleSearchChange = (e) => {
@@ -171,13 +255,35 @@ export default function Zones() {
         searchRef.current?.focus();
     };
 
+    // HU-31 AC-09: the filter replaces its entry of the history, so the back
+    // button leaves the list instead of going through every filter tried
+    // A new filter starts on page 1, also when it is the one chosen before
+    const handleTypeChange = (value) => {
+        setPageOf({ type: typeFilterOf(value), page: 1 });
+        setTypeChanged(true);
+        setSearchParams(queryWith('type', value), { replace: true });
+    };
+
+    const handleClearType = () => {
+        handleTypeChange(null);
+        allTypesRef.current?.focus();
+    };
+
     // AC-08: if the map can't load, explain it and fall back to the list.
+    // HU-31: the list keeps the filter
     const handleMapError = useCallback(() => {
         setMapFailed(true);
-        setSearchParams({}, { replace: true });
+        setSearchParams(
+            (current) => {
+                const next = new URLSearchParams(current);
+                next.delete('view');
+                return next;
+            },
+            { replace: true },
+        );
     }, [setSearchParams]);
 
-    const showList = () => setSearchParams({});
+    const showList = () => setSearchParams(queryWith('view', null));
 
     const handleReserve = (zone) => {
         if (!user) {
@@ -203,7 +309,7 @@ export default function Zones() {
                 {/* View toggle (HU-25 AC-01) */}
                 <div className="flex overflow-hidden rounded-md border border-neutral-200" role="group" aria-label="Cambiar entre lista y mapa">
                     <Link
-                        to={{ search: '?view=map' }}
+                        to={{ search: queryWith('view', 'map') }}
                         onClick={() => setMapFailed(false)}
                         aria-current={view === 'map' ? 'page' : undefined}
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-label transition-colors ${view === 'map'
@@ -215,7 +321,7 @@ export default function Zones() {
                         Mapa
                     </Link>
                     <Link
-                        to={{ search: '' }}
+                        to={{ search: queryWith('view', null) }}
                         aria-current={view === 'list' ? 'page' : undefined}
                         className={`flex items-center gap-1.5 px-3 py-1.5 text-label transition-colors ${view === 'list'
                             ? 'bg-parkea-600 text-white'
@@ -252,6 +358,11 @@ export default function Zones() {
                         <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                 )}
+            </div>
+
+            {/* HU-31 AC-09 */}
+            <div className="mt-4">
+                <TypeFilter type={type} onChange={handleTypeChange} allRef={allTypesRef} />
             </div>
 
             {/* #331: announces the result of the search to screen readers */}
@@ -296,16 +407,30 @@ export default function Zones() {
                             <Ban className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
                             {zones.length === 0
                                 ? 'No hay zonas disponibles en este momento.'
-                                : 'No se encontraron zonas con ese nombre.'}
+                                : zonesFoundText(0, term, type)}
                         </p>
                         {zones.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={handleClearSearch}
-                                className="rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
-                            >
-                                Limpiar búsqueda
-                            </button>
+                            <div className="flex flex-wrap gap-3">
+                                {term && (
+                                    <button
+                                        type="button"
+                                        onClick={handleClearSearch}
+                                        className="rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                                    >
+                                        Limpiar búsqueda
+                                    </button>
+                                )}
+                                {/* HU-31 AC-09 */}
+                                {type && (
+                                    <button
+                                        type="button"
+                                        onClick={handleClearType}
+                                        className="rounded-md border border-neutral-200 px-3 py-1.5 text-label text-neutral-900 transition-colors hover:border-parkea-600 hover:text-parkea-600"
+                                    >
+                                        Ver todos los tipos
+                                    </button>
+                                )}
+                            </div>
                         )}
                     </div>
                 )}
@@ -323,6 +448,7 @@ export default function Zones() {
                         >
                             <ZoneMap
                                 zones={filteredZones}
+                                type={type}
                                 onReserve={handleReserve}
                                 onLoadError={handleMapError}
                                 onShowList={showList}
@@ -339,7 +465,7 @@ export default function Zones() {
                     <>
                         <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                             {paginatedZones.map((zone) => (
-                                <ZoneCard key={zone.id} zone={zone} onReserve={handleReserve} />
+                                <ZoneCard key={zone.id} zone={zone} type={type} onReserve={handleReserve} />
                             ))}
                         </div>
 

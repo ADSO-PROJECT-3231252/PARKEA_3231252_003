@@ -32,7 +32,8 @@ const zone = (id, name, availableSlots, latitude) => ({
     address: 'Calle 1 # 2-3',
     availableSlots,
     totalSlots: 10,
-    hourlyRate: '3000.00',
+    // HU-31: a zone for cars
+    vehicleTypes: [{ vehicleType: 'car', totalSlots: 10, availableSlots, hourlyRate: 3000 }],
     isActive: true,
     open24h: true,
     schedule: [],
@@ -43,6 +44,8 @@ const zone = (id, name, availableSlots, latitude) => ({
 const FULL = zone('zone-full', 'Parqueadero Centro', 0, '4.8100000');
 const FREE = zone('zone-free', 'Av. Simón Bolívar', 5, '4.8200000');
 const NOTE = 'No hay cupos en este momento, pero puedes reservar para otro horario.';
+// HU-31 AC-10: on the reserve screen, the note is about the type of the vehicle
+const NOTE_CARS = 'No hay cupos de carros en este momento, pero puedes reservar para otro horario.';
 
 function renderList(search = '') {
     getZones.mockResolvedValue({ data: { zones: [FULL, FREE] } });
@@ -71,10 +74,10 @@ describe('A zone with no room now can still be reserved from the list (#375)', (
         renderList();
         const button = await screen.findByRole('button', { name: 'Reservar en Parqueadero Centro' });
 
-        // Assert: the "Llena" badge stays, the count is the room now, and
-        // the note is read with the button
+        // Assert: the "Llena" badge stays, the count is the room now (HU-31:
+        // of each type), and the note is read with the button
         expect(screen.getByText('Llena')).toBeInTheDocument();
-        expect(screen.getAllByText('cupos libres ahora')).toHaveLength(2);
+        expect(screen.getAllByText('Cupos libres ahora y tarifa por hora')).toHaveLength(2);
         expect(button).toBeEnabled();
         expect(button).not.toHaveAttribute('aria-disabled');
         expect(button).toHaveTextContent('Reservar');
@@ -130,7 +133,8 @@ describe('A zone with no room now can still be reserved from the map (#375)', ()
         expect(button).not.toHaveAttribute('aria-disabled');
         expect(button).toHaveTextContent('Reservar');
         expect(button).toHaveAccessibleDescription(NOTE);
-        expect(screen.getAllByText('cupos libres ahora', { exact: false })).toHaveLength(2);
+        // HU-31: the free spots now of each type
+        expect(screen.getAllByText('Cupos libres ahora y tarifa por hora')).toHaveLength(2);
         expect(screen.getByText('Llena (sin cupos ahora)')).toBeInTheDocument();
         expect(screen.queryByText('Sin cupos disponibles')).not.toBeInTheDocument();
     });
@@ -158,7 +162,7 @@ describe('A zone with no room now can still be reserved from the map (#375)', ()
 describe('The reserve screen of a zone with no room now (#375)', () => {
     async function renderReserve(zoneValues) {
         getZone.mockResolvedValue({ data: { zone: zoneValues } });
-        getVehicles.mockResolvedValue({ data: { vehicles: [{ id: 'v1', plate: 'ABC123', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true }] } });
+        getVehicles.mockResolvedValue({ data: { vehicles: [{ id: 'v1', plate: 'ABC123', vehicleType: 'car', brand: 'Kia', model: 'Rio', color: 'Rojo', isDefault: true }] } });
         render(
             <MemoryRouter initialEntries={[`/reserve/${zoneValues.id}`]}>
                 <Routes>
@@ -175,15 +179,16 @@ describe('The reserve screen of a zone with no room now (#375)', () => {
 
         // Assert
         expect(screen.getByText('Llena')).toBeInTheDocument();
-        expect(screen.getByText('cupos libres ahora')).toBeInTheDocument();
-        expect(screen.getByText(NOTE)).toBeInTheDocument();
+        // HU-31 AC-10: the spots of the type of the chosen vehicle
+        expect(screen.getByText('cupos de carros libres ahora')).toBeInTheDocument();
+        expect(screen.getByText(NOTE_CARS)).toBeInTheDocument();
         expect(document.getElementById('startDate')).toBeEnabled();
         expect(screen.getByRole('button', { name: 'Reservar cupo' })).toBeEnabled();
     });
 
     test('a zone with room has no note', async () => {
         await renderReserve(FREE);
-        expect(screen.getByText('cupos libres ahora')).toBeInTheDocument();
-        expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+        expect(screen.getByText('cupos de carros libres ahora')).toBeInTheDocument();
+        expect(screen.queryByText(NOTE_CARS)).not.toBeInTheDocument();
     });
 });

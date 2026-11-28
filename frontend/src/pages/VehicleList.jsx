@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-    Car,
-    Truck,
-    Motorbike,
     Star,
     Pencil,
     Trash2,
@@ -17,7 +14,8 @@ import {
 import { getVehicles, setDefaultVehicle, deleteVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { VEHICLE_TYPE_LABELS } from '../utils/vehicleTypes';
+import { vehicleTypeLabel } from '../utils/vehicleTypes';
+import VehicleTypeIcon from '../components/VehicleTypeIcon';
 
 // AC-10: the list must be paginated when there are more than 9 vehicles.
 const PAGE_SIZE = 9;
@@ -30,8 +28,6 @@ const FLASH_MESSAGES = {
     vehicleUpdated: 'Vehículo actualizado correctamente.',
     vehicleDeleted: 'Vehículo eliminado correctamente.',
 };
-
-const VEHICLE_TYPE_ICONS = { car: Car, motorcycle: Motorbike, truck: Truck };
 
 // Uses a single neutral color for all plates, regardless of vehicle type.
 // Colombian plate colors depend on the type of service (private/public/
@@ -54,8 +50,7 @@ function LicensePlate({ plate }) {
 }
 
 function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete }) {
-    const Icon = VEHICLE_TYPE_ICONS[vehicle.vehicleType] ?? Car;
-    const typeLabel = VEHICLE_TYPE_LABELS[vehicle.vehicleType] ?? vehicle.vehicleType;
+    const typeLabel = vehicleTypeLabel(vehicle.vehicleType);
     const isSettingThis = settingDefaultId === vehicle.id;
     const vehicleDescription = `${vehicle.brand} ${vehicle.model}, placa ${vehicle.plate}`;
 
@@ -88,7 +83,7 @@ function VehicleCard({ vehicle, onSetDefault, settingDefaultId, onEdit, onDelete
                 <div className="flex items-center gap-3">
                     <LicensePlate plate={vehicle.plate} />
                     <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-parkea-50 text-parkea-600">
-                        <Icon className="h-7 w-7" aria-hidden="true" />
+                        <VehicleTypeIcon type={vehicle.vehicleType} className="h-7 w-7" />
                     </span>
                 </div>
 

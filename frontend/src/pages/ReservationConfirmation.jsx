@@ -42,6 +42,7 @@ import {
     stayEndSoFar,
 } from '../utils/openStay';
 import { MAX_TIMER_MS, canExtendStay, limitedByClosing } from '../utils/extendStay';
+import { spotText } from '../utils/vehicleTypes';
 
 // Once the 15-minute hold runs out, the backend job (every 60 s) is what
 // actually marks the reservation as Expired, so the screen asks again every
@@ -585,7 +586,10 @@ export default function ReservationConfirmation() {
                                 </span>
                                 <div>
                                     <p className="text-caption text-neutral-600">Cupo asignado</p>
-                                    <p className="font-mono text-body font-medium text-neutral-900">{reservation.spotNumber}</p>
+                                    {/* HU-31 AC-03 */}
+                                    <p className="font-mono text-body font-medium text-neutral-900">
+                                        {spotText(reservation.spotNumber, reservation.spotVehicleType)}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -701,7 +705,7 @@ export default function ReservationConfirmation() {
                                 Cupo asignado
                             </span>
                             <span className="font-mono text-body font-medium text-neutral-900">
-                                {reservation.paymentSummary.spotNumber}
+                                {spotText(reservation.paymentSummary.spotNumber, reservation.spotVehicleType)}
                             </span>
                         </div>
                         <div className="flex items-center justify-between gap-3">

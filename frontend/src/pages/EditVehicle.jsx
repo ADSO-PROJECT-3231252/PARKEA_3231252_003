@@ -6,7 +6,7 @@ import { getVehicle, updateVehicle } from '../services/vehicleService';
 import { translateError } from '../utils/errorMessages';
 import { MAX_LENGTH } from '../utils/vehicleFieldLimits';
 import { isValidVehicleText, normalizeVehicleText, VEHICLE_TEXT_RULE_MESSAGE } from '../utils/vehicleRules';
-import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
+import { VEHICLE_TYPE_OPTIONS, vehicleTypeLabel } from '../utils/vehicleTypes';
 import FieldRow from '../components/FieldRow';
 import usePendingFocus from '../hooks/usePendingFocus';
 
@@ -33,11 +33,15 @@ export default function EditVehicle() {
     // #390: after a failed save, the focus goes to the message or to the field
     const serverErrorRef = useRef(null);
     const pendingFocusRef = usePendingFocus(serverErrorRef);
+    // HU-31 AC-13: the type the vehicle has, which it keeps while it has a
+    // reservation that has not ended
+    const [savedType, setSavedType] = useState('');
     const fetchVehicle = useCallback(() => {
         getVehicle(id)
             .then(({ data }) => {
                 const vehicle = data.vehicle;
                 setPlate(vehicle.plate);
+                setSavedType(vehicle.vehicleType);
                 setForm({
                     vehicleType: vehicle.vehicleType,
                     brand: vehicle.brand ?? '',
@@ -133,6 +137,14 @@ export default function EditVehicle() {
             if (code === 'INVALID_PLATE_FORMAT') {
                 pendingFocusRef.current = 'vehicleType';
                 setErrors((prev) => ({ ...prev, vehicleType: translateError(code) }));
+            } else if (code === 'VEHICLE_HAS_ACTIVE_RESERVATION') {
+                // HU-31 AC-13: nothing was saved. The message is on the type,
+                // with the way to save the other changes, and the focus goes there.
+                pendingFocusRef.current = 'vehicleType';
+                setErrors((prev) => ({
+                    ...prev,
+                    vehicleType: `Este vehículo tiene una reserva pendiente o activa, así que no puedes cambiar su tipo. Deja "${vehicleTypeLabel(savedType)}" para guardar los demás cambios.`,
+                }));
             } else if (code === 'VALIDATION_ERROR') {
                 pendingFocusRef.current = 'server';
                 // #234: mark the brand, the model or the color that the server rejects

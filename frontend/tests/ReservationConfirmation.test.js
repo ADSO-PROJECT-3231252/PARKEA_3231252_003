@@ -239,3 +239,31 @@ describe('Keyboard focus when a paid stay reaches its exit time on the reservati
         expect(screen.getByText('Activa')).toHaveFocus();
     });
 });
+
+// HU-31 AC-03: the spots are numbered per type, so a spot is always shown
+// with its type, as GET /reservations/:id sends it (spotVehicleType)
+describe('The spot of the reservation (HU-31 AC-03)', () => {
+    test('is shown with its type, in the reservation and in its payment summary', async () => {
+        // Arrange
+        answer({ spotVehicleType: 'motorcycle' });
+
+        // Act
+        renderScreen();
+
+        // Assert
+        expect(await screen.findAllByText('4 · Moto')).toHaveLength(2);
+        expect(screen.getAllByText('Cupo asignado')).toHaveLength(2);
+    });
+
+    test('without its type, only its number', async () => {
+        // Arrange
+        answer({ spotVehicleType: null });
+
+        // Act
+        renderScreen();
+
+        // Assert
+        expect(await screen.findAllByText('4')).toHaveLength(2);
+        expect(screen.queryByText(/4 · /)).not.toBeInTheDocument();
+    });
+});

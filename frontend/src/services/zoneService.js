@@ -5,8 +5,9 @@ export const getZone = (id) => api.get(`/zones/${id}`);
 
 // #375: how many spots of the zone are free for some hours, with the same
 // values as POST /reservations: { startTime, endTime }, or { startTime,
-// openEnded: true } for a stay without an exit time. `signal` cancels the
-// request when the hours change again before it answers.
+// openEnded: true } for a stay without an exit time. HU-31: also the
+// vehicleType whose spots are counted. `signal` cancels the request when the
+// hours change again before it answers.
 export const getAvailabilityForHours = (id, hours, { signal } = {}) =>
     api.get(`/zones/${id}/availability`, { params: hours, signal });
 
