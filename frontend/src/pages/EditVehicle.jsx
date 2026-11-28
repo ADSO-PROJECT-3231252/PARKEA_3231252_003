@@ -8,6 +8,7 @@ import { MAX_LENGTH } from '../utils/vehicleFieldLimits';
 import { isValidVehicleText, normalizeVehicleText, VEHICLE_TEXT_RULE_MESSAGE } from '../utils/vehicleRules';
 import { VEHICLE_TYPE_OPTIONS } from '../utils/vehicleTypes';
 import FieldRow from '../components/FieldRow';
+import usePendingFocus from '../hooks/usePendingFocus';
 
 // #390: the fields in the order they are shown (the plate is not edited), to
 // send the focus to the first one that fails
@@ -29,19 +30,9 @@ export default function EditVehicle() {
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null); // null | 'not_found' | 'generic'
     const [saving, setSaving] = useState(false);
-    // #390: after a failed save, the focus goes to the message ('server') or
-    // to the field that has the error, once it is on screen. That also brings
-    // it into view on a phone, where the button is far below the message.
+    // #390: after a failed save, the focus goes to the message or to the field
     const serverErrorRef = useRef(null);
-    const pendingFocus = useRef(null);
-    useEffect(() => {
-        if (!pendingFocus.current) return;
-        const target = pendingFocus.current === 'server'
-            ? serverErrorRef.current
-            : document.getElementById(pendingFocus.current);
-        pendingFocus.current = null;
-        target?.focus();
-    });
+    const pendingFocusRef = usePendingFocus(serverErrorRef);
     const fetchVehicle = useCallback(() => {
         getVehicle(id)
             .then(({ data }) => {
@@ -118,7 +109,7 @@ export default function EditVehicle() {
         setServerError('');
         const newErrors = validate();
         if (Object.keys(newErrors).length > 0) {
-            pendingFocus.current = FIELD_ORDER.find((id) => newErrors[id]) ?? null;
+            pendingFocusRef.current = FIELD_ORDER.find((id) => newErrors[id]) ?? null;
             return;
         }
         setSaving(true);
@@ -140,10 +131,10 @@ export default function EditVehicle() {
         } catch (err) {
             const code = err.response?.data?.code;
             if (code === 'INVALID_PLATE_FORMAT') {
-                pendingFocus.current = 'vehicleType';
+                pendingFocusRef.current = 'vehicleType';
                 setErrors((prev) => ({ ...prev, vehicleType: translateError(code) }));
             } else if (code === 'VALIDATION_ERROR') {
-                pendingFocus.current = 'server';
+                pendingFocusRef.current = 'server';
                 // #234: mark the brand, the model or the color that the server rejects
                 const fieldErrors = {};
                 for (const { path } of err.response.data.errors ?? []) {
@@ -154,7 +145,7 @@ export default function EditVehicle() {
                 // "Revisa los campos marcados" only makes sense if a field was marked.
                 setServerError(translateError(markedAny ? code : 'INTERNAL_ERROR'));
             } else {
-                pendingFocus.current = 'server';
+                pendingFocusRef.current = 'server';
                 setServerError(translateError(code));
             }
         } finally {
