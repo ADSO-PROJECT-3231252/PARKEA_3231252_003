@@ -169,6 +169,41 @@ describe('Register a vehicle: the focus goes to the error (#390)', () => {
         // Assert
         expect(field('plate')).toHaveFocus();
     });
+
+    test('the fields fail one after another: each save moves the focus to the next one, in the order of the form', async () => {
+        // Arrange: every field fails except the type
+        const user = userEvent.setup();
+        renderForm();
+        fillValid({ plate: 'AB', brand: '', model: '', color: '' });
+        const focused = [];
+
+        // Act: each time, the field with the focus is corrected
+        for (const [id, value] of [['plate', 'ABC123'], ['brand', 'Mazda'], ['model', '3'], ['color', 'Rojo']]) {
+            await submit(user);
+            focused.push(document.activeElement.id);
+            fill(id, value);
+        }
+
+        // Assert
+        expect(focused).toEqual(['plate', 'brand', 'model', 'color']);
+        expect(createVehicle).not.toHaveBeenCalled();
+    });
+
+    test('after the focus moves to the error, the person can type in another field', async () => {
+        // Arrange
+        const user = userEvent.setup();
+        renderForm();
+        fillValid({ brand: '' });
+        await submit(user);
+
+        // Act
+        await user.click(field('visualDescription'));
+        await user.type(field('visualDescription'), 'Con rayón');
+
+        // Assert
+        expect(field('visualDescription')).toHaveFocus();
+        expect(field('visualDescription')).toHaveValue('Con rayón');
+    });
 });
 
 describe('Edit a vehicle: the focus goes to the error (#390)', () => {
@@ -261,5 +296,42 @@ describe('Edit a vehicle: the focus goes to the error (#390)', () => {
 
         // Assert
         expect(field('brand')).toHaveFocus();
+    });
+
+    test('the fields fail one after another: each save moves the focus to the next one, in the order of the form', async () => {
+        // Arrange
+        const user = userEvent.setup();
+        await openEdit();
+        fill('brand', '');
+        fill('model', '');
+        fill('color', '');
+        const focused = [];
+
+        // Act: each time, the field with the focus is corrected
+        for (const [id, value] of [['brand', 'Mazda'], ['model', '3'], ['color', 'Rojo']]) {
+            await save(user);
+            focused.push(document.activeElement.id);
+            fill(id, value);
+        }
+
+        // Assert
+        expect(focused).toEqual(['brand', 'model', 'color']);
+        expect(updateVehicle).not.toHaveBeenCalled();
+    });
+
+    test('after the focus moves to the error, the person can type in another field', async () => {
+        // Arrange
+        const user = userEvent.setup();
+        await openEdit();
+        fill('brand', '');
+        await save(user);
+
+        // Act
+        await user.click(field('visualDescription'));
+        await user.type(field('visualDescription'), 'Con rayón');
+
+        // Assert
+        expect(field('visualDescription')).toHaveFocus();
+        expect(field('visualDescription')).toHaveValue('Con rayón');
     });
 });
